@@ -37,9 +37,9 @@ changes:
 
 同一 Beat 的 `changes` 是一个没有内部顺序的原子结果。只在 Beat 结尾短暂恢复、且不影响后文的中间状态留在自然语言中；若某个中间结果需要被后续故事单元独立依赖，应拆成两个 StoryBeat，而不是在 frontmatter 编写操作流程。
 
-状态路径采用 `<对象>.<属性>`。中文作品优先使用已有 Character、Place、Resource 文件的本地中文 id；工具根据属性签名解析对象 kind。若同一个本地 id 在多个 kind 中有歧义，才写 `resource:<id>.holder` 等完整引用。`changes` 涉及的 identity 自动进入本 Beat 的 Context 路由；对象在本 Beat 被实质使用但状态没有变化时，仍须写入 `refs`。
+状态路径采用 `<对象>.<属性>`。对象写已有 Character、Place、Resource 文件的本地 id，工具根据属性判断它是哪一类；同一个本地 id 在几类里撞名时，才写 `resource:<id>.holder` 这样的完整引用。`changes` 涉及的 identity 自动进入本 Beat 的 Context 路由；对象在本 Beat 被实质使用但状态没有变化时，仍须写入 `refs`。
 
-Secret 不对应文件，只在某个 StoryBeat 的 `refs.secret` 里声明，之后才能在同一或更晚的 Beat 写 `revealed`。`revealed` 只属于 Secret，所以 `单福身份.revealed` 与 `secret:单福身份.revealed` 等价；与某个文件的本地 id 撞名时写带前缀的形式。
+Secret 不对应文件，只在某个 StoryBeat 的 `refs.secret` 里声明，之后才能在同一或更晚的 Beat 写 `revealed`。例如徐庶投奔刘备时化名单福：他化名出场的 Beat 写 `refs: { secret: [单福身份] }`；程昱向曹操道破单福就是徐庶的那一节，读者和曹操同时得知，写下文的 `changes`；刘备要等徐庶自己说出来才知道，那是更晚一节的 `changes`。`revealed` 只属于 Secret，所以 `单福身份.revealed` 与 `secret:单福身份.revealed` 等价；与某个文件的本地 id 撞名时才必须写带前缀的形式。
 
 ## 作用域
 
@@ -48,13 +48,13 @@ Secret 不对应文件，只在某个 StoryBeat 的 `refs.secret` 里声明，�
 ```yaml
 changes:
   reader:
-    secret:单福身份.revealed: true
+    单福身份.revealed: true
   character:
-    刘备:
-      secret:单福身份.revealed: true
+    曹操:
+      单福身份.revealed: true
 ```
 
-`character` 下的键是人物本地 id。一个 Beat 可以同时改变客观状态和多个认知作用域；每项只陈述相应观察边界中在 Beat 结束时新成立的结果。Context 或 Character 对作者型 Agent 可见，不使其中的客观事实自动成为人物或读者知识。人物轨迹基底中已经知道的复杂事实写 Character 自然语言；此后知情变化写 StoryBeat，不为建立完整知识图谱扩张 `initial`。
+`character` 下的键是人物本地 id。一个 Beat 可以同时改变客观状态和多个认知作用域；每项只陈述相应观察边界中在 Beat 结束时新成立的结果。人物进入故事之前已经知道的复杂事实写 Character 自然语言；此后的知情变化写 StoryBeat，不为建立完整知识图谱扩张 `initial`。
 
 `reader` 的 `secret.revealed: true` 表示故事已经让读者获得该秘密的真实答案，不表示读者只听到一个可能为假的说法。`world` 的同一属性只在秘密已经成为故事世界中的客观公开信息时使用，也不自动证明每个未接触传播途径的人物都已获知。怀疑、半知、误信、谎言和二阶认知继续由 StoryBeat 自然语言表达。
 
@@ -73,7 +73,7 @@ P0 只支持以下稳定属性：
 | Resource | `consumed`、`destroyed`、`sealed`、`installed` | boolean |
 | Secret | `revealed` | boolean |
 
-不写某项表示未被硬投影，不表示其反面。例如没有 `韩枫.dead: true` 只表示 Checker 不知道其生死，不能据此推断他活着。死亡确定且后文不得再以活人出现时才写 `dead: true`；假死、肉身死亡但神魂继续、计划复活等情况继续用 StoryBeat 自然语言表达，除非现有属性能无歧义表示真正需要的边界。
+不写某项表示未被硬投影，不表示其反面。例如赤壁火攻时黄盖中箭落水，没写 `黄盖.dead: true` 只表示 Checker 不知道他的生死，不能据此推断他活着。死亡确定、后文不会再以活人出现时才写 `dead: true`；诈死、生死不明这类情况用 StoryBeat 自然语言表达，除非现有属性能无歧义表示真正需要的边界。
 
 `holder` 表示当前实际控制，不表示法律所有权。一个 Resource 有非 `none` holder 时，工具把其自由 `location` 置为 `none`；写入非 `none` location 时，holder 置为 `none`。`consumed: true` 与 `destroyed: true` 是 world scope 的终止状态：它们清空 holder 和 location，之后不能恢复或重新持有。同一 `initial` 或 Beat 不能同时让 Resource 终止并拥有 holder / location，也不能同时赋予非空 holder 和自由 location；Checker 将其视为原子冲突，不受 YAML 字段顺序影响。
 
@@ -81,6 +81,6 @@ P0 只支持以下稳定属性：
 
 ## 模型与 Checker 的分工
 
-Agent 在 Design 与 Review 中审计 StoryBeat，判断哪些开场状态和变化值得投影、自然语言是否支持声明的结果、是否遗漏或过度硬化。工具把显式 `initial` 与 `changes` 编译成规范化 StateProjection，并按 StoryBeat 顺序检查引用、类型、原子冲突、死亡和资源终止规则。
+Agent 在 Design 与 Review 中审计 StoryBeat，判断哪些开场状态和变化值得投影、自然语言是否支持声明的结果、是否遗漏或过度硬化。工具把显式 `initial` 与 `changes` 转成规范化的 StateProjection，并按 StoryBeat 顺序检查引用、类型、原子冲突、死亡和资源终止规则。
 
 Checker 不从自然语言自动发明 Canon，也不证明应该投影的状态没有遗漏。`changes` 不重复声明进入条件：当前状态已经可由重放得到，重复写前置条件不能证明故事语义成立。人物动机、关系变化、力量体系、主题、伏笔、复杂真假状态以及自然语言与投影是否一致，仍由完整 StoryOutline 和模型 Review 判断。

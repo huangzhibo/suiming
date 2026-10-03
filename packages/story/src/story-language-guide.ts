@@ -158,7 +158,7 @@ function stateProfileSection(): string {
 	});
 	return [
 		`## 硬状态属性（profile ${PROFILE_VERSION}）`,
-		`\`<state-property>\` 只能是下列之一，主体种类 ${REFERENCE_KINDS.join(" | ")}；不在表里的属性会被 check 拒绝。changes 里的键写成 \`<主体id>.<属性>\`（如 \`火船.holder: 黄盖\`，本地 id 撞名时写 \`resource:火船.holder\`）；initial 里主体就是这个文件，键只写属性（如 \`location: 萧家\`）。布尔属性（${BOOLEAN_STATE_PROPERTIES.join("、")}）只在成立时写 true，不用 false 填默认值。`,
+		`\`<state-property>\` 只能是下列之一，主体种类 ${REFERENCE_KINDS.join(" | ")}；不在表里的属性会被 check 拒绝。changes 里的键写成 \`<主体id>.<属性>\`（如 \`青釭剑.holder: 赵云\`，本地 id 撞名时写 \`resource:青釭剑.holder\`）；initial 里主体就是这个文件，键只写属性（如 \`world/resources/青釭剑.md\` 写 \`holder: 夏侯恩\`）。布尔属性（${BOOLEAN_STATE_PROPERTIES.join("、")}）只在成立时写 true，不用 false 填默认值。`,
 		rows.join("\n"),
 		`\`reader\` 与 \`character\` 作用域只能写 ${SCOPED_STATE_PROPERTIES.join("、")}（谁知道了哪个秘密）；位置、持有、生死这类客观状态写在 \`world\`。修为、伤势、心境、关系这类不在表里的状态写在 Beat 正文的自然语言里，不进 changes 或 initial。`,
 	].join("\n\n");
