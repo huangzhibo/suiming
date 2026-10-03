@@ -1,0 +1,394 @@
+<title>故事轴 · 史诗三国</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&display=swap">
+<style>
+:root {
+	--bg: #ffffff; --chrome: #f6f4ee; --panel: #fbfaf7; --ink: #1c1c1e; --ink-2: #3f3f46; --ink-3: #6b6b74; --faint: #a7a7ad;
+	--line: #d9d7d0; --hair: #ebe9e2; --green: #2e6b4e; --green-bg: #eaf2ec; --amber: #b45309; --amber-bg: #fbf4e7;
+	--purple: #6d4fc4; --purple-bg: #efeafb; --red: #b3402a; --red-bg: #f9ebe7; --cursor: #2e6b4e; --shade: rgba(28,28,30,.06);
+	--serif: "Noto Serif SC", "Songti SC", "SimSun", serif; --sans: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+	--bg: #161719; --chrome: #1e1f22; --panel: #1b1c1f; --ink: #ece9e2; --ink-2: #cfcbc2; --ink-3: #9a978f; --faint: #666460;
+	--line: #34353a; --hair: #26272b; --green: #7dbb98; --green-bg: #1f2d26; --amber: #dda15e; --amber-bg: #2d251a;
+	--purple: #b39bf0; --purple-bg: #26213a; --red: #e37a62; --red-bg: #33211d; --cursor: #7dbb98; --shade: rgba(255,255,255,.07);
+} }
+:root[data-theme="dark"] {
+	--bg: #161719; --chrome: #1e1f22; --panel: #1b1c1f; --ink: #ece9e2; --ink-2: #cfcbc2; --ink-3: #9a978f; --faint: #666460;
+	--line: #34353a; --hair: #26272b; --green: #7dbb98; --green-bg: #1f2d26; --amber: #dda15e; --amber-bg: #2d251a;
+	--purple: #b39bf0; --purple-bg: #26213a; --red: #e37a62; --red-bg: #33211d; --cursor: #7dbb98; --shade: rgba(255,255,255,.07);
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.5 var(--sans); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--cursor); outline-offset: 2px; }
+.top { display: flex; align-items: center; gap: 18px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--chrome); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+.top h1 { font: 700 17px/1.2 var(--serif); margin: 0; letter-spacing: .02em; }
+.top .sub { color: var(--ink-3); font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { padding: 4px 11px; font-size: 12px; color: var(--ink-3); }
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--ink); font-weight: 600; }
+.tabs { display: flex; gap: 2px; margin-left: auto; }
+.tabs button { padding: 5px 12px; border-radius: 6px 6px 0 0; color: var(--ink-3); border: 1px solid transparent; border-bottom: 0; }
+.tabs button[aria-selected="true"] { background: var(--bg); color: var(--ink); border-color: var(--line); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 8px 20px; font-size: 11.5px; color: var(--ink-3); border-bottom: 1px solid var(--hair); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.legend i.sq { border-radius: 2px; }
+.legend i.ring { background: none; border: 1.5px solid var(--faint); }
+.legend i.half { background: linear-gradient(90deg, var(--green) 50%, transparent 50%); border: 1.5px solid var(--green); }
+main { display: none; }
+main[data-active="true"] { display: block; }
+.axis-wrap { display: grid; grid-template-columns: 200px 1fr; }
+.labels { position: sticky; left: 0; background: var(--bg); border-right: 1px solid var(--line); z-index: 2; }
+.scroll { overflow-x: auto; }
+.lane-label { height: 24px; display: flex; align-items: center; gap: 7px; padding: 0 12px 0 14px; font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--hair); }
+.lane-label.group { height: 30px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); background: var(--panel); border-top: 1px solid var(--line); }
+.lane-label.group button { color: var(--ink-3); font-size: 11px; margin-left: auto; letter-spacing: 0; }
+.lane-label.head { height: 66px; border-top: 0; align-items: flex-end; padding-bottom: 6px; color: var(--ink-3); font-size: 11px; }
+.lane-label i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.lane-label b { font-weight: 500; }
+.lane-label small { color: var(--faint); font-variant-numeric: tabular-nums; }
+svg text { font-family: var(--sans); }
+.vol-title { font: 700 12px var(--serif); fill: var(--ink); }
+.beat-title { font: 500 11px var(--serif); fill: var(--ink-2); }
+.tick { font-size: 9.5px; fill: var(--faint); font-variant-numeric: tabular-nums; }
+.grid line { stroke: var(--hair); }
+.vol-sep { stroke: var(--line); stroke-width: 1; }
+.col-hit { fill: transparent; cursor: pointer; }
+.col-hit:hover { fill: var(--shade); }
+.col-sel { fill: var(--green-bg); }
+.beyond { opacity: .38; }
+.arc { fill: none; stroke: var(--purple); stroke-width: 1.4; opacity: .55; }
+.arc.dim { opacity: .12; }
+.arc.hot { opacity: 1; stroke-width: 2.2; }
+.cursor-line { stroke: var(--cursor); stroke-width: 1.5; }
+.cursor-grip { fill: var(--cursor); cursor: ew-resize; }
+.tip { position: fixed; z-index: 9; max-width: 320px; background: var(--ink); color: var(--bg); padding: 7px 10px; border-radius: 6px; font-size: 12px; line-height: 1.55; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.tip b { font-weight: 600; }
+.tip small { display: block; opacity: .7; font-size: 11px; margin-top: 2px; }
+.detail { position: sticky; bottom: 0; border-top: 1px solid var(--line); background: var(--chrome); padding: 9px 20px; font-size: 12px; color: var(--ink-2); display: flex; gap: 18px; align-items: baseline; min-height: 38px; }
+.detail b { font-family: var(--serif); font-size: 13px; color: var(--ink); }
+.detail .k { color: var(--ink-3); }
+/* 邻域图 */
+.nb { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; padding: 22px 28px; max-width: 1100px; }
+.nb-head { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.nb-head h2 { font: 700 20px var(--serif); margin: 0; }
+.nb-head select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
+.nb-svg { grid-column: 1 / -1; width: 100%; height: auto; }
+.node { cursor: pointer; }
+.node rect { fill: var(--bg); stroke: var(--line); }
+.node:hover rect { stroke: var(--ink-3); }
+.node.center rect { fill: var(--green-bg); stroke: var(--green); stroke-width: 1.5; }
+.node text { font-size: 12px; fill: var(--ink); }
+.node .kind { font-size: 10px; fill: var(--ink-3); }
+.group-title { font-size: 10.5px; fill: var(--ink-3); letter-spacing: .08em; }
+.edge { fill: none; stroke-width: 1.2; opacity: .8; }
+.col-head { font-size: 11px; fill: var(--ink-3); letter-spacing: .1em; }
+/* 承诺页 */
+.contract { padding: 22px 28px; max-width: 980px; }
+.contract h2 { font: 700 22px var(--serif); margin: 0 0 4px; }
+.contract .meta { color: var(--ink-3); font-size: 12px; margin-bottom: 14px; }
+.contract .status { display: inline-flex; gap: 6px; align-items: center; padding: 2px 8px; border-radius: 4px; background: var(--amber-bg); color: var(--amber); font-weight: 600; font-size: 12px; }
+.contract .status.ok { background: var(--green-bg); color: var(--green); }
+.contract p { font: 15px/1.9 var(--serif); color: var(--ink-2); max-width: 66ch; }
+.life { width: 100%; height: auto; margin: 6px 0 18px; }
+.anchors { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.anchor { border: 1px solid var(--hair); border-radius: 6px; padding: 8px 10px; font-size: 12px; display: grid; gap: 2px; }
+.anchor .t { font: 500 13px var(--serif); }
+.anchor .k { color: var(--ink-3); font-size: 11px; }
+.anchor.warn { border-color: var(--red); background: var(--red-bg); }
+.anchor .text { color: var(--green); }
+.anchor .notext { color: var(--faint); }
+.note { padding: 12px 20px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--hair); }
+@media (prefers-reduced-motion: no-preference) { .node rect, .arc { transition: opacity .18s, stroke-width .18s; } }
+</style>
+<div class="top">
+	<div><h1>故事轴 · 史诗三国</h1><div class="sub">eval-022 · 9 卷 69 Beat · 只画作品记录的字段，不含模型解释</div></div>
+	<div class="seg" id="scale"><button aria-pressed="true" data-scale="book">全书</button><button aria-pressed="false" data-scale="volume">当前卷</button></div>
+	<div class="sub" id="cursor-label">时点 beat-0006 · 拖动竖线或 ← → 移动</div>
+	<div class="tabs" role="tablist">
+		<button role="tab" aria-selected="true" data-tab="axis">故事轴</button>
+		<button role="tab" aria-selected="false" data-tab="nb">邻域图</button>
+		<button role="tab" aria-selected="false" data-tab="contract">承诺页</button>
+	</div>
+</div>
+<main id="axis" data-active="true">
+	<div class="legend">
+		<span><i style="background:var(--green)"></i>已提交正文</span>
+		<span><i class="ring"></i>仅设计</span>
+		<span><i class="sq" style="background:var(--amber)"></i>承诺锚点 open / resolve</span>
+		<span><i style="background:var(--amber);width:6px;height:6px"></i>advance</span>
+		<span><i style="background:var(--red)"></i>resolve 之后仍 advance</span>
+		<span><i style="width:14px;height:0;border-top:1.5px solid var(--purple);border-radius:0"></i>因果弧 refs.beat</span>
+		<span><i style="background:var(--ink-2)"></i>人物被引用（refs.character，不表示出场或 POV）</span>
+		<span>✕ 死亡 ◆ 秘密对其揭示 ⌖ 位置变化</span>
+		<span style="margin-left:auto">审稿泳道在原型里无数据，未画</span>
+	</div>
+	<div class="axis-wrap"><div class="labels" id="labels"></div><div class="scroll" id="scroll"></div></div>
+	<div class="detail" id="detail"><span class="k">点一个 Beat 列：高亮它、只留与它相关的因果弧、放大它的承诺锚点。</span></div>
+</main>
+<main id="nb">
+	<div class="nb">
+		<div class="nb-head"><h2>邻域图</h2><span class="sub">中心：</span><select id="nb-pick"></select><span class="sub">左列是它依赖的，右列是依赖它的；点任一节点换中心。</span></div>
+		<svg class="nb-svg" id="nb-svg" viewBox="0 0 1040 520" role="img" aria-label="邻域图"></svg>
+	</div>
+	<div class="note">边来自 frontmatter 的 refs / contracts / deadline 键名，键名即边的说明；没有语义推断。取代现在把节点摆在圆上的结构图。</div>
+</main>
+<main id="contract">
+	<div class="contract" id="contract-body"></div>
+	<div class="note">承诺页顶部就是故事轴上这一条泳道的单行版；锚点卡片标出该 Beat 有没有正文。</div>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script>
+const DATA = {"volumes":[{"id":"vol-0001","title":"黄天将裂","beatIds":["beat-0001","beat-0068","beat-0002","beat-0003","beat-0004","beat-0005","beat-0069","beat-0006","beat-0007"]},{"id":"vol-0002","title":"无主之地","beatIds":["beat-0008","beat-0009","beat-0010","beat-0011","beat-0012","beat-0013","beat-0014"]},{"id":"vol-0003","title":"许都与江东","beatIds":["beat-0015","beat-0016","beat-0017","beat-0018","beat-0019","beat-0020","beat-0021","beat-0022"]},{"id":"vol-0004","title":"三顾与赤壁","beatIds":["beat-0023","beat-0024","beat-0025","beat-0026","beat-0027","beat-0028","beat-0029","beat-0030"]},{"id":"vol-0005","title":"各有天下","beatIds":["beat-0031","beat-0032","beat-0033","beat-0034","beat-0035","beat-0036","beat-0037","beat-0038","beat-0039"]},{"id":"vol-0006","title":"火烧连营","beatIds":["beat-0040","beat-0041","beat-0042","beat-0043","beat-0044","beat-0045","beat-0046"]},{"id":"vol-0007","title":"托孤之国","beatIds":["beat-0047","beat-0048","beat-0049","beat-0050","beat-0051","beat-0052"]},{"id":"vol-0008","title":"未竟","beatIds":["beat-0053","beat-0054","beat-0055","beat-0056","beat-0057","beat-0058","beat-0059"]},{"id":"vol-0009","title":"后来天下","beatIds":["beat-0060","beat-0061","beat-0062","beat-0063","beat-0064","beat-0065","beat-0066","beat-0067"]}],"beats":{"beat-0001":{"id":"beat-0001","vol":"vol-0001","title":"符水里的一把米","refs":{"character":["张角","杜蘅","严石"],"world":["疫病医药与太平道","州郡豪强与部曲"]},"contracts":{"open":["活人的要求"]},"changes":{},"text":true},"beat-0068":{"id":"beat-0068","vol":"vol-0001","title":"五色棒下","refs":{"character":["曹操"],"world":["汉廷名义与官爵","州郡豪强与部曲"]},"contracts":{},"changes":{},"text":true},"beat-0002":{"id":"beat-0002","vol":"vol-0001","title":"方与方之间","refs":{"character":["张角","杜蘅","严石"],"world":["疫病医药与太平道","道路水系与战时信息","州郡豪强与部曲"]},"contracts":{"advance":["活人的要求"]},"changes":{},"text":true},"beat-0003":{"id":"beat-0003","vol":"vol-0001","title":"黄天提前","refs":{"character":["张角","杜蘅","严石"],"world":["疫病医药与太平道","道路水系与战时信息"]},"contracts":{"advance":["活人的要求"]},"changes":{},"text":true},"beat-0004":{"id":"beat-0004","vol":"vol-0001","title":"桃树下的三条路","refs":{"character":["刘备","关羽","张飞"],"place":["涿县县寺"],"resource":["张飞的钱串"],"secret":["关羽亡命"],"world":["州郡豪强与部曲","汉廷名义与官爵"]},"contracts":{"open":["三人同到太平"]},"changes":{"world":{"张飞的钱串.location":"涿县县寺"},"character":{"刘备":{"secret:关羽亡命.revealed":true},"张飞":{"secret:关羽亡命.revealed":true}}},"text":true},"beat-0005":{"id":"beat-0005","vol":"vol-0001","title":"广宗秋雨","refs":{"character":["张角","杜蘅","严石"],"place":["广宗北门外"],"resource":["太平道总册"],"world":["疫病医药与太平道","军粮屯田与迁徙","道路水系与战时信息"]},"contracts":{"advance":["活人的要求"]},"changes":{"world":{"张角.dead":true,"太平道总册.consumed":true,"严石.location":"广宗北门外","杜蘅.location":"广宗北门外"}},"text":true},"beat-0069":{"id":"beat-0069","vol":"vol-0001","title":"无功者","refs":{"character":["刘备","关羽","张飞"],"secret":["关羽亡命"],"beat":["beat-0004"],"world":["汉廷名义与官爵","州郡豪强与部曲"]},"contracts":{"advance":["三人同到太平"]},"changes":{"world":{"secret:关羽亡命.revealed":true}},"text":false},"beat-0006":{"id":"beat-0006","vol":"vol-0001","title":"宫门无主","refs":{"character":["曹操","刘协"],"world":["汉廷名义与官爵","道路水系与战时信息"]},"contracts":{"open":["汉名归处"]},"changes":{},"text":false},"beat-0007":{"id":"beat-0007","vol":"vol-0001","title":"火照旧都","refs":{"character":["曹操","刘备","关羽","张飞","吕布","刘协","孙策"],"world":["汉廷名义与官爵","军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0068"]},"contracts":{"open":["奉天子以止乱"],"advance":["汉名归处","三人同到太平"]},"changes":{},"text":false},"beat-0008":{"id":"beat-0008","vol":"vol-0002","title":"败军成家","refs":{"character":["曹操","荀彧","杜蘅","严石"],"world":["军粮屯田与迁徙","州郡豪强与部曲"]},"contracts":{"advance":["奉天子以止乱","活人的要求"]},"changes":{},"text":false},"beat-0009":{"id":"beat-0009","vol":"vol-0002","title":"长安杀局","refs":{"character":["吕布","刘协"],"world":["汉廷名义与官爵","州郡豪强与部曲"]},"contracts":{"advance":["汉名归处"]},"changes":{},"text":false},"beat-0010":{"id":"beat-0010","vol":"vol-0002","title":"父仇入徐州","refs":{"character":["曹操","杜蘅","严石","刘备","关羽","张飞"],"world":["军粮屯田与迁徙","州郡豪强与部曲"]},"contracts":{"advance":["奉天子以止乱","活人的要求","三人同到太平"]},"changes":{},"text":false},"beat-0011":{"id":"beat-0011","vol":"vol-0002","title":"兖州改旗","refs":{"character":["曹操","陈宫","吕布","荀彧"],"world":["州郡豪强与部曲","军粮屯田与迁徙"]},"contracts":{"advance":["奉天子以止乱"]},"changes":{},"text":false},"beat-0012":{"id":"beat-0012","vol":"vol-0002","title":"一州借主","refs":{"character":["刘备","关羽","张飞","糜夫人"],"world":["州郡豪强与部曲","婚姻宗族与家国","汉廷名义与官爵"]},"contracts":{"advance":["三人同到太平"]},"changes":{},"text":false},"beat-0013":{"id":"beat-0013","vol":"vol-0002","title":"天子东归","refs":{"character":["刘协","曹操","荀彧"],"world":["汉廷名义与官爵","道路水系与战时信息","军粮屯田与迁徙"]},"contracts":{"advance":["汉名归处","奉天子以止乱"]},"changes":{},"text":false},"beat-0014":{"id":"beat-0014","vol":"vol-0002","title":"田上新籍","refs":{"character":["曹操","荀彧","刘协","杜蘅","严石"],"world":["军粮屯田与迁徙","汉廷名义与官爵"]},"contracts":{"advance":["奉天子以止乱","汉名归处","活人的要求"]},"changes":{},"text":false},"beat-0015":{"id":"beat-0015","vol":"vol-0003","title":"辕门一箭","refs":{"character":["刘备","关羽","张飞","吕布","陈宫","糜夫人"],"world":["州郡豪强与部曲","婚姻宗族与家国"]},"contracts":{"advance":["三人同到太平"]},"changes":{},"text":false},"beat-0016":{"id":"beat-0016","vol":"vol-0003","title":"下邳水围","refs":{"character":["吕布","陈宫","曹操","刘备","关羽","张飞","糜夫人"],"world":["州郡豪强与部曲","道路水系与战时信息"]},"contracts":{"advance":["三人同到太平","奉天子以止乱"]},"changes":{"world":{"吕布.dead":true,"陈宫.dead":true}},"text":false},"beat-0017":{"id":"beat-0017","vol":"vol-0003","title":"青梅不只论英雄","refs":{"character":["曹操","刘备","关羽","张飞","刘协","荀彧"],"world":["汉廷名义与官爵"]},"contracts":{"advance":["汉名归处","奉天子以止乱","三人同到太平"]},"changes":{},"text":false},"beat-0018":{"id":"beat-0018","vol":"vol-0003","title":"衣带成灰","refs":{"character":["刘协","曹操","荀彧","刘备"],"world":["汉廷名义与官爵","道路水系与战时信息"]},"contracts":{"advance":["汉名归处","奉天子以止乱"]},"changes":{},"text":false},"beat-0019":{"id":"beat-0019","vol":"vol-0003","title":"孙郎渡江","refs":{"character":["孙策","周瑜"],"world":["州郡豪强与部曲","道路水系与战时信息"]},"contracts":{"open":["江东可继"]},"changes":{},"text":false},"beat-0020":{"id":"beat-0020","vol":"vol-0003","title":"皖城不只二乔","refs":{"character":["孙策","周瑜","乔氏"],"world":["婚姻宗族与家国","州郡豪强与部曲"]},"contracts":{"advance":["江东可继"]},"changes":{},"text":false},"beat-0021":{"id":"beat-0021","vol":"vol-0003","title":"江东未服","refs":{"character":["孙策","孙权","周瑜","乔氏"],"world":["州郡豪强与部曲","道路水系与战时信息"]},"contracts":{"advance":["江东可继"]},"changes":{"world":{"孙策.dead":true}},"text":false},"beat-0022":{"id":"beat-0022","vol":"vol-0003","title":"官渡粮尽之前","refs":{"character":["曹操","荀彧","刘备","杜蘅","严石"],"world":["军粮屯田与迁徙","道路水系与战时信息","州郡豪强与部曲"]},"contracts":{"advance":["奉天子以止乱","活人的要求"]},"changes":{},"text":false},"beat-0023":{"id":"beat-0023","vol":"vol-0004","title":"江东新主","refs":{"character":["孙权","周瑜","乔氏"],"world":["州郡豪强与部曲","汉廷名义与官爵"]},"contracts":{"advance":["江东可继"]},"changes":{},"text":false},"beat-0024":{"id":"beat-0024","vol":"vol-0004","title":"髀肉复生","refs":{"character":["刘备","关羽","张飞","诸葛亮","杜蘅"],"world":["州郡豪强与部曲","道路水系与战时信息"]},"contracts":{"advance":["三人同到太平"]},"changes":{},"text":false},"beat-0025":{"id":"beat-0025","vol":"vol-0004","title":"茅庐三问","refs":{"character":["刘备","关羽","张飞","诸葛亮"],"world":["州郡豪强与部曲","军粮屯田与迁徙","道路水系与战时信息"]},"contracts":{"open":["隆中之约"],"advance":["三人同到太平"]},"changes":{},"text":false},"beat-0026":{"id":"beat-0026","vol":"vol-0004","title":"长坂的车位","refs":{"character":["刘备","关羽","张飞","诸葛亮","糜夫人","刘禅","曹操"],"world":["道路水系与战时信息","婚姻宗族与家国","军粮屯田与迁徙"]},"contracts":{"advance":["三人同到太平","隆中之约","活人的要求"]},"changes":{"world":{"糜夫人.dead":true}},"text":false},"beat-0027":{"id":"beat-0027","vol":"vol-0004","title":"江东问战","refs":{"character":["诸葛亮","孙权","周瑜","乔氏","曹操"],"world":["道路水系与战时信息","州郡豪强与部曲"]},"contracts":{"advance":["江东可继","隆中之约"]},"changes":{},"text":false},"beat-0028":{"id":"beat-0028","vol":"vol-0004","title":"赤壁风起","refs":{"character":["周瑜","孙权","诸葛亮","刘备","曹操"],"world":["道路水系与战时信息","军粮屯田与迁徙"]},"contracts":{"advance":["江东可继","隆中之约","奉天子以止乱"]},"changes":{},"text":false},"beat-0029":{"id":"beat-0029","vol":"vol-0004","title":"华容道上没有私放","refs":{"character":["曹操","刘备","关羽","诸葛亮"],"world":["道路水系与战时信息","军粮屯田与迁徙"]},"contracts":{"advance":["隆中之约","三人同到太平","奉天子以止乱"]},"changes":{},"text":false},"beat-0030":{"id":"beat-0030","vol":"vol-0004","title":"借地成盟","refs":{"character":["刘备","诸葛亮","孙权","周瑜","孙夫人"],"world":["州郡豪强与部曲","婚姻宗族与家国","道路水系与战时信息"]},"contracts":{"advance":["江东可继","隆中之约"]},"changes":{"world":{"周瑜.dead":true}},"text":false},"beat-0031":{"id":"beat-0031","vol":"vol-0005","title":"一场婚姻两座营","refs":{"character":["刘备","孙夫人","孙权","关羽","张飞"],"world":["婚姻宗族与家国","州郡豪强与部曲"]},"contracts":{"advance":["江东可继","三人同到太平"]},"changes":{},"text":false},"beat-0032":{"id":"beat-0032","vol":"vol-0005","title":"入蜀之门","refs":{"character":["刘备","诸葛亮","孙夫人","刘禅"],"world":["州郡豪强与部曲","婚姻宗族与家国","道路水系与战时信息"]},"contracts":{"advance":["隆中之约","江东可继"]},"changes":{},"text":false},"beat-0033":{"id":"beat-0033","vol":"vol-0005","title":"魏公的空食匣","refs":{"character":["曹操","荀彧","刘协","曹节"],"world":["汉廷名义与官爵"]},"contracts":{"advance":["汉名归处","奉天子以止乱"]},"changes":{"world":{"荀彧.dead":true}},"text":false},"beat-0034":{"id":"beat-0034","vol":"vol-0005","title":"落凤以后的成都","refs":{"character":["刘备","诸葛亮","关羽","张飞","杜蘅"],"world":["州郡豪强与部曲","道路水系与战时信息"]},"contracts":{"advance":["隆中之约","三人同到太平"]},"changes":{},"text":false},"beat-0035":{"id":"beat-0035","vol":"vol-0005","title":"汉中两条粮道","refs":{"character":["刘备","诸葛亮","曹操"],"world":["军粮屯田与迁徙","道路水系与战时信息","汉廷名义与官爵"]},"contracts":{"advance":["隆中之约","奉天子以止乱"]},"changes":{},"text":false},"beat-0036":{"id":"beat-0036","vol":"vol-0005","title":"水淹七军","refs":{"character":["关羽","刘备","孙权","陆逊"],"world":["道路水系与战时信息","州郡豪强与部曲"]},"contracts":{"advance":["三人同到太平","江东可继"]},"changes":{},"text":false},"beat-0037":{"id":"beat-0037","vol":"vol-0005","title":"白衣渡江与麦城","refs":{"character":["关羽","刘备","张飞","孙权","陆逊"],"world":["道路水系与战时信息","州郡豪强与部曲"]},"contracts":{"advance":["三人同到太平","江东可继"]},"changes":{"world":{"关羽.dead":true}},"text":false},"beat-0038":{"id":"beat-0038","vol":"vol-0005","title":"曹操最后一个冬天","refs":{"character":["曹操","刘协","曹节","曹丕","严石"],"world":["汉廷名义与官爵","军粮屯田与迁徙"]},"contracts":{"advance":["奉天子以止乱","汉名归处","活人的要求"]},"changes":{"world":{"曹操.dead":true,"严石.dead":true}},"text":false},"beat-0039":{"id":"beat-0039","vol":"vol-0005","title":"玺落谁手","refs":{"character":["刘协","曹节","曹丕","曹操"],"world":["汉廷名义与官爵","婚姻宗族与家国"],"beat":["beat-0006","beat-0013","beat-0018","beat-0033","beat-0038"]},"contracts":{"resolve":["汉名归处","奉天子以止乱"],"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0040":{"id":"beat-0040","vol":"vol-0006","title":"成都续汉","refs":{"character":["刘备","诸葛亮","刘禅","刘协","孙权"],"world":["汉廷名义与官爵"]},"contracts":{"advance":["隆中之约","江东可继"]},"changes":{},"text":false},"beat-0041":{"id":"beat-0041","vol":"vol-0006","title":"张飞的最后一夜","refs":{"character":["张飞","刘备","诸葛亮"],"world":["州郡豪强与部曲"]},"contracts":{"advance":["三人同到太平"]},"changes":{"world":{"张飞.dead":true}},"text":false},"beat-0042":{"id":"beat-0042","vol":"vol-0006","title":"东征不只为复仇","refs":{"character":["刘备","诸葛亮","孙权","陆逊","孙夫人"],"world":["州郡豪强与部曲","道路水系与战时信息"]},"contracts":{"advance":["三人同到太平","江东可继","隆中之约"]},"changes":{},"text":false},"beat-0043":{"id":"beat-0043","vol":"vol-0006","title":"七百里连营","refs":{"character":["刘备","陆逊","孙权"],"world":["道路水系与战时信息","军粮屯田与迁徙"]},"contracts":{"advance":["三人同到太平","江东可继"]},"changes":{},"text":false},"beat-0044":{"id":"beat-0044","vol":"vol-0006","title":"夷陵余烬","refs":{"character":["刘备","陆逊","孙权","孙夫人"],"world":["道路水系与战时信息","军粮屯田与迁徙"]},"contracts":{"advance":["三人同到太平","江东可继","活人的要求"]},"changes":{},"text":false},"beat-0045":{"id":"beat-0045","vol":"vol-0006","title":"白帝托孤","refs":{"character":["刘备","诸葛亮","刘禅","关羽","张飞"],"world":["汉廷名义与官爵","州郡豪强与部曲"],"beat":["beat-0004","beat-0025","beat-0037","beat-0041","beat-0044"]},"contracts":{"resolve":["三人同到太平"],"advance":["隆中之约"]},"changes":{"world":{"刘备.dead":true}},"text":false},"beat-0046":{"id":"beat-0046","vol":"vol-0006","title":"使者过江","refs":{"character":["诸葛亮","刘禅","孙权","陆逊"],"world":["汉廷名义与官爵","道路水系与战时信息"]},"contracts":{"advance":["隆中之约","江东可继"]},"changes":{},"text":false},"beat-0047":{"id":"beat-0047","vol":"vol-0007","title":"成都无成年君","refs":{"character":["刘禅","诸葛亮"],"world":["汉廷名义与官爵","州郡豪强与部曲"],"beat":["beat-0045","beat-0046"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0048":{"id":"beat-0048","vol":"vol-0007","title":"南中不是七擒","refs":{"character":["诸葛亮","刘禅","杜蘅"],"world":["州郡豪强与部曲","军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0047"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0049":{"id":"beat-0049","vol":"vol-0007","title":"归汉的价钱","refs":{"character":["诸葛亮","刘禅","杜蘅"],"world":["州郡豪强与部曲","军粮屯田与迁徙","疫病医药与太平道"],"beat":["beat-0048"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0050":{"id":"beat-0050","vol":"vol-0007","title":"出师之前","refs":{"character":["诸葛亮","刘禅","曹丕","司马懿"],"world":["汉廷名义与官爵","军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0047","beat-0049"]},"contracts":{"advance":["隆中之约"]},"changes":{"world":{"曹丕.dead":true}},"text":false},"beat-0051":{"id":"beat-0051","vol":"vol-0007","title":"街亭","refs":{"character":["诸葛亮","刘禅"],"world":["军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0050"]},"contracts":{"advance":["隆中之约"]},"changes":{},"text":false},"beat-0052":{"id":"beat-0052","vol":"vol-0007","title":"空城之外","refs":{"character":["诸葛亮","司马懿","刘禅"],"world":["道路水系与战时信息","军粮屯田与迁徙"],"beat":["beat-0051"]},"contracts":{"advance":["隆中之约"]},"changes":{},"text":false},"beat-0053":{"id":"beat-0053","vol":"vol-0008","title":"粮尽三回","refs":{"character":["诸葛亮","刘禅","司马懿"],"world":["军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0051","beat-0052"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0054":{"id":"beat-0054","vol":"vol-0008","title":"木牛流马","refs":{"character":["诸葛亮","杜蘅"],"world":["军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0053"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0055":{"id":"beat-0055","vol":"vol-0008","title":"陇上麦熟","refs":{"character":["诸葛亮","司马懿","杜蘅"],"world":["军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0053","beat-0054"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{},"text":false},"beat-0056":{"id":"beat-0056","vol":"vol-0008","title":"合肥与渭水","refs":{"character":["孙权","陆逊","诸葛亮","刘禅","司马懿"],"world":["汉廷名义与官爵","道路水系与战时信息","军粮屯田与迁徙"],"beat":["beat-0046","beat-0055"]},"contracts":{"advance":["江东可继","隆中之约"]},"changes":{},"text":false},"beat-0057":{"id":"beat-0057","vol":"vol-0008","title":"山阳旧帝","refs":{"character":["刘协","曹节","杜蘅","荀彧"],"world":["汉廷名义与官爵","疫病医药与太平道","婚姻宗族与家国"],"beat":["beat-0013","beat-0018","beat-0033","beat-0039"]},"contracts":{"advance":["活人的要求"]},"changes":{"world":{"刘协.dead":true}},"text":false},"beat-0058":{"id":"beat-0058","vol":"vol-0008","title":"五丈原秋","refs":{"character":["诸葛亮","刘禅","司马懿"],"world":["军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0053","beat-0054","beat-0055","beat-0056"]},"contracts":{"advance":["隆中之约","活人的要求"]},"changes":{"world":{"诸葛亮.dead":true}},"text":false},"beat-0059":{"id":"beat-0059","vol":"vol-0008","title":"死诸葛","refs":{"character":["诸葛亮","刘禅","司马懿"],"world":["汉廷名义与官爵","道路水系与战时信息"],"beat":["beat-0025","beat-0045","beat-0051","beat-0058"]},"contracts":{"resolve":["隆中之约"],"advance":["活人的要求"]},"changes":{},"text":false},"beat-0060":{"id":"beat-0060","vol":"vol-0009","title":"江东失弦","refs":{"character":["孙权","陆逊","孙策","周瑜"],"world":["婚姻宗族与家国","汉廷名义与官爵","州郡豪强与部曲"],"beat":["beat-0023","beat-0036","beat-0043","beat-0056"]},"contracts":{"advance":["江东可继","活人的要求"]},"changes":{"world":{"陆逊.dead":true}},"text":false},"beat-0061":{"id":"beat-0061","vol":"vol-0009","title":"洛水为誓","refs":{"character":["司马懿","曹丕"],"world":["汉廷名义与官爵","州郡豪强与部曲"],"beat":["beat-0039","beat-0052","beat-0058"]},"contracts":{"advance":["活人的要求"]},"changes":{"world":{"司马懿.dead":true}},"text":false},"beat-0062":{"id":"beat-0062","vol":"vol-0009","title":"最后一位孙郎","refs":{"character":["孙权","孙策","周瑜","陆逊","乔氏"],"world":["婚姻宗族与家国","汉廷名义与官爵"],"beat":["beat-0019","beat-0021","beat-0023","beat-0060"]},"contracts":{"advance":["江东可继","活人的要求"]},"changes":{"world":{"孙权.dead":true}},"text":false},"beat-0063":{"id":"beat-0063","vol":"vol-0009","title":"相府之后","refs":{"character":["刘禅","诸葛亮"],"world":["汉廷名义与官爵","军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0047","beat-0053","beat-0059"]},"contracts":{"advance":["活人的要求"]},"changes":{},"text":false},"beat-0064":{"id":"beat-0064","vol":"vol-0009","title":"成都城门","refs":{"character":["刘禅","诸葛亮"],"world":["汉廷名义与官爵","军粮屯田与迁徙","道路水系与战时信息"],"beat":["beat-0045","beat-0059","beat-0063"]},"contracts":{"advance":["活人的要求"]},"changes":{},"text":false},"beat-0065":{"id":"beat-0065","vol":"vol-0009","title":"又一次禅让","refs":{"character":["司马懿","刘协","曹丕","曹节"],"world":["汉廷名义与官爵","婚姻宗族与家国"],"beat":["beat-0039","beat-0061","beat-0064"]},"contracts":{"advance":["活人的要求"]},"changes":{},"text":false},"beat-0066":{"id":"beat-0066","vol":"vol-0009","title":"石头城开","refs":{"character":["孙权","陆逊","乔氏"],"world":["道路水系与战时信息","州郡豪强与部曲","汉廷名义与官爵"],"beat":["beat-0019","beat-0020","beat-0023","beat-0060","beat-0062"]},"contracts":{"resolve":["江东可继"],"advance":["活人的要求"]},"changes":{},"text":false},"beat-0067":{"id":"beat-0067","vol":"vol-0009","title":"太康路上","refs":{"character":["杜蘅","严石","刘协","刘禅","孙权","诸葛亮"],"world":["军粮屯田与迁徙","道路水系与战时信息","疫病医药与太平道","汉廷名义与官爵"],"beat":["beat-0001","beat-0005","beat-0014","beat-0049","beat-0054","beat-0059","beat-0064","beat-0066"]},"contracts":{"resolve":["活人的要求"]},"changes":{"world":{"杜蘅.dead":true}},"text":false}},"contracts":{"三人同到太平":{"id":"三人同到太平","subjects":{"character":["刘备","关羽","张飞"]},"deadline":"beat-0045"},"奉天子以止乱":{"id":"奉天子以止乱","subjects":{"character":["曹操","刘协","荀彧"]},"deadline":"beat-0039"},"汉名归处":{"id":"汉名归处","subjects":{"character":["刘协","曹操","曹节","曹丕"]},"deadline":"beat-0039"},"江东可继":{"id":"江东可继","subjects":{"character":["孙策","孙权","周瑜","乔氏"]},"deadline":"beat-0066"},"活人的要求":{"id":"活人的要求","subjects":{"character":["张角","杜蘅","严石"]},"deadline":"book_end"},"隆中之约":{"id":"隆中之约","subjects":{"character":["刘备","诸葛亮","刘禅"]},"deadline":"beat-0059"}},"characters":["严石","乔氏","关羽","刘协","刘备","刘禅","司马懿","吕布","周瑜","孙夫人","孙权","孙策","张角","张飞","曹丕","曹操","曹节","杜蘅","糜夫人","荀彧","诸葛亮","陆逊","陈宫"],"world":["core","军粮屯田与迁徙","婚姻宗族与家国","州郡豪强与部曲","汉廷名义与官爵","疫病医药与太平道","道路水系与战时信息"]};
+const order = DATA.volumes.flatMap(v => v.beatIds);
+const beats = DATA.beats;
+const ordinal = Object.fromEntries(order.map((id, i) => [id, i]));
+const title = id => (beats[id] && beats[id].title) || id;
+const num = id => id.replace("beat-", "").replace(/^0+/, "");
+const volumeOf = id => DATA.volumes.find(v => v.beatIds.includes(id));
+// 承诺锚点
+const contracts = Object.values(DATA.contracts).map(c => {
+	const open = [], advance = [], resolve = [];
+	for (const b of Object.values(beats)) {
+		if ((b.contracts.open || []).includes(c.id)) open.push(b.id);
+		if ((b.contracts.advance || []).includes(c.id)) advance.push(b.id);
+		if ((b.contracts.resolve || []).includes(c.id)) resolve.push(b.id);
+	}
+	const by = ids => ids.slice().sort((a, b) => ordinal[a] - ordinal[b]);
+	const o = by(open), r = by(resolve), a = by(advance);
+	const resolveAt = r.length ? ordinal[r[0]] : -1;
+	return { ...c, open: o, advance: a, resolve: r, late: a.filter(id => resolveAt >= 0 && ordinal[id] > resolveAt), deadlineIdx: c.deadline === "book_end" ? order.length - 1 : ordinal[c.deadline] };
+}).sort((x, y) => ordinal[x.open[0]] - ordinal[y.open[0]]);
+// 人物：在场、死亡、秘密、位置
+const charStats = {};
+for (const b of Object.values(beats)) for (const c of (b.refs.character || [])) { charStats[c] ??= { count: 0, first: 1e9 }; charStats[c].count++; charStats[c].first = Math.min(charStats[c].first, ordinal[b.id]); }
+const events = {}; // name -> [{beat, kind, note}]
+for (const b of Object.values(beats)) {
+	for (const [k, v] of Object.entries(b.changes.world || {})) {
+		const [obj, prop] = k.split(".");
+		if (prop === "dead" && v === true) (events[obj] ??= []).push({ beat: b.id, kind: "dead", note: "changes.world." + k });
+		if (prop === "location") (events[obj] ??= []).push({ beat: b.id, kind: "location", note: "location → " + v });
+	}
+	for (const [who, m] of Object.entries(b.changes.character || {})) for (const k of Object.keys(m)) { const s = k.match(/^secret:(.+)\.revealed$/); if (s) (events[who] ??= []).push({ beat: b.id, kind: "secret", note: "秘密揭示：" + s[1] }); }
+}
+const characters = DATA.characters.filter(c => charStats[c]).sort((a, b) => charStats[a].first - charStats[b].first);
+const arcs = Object.values(beats).flatMap(b => (b.refs.beat || []).filter(t => t in ordinal).map(t => ({ from: t, to: b.id })));
+const worlds = DATA.world.map(w => ({ id: w, beats: Object.values(beats).filter(b => (b.refs.world || []).includes(w)).map(b => b.id) })).filter(w => w.beats.length);
+
+let state = { scale: "book", cursor: "beat-0006", selected: null, charsOpen: false, worldOpen: false };
+const scroll = document.getElementById("scroll"), labels = document.getElementById("labels"), tip = document.getElementById("tip"), detail = document.getElementById("detail");
+const svgNS = "http://www.w3.org/2000/svg";
+const el = (n, attrs = {}, text) => { const e = document.createElementNS(svgNS, n); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text !== undefined) e.textContent = text; return e; };
+function showTip(ev, html) { tip.innerHTML = html; tip.hidden = false; moveTip(ev); }
+function moveTip(ev) { const x = Math.min(ev.clientX + 14, window.innerWidth - 340), y = Math.min(ev.clientY + 14, window.innerHeight - 90); tip.style.left = x + "px"; tip.style.top = y + "px"; }
+function hideTip() { tip.hidden = true; }
+function hover(node, html) { node.addEventListener("mouseenter", e => showTip(e, html)); node.addEventListener("mousemove", moveTip); node.addEventListener("mouseleave", hideTip); }
+
+function visibleBeats() { return state.scale === "book" ? order : volumeOf(state.cursor).beatIds; }
+function render() {
+	const ids = visibleBeats();
+	const colW = state.scale === "book" ? 18 : 84;
+	const left = 8, headH = 66, laneH = 24, groupH = 30, arcH = 70;
+	const shownChars = state.charsOpen ? characters : characters.slice().sort((a, b) => charStats[b].count - charStats[a].count).slice(0, 8).sort((a, b) => charStats[a].first - charStats[b].first);
+	const lanes = [
+		{ kind: "group", label: "覆盖" }, { kind: "coverage", label: "正文 / 仅设计" },
+		{ kind: "group", label: "承诺 · " + contracts.length + " 条" }, ...contracts.map(c => ({ kind: "contract", c, label: c.id, color: "var(--amber)" })),
+		{ kind: "group", label: "因果 · refs.beat " + arcs.length + " 条" }, { kind: "arcs", label: "" },
+		{ kind: "group", label: "人物 · " + characters.length + " 人", toggle: "chars" }, ...shownChars.map(n => ({ kind: "char", n, label: n, count: charStats[n].count })),
+		{ kind: "group", label: "世界文档 · " + worlds.length + " 份", toggle: "world" }, ...(state.worldOpen ? worlds.map(w => ({ kind: "world", w, label: w.id })) : []),
+	];
+	// 左列标签
+	labels.innerHTML = "";
+	const head = document.createElement("div"); head.className = "lane-label head"; head.textContent = "卷 / Beat"; labels.appendChild(head);
+	let y = headH;
+	const rows = [];
+	for (const lane of lanes) {
+		const h = lane.kind === "group" ? groupH : lane.kind === "arcs" ? arcH : laneH;
+		const d = document.createElement("div"); d.className = "lane-label" + (lane.kind === "group" ? " group" : ""); d.style.height = h + "px";
+		if (lane.kind === "group") {
+			d.textContent = lane.label;
+			if (lane.toggle) { const b = document.createElement("button"); const open = lane.toggle === "chars" ? state.charsOpen : state.worldOpen; b.textContent = open ? "收起" : (lane.toggle === "chars" ? "展开全部 " + characters.length + " 人" : "展开"); b.onclick = () => { if (lane.toggle === "chars") state.charsOpen = !state.charsOpen; else state.worldOpen = !state.worldOpen; render(); }; d.appendChild(b); }
+		} else if (lane.kind === "char") { d.innerHTML = '<i style="background:var(--ink-2)"></i><b>' + lane.n + "</b><small>" + lane.count + "</small>"; }
+		else if (lane.kind === "contract") { d.innerHTML = '<i style="background:var(--amber);border-radius:2px"></i><b>' + lane.c.id + "</b>" + (lane.c.late.length ? '<small style="color:var(--red)">异常</small>' : ""); }
+		else if (lane.kind === "world") { d.innerHTML = '<i style="background:var(--ink-3);border-radius:2px"></i><b>' + lane.w.id + "</b>"; }
+		else d.innerHTML = "<b>" + lane.label + "</b>";
+		labels.appendChild(d); rows.push({ lane, y, h }); y += h;
+	}
+	const totalH = y, totalW = left + ids.length * colW + 20;
+	scroll.innerHTML = "";
+	const svg = el("svg", { width: totalW, height: totalH, viewBox: "0 0 " + totalW + " " + totalH, role: "img", "aria-label": "故事轴" });
+	const x = id => left + ids.indexOf(id) * colW, cx = id => x(id) + colW / 2;
+	const cursorIdx = ordinal[state.cursor];
+	// 列背景与卷分隔
+	const g = el("g", { class: "grid" });
+	ids.forEach((id, i) => {
+		if (state.selected === id) g.appendChild(el("rect", { x: x(id), y: 0, width: colW, height: totalH, class: "col-sel" }));
+		if (i > 0 && volumeOf(id) !== volumeOf(ids[i - 1])) g.appendChild(el("line", { x1: x(id), y1: 0, x2: x(id), y2: totalH, class: "vol-sep" }));
+	});
+	rows.forEach(r => g.appendChild(el("line", { x1: 0, y1: r.y, x2: totalW, y2: r.y })));
+	svg.appendChild(g);
+	// 卷名与 Beat 刻度
+	const seen = new Set();
+	ids.forEach(id => { const v = volumeOf(id); if (seen.has(v.id)) return; seen.add(v.id); const t = el("text", { x: x(id) + 4, y: 16, class: "vol-title" }, v.title + " · " + v.beatIds.length); svg.appendChild(t); });
+	ids.forEach(id => {
+		svg.appendChild(el("text", { x: cx(id), y: headH - 8, class: "tick", "text-anchor": "middle" }, num(id)));
+		if (state.scale === "volume") { const t = el("text", { x: x(id) + 4, y: 38, class: "beat-title" }, title(id).slice(0, 6)); svg.appendChild(t); }
+	});
+	// 泳道内容
+	const beyond = id => ordinal[id] > cursorIdx ? " beyond" : "";
+	for (const r of rows) {
+		const midY = r.y + r.h / 2, lane = r.lane;
+		if (lane.kind === "coverage") for (const id of ids) {
+			const b = beats[id];
+			const dot = b.text ? el("circle", { cx: cx(id), cy: midY, r: 4.5, fill: "var(--green)", class: beyond(id) }) : el("circle", { cx: cx(id), cy: midY, r: 4, fill: "none", stroke: "var(--faint)", "stroke-width": 1.5, class: beyond(id) });
+			hover(dot, "<b>" + title(id) + "</b> " + id + "<small>" + (b.text ? "已提交 StoryText（text/" + id + ".md）" : "仅设计，text/" + id + ".md 不存在") + "</small>"); svg.appendChild(dot);
+		}
+		if (lane.kind === "contract") {
+			const c = lane.c; const o = c.open[0], rz = c.resolve[0];
+			const inRange = id => ids.includes(id);
+			const x0 = inRange(o) ? cx(o) : (ordinal[o] < ordinal[ids[0]] ? left : null);
+			const endId = rz || (c.deadline === "book_end" ? order[order.length - 1] : c.deadline);
+			const x1 = inRange(endId) ? cx(endId) : (ordinal[endId] > ordinal[ids[ids.length - 1]] ? totalW - 20 : null);
+			if (x0 !== null && x1 !== null) {
+				const line = el("line", { x1: x0, y1: midY, x2: x1, y2: midY, stroke: "var(--amber)", "stroke-width": rz ? 2 : 1.5, "stroke-dasharray": rz ? "" : "4 3", opacity: .8 });
+				hover(line, "<b>" + c.id + "</b><small>open " + o + " · advance " + c.advance.length + " 次 · " + (rz ? "resolve " + rz : "尚未 resolve") + " · deadline " + c.deadline + "<br>subjects：" + (c.subjects.character || []).join("、") + "</small>"); svg.appendChild(line);
+			}
+			if (c.deadlineIdx >= 0 && inRange(order[c.deadlineIdx])) { const dl = el("line", { x1: cx(order[c.deadlineIdx]), y1: midY - 9, x2: cx(order[c.deadlineIdx]), y2: midY + 9, stroke: "var(--amber)", "stroke-width": 1.5 }); hover(dl, "<b>deadline</b> " + c.deadline + " " + title(c.deadline)); svg.appendChild(dl); }
+			for (const id of c.advance) if (inRange(id)) { const lateOne = c.late.includes(id); const sel = state.selected === id; const d = el("circle", { cx: cx(id), cy: midY, r: sel ? 5 : 3, fill: lateOne ? "var(--red)" : "var(--amber)", class: beyond(id) }); hover(d, "<b>advance</b> " + title(id) + " " + id + (lateOne ? "<small style='color:#ffb4a0'>已在 " + c.resolve[0] + " resolve，之后仍 advance：Checker 不报，作者要看</small>" : "")); svg.appendChild(d); }
+			for (const [kind, list] of [["open", c.open], ["resolve", c.resolve]]) for (const id of list) if (inRange(id)) { const sel = state.selected === id; const s = sel ? 12 : 9; const sq = el("rect", { x: cx(id) - s / 2, y: midY - s / 2, width: s, height: s, rx: 2, fill: "var(--amber)", class: beyond(id) }); hover(sq, "<b>" + kind + "</b> " + title(id) + " " + id); svg.appendChild(sq); }
+		}
+		if (lane.kind === "arcs") {
+			const base = r.y + r.h - 6;
+			for (const a of arcs) {
+				if (!ids.includes(a.from) || !ids.includes(a.to)) continue;
+				const xa = cx(a.from), xb = cx(a.to), span = Math.abs(xb - xa), h = Math.min(r.h - 10, 12 + span * 0.35);
+				const p = el("path", { d: "M" + xa + " " + base + " C " + xa + " " + (base - h) + ", " + xb + " " + (base - h) + ", " + xb + " " + base, class: "arc" + (state.selected ? (a.from === state.selected || a.to === state.selected ? " hot" : " dim") : "") });
+				hover(p, "<b>refs.beat</b><small>" + title(a.to) + "（" + a.to + "）依赖 " + title(a.from) + "（" + a.from + "），跨 " + (ordinal[a.to] - ordinal[a.from]) + " 个 Beat</small>"); svg.appendChild(p);
+			}
+		}
+		if (lane.kind === "char") {
+			const n = lane.n; const evs = events[n] || []; const deadAt = evs.find(e => e.kind === "dead"); const deadIdx = deadAt ? ordinal[deadAt.beat] : 1e9;
+			for (const id of ids) {
+				const b = beats[id]; const present = (b.refs.character || []).includes(n);
+				if (present) { const dead = ordinal[id] > deadIdx; const d = dead ? el("circle", { cx: cx(id), cy: midY, r: 3.5, fill: "none", stroke: "var(--ink-3)", "stroke-width": 1.4, class: beyond(id) }) : el("circle", { cx: cx(id), cy: midY, r: 3.5, fill: "var(--ink-2)", class: beyond(id) }); hover(d, "<b>" + n + "</b> · " + title(id) + " " + id + "<small>refs.character 含此人" + (dead ? "；此时已死亡，仍被引用（回忆或遗产）" : "") + "</small>"); svg.appendChild(d); }
+				for (const e of evs.filter(e => e.beat === id)) {
+					const glyph = e.kind === "dead" ? "✕" : e.kind === "secret" ? "◆" : "⌖";
+					const t = el("text", { x: cx(id) + (present ? 6 : 0), y: midY + 4, "font-size": 10, "text-anchor": present ? "start" : "middle", fill: e.kind === "dead" ? "var(--red)" : e.kind === "secret" ? "var(--purple)" : "var(--ink-3)", class: beyond(id) }, glyph);
+					hover(t, "<b>" + n + "</b> · " + title(id) + "<small>" + e.note + "</small>"); svg.appendChild(t);
+				}
+			}
+		}
+		if (lane.kind === "world") for (const id of lane.w.beats) if (ids.includes(id)) { const s = el("rect", { x: cx(id) - 3.5, y: midY - 3.5, width: 7, height: 7, rx: 1.5, fill: "var(--ink-3)", class: beyond(id) }); hover(s, "<b>" + lane.w.id + "</b> · " + title(id) + "<small>refs.world</small>"); svg.appendChild(s); }
+	}
+	// 列点击区
+	ids.forEach(id => { const hit = el("rect", { x: x(id), y: 0, width: colW, height: headH, class: "col-hit" }); hit.addEventListener("click", () => select(id)); hover(hit, "<b>" + title(id) + "</b> " + id + "<small>" + volumeOf(id).title + " · " + (beats[id].text ? "已提交正文" : "仅设计") + "；点击选中，双击设为时点</small>"); hit.addEventListener("dblclick", () => setCursor(id)); svg.appendChild(hit); });
+	// 时点竖线
+	if (ids.includes(state.cursor)) {
+		const cxr = cx(state.cursor);
+		svg.appendChild(el("line", { x1: cxr, y1: headH - 4, x2: cxr, y2: totalH, class: "cursor-line" }));
+		const grip = el("rect", { x: cxr - 6, y: headH - 14, width: 12, height: 10, rx: 2, class: "cursor-grip" });
+		grip.addEventListener("pointerdown", e => { grip.setPointerCapture(e.pointerId); const move = ev => { const rect = svg.getBoundingClientRect(); const i = Math.max(0, Math.min(ids.length - 1, Math.floor((ev.clientX - rect.left - left) / colW))); if (ids[i] !== state.cursor) { state.cursor = ids[i]; render(); } }; grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", () => grip.removeEventListener("pointermove", move), { once: true }); });
+		hover(grip, "<b>时点</b> " + title(state.cursor) + "<small>拖动改变；右侧内容表示叙述还没到</small>");
+		svg.appendChild(grip);
+	}
+	scroll.appendChild(svg);
+	document.getElementById("cursor-label").textContent = "时点 " + state.cursor + " " + title(state.cursor) + " · 拖动竖线或 ← → 移动";
+	renderDetail();
+}
+function select(id) { state.selected = state.selected === id ? null : id; render(); }
+function setCursor(id) { state.cursor = id; render(); }
+function renderDetail() {
+	const id = state.selected; if (!id) { detail.innerHTML = '<span class="k">点一个 Beat 列：高亮它、只留与它相关的因果弧、放大它的承诺锚点。双击设为时点。</span>'; return; }
+	const b = beats[id]; const ups = (b.refs.beat || []).map(t => title(t) + " " + num(t)); const downs = arcs.filter(a => a.from === id).map(a => title(a.to) + " " + num(a.to));
+	const anchors = contracts.flatMap(c => [["open", c.open], ["advance", c.advance], ["resolve", c.resolve]].filter(([, l]) => l.includes(id)).map(([k]) => c.id + " " + k));
+	detail.innerHTML = "<b>" + title(id) + "</b><span class='k'>" + id + " · " + volumeOf(id).title + "</span><span><span class='k'>人物 </span>" + (b.refs.character || []).join("、") + "</span><span><span class='k'>前因 </span>" + (ups.join("、") || "无") + "</span><span><span class='k'>后果 </span>" + (downs.join("、") || "无") + "</span><span><span class='k'>承诺 </span>" + (anchors.join("、") || "无") + "</span>";
+}
+document.getElementById("scale").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.scale = b.dataset.scale; for (const x of e.currentTarget.children) x.setAttribute("aria-pressed", x === b); render(); });
+document.addEventListener("keydown", e => { if (e.target.tagName === "SELECT") return; const i = ordinal[state.cursor]; if (e.key === "ArrowRight") { if (e.shiftKey) { const v = volumeOf(state.cursor); const nv = DATA.volumes[DATA.volumes.indexOf(v) + 1]; if (nv) setCursor(nv.beatIds[0]); } else if (i < order.length - 1) setCursor(order[i + 1]); } if (e.key === "ArrowLeft") { if (e.shiftKey) { const v = volumeOf(state.cursor); const pv = DATA.volumes[DATA.volumes.indexOf(v) - 1]; if (pv) setCursor(pv.beatIds[0]); } else if (i > 0) setCursor(order[i - 1]); } if (e.key === "Escape") { state.selected = null; render(); } if (e.key === "Enter" && state.selected) { nbCenter = { kind: "beat", id: state.selected }; switchTab("nb"); } });
+
+// ===== 邻域图 =====
+let nbCenter = { kind: "beat", id: "beat-0039" };
+const nbPick = document.getElementById("nb-pick");
+for (const id of order) { const o = document.createElement("option"); o.value = id; o.textContent = id + " " + title(id); nbPick.appendChild(o); }
+nbPick.value = nbCenter.id;
+nbPick.addEventListener("change", () => { nbCenter = { kind: "beat", id: nbPick.value }; renderNb(); });
+const KIND_LABEL = { beat: "Beat", contract: "承诺", character: "人物", world: "世界", place: "地点", resource: "资源" };
+const KIND_COLOR = { beat: "var(--purple)", contract: "var(--amber)", character: "var(--ink-2)", world: "var(--ink-3)", place: "var(--green)", resource: "var(--green)" };
+function neighbors(center) {
+	const up = [], down = [];
+	if (center.kind === "beat") {
+		const b = beats[center.id];
+		for (const t of (b.refs.beat || [])) up.push({ kind: "beat", id: t, key: "refs.beat" });
+		for (const w of (b.refs.world || [])) up.push({ kind: "world", id: w, key: "refs.world" });
+		for (const c of (b.refs.character || [])) up.push({ kind: "character", id: c, key: "refs.character" });
+		for (const p of (b.refs.place || [])) up.push({ kind: "place", id: p, key: "refs.place" });
+		for (const r of (b.refs.resource || [])) up.push({ kind: "resource", id: r, key: "refs.resource" });
+		for (const a of arcs) if (a.from === center.id) down.push({ kind: "beat", id: a.to, key: "refs.beat" });
+		for (const k of ["open", "advance", "resolve"]) for (const c of (b.contracts[k] || [])) down.push({ kind: "contract", id: c, key: "contracts." + k });
+	} else if (center.kind === "contract") {
+		const c = contracts.find(c => c.id === center.id);
+		for (const n of (c.subjects.character || [])) up.push({ kind: "character", id: n, key: "subjects.character" });
+		if (c.deadline !== "book_end") up.push({ kind: "beat", id: c.deadline, key: "deadline" });
+		for (const k of ["open", "advance", "resolve"]) for (const id of c[k]) down.push({ kind: "beat", id, key: "contracts." + k });
+	} else if (center.kind === "character") {
+		for (const b of Object.values(beats)) if ((b.refs.character || []).includes(center.id)) down.push({ kind: "beat", id: b.id, key: "refs.character" });
+		for (const c of contracts) if ((c.subjects.character || []).includes(center.id)) down.push({ kind: "contract", id: c.id, key: "subjects.character" });
+	} else if (center.kind === "world") {
+		for (const b of Object.values(beats)) if ((b.refs.world || []).includes(center.id)) down.push({ kind: "beat", id: b.id, key: "refs.world" });
+	}
+	const sortBeats = list => list.sort((a, b) => (a.kind === "beat" && b.kind === "beat") ? ordinal[a.id] - ordinal[b.id] : 0);
+	return { up: sortBeats(up), down: sortBeats(down) };
+}
+function renderNb() {
+	const svg = document.getElementById("nb-svg"); svg.innerHTML = "";
+	const { up, down } = neighbors(nbCenter);
+	const W = 1040, colX = { up: 40, center: 420, down: 800 }, nodeW = 200, nodeH = 30, gap = 8, groupGap = 18;
+	const layout = list => { const groups = {}; for (const n of list) (groups[n.kind] ??= []).push(n); const out = []; let y = 44; for (const [kind, items] of Object.entries(groups)) { const shown = items.slice(0, 8); out.push({ group: kind, y, count: items.length }); y += 16; for (const n of shown) { out.push({ ...n, y }); y += nodeH + gap; } if (items.length > 8) { out.push({ more: items.length - 8, y }); y += 22; } y += groupGap; } return { out, height: y }; };
+	const L = layout(up), R = layout(down);
+	const H = Math.max(520, L.height + 20, R.height + 20); svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+	svg.appendChild(el("text", { x: colX.up, y: 22, class: "col-head" }, "它依赖的 · " + up.length));
+	svg.appendChild(el("text", { x: colX.center, y: 22, class: "col-head" }, "当前"));
+	svg.appendChild(el("text", { x: colX.down, y: 22, class: "col-head" }, "依赖它的 · " + down.length));
+	const cy = H / 2;
+	const centerLabel = nbCenter.kind === "beat" ? title(nbCenter.id) : nbCenter.id;
+	const cg = el("g", { class: "node center" }); cg.appendChild(el("rect", { x: colX.center, y: cy - 22, width: nodeW, height: 44, rx: 6 })); cg.appendChild(el("text", { x: colX.center + 10, y: cy - 3 }, centerLabel)); cg.appendChild(el("text", { x: colX.center + 10, y: cy + 13, class: "kind" }, KIND_LABEL[nbCenter.kind] + (nbCenter.kind === "beat" ? " · " + nbCenter.id + (beats[nbCenter.id].text ? " · 已提交正文" : " · 仅设计") : ""))); svg.appendChild(cg);
+	const drawCol = (col, side) => {
+		for (const n of col.out) {
+			const x = side === "up" ? colX.up : colX.down;
+			if (n.group) { svg.appendChild(el("text", { x, y: n.y, class: "group-title" }, KIND_LABEL[n.group].toUpperCase() + " · " + n.count)); continue; }
+			if (n.more) { svg.appendChild(el("text", { x: x + 8, y: n.y + 14, class: "kind", fill: "var(--ink-3)", "font-size": 11 }, "还有 " + n.more + " 项，展开为列表")); continue; }
+			const g = el("g", { class: "node" }); g.appendChild(el("rect", { x, y: n.y, width: nodeW, height: nodeH, rx: 5 }));
+			const label = n.kind === "beat" ? num(n.id) + " " + title(n.id) : n.id;
+			g.appendChild(el("text", { x: x + 9, y: n.y + 19 }, label.length > 14 ? label.slice(0, 13) + "…" : label));
+			g.addEventListener("click", () => { nbCenter = { kind: n.kind, id: n.id }; if (n.kind === "beat") nbPick.value = n.id; renderNb(); });
+			hover(g, "<b>" + label + "</b><small>" + KIND_LABEL[n.kind] + " · 边：" + n.key + "</small>");
+			const x1 = side === "up" ? x + nodeW : colX.center, x2 = side === "up" ? colX.center : x, y1 = n.y + nodeH / 2;
+			const y2 = cy; const midX = (x1 + x2) / 2;
+			const p = el("path", { d: side === "up" ? "M" + x1 + " " + y1 + " C " + midX + " " + y1 + ", " + midX + " " + y2 + ", " + x2 + " " + y2 : "M" + x1 + " " + y2 + " C " + midX + " " + y2 + ", " + midX + " " + y1 + ", " + x2 + " " + y1, class: "edge", stroke: KIND_COLOR[n.kind] });
+			svg.appendChild(p); svg.appendChild(g);
+		}
+	};
+	drawCol(L, "up"); drawCol(R, "down");
+}
+
+// ===== 承诺页 =====
+function renderContract() {
+	const c = contracts.find(c => c.id === "三人同到太平") || contracts[0];
+	const body = document.getElementById("contract-body");
+	const late = c.late.length > 0;
+	const all = [...c.open.map(id => [id, "open"]), ...c.advance.map(id => [id, "advance"]), ...c.resolve.map(id => [id, "resolve"])].sort((a, b) => ordinal[a[0]] - ordinal[b[0]]);
+	const W = 940, x = i => 20 + i * ((W - 40) / (order.length - 1));
+	let svgHtml = '<svg class="life" viewBox="0 0 ' + W + ' 70" role="img" aria-label="承诺生命周期">';
+	DATA.volumes.forEach((v, vi) => { const i0 = ordinal[v.beatIds[0]]; svgHtml += '<line x1="' + x(i0) + '" y1="10" x2="' + x(i0) + '" y2="60" stroke="var(--hair)"/><text x="' + (x(i0) + 3) + '" y="66" font-size="9.5" fill="var(--faint)">' + v.title + "</text>"; });
+	const o = ordinal[c.open[0]], rz = c.resolve.length ? ordinal[c.resolve[0]] : order.length - 1;
+	svgHtml += '<line x1="' + x(o) + '" y1="34" x2="' + x(rz) + '" y2="34" stroke="var(--amber)" stroke-width="2.5"/>';
+	if (c.deadlineIdx >= 0) svgHtml += '<line x1="' + x(c.deadlineIdx) + '" y1="20" x2="' + x(c.deadlineIdx) + '" y2="48" stroke="var(--amber)" stroke-width="1.5"/><text x="' + (x(c.deadlineIdx) + 4) + '" y="18" font-size="10" fill="var(--amber)">deadline ' + num(c.deadline) + "</text>";
+	for (const [id, k] of all) { const i = ordinal[id]; const lateOne = c.late.includes(id); if (k === "advance") svgHtml += '<circle cx="' + x(i) + '" cy="34" r="4" fill="' + (lateOne ? "var(--red)" : "var(--amber)") + '"><title>' + k + " " + title(id) + "</title></circle>"; else svgHtml += '<rect x="' + (x(i) - 6) + '" y="28" width="12" height="12" rx="2" fill="var(--amber)"><title>' + k + " " + title(id) + "</title></rect>"; }
+	svgHtml += "</svg>";
+	body.innerHTML = "<h2>" + c.id + '</h2><div class="meta">StoryContract · outline/contracts/' + c.id + ".md · subjects：" + (c.subjects.character || []).join("、") + '</div><span class="status ' + (late ? "" : "ok") + '">' + (c.resolve.length ? "已兑现于 " + title(c.resolve[0]) + "（" + c.resolve[0] + "）" : "尚未兑现") + " · 推进 " + c.advance.length + " 次 · deadline " + c.deadline + (late ? " · 兑现后仍有 " + c.late.length + " 次 advance" : "") + "</span>" + svgHtml + '<div class="anchors">' + all.map(([id, k]) => '<div class="anchor' + (c.late.includes(id) ? " warn" : "") + '"><span class="k">' + k + " · " + id + '</span><span class="t">' + title(id) + '</span><span class="' + (beats[id].text ? "text" : "notext") + '">' + (beats[id].text ? "已提交正文" : "仅设计") + (c.late.includes(id) ? " · 在 resolve 之后" : "") + "</span></div>").join("") + "</div>";
+}
+function switchTab(name) { for (const b of document.querySelectorAll('[role="tab"]')) b.setAttribute("aria-selected", b.dataset.tab === name); for (const m of document.querySelectorAll("main")) m.dataset.active = m.id === name; if (name === "nb") renderNb(); if (name === "contract") renderContract(); }
+document.querySelector(".tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) switchTab(b.dataset.tab); });
+render(); renderNb(); renderContract();
+</script>

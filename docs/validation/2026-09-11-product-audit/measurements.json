@@ -1,0 +1,902 @@
+{
+  "projectId": "project_d82d5e13-9248-41ee-8c6a-03b576222223",
+  "revisions": 2,
+  "changes": [
+    "evidence/contexts/ctx_0e4df377dbce81047a5903b2c8994a2389080e2408ba56ef685e0ec38392e003.json",
+    "evidence/contexts/ctx_0e4df377dbce81047a5903b2c8994a2389080e2408ba56ef685e0ec38392e003.payload",
+    "evidence/manifest.json",
+    "evidence/reviews/rr_b8471c2bd2e8b714d2ef75d465baef72b31b78561637ba80fcc08c769ba1033a.json",
+    "intent/story-text-style.md"
+  ],
+  "expectedSentencePresent": true,
+  "runs": [
+    {
+      "id": "run_7d3303c4c88c1560cdf205270643f10b77edbfb203439d996c43eb9dfb793214",
+      "conversationId": "conversation_f3e50c36d9d973264082bd37134bbb6661f352ae2d3f854155b0f7d83ce5f50b",
+      "status": "completed",
+      "usage": {
+        "calls": 9,
+        "confirmedCalls": 9,
+        "input": 134788,
+        "output": 11752,
+        "cacheRead": 289536,
+        "cacheWrite": 0,
+        "reasoning": 8698,
+        "totalTokens": 436076,
+        "costUsd": 0.0229715808
+      },
+      "tasks": [
+        {
+          "id": "task_2e2e2392-2709-4096-be35-3da83dfd3571",
+          "kind": "review",
+          "status": "completed",
+          "parent": {
+            "taskId": "task_37dd4a3a-5f70-4334-8e86-3df3b3a5eb50",
+            "actionId": "action_7a5d9175-d883-42f6-a49a-0ed87fbca0bd"
+          },
+          "result": {
+            "kind": "object",
+            "id": "eo_4605fa204d3055a9cacf45be374a704a84802a7ec34e29e4bc41d719c6309f92"
+          }
+        },
+        {
+          "id": "task_37dd4a3a-5f70-4334-8e86-3df3b3a5eb50",
+          "kind": "director",
+          "status": "completed",
+          "result": {
+            "kind": "object",
+            "id": "eo_c424a5f74ef21db60f79d9272ad3e1af02f04edb06e02a30b58e48b87e0e8af3"
+          }
+        }
+      ],
+      "langfuseHTTP": 200,
+      "observations": [
+        {
+          "id": "82923c198bbec109",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool finish",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "c562169be43d2429",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0003900736,
+          "totalUsage": 81175
+        },
+        {
+          "id": "b69d535eedb8f6f9",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "aba03a41dfb4fe96",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.00037282,
+          "totalUsage": 80614
+        },
+        {
+          "id": "f89e779b175d2979",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "18e7950a1f0821a4",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GUARDRAIL",
+          "name": "suiming.checker.commit",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "93d02356162c1cd8",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool commit",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "7eb7c556d0ca8fcd",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0082482064,
+          "totalUsage": 80124
+        },
+        {
+          "id": "044785f8ccedaa45",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "0623c89d1678112a",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool read_result",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "4ccd49565165d565",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0009457784,
+          "totalUsage": 22006
+        },
+        {
+          "id": "b8e19dc47055b9f8",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "89cbbc0f5cfe2445",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "TOOL",
+          "name": "suiming.tool submit_review",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "269a515f87c333ee",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0021415464,
+          "totalUsage": 67624
+        },
+        {
+          "id": "3f805e68b9ce5b90",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "4c6f28913d74eec2",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "26fa74e8ac11fd74",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "25ef7b0cc0a36bfb",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "34974c301b0f5e25",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "TOOL",
+          "name": "suiming.tool check",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "b8d92b73e4f6aa27",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.00885038,
+          "totalUsage": 57879
+        },
+        {
+          "id": "dca58789cfc05279",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "38bd9ad24869a776",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "38bd9ad24869a776",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "AGENT",
+          "name": "suiming.task review",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "e8595ffbb3a08da6",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool review",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "aa033d9a9073e0e2",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool check",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "b8f9763d4c1cba3a",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0001997464,
+          "totalUsage": 16172
+        },
+        {
+          "id": "b0e64dfa8b817ae4",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "01d4af75af4f7dd5",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool edit",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "eb66d5c4df59bb58",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.000220696,
+          "totalUsage": 15719
+        },
+        {
+          "id": "1a7ad04727d33288",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "081f853e567123af",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "fc1270ee1ee60360",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0016023336,
+          "totalUsage": 14763
+        },
+        {
+          "id": "6839f5994cef3de6",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "632d955c77fa6447",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "632d955c77fa6447",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": "8c6a2e8d1bc086d8",
+          "type": "AGENT",
+          "name": "suiming.task director",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "8c6a2e8d1bc086d8",
+          "traceId": "f92c8cb3775f38cbe9a3192aff7b5136",
+          "parentObservationId": null,
+          "type": "SPAN",
+          "name": "suiming.run director",
+          "totalCost": null,
+          "totalUsage": 0
+        }
+      ]
+    },
+    {
+      "id": "run_d44cd2573f3a89022497ad9d9e48efebf78c68d573dca9cceca94a1f9682727b",
+      "conversationId": "conversation_d44cd2573f3a89022497ad9d9e48efebf78c68d573dca9cceca94a1f9682727b",
+      "status": "completed",
+      "usage": {
+        "calls": 10,
+        "confirmedCalls": 10,
+        "input": 22138,
+        "output": 5375,
+        "cacheRead": 160256,
+        "cacheWrite": 0,
+        "reasoning": 3869,
+        "totalTokens": 187769,
+        "costUsd": 0.0050530368
+      },
+      "tasks": [
+        {
+          "id": "task_8f7c5170-eb07-4bb6-b8ac-2e61e7cfcf5f",
+          "kind": "director",
+          "status": "completed",
+          "result": {
+            "kind": "object",
+            "id": "eo_e4bdbe9944b42d735212e5d9420a095a104c1129fdc8efa3e497f81a95f743ca"
+          }
+        }
+      ],
+      "langfuseHTTP": 200,
+      "observations": [
+        {
+          "id": "dd4cf0ebc81bfa07",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool finish",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "39294cb1fb65488e",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0005257896,
+          "totalUsage": 26590
+        },
+        {
+          "id": "8950d9ee08dcf578",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "43883fe4d451b196",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "5ef82f949d119f60",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "26c2fcf3acfce53b",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0005619768,
+          "totalUsage": 24902
+        },
+        {
+          "id": "821348eb5b8dd4d8",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "c4fbfb60baeb3096",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "23b0bcd2189baf11",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "f79d4ac28280bb2b",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "d80b6e76eebbfb6a",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "7927aecf53c63c07",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "405ce1ef217df2a9",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "a4713dcf0171f0ac",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.000304808,
+          "totalUsage": 22755
+        },
+        {
+          "id": "6d12a90f0986664a",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "67b44d171c324d4f",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "1706834c93e72e41",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "db1dc567ea92abc3",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.000831012,
+          "totalUsage": 21969
+        },
+        {
+          "id": "ac81bbbed24a51dc",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "d82bb927241f7bc3",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool check",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "bffd5e4f362a8d81",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0001275568,
+          "totalUsage": 16701
+        },
+        {
+          "id": "612f72da4924381c",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "284d8fe827819983",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "a3062641beabfd04",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "5cb80865de143432",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0002713928,
+          "totalUsage": 16288
+        },
+        {
+          "id": "ec6b85ced40b85f7",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "40877f6a1417fd42",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "04c22e8b0a16ca03",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "7d7c6871c19d4ff8",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.000115696,
+          "totalUsage": 15060
+        },
+        {
+          "id": "82626e6ac8bb92e8",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "0946bd5b411c7a5f",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool read_conversation",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "2e266e8fc0aeef32",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0000885976,
+          "totalUsage": 14847
+        },
+        {
+          "id": "6cf627de53022d5e",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "cbd04384496104ce",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "6469da19ebd06c6c",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "ad76ce810d6727d6",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.0002205672,
+          "totalUsage": 14710
+        },
+        {
+          "id": "c310d7db30bce90b",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "99824cae52df34fa",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "c20a76b9c4617c6a",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "7dd6fa8fa4b9f962",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.00200564,
+          "totalUsage": 13947
+        },
+        {
+          "id": "f69a12b42bfd290e",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "54e48c3f31f5ff3e",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "54e48c3f31f5ff3e",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": "7b0a2861561c0db3",
+          "type": "AGENT",
+          "name": "suiming.task director",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "7b0a2861561c0db3",
+          "traceId": "e1c091f50ee634f84c84f7c0c1984307",
+          "parentObservationId": null,
+          "type": "SPAN",
+          "name": "suiming.run director",
+          "totalCost": null,
+          "totalUsage": 0
+        }
+      ]
+    },
+    {
+      "id": "run_f3e50c36d9d973264082bd37134bbb6661f352ae2d3f854155b0f7d83ce5f50b",
+      "conversationId": "conversation_f3e50c36d9d973264082bd37134bbb6661f352ae2d3f854155b0f7d83ce5f50b",
+      "status": "completed",
+      "usage": {
+        "calls": 2,
+        "confirmedCalls": 2,
+        "input": 12772,
+        "output": 841,
+        "cacheRead": 15360,
+        "cacheWrite": 0,
+        "reasoning": 302,
+        "totalTokens": 28973,
+        "costUsd": 0.0020665680000000004
+      },
+      "tasks": [
+        {
+          "id": "task_d9977b82-dd82-4be4-abc4-054435c1e20c",
+          "kind": "director",
+          "status": "completed",
+          "result": {
+            "kind": "object",
+            "id": "eo_6c01ff9e69d5a3a89560ca980121340d74349516693116939f0f6d8f9485c864"
+          }
+        }
+      ],
+      "langfuseHTTP": 200,
+      "observations": [
+        {
+          "id": "48348401dd8a8e0b",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "TOOL",
+          "name": "suiming.tool finish",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "d4d369d4e12eae99",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.000231224,
+          "totalUsage": 14890
+        },
+        {
+          "id": "7fe81d47bf39abee",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "15bbc5bfc9f147ee",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "TOOL",
+          "name": "suiming.tool search",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "5e547f285525f3b1",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "TOOL",
+          "name": "suiming.tool project_status",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "3169401506410765",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "GENERATION",
+          "name": "suiming.model.call",
+          "totalCost": 0.001835344,
+          "totalUsage": 14083
+        },
+        {
+          "id": "2ece981b53a4c19c",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "8b45116cad5fd2ee",
+          "type": "RETRIEVER",
+          "name": "suiming.context.capture",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "8b45116cad5fd2ee",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": "246a3fb36a1b112d",
+          "type": "AGENT",
+          "name": "suiming.task director",
+          "totalCost": null,
+          "totalUsage": 0
+        },
+        {
+          "id": "246a3fb36a1b112d",
+          "traceId": "e2e3763ebc1c717e880cb5a2547acb0f",
+          "parentObservationId": null,
+          "type": "SPAN",
+          "name": "suiming.run director",
+          "totalCost": null,
+          "totalUsage": 0
+        }
+      ]
+    }
+  ],
+  "queryBenchmark": {
+    "samples": 15,
+    "workspaceShow": {
+      "medianMs": 118.893917,
+      "maxMs": 460.278208
+    },
+    "runList": {
+      "medianMs": 2.354334,
+      "maxMs": 3.406792
+    }
+  }
+}

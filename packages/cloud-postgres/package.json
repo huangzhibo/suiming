@@ -1,0 +1,27 @@
+{
+	"name": "@suiming/cloud-postgres",
+	"version": "0.0.0",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"dependencies": {
+		"@suiming/runtime": "0.0.0",
+		"kysely": "0.29.5",
+		"pg": "8.23.0"
+	},
+	"devDependencies": {
+		"@types/pg": "8.16.0"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	}
+}

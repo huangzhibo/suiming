@@ -1,0 +1,21 @@
+{
+	"name": "@suiming/cloud-s3",
+	"version": "0.0.0",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist"],
+	"dependencies": {
+		"@aws-sdk/client-s3": "3.1125.0",
+		"@suiming/runtime": "0.0.0"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	}
+}

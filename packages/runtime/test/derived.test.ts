@@ -1,0 +1,362 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import test from "node:test";
+import { type ReviewFile, type ReviewScope, renderReviewFile } from "@suiming/story";
+import {
+	type ArtifactCandidate,
+	ArtifactError,
+	composeReviewFile,
+	designClosurePaths,
+	inspectRelease,
+	type OpenPackageFile,
+	type ProjectRevision,
+	publishRelease,
+	type RevisionHistoryReader,
+	releaseReadiness,
+	reviewCurrency,
+	reviewSubjectPaths,
+	storyPackageCodec,
+	subjectDigests,
+	textCurrencies,
+	textCurrency,
+} from "../src/index.js";
+import { sampleWorkFiles } from "./sample-work.js";
+
+const encoder = new TextEncoder();
+
+/**
+ * 派生层只依赖 `RevisionHistoryReader`：这里用一串快照冒充历史，摘要就是内容 sha。
+ * git 实现的同名契约由 canon-store-contract 与 local-project-service 的测试覆盖。
+ */
+class FakeHistory implements RevisionHistoryReader {
+	readonly #revisions: { revision: ProjectRevision; files: OpenPackageFile[] }[] = [];
+	commit(files: OpenPackageFile[]): string {
+		const id = `r${this.#revisions.length + 1}`;
+		const parentId = this.#revisions.at(-1)?.revision.id ?? null;
+		this.#revisions.push({ revision: { id, parentId }, files });
+		return id;
+	}
+	candidateFiles(revisionId: string): OpenPackageFile[] {
+		const entry = this.#revisions.find((item) => item.revision.id === revisionId);
+		if (entry === undefined) throw new ArtifactError("revision_not_found", revisionId);
+		return entry.files;
+	}
+	candidate(revisionId: string): ArtifactCandidate {
+		return candidateOf(this.candidateFiles(revisionId), revisionId);
+	}
+	async history(): Promise<ProjectRevision[]> {
+		return this.#revisions.map((item) => item.revision);
+	}
+	async fileDigests(revisionId: string): Promise<ReadonlyMap<string, string>> {
+		const entry = this.#revisions.find((item) => item.revision.id === revisionId);
+		if (entry === undefined) throw new ArtifactError("revision_not_found", revisionId);
+		return new Map(entry.files.map((file) => [file.path, createHash("sha256").update(file.bytes).digest("hex")]));
+	}
+	async snapshot(revisionId: string): Promise<ArtifactCandidate> {
+		return this.candidate(revisionId);
+	}
+}
+
+function candidateOf(files: readonly OpenPackageFile[], baseRevisionId: string): ArtifactCandidate {
+	return {
+		baseRevisionId,
+		artifacts: files.map((file) => ({
+			identity: storyPackageCodec.identityForPath(file.path),
+			path: file.path,
+			mediaType: file.mediaType,
+			bytes: file.bytes,
+		})),
+	};
+}
+
+const markdown = (path: string, text: string): OpenPackageFile => ({
+	path,
+	mediaType: "text/markdown; charset=utf-8",
+	bytes: encoder.encode(text),
+});
+const replace = (files: OpenPackageFile[], path: string, text: string) =>
+	files.map((file) => (file.path === path ? markdown(path, text) : file));
+const texts = () => [
+	markdown("text/beat-0001.md", "李牧走入皇档。\n\n他在尘封木匣里找到了密信。"),
+	markdown("text/beat-0002.md", "天亮前，他公开真相，亲手把唯一的密信送进火里。"),
+];
+
+test("正文时效从历史派生：写成时的 Design 闭包没变就是 current，闭包里任一文件变了就是 design-changed，重写正文后重新起算", async () => {
+	const history = new FakeHistory();
+	const design = sampleWorkFiles();
+	const r1 = history.commit(design);
+	assert.deepEqual(
+		(await textCurrencies(history, r1, history.candidate(r1))).map((item) => [item.storyBeatId, item.state]),
+		[
+			["beat-0001", "missing"],
+			["beat-0002", "missing"],
+		],
+	);
+	// 样例作品很小，两个 Beat 的闭包都是整套 Design。
+	assert.ok(designClosurePaths(history.candidate(r1), "beat-0001").includes("world/characters/李牧.md"));
+
+	const withText = [...design, ...texts()];
+	assert.deepEqual(
+		(await textCurrencies(history, r1, candidateOf(withText, r1))).map((item) => item.state),
+		["uncommitted", "uncommitted"],
+		"候选里有正文、head 里没有：还没提交",
+	);
+	const r2 = history.commit(withText);
+	assert.deepEqual(await textCurrencies(history, r2, history.candidate(r2)), [
+		{ storyBeatId: "beat-0001", state: "current", writtenAt: r2, changed: [] },
+		{ storyBeatId: "beat-0002", state: "current", writtenAt: r2, changed: [] },
+	]);
+
+	const r3 = history.commit(
+		replace(withText, "world/characters/李牧.md", "---\nname: 李牧\n---\n相信真相必须由证据和代价共同承担。\n"),
+	);
+	const changed = await textCurrencies(history, r3, history.candidate(r3));
+	assert.deepEqual(
+		changed.map((item) => [item.state, item.writtenAt, item.changed]),
+		[
+			["design-changed", r2, ["world/characters/李牧.md"]],
+			["design-changed", r2, ["world/characters/李牧.md"]],
+		],
+	);
+
+	// r4：李牧改回 r2 的样子，同时重写 beat-0001 的正文。
+	const r4 = history.commit(replace(withText, "text/beat-0001.md", "李牧推开皇档的门。"));
+	assert.deepEqual(
+		(await textCurrencies(history, r4, history.candidate(r4))).map((item) => [item.state, item.writtenAt]),
+		[
+			["current", r4],
+			["current", r2],
+		],
+		"时效比较的是写成时与 head 的闭包内容，中间来回改过不算",
+	);
+	assert.equal((await textCurrency(history, r4, history.candidate(r4), "beat-0002")).changed.length, 0);
+	await assert.rejects(textCurrencies(history, "r9", history.candidate(r4)), { code: "revision_not_found" });
+});
+
+test("story index 只按这个 Beat 的那一段算进闭包：末尾加卷不让前面的正文变黄，改卷名、动了前后邻居才算", async () => {
+	const history = new FakeHistory();
+	const withText = [...sampleWorkFiles(), ...texts()];
+	const r1 = history.commit(withText);
+	assert.deepEqual(
+		(await textCurrencies(history, r1, history.candidate(r1))).map((item) => item.state),
+		["current", "current"],
+	);
+	const index = (volumes: string) => markdown("outline/story/index.yaml", `schema_version: 2\nvolumes:\n${volumes}`);
+	const first = "  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001, beat-0002]\n";
+	// r2：全书末尾追加一卷一个 Beat（连载式写法每加一节都会改 index.yaml）
+	const appended = [
+		...withText.filter((file) => file.path !== "outline/story/index.yaml"),
+		index(`${first}  - id: vol-0002\n    title: 续篇\n    beat_ids: [beat-0003]\n`),
+		markdown("outline/story/vol-0002/beat-0003.md", "---\nrefs:\n  character: [李牧]\n---\n李牧离开都城。\n"),
+	];
+	const r2 = history.commit(appended);
+	assert.deepEqual(
+		(await textCurrencies(history, r2, history.candidate(r2))).map((item) => [item.storyBeatId, item.state]),
+		[
+			["beat-0001", "current"],
+			["beat-0002", "design-changed"],
+			["beat-0003", "missing"],
+		],
+		"只有原来的最后一篇多了一个「下一个」",
+	);
+	// r3：改第一卷的卷名，这一卷的正文都算 Design 变了
+	const r3 = history.commit(
+		appended.map((file) =>
+			file.path === "outline/story/index.yaml"
+				? index(`${first.replace("入局", "破局")}  - id: vol-0002\n    title: 续篇\n    beat_ids: [beat-0003]\n`)
+				: file,
+		),
+	);
+	const renamed = await textCurrencies(history, r3, history.candidate(r3));
+	assert.deepEqual(
+		renamed
+			.slice(0, 2)
+			.map((item) => [item.storyBeatId, item.state, item.changed.includes("outline/story/index.yaml")]),
+		[
+			["beat-0001", "design-changed", true],
+			["beat-0002", "design-changed", true],
+		],
+	);
+});
+
+test("审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间", async () => {
+	const history = new FakeHistory();
+	const design = sampleWorkFiles();
+	history.commit(design);
+	const withText = [...design, ...texts()];
+	const r2 = history.commit(withText);
+	const draft = { verdict: "pass" as const, summary: "成立", findings: [], uncovered: [], uncertainties: [] };
+	// 用真实的 composeReviewFile 造审稿：subjects 由它按主体路径算，测的是产品路径不是手搭的字面量。
+	const compose = (candidate: ArtifactCandidate, layer: "text" | "design", scope: ReviewScope, revision: string) =>
+		composeReviewFile(candidate, { layer, scope, revision, draft }).file;
+	const book = { kind: "book" as const };
+	const at2 = history.candidate(r2);
+	const bookText = compose(at2, "text", book, r2);
+	const beatOne = compose(at2, "text", { kind: "beats", storyBeatIds: ["beat-0001"] }, r2);
+	const designReview = compose(at2, "design", book, r2);
+	const at = (file: ReviewFile, path = "review/x.md") => ({ path, file });
+
+	assert.deepEqual(await reviewCurrency(history, r2, at2, at(bookText)), {
+		state: "current",
+		changed: [],
+		revision: r2,
+	});
+
+	const r3 = history.commit(replace(withText, "text/beat-0002.md", "他公开真相。人群沉默许久。"));
+	const at3 = history.candidate(r3);
+	assert.deepEqual(await reviewCurrency(history, r3, at3, at(bookText)), {
+		state: "stale",
+		changed: ["text/beat-0002.md"],
+		revision: r2,
+	});
+	assert.deepEqual(await reviewCurrency(history, r3, at3, at(beatOne)), {
+		state: "current",
+		changed: [],
+		revision: r2,
+	});
+	assert.deepEqual(await reviewCurrency(history, r3, at3, at(designReview)), {
+		state: "current",
+		changed: [],
+		revision: r2,
+	});
+
+	const r4 = history.commit(replace(withText, "intent/揭开真相.md", "真相必须有代价。\n"));
+	const at4 = history.candidate(r4);
+	assert.deepEqual(await reviewCurrency(history, r4, at4, at(designReview)), {
+		state: "stale",
+		changed: ["intent/揭开真相.md"],
+		revision: r2,
+	});
+	assert.equal(
+		(await reviewCurrency(history, r4, at4, at(beatOne))).state,
+		"stale",
+		"Intent 在 Beat 的 Design 闭包里",
+	);
+
+	// 2026-09-16 第一次真实对话撞上的那条：Agent 审完按意见改正文，两者一起提交。
+	// 按版本比时区间为空、必然判 current；按摘要比才判得出来。
+	const beforeFix = history.candidate(r4);
+	const sameCommitReview = compose(beforeFix, "text", { kind: "beats", storyBeatIds: ["beat-0001"] }, "candidate");
+	const fixed = [
+		...replace(history.candidateFiles(r4), "text/beat-0001.md", "李牧推开皇档的门，在尘封木匣里找到密信。"),
+		markdown("review/same.md", renderReviewFile(sameCommitReview)),
+	];
+	const r5 = history.commit(fixed);
+	assert.deepEqual(
+		await reviewCurrency(history, r5, history.candidate(r5), at(sameCommitReview, "review/same.md")),
+		{ state: "stale", changed: ["text/beat-0001.md"], revision: r5 },
+		"审稿与按它改过的正文落在同一个 revision，仍要判 stale",
+	);
+
+	// 审稿时还不存在、后来成了主体的文件，也让全书正文审稿过时。
+	const onlyOne = [...design, markdown("text/beat-0001.md", "李牧走入皇档。")];
+	const r6 = history.commit(onlyOne);
+	const partial = compose(history.candidate(r6), "text", book, r6);
+	assert.deepEqual(partial.subjects.has("text/beat-0002.md"), false, "审的时候 beat-0002 还没有正文");
+	const r7 = history.commit([...onlyOne, markdown("text/beat-0002.md", "他公开真相。")]);
+	assert.deepEqual(await reviewCurrency(history, r7, history.candidate(r7), at(partial)), {
+		state: "stale",
+		changed: ["text/beat-0002.md"],
+		revision: r6,
+	});
+});
+
+test("Release 从完整且 current 的正文派生，Review 意见不拥有发布裁决权；正文一变 Release 就 stale", async () => {
+	const history = new FakeHistory();
+	const design = sampleWorkFiles();
+	const r1 = history.commit(design);
+	const incomplete = await releaseReadiness(history, r1, history.candidate(r1));
+	assert.equal(incomplete.publishable, false);
+	assert.ok(incomplete.blockers.length > 0);
+
+	const withText = [...design, ...texts()];
+	const r2 = history.commit(withText);
+	const readiness = await releaseReadiness(history, r2, history.candidate(r2));
+	assert.equal(readiness.publishable, false, "还没有 current 的全书正文审稿");
+	assert.deepEqual(readiness.blockers, ["没有 current 的全书正文审稿"]);
+	assert.ok(readiness.texts.every((item) => item.state === "current"));
+
+	const review = {
+		layer: "text" as const,
+		scope: { kind: "book" as const },
+		revision: r2,
+		draft: {
+			verdict: "revise" as const,
+			summary: "结尾反馈仍可加强。",
+			findings: [
+				{
+					severity: "minor" as const,
+					anchor: { kind: "artifact" as const, path: "text/beat-0002.md" },
+					issue: "焚信后的旁观者反馈偏少。",
+					evidence: "亲手把唯一的密信送进火里。",
+					repairLayer: "text" as const,
+				},
+			],
+			uncovered: [],
+			uncertainties: [],
+		},
+	};
+	const reviewedAt = history.candidate(r2);
+	const reviewed = [
+		...withText,
+		markdown(
+			"review/text-book.md",
+			renderReviewFile({
+				...review,
+				subjects: subjectDigests(reviewedAt, reviewSubjectPaths(reviewedAt, "text", review.scope)),
+			}),
+		),
+	];
+	const r3 = history.commit(reviewed);
+	const ready = await releaseReadiness(history, r3, history.candidate(r3));
+	assert.equal(ready.publishable, true);
+	assert.deepEqual(ready.review, { id: "text-book", verdict: "revise" });
+
+	const published = await publishRelease(history, {
+		candidate: history.candidate(r3),
+		headRevisionId: r3,
+		storyTextReview: "text-book",
+		minCodePoints: 12,
+		targetCodePoints: 18,
+		maxCodePoints: 24,
+	});
+	assert.equal(published.reviewVerdict, "revise", "verdict 原样带出，不决定发布权限");
+	assert.equal(published.manifest.revision, r3);
+	assert.equal(published.manifest.storyTextReview, "text-book");
+	const releaseFiles: OpenPackageFile[] = published.operations.flatMap((operation) =>
+		operation.operation === "delete"
+			? []
+			: [
+					{
+						path: operation.path,
+						mediaType: operation.mediaType,
+						bytes: operation.bytes,
+					},
+				],
+	);
+	assert.ok(releaseFiles.some((file) => file.path === "release/manifest.yaml"));
+	const r4 = history.commit([...reviewed, ...releaseFiles]);
+	assert.deepEqual(await inspectRelease(history, r4, history.candidate(r4)), {
+		state: "current",
+		chapterCount: published.manifest.chapters.length,
+		reviewVerdict: "revise",
+	});
+
+	await assert.rejects(
+		publishRelease(history, { candidate: history.candidate(r4), headRevisionId: r4, storyTextReview: "nope" }),
+		{ code: "invalid_release_review" },
+	);
+
+	const r5 = history.commit(
+		replace([...reviewed, ...releaseFiles], "text/beat-0002.md", "他公开真相，人群沉默许久，才有人喊出他的名字。"),
+	);
+	const stale = await inspectRelease(history, r5, history.candidate(r5));
+	assert.equal(stale.state, "stale");
+	await assert.rejects(
+		publishRelease(history, { candidate: history.candidate(r5), headRevisionId: r5, storyTextReview: "text-book" }),
+		{ code: "review_not_current" },
+	);
+	const republished = await publishRelease(history, { candidate: history.candidate(r5), headRevisionId: r5 });
+	assert.equal(republished.manifest.revision, r5);
+	assert.equal(republished.manifest.storyTextReview, undefined);
+});

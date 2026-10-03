@@ -1,0 +1,276 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+	createModels,
+	fauxAssistantMessage,
+	fauxProvider,
+	fauxToolCall,
+	type Message,
+	Type,
+} from "@earendil-works/pi-ai";
+import { getSystemMessageText } from "@earendil-works/pi-ai/utils/text";
+import { type LoopCheckpoint, runTaskLoop } from "../src/harness/loop.js";
+import type { HarnessTool } from "../src/harness/tool.js";
+import { ModelGateway } from "../src/model/model-gateway.js";
+
+/**
+ * 会话永续，上下文就必须有生命周期（2026-10-01 Harness 审查 F3）：请求接近窗口时先清掉较早的工具结果，
+ * 仍然太大就请模型压缩，provider 报超限时清理后重试一次，实在放不下就如实报 context_overflow。
+ * 这里的 faux provider 按请求大小拒绝超限请求，和真实 provider 一样。
+ */
+
+/**
+ * 与 faux provider 估算 input tokens 的口径一致（它的 serializeContext：各消息的文本拼起来，字符数 / 4），
+ * harness 用返回的 usage 校准自己的估计，这里的「provider 上限」也得按同一口径算。pi-ai 0.99 起 faux 拿到的是
+ * 折好的 transcript：系统提示与工具声明在开头那条 system message 里，只序列化消息。
+ */
+/** faux 拿到的是折好的 transcript，不再是带 systemPrompt / tools 的 Context。 */
+type Transcript = { messages: readonly Message[] };
+
+function tokensOf(context: Transcript): number {
+	const text = (message: Message): string => {
+		if (message.role === "system")
+			return [
+				getSystemMessageText(message),
+				...(message.toolsRemoved?.map((tool) => `tool-:${JSON.stringify(tool)}`) ?? []),
+				...(message.toolsAdded?.map((tool) => `tool+:${JSON.stringify(tool)}`) ?? []),
+			]
+				.filter((part) => part.length > 0)
+				.join("\n");
+		if (message.role === "user")
+			return typeof message.content === "string"
+				? message.content
+				: message.content.map((part) => (part.type === "text" ? part.text : "")).join("\n");
+		if (message.role === "assistant")
+			return message.content
+				.map((part) =>
+					part.type === "text"
+						? part.text
+						: part.type === "thinking"
+							? part.thinking
+							: `${part.name}:${JSON.stringify(part.arguments)}`,
+				)
+				.join("\n");
+		return [message.toolName, ...message.content.map((part) => (part.type === "text" ? part.text : ""))].join("\n");
+	};
+	return Math.ceil(context.messages.map((message) => `${message.role}:${text(message)}`).join("\n\n").length / 4);
+}
+
+function overflow(tokens: number, limit: number) {
+	return fauxAssistantMessage([], {
+		stopReason: "error",
+		errorMessage: `prompt is too long: ${tokens} tokens > ${limit} maximum`,
+	});
+}
+
+async function fixture(contextWindow: number) {
+	const provider = fauxProvider({
+		provider: "context-window",
+		models: [{ id: "small", contextWindow, maxTokens: 1000, reasoning: false }],
+	});
+	const models = createModels();
+	models.setProvider(provider.provider);
+	const profile = { provider: provider.provider.id, model: "small" };
+	const model = await new ModelGateway(models, { profiles: { main: profile, reviewer: profile } }).bind("main");
+	return { provider, model };
+}
+
+/** 一个读取工具：每次返回一大段不同的正文。 */
+function bigTool(size: number): HarnessTool {
+	let count = 0;
+	return {
+		name: "big",
+		description: "读一大段正文",
+		parameters: Type.Object({}, { additionalProperties: false }),
+		replay: "read",
+		async prepare() {
+			count += 1;
+			return { content: [{ type: "text" as const, text: `第${count}段：${"李牧封蜡".repeat(size / 4)}` }] };
+		},
+		async execute(_id, _params, _signal, _update, prepared) {
+			return prepared as { content: { type: "text"; text: string }[] };
+		},
+	};
+}
+
+function lastToolResults(context: Transcript): string[] {
+	return context.messages
+		.filter((message) => message.role === "toolResult")
+		.map((message) => message.content.map((part) => (part.type === "text" ? part.text : "")).join(""));
+}
+
+test("请求接近窗口时清掉较早的工具结果：发出的请求不超窗口，原消息不改，最近一次的结果保留", async () => {
+	const window = 4000;
+	const { provider, model } = await fixture(window);
+	const seen: Transcript[] = [];
+	const step = async (context: Transcript) => {
+		seen.push(context);
+		const tokens = tokensOf(context);
+		if (tokens > window) return overflow(tokens, window);
+		return seen.length <= 8 ? fauxAssistantMessage(fauxToolCall("big", {})) : fauxAssistantMessage("读完了");
+	};
+	provider.setResponses(Array.from({ length: 9 }, () => step));
+	let checkpoint: LoopCheckpoint | undefined;
+	const outcome = await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: "反复读",
+		tools: [bigTool(2400)],
+		budget: { maxTurns: 20 },
+		saveCheckpoint: async (next) => {
+			checkpoint = structuredClone(next);
+		},
+	});
+	assert.equal(outcome.stop, "model_stopped");
+	assert.ok(
+		seen.every((context) => tokensOf(context) <= window),
+		"每个请求都在窗口内",
+	);
+	const last = lastToolResults(seen.at(-1) as Transcript);
+	assert.match(last.at(-1) ?? "", /^第8段：/u, "最近一次的结果原样发送");
+	assert.ok(
+		last.some((text) => text.includes("已清除")),
+		"较早的结果换成了占位",
+	);
+	const stored = (checkpoint?.messages ?? []).filter((message) => message.role === "toolResult");
+	assert.equal(stored.length, 8);
+	assert.ok(
+		stored.every((message) => JSON.stringify(message.content).includes("李牧封蜡")),
+		"checkpoint 里的原消息一字不改",
+	);
+});
+
+test("provider 报上下文超限时清掉较早的工具结果重试一次，turn 照常结束", async () => {
+	// 模型目录说窗口很大，provider 实际只收 4000：主动清理不会触发，靠报错后的重试兜住。
+	const limit = 4000;
+	const { provider, model } = await fixture(1_000_000);
+	let overflows = 0;
+	let calls = 0;
+	const step = async (context: Transcript) => {
+		calls += 1;
+		const tokens = tokensOf(context);
+		if (tokens > limit) {
+			overflows += 1;
+			return overflow(tokens, limit);
+		}
+		return lastToolResults(context).length < 9
+			? fauxAssistantMessage(fauxToolCall("big", {}))
+			: fauxAssistantMessage("读完了");
+	};
+	provider.setResponses(Array.from({ length: 12 }, () => step));
+	let checkpoint: LoopCheckpoint | undefined;
+	const outcome = await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: "反复读",
+		tools: [bigTool(2400)],
+		budget: { maxTurns: 20 },
+		saveCheckpoint: async (next) => {
+			checkpoint = structuredClone(next);
+		},
+	});
+	assert.equal(outcome.stop, "model_stopped");
+	assert.equal(overflows, 1, "清理后重试一次就够了");
+	assert.ok(
+		!(checkpoint?.messages ?? []).some((message) => message.role === "assistant" && message.stopReason === "error"),
+		"报超限的那次响应撤回，不留在消息列表里",
+	);
+	assert.ok(calls <= 12);
+});
+
+test("清掉工具结果后仍然偏大：请求末尾请模型先 compact_context，压缩后接着做", async () => {
+	const window = 6000;
+	const { provider, model } = await fixture(window);
+	const seen: Transcript[] = [];
+	let compacted = false;
+	const step = async (context: Transcript) => {
+		seen.push(context);
+		const tokens = tokensOf(context);
+		if (tokens > window) return overflow(tokens, window);
+		const last = context.messages.at(-1);
+		const asked = last?.role === "user" && JSON.stringify(last.content).includes("compact_context");
+		if (asked && !compacted) {
+			compacted = true;
+			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "已经讨论了李牧公开密信的代价。" }));
+		}
+		if (compacted) return fauxAssistantMessage("压缩后接着说完。");
+		// 工具结果很小，清不出多少；占地方的是模型自己的长回复。
+		return fauxAssistantMessage([
+			{ type: "text", text: "李牧在封蜡前停了一下。".repeat(120) },
+			fauxToolCall("note", {}),
+		]);
+	};
+	provider.setResponses(Array.from({ length: 30 }, () => step));
+	const note: HarnessTool = {
+		name: "note",
+		description: "记一笔",
+		parameters: Type.Object({}, { additionalProperties: false }),
+		replay: "read",
+		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
+		execute: async (_id, _params, _signal, _update, prepared) =>
+			prepared as { content: { type: "text"; text: string }[] },
+	};
+	const { compactContextTool } = await import("../src/harness/tools.js");
+	const outcome = await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: "讨论",
+		tools: [note, compactContextTool()],
+		budget: { maxTurns: 40 },
+	});
+	assert.equal(outcome.stop, "model_stopped");
+	assert.equal(compacted, true, "模型被请求压缩并照做了");
+	assert.ok(
+		seen.every((context) => tokensOf(context) <= window),
+		"没有请求超出窗口",
+	);
+	assert.ok(tokensOf(seen.at(-1) as Transcript) < tokensOf(seen.at(-2) as Transcript), "压缩之后请求变小");
+});
+
+test("清完仍放不下：重试一次后如实报 context_overflow，不无限重发", async () => {
+	const limit = 1000;
+	const { provider, model } = await fixture(1_000_000);
+	let calls = 0;
+	provider.setResponses(
+		Array.from({ length: 5 }, () => async (context: Transcript) => {
+			calls += 1;
+			return overflow(tokensOf(context), limit);
+		}),
+	);
+	await assert.rejects(
+		runTaskLoop({
+			model,
+			systemPrompt: "测试",
+			prompt: "作者贴进来的一整章。".repeat(800),
+			tools: [],
+			budget: { maxTurns: 20 },
+		}),
+		(error: { code?: string; message?: string }) =>
+			error.code === "context_overflow" && /新对话/u.test(error.message ?? ""),
+	);
+	assert.ok(calls <= 2, `最多重试一次，实际 ${calls} 次`);
+});
+
+test("请求带上 loop 的 id 作 sessionId：按会话做 prompt cache 的 provider 能把同一会话的请求路由到一起", async () => {
+	const { provider, model } = await fixture(1_000_000);
+	const sessionIds: (string | undefined)[] = [];
+	provider.setResponses([
+		async (_context: Transcript, options?: { sessionId?: string }) => {
+			sessionIds.push(options?.sessionId);
+			return fauxAssistantMessage(fauxToolCall("big", {}));
+		},
+		async (_context: Transcript, options?: { sessionId?: string }) => {
+			sessionIds.push(options?.sessionId);
+			return fauxAssistantMessage("读完了");
+		},
+	]);
+	await runTaskLoop({
+		model,
+		loopId: "session-cache",
+		systemPrompt: "测试",
+		prompt: "读一次",
+		tools: [bigTool(40)],
+		budget: { maxTurns: 5 },
+	});
+	assert.deepEqual(sessionIds, ["session-cache", "session-cache"]);
+});

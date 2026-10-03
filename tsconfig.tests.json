@@ -1,0 +1,17 @@
+{
+	"extends": "./tsconfig.base.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"paths": {
+			"@suiming/cloud-postgres": ["./packages/cloud-postgres/src/index.ts"],
+			"@suiming/cloud-s3": ["./packages/cloud-s3/src/index.ts"],
+			"@suiming/runtime": ["./packages/runtime/src/index.ts"],
+			"@suiming/sdk": ["./packages/sdk/src/index.ts"],
+			"@suiming/story": ["./packages/story/src/index.ts"]
+		}
+	},
+	"include": ["packages/*/test/**/*.ts", "apps/*/test/**/*.ts"]
+}

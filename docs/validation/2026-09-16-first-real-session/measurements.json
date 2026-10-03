@@ -1,0 +1,52 @@
+{
+	"turn1": {
+		"events": 190,
+		"wallSeconds": 205.7,
+		"usage": {
+			"calls": 7,
+			"confirmedCalls": 7,
+			"input": 62491,
+			"output": 34207,
+			"cacheRead": 401792,
+			"cacheWrite": 0,
+			"reasoning": 25049,
+			"totalTokens": 498490,
+			"costUsd": 0.019451717599999998
+		},
+		"actions": {
+			"write_context": 1,
+			"story_guide": 1,
+			"read": 4,
+			"write": 1,
+			"edit": 5,
+			"check": 1,
+			"commit": 1
+		}
+	},
+	"turn2": {
+		"events": 310,
+		"wallSeconds": 188.4,
+		"usage": {
+			"calls": 24,
+			"confirmedCalls": 24,
+			"input": 144281,
+			"output": 67095,
+			"cacheRead": 1965312,
+			"cacheWrite": 0,
+			"reasoning": 52784,
+			"totalTokens": 2176688,
+			"costUsd": 0.04448881359999998
+		},
+		"actions": {
+			"frame": 1,
+			"check": 2,
+			"search": 6,
+			"submit_review": 1,
+			"review": 2,
+			"read_result": 1,
+			"read": 6,
+			"edit": 8,
+			"commit": 1
+		}
+	}
+}

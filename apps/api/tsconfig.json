@@ -1,0 +1,16 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"composite": true,
+		"rootDir": "src",
+		"outDir": "dist",
+		"tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+	},
+	"include": ["src/**/*.ts"],
+	"references": [
+		{ "path": "../../packages/sdk" },
+		{ "path": "../../packages/runtime" },
+		{ "path": "../../packages/cloud-postgres" },
+		{ "path": "../../packages/cloud-s3" }
+	]
+}

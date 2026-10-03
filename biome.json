@@ -1,0 +1,29 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.8/schema.json",
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended"
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 3,
+		"lineWidth": 120
+	},
+	"files": {
+		"includes": [
+			"apps/*/src/**/*.ts",
+			"apps/*/src/**/*.tsx",
+			"apps/*/test/**/*.ts",
+			"packages/*/src/**/*.ts",
+			"packages/*/test/**/*.ts",
+			"scripts/**/*.mjs",
+			"!packages/story/src/constitution.ts",
+			"!packages/story/src/story-language-docs.ts",
+			"!apps/cli/src/host-files.ts"
+		]
+	}
+}

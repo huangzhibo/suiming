@@ -1,0 +1,52 @@
+{
+	"name": "suiming",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"packageManager": "npm@11.17.0",
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"scripts": {
+		"build": "tsc -b --force",
+		"postbuild": "node -e \"require('node:fs').chmodSync('apps/cli/dist/bin.js', 0o755)\"",
+		"check": "npm run check:docs && npm run check:constitution && npm run check:story-language && npm run check:host-files && npm run check:story-isolation && biome check --error-on-warnings . && npm run check:types && npm run check:web && npm run check:design-system && npm run check:integrations",
+		"check:docs": "node scripts/check-docs.mjs",
+		"check:integrations": "node scripts/check-host-integrations.mjs",
+		"check:story-isolation": "node scripts/check-story-isolation.mjs",
+		"check:types": "tsc -b --pretty false && tsc -p tsconfig.tests.json --pretty false",
+		"format": "biome check --write .",
+		"dev:api": "node --env-file-if-exists=.env --import tsx apps/api/src/bin.ts",
+		"test": "node --import tsx --test packages/story/test/*.test.ts packages/runtime/test/*.test.ts packages/sdk/test/*.test.ts packages/cloud-postgres/test/*.test.ts packages/cloud-s3/test/*.test.ts apps/api/test/*.test.ts apps/cli/test/*.test.ts apps/web/test/*.test.ts",
+		"generate:constitution": "node scripts/generate-constitution.mjs",
+		"check:constitution": "node scripts/generate-constitution.mjs --check",
+		"generate:story-language": "node scripts/generate-story-language.mjs",
+		"check:story-language": "node scripts/generate-story-language.mjs --check",
+		"generate:host-files": "node scripts/generate-host-files.mjs",
+		"check:host-files": "node scripts/generate-host-files.mjs --check",
+		"build:desktop": "npm run build && esbuild apps/desktop/src/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=apps/desktop/dist/preload.cjs && npm run build --workspace @suiming/web",
+		"dev:desktop": "npm run build:desktop && node --env-file-if-exists=.env node_modules/electron/cli.js apps/desktop",
+		"check:web": "tsc -p apps/web/tsconfig.json --pretty false",
+		"test:desktop": "npm run build:desktop && esbuild apps/desktop/test/entry.ts --platform=node --format=esm --outdir=apps/desktop/test-dist && node --import tsx --test --test-concurrency=1 apps/desktop/test/*.test.ts",
+		"regression:harness": "npm run build && node --env-file-if-exists=.env --import tsx scripts/harness-regression.mjs",
+		"check:design-system": "npm run lint -w @suiming/web"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.8",
+		"@types/node": "24.13.3",
+		"@types/proper-lockfile": "4.1.4",
+		"tsx": "4.23.12",
+		"typescript": "6.0.3"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"allowScripts": {
+		"@google/genai@1.52.0": false,
+		"esbuild@0.28.2": true,
+		"fsevents@2.3.3": true,
+		"protobufjs@7.6.6": false,
+		"electron@42.11.2": true
+	}
+}
