@@ -88,6 +88,7 @@ export type { InspectedSource } from "./artifact/source-validator.js";
 export { inspectStorySourcesCandidate } from "./artifact/source-validator.js";
 export type { InspectedStoryDesign, InspectedStoryProject } from "./artifact/story-design-validator.js";
 export {
+	checkFindings,
 	inspectStoryDesignCandidate,
 	inspectStoryProjectCandidate,
 	validateCompleteStoryTextCandidate,

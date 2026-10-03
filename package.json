@@ -11,10 +11,11 @@
 	"scripts": {
 		"build": "tsc -b --force",
 		"postbuild": "node -e \"require('node:fs').chmodSync('apps/cli/dist/bin.js', 0o755)\"",
-		"check": "npm run check:docs && npm run check:constitution && npm run check:story-language && npm run check:host-files && npm run check:story-isolation && biome check --error-on-warnings . && npm run check:types && npm run check:web && npm run check:design-system && npm run check:integrations",
+		"check": "npm run check:docs && npm run check:constitution && npm run check:story-language && npm run check:host-files && npm run check:story-isolation && biome check --error-on-warnings . && npm run check:types && npm run check:examples && npm run check:web && npm run check:design-system && npm run check:integrations",
 		"check:docs": "node scripts/check-docs.mjs",
 		"check:integrations": "node scripts/check-host-integrations.mjs",
 		"check:story-isolation": "node scripts/check-story-isolation.mjs",
+		"check:examples": "node scripts/check-examples.mjs",
 		"check:types": "tsc -b --pretty false && tsc -p tsconfig.tests.json --pretty false",
 		"format": "biome check --write .",
 		"dev:api": "node --env-file-if-exists=.env --import tsx apps/api/src/bin.ts",

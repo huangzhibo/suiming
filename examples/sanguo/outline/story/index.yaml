@@ -1,0 +1,30 @@
+schema_version: 2
+open_ended: true
+volumes:
+  - id: vol-0001
+    title: 黄巾起事与汉廷倾覆
+    beat_ids: [beat-0001, beat-0002, beat-0003, beat-0004, beat-0005, beat-0006, beat-0007, beat-0008, beat-0009, beat-0010, beat-0011, beat-0012, beat-0013, beat-0014, beat-0015, beat-0016, beat-0017, beat-0018, beat-0019, beat-0020, beat-0021, beat-0022, beat-0023, beat-0024]
+  - id: vol-0002
+    title: 诸侯讨董与长安政变
+    beat_ids: [beat-0025, beat-0026, beat-0027, beat-0028, beat-0029, beat-0030, beat-0031, beat-0032, beat-0033, beat-0034, beat-0035, beat-0036, beat-0037, beat-0038, beat-0039, beat-0040, beat-0041, beat-0042, beat-0043, beat-0044, beat-0045, beat-0046, beat-0047, beat-0048, beat-0049, beat-0050, beat-0051, beat-0052, beat-0053, beat-0054, beat-0055, beat-0056, beat-0057]
+  - id: vol-0003
+    title: 兖徐争夺与车驾迁许
+    beat_ids: [beat-0058, beat-0059, beat-0060, beat-0061, beat-0062, beat-0101, beat-0102, beat-0103, beat-0104, beat-0105, beat-0106, beat-0107, beat-0108, beat-0109, beat-0110, beat-0111, beat-0112, beat-0113, beat-0114, beat-0115]
+  - id: vol-0004
+    title: 孙策定江东与吕布败亡
+    beat_ids: [beat-0116, beat-0117, beat-0118, beat-0119, beat-0120, beat-0121, beat-0122, beat-0123, beat-0124, beat-0125, beat-0126, beat-0127, beat-0128, beat-0129, beat-0130, beat-0131, beat-0132, beat-0133, beat-0134, beat-0135, beat-0136, beat-0137, beat-0138, beat-0139, beat-0201]
+  - id: vol-0005
+    title: 衣带密诏与关羽归刘
+    beat_ids: [beat-0202, beat-0203, beat-0204, beat-0205, beat-0206, beat-0207, beat-0208, beat-0209, beat-0210, beat-0211, beat-0212, beat-0213, beat-0214, beat-0215, beat-0216, beat-0217, beat-0218, beat-0219, beat-0220, beat-0221, beat-0222, beat-0223, beat-0224, beat-0225, beat-0226, beat-0227, beat-0228, beat-0229, beat-0230, beat-0231, beat-0232, beat-0233, beat-0234, beat-0235, beat-0236, beat-0237, beat-0238, beat-0239, beat-0240, beat-0241, beat-0242, beat-0243, beat-0244, beat-0245, beat-0246, beat-0247]
+  - id: vol-0006
+    title: 官渡决胜与河北归曹
+    beat_ids: [beat-0301, beat-0302, beat-0303, beat-0304, beat-0305, beat-0306, beat-0307, beat-0308, beat-0309, beat-0310, beat-0311, beat-0312, beat-0313, beat-0314, beat-0315, beat-0316, beat-0317, beat-0318, beat-0319, beat-0320, beat-0321, beat-0322, beat-0323]
+  - id: vol-0007
+    title: 新野求贤与江东进取
+    beat_ids: [beat-0324, beat-0325, beat-0326, beat-0327, beat-0328, beat-0329, beat-0330, beat-0331, beat-0332, beat-0333, beat-0334, beat-0335, beat-0336, beat-0337, beat-0338, beat-0339, beat-0340, beat-0341, beat-0342]
+  - id: vol-0008
+    title: 荆州失守与孙刘结盟
+    beat_ids: [beat-0401, beat-0402, beat-0403, beat-0404, beat-0405, beat-0406, beat-0407, beat-0408, beat-0409, beat-0410, beat-0411, beat-0412, beat-0413, beat-0414, beat-0415, beat-0416, beat-0417, beat-0418, beat-0419]
+  - id: vol-0009
+    title: 赤壁火攻与华容放曹
+    beat_ids: [beat-0420, beat-0421, beat-0422, beat-0423, beat-0424, beat-0425, beat-0426, beat-0427, beat-0428, beat-0429, beat-0430, beat-0431, beat-0432, beat-0433, beat-0434, beat-0435, beat-0436, beat-0437, beat-0438, beat-0439, beat-0440, beat-0441]
