@@ -1,5 +1,7 @@
 # 燧明界 Suiming
 
+[![CI](https://github.com/huangzhibo/suiming/actions/workflows/ci.yml/badge.svg)](https://github.com/huangzhibo/suiming/actions/workflows/ci.yml)
+
 写长篇小说的 AI 工作台。专属的 Suiming Agent 在你的作品目录上读、写、自检、委派独立审稿；作品是版本化的 Story Artifact，用一套面向 AI 的故事语言（Story Language）表达，由确定性的 Checker 守住每一次提交。核心产品是本地桌面工作台，`suim` 命令行与 Codex / Claude Code / Grok 接入共用同一套 Runtime 与 Checker。
 
 *An AI workbench for long-form fiction. See [English](#english) below.*
