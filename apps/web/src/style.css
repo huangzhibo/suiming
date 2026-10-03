@@ -272,6 +272,14 @@
 	.prose-compact p {
 		@apply mb-2.5 text-sm leading-[1.9];
 	}
+	/* Streamdown 的表格固定占满宽度，单元格又继承了 overflow-wrap:anywhere：在对话栏这种窄处，中文逐字断行，
+	   列被挤成一两个字宽、竖着排。改成按内容定宽（上限 56em，长的那一列分到大部分），每列至少 5em，放不下时由外层（自带 overflow-x-auto）横向滚动。 */
+	[data-streamdown="table"] {
+		@apply w-max! max-w-[56em] min-w-full;
+	}
+	[data-streamdown="table"] :is(th, td) {
+		@apply min-w-[5em] [overflow-wrap:normal];
+	}
 	.design-body p {
 		@apply mb-3.5 text-[14.5px] leading-[1.9] whitespace-pre-wrap text-ink-2 [overflow-wrap:anywhere];
 	}
