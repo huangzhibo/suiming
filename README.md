@@ -1,37 +1,43 @@
-# Suiming
+# 燧明界 Suiming
 
-燧明界的根产品：以桌面创作工作台为核心产品，通过专属 Suiming Agent、版本化 Story Artifact、AI-native 故事语言和确定性 Checker，生成可验证的高质量长篇小说。CLI、Codex / Claude Code / Grok integrations 与可选 Cloud 共用作品与运行能力。
+写长篇小说的 AI 工作台。专属的 Suiming Agent 在你的作品目录上读、写、自检、委派独立审稿；作品是版本化的 Story Artifact，用一套面向 AI 的故事语言（Story Language）表达，由确定性的 Checker 守住每一次提交。核心产品是本地桌面工作台，`suim` 命令行与 Codex / Claude Code / Grok 接入共用同一套 Runtime 与 Checker。
 
-> **当前状态**：处在[路线图](docs/roadmap.md)的 S5——桌面工作台与自主 Agent 已贯通并收敛到 Session 模型，Cloud 只剩 Canon 与显式同步；证据最高到「真实调用」，还没有完整长篇。本阶段做的是真实长篇质量、Harness 余下切片与认证发行。具体队列见路线图第 6 节，完成度与已知缺陷见[当前状态](docs/current-status.md)；这一段只在阶段变化时改。
+*An AI workbench for long-form fiction. See [English](#english) below.*
 
-## 核心心智模型
+> **当前状态：开发预览。**桌面工作台与自主 Agent 已经贯通，但证据最高只到「真实调用」：还没有一部完整的长篇在它上面写完，也没有安装包，目前只在 macOS 上验证过。完成度与已知缺陷见[当前状态](docs/current-status.md)，实施顺序见[路线图](docs/roadmap.md)第 6 节；这一段只在阶段变化时改。
+
+## 它解决什么
+
+让 AI 在长篇尺度上持续理解同一部作品：人物、时间、关键物品、谁知道什么、长期埋下的期待，写到后面也不走样；同时作者随时能读、改、比较、回退自己的作品，不被锁进某个服务。
+
+- **作品就是一个普通目录。**大纲、人物、世界设定、正文、审稿都是 Markdown 文件；作品目录本身是 git 仓库，历史随它走。人、Agent、外部 coding agent 改的是同一份文件。
+- **只有过了 Checker 的修改才算数。**Checker 只管确定性的东西：格式、引用、顺序、硬状态（谁持有什么、谁已死去、哪个秘密何时揭开）、长期期待是否按期回应。文学好坏交给模型与独立审稿，不交给规则。
+- **Agent 自主推进，作者随时插手。**一次对话里 Agent 可以直接改、委派写作或审稿的子任务、阶段性提交多个版本；作者可以打断、补充意图、直接编辑，长期成立的要求会写回作品的 `intent/`，而不是只留在聊天记录里。
 
 ```text
-用户目标 / 作品 Intent
+作者的目标 / 作品意图（intent/）
    ↓
-Suiming Agent
-   ↓ 在作者的 checkout 上读取、修改、自检
-Agent 按需委派与独立 Review，再裁决
+Suiming Agent：在作品目录上读、改、自检，按需委派写作与独立审稿
    ↓
-checkout diff → ChangeSet → Checker
-   ↓ 原子提交
-ProjectRevision（阶段成果；同一个对话可以接着改）
+目录 diff → Checker → 原子提交
    ↓
-版本化 Story Artifact
+作品的一个版本（同一个对话可以接着改）
 ```
 
-- Story Artifact 是作品长期记忆；会话、任务、trace 和索引不是 Canon。
-- Story Search 允许 Agent 按表达意图发现相关 Story Artifact，并回到当前版本原文核实；`refs` 只保存已确认的重要关系。
-- Agent 对作者这一轮的目标负责，可直接执行或委派；Capability 是可组合的领域动作，写作方法是可选的，子任务是 task-local loop，结果先保存再交还。
-- StoryOutline 保证因果完整，StoryText 保证体验完整。
-- Checker 验证确定性边界，Review 提供可反驳的文学判断。
-- Agent 直接在作者的 checkout 上用受限文件工具迭代，没有 shell；作者、host agent 与它只有一份候选，提交走同一条 diff → ChangeSet 路径。事件是 AG-UI 标准事件与 Suiming 扩展（`SessionEvent` 信封，threadId 是 sessionId、runId 是 turn id），作品与 diff 经领域查询读取。
-- 每个 Local 或 Cloud Project 都以已提交的 ProjectRevision 为权威；本地作品目录就是 git 仓，历史随它走；正文与审稿的时效从历史派生，不另存 evidence。开放作品包是无历史的快照，支持字节稳定 round-trip、迁移和外部 Agent 接续。
-- 本地 SQLite 保存 Session / Task 执行数据，Cloud PostgreSQL 保存 Canon 与同步数据；Langfuse 只观察调用，故事专属 Eval 保存质量证据。
+## 快速开始
 
-## 安装
+需要 Node.js 24 以上与 git。桌面端目前只在 macOS 上验证过，其他平台未验证。
 
-需要 Node 24。从源码安装本地 CLI：
+### 桌面工作台
+
+```sh
+npm install
+npm run dev:desktop
+```
+
+打开一个已有作品，或选一个空目录新建。阅读与编辑不需要模型；要和 Agent 对话，在导航轨底部的「设置」里配置：「提供商」里填 API key 或登录，「模型配置」里给各个角色选模型。目前是开发构建，安装包、签名与自动升级还没做。
+
+### 命令行 `suim`
 
 ```sh
 npm install
@@ -40,118 +46,122 @@ npm link -w @suiming/cli
 suim --version
 ```
 
-`npm link` 把全局 `suim` 指向本仓的 `apps/cli`。旧仓 suiming-story 的 CLI 也叫 `suim`，两者只能有一个在 PATH 上；在哪个仓里再跑一次 `npm link -w @suiming/cli` 就切到哪个。用 fnm / nvm 的话，每个 Node prefix 各有一份全局链接，要在 coding agent 实际使用的登录 shell 里执行，之后用 `zsh -lc 'which suim; suim --version'` 确认。
-
-## 开始一部作品
-
 ```sh
-suim init ~/stories/my-book --intent-file intent.md --agent codex
+suim init ~/stories/my-book --intent-file intent.md   # 新建作品，intent.md 是你的创作意图
 cd ~/stories/my-book
+suim session send "先读意图，设计第一卷的大纲，检查后提交"
+suim status        # 作品状态：未提交的修改、过时的正文与审稿
+suim check         # 跑 Checker
+suim history       # 版本历史；suim rollback <revision> 恢复成一个新版本
 ```
 
-`init` 在空目录写最小 Design（一个空卷的 Story index）、把文本文件写成 `intent/book.md`，把目录登记为 Local Project 并提交第一个 ProjectRevision；`--agent` 装上该 host 的 Skill、agent 文件、`AGENTS.md` / `CLAUDE.md` 标记段与 `.gitignore` 标记段，可重复，也可事后用 `suim update --agent <host>` 补装或刷新。已有的 Open Story Directory 上 `init` 保留作品内容并登记；显式初始化含普通辅助文件的目录时会补齐最小故事结构。已初始化作品不能重复 `init`，后续维护用 `update`。
+不带子命令运行 `suim` 显示全部命令；加 `--json` 得到给程序用的稳定输出。
 
-接入维护在作品目录执行：
+### 在 Codex / Claude Code / Grok 里写
 
 ```sh
-suim update                  # 刷新所有已安装接入
-suim update --agent grok     # 补接 Grok，或只刷新 Grok
+suim init ~/stories/my-book --intent-file intent.md --agent claude-code
 ```
 
-`--agent` 可以重复指定多个 host。`update` 不修改故事内容，不升级 CLI 或 host 程序；未初始化目录先用 `init`。Codex agent 的作者模型配置会保留，接入器更新角色指示；TOML 重写可能调整格式和注释。
+`--agent`（可重复，`codex` / `claude-code` / `grok`）会在作品目录里装上对应 host 的 Skill 与入口说明，之后用那个 host 打开目录、用自然语言提要求即可；host 用它自己的模型与凭据，经 `suim check` / `suim commit` 提交。已有作品用 `suim update --agent <host>` 补装或刷新。细节见 [integrations](integrations/README.md)。
 
-然后用所选 host 打开这个目录，用自然语言说明创作要求，例如：
-
-> 请读取 AGENTS.md，按 suiming Skill 从现有作品意图开始，完成并审查完整 Story Design；在 Design 稳定前不要生成正文。
-
-host 的模型与凭据照常使用；只有显式 `suim session send ...` 才走 Suiming 自己的 Agent 与 model profile（见下文模型配置）。各 host 的细节见 [integrations](integrations/README.md)。
-
-## 产品入口
-
-作者主要通过自然语言与 Agent 协作，同时使用 StoryOutline、人物、Contract、World、StoryText、Review 和 revision diff 等派生视图理解作品。默认自主创作不要求逐项人工接受；作者可以随时打断、修改方向、直接编辑 artifact 或回退 revision。
-
-- 本地 CLI：无子命令显示帮助；`suim session send "创作要求"` 启动一次对话，后续用 `--session <id>` 继续。TUI 已删除。
-- Coding-agent integrations：Codex / Claude Code / Grok 直接编辑同一个 Open Story Directory，再由 `suim check / commit` 接纳为 ProjectRevision。
-- Local revision：`suim history` 查看线性历史，`suim rollback <revision-id>` 将历史快照恢复为新的 revision，不改写或删除既有历史。
-- 本地桌面端：最终核心产品，首个工作台已实现。在 Electron 工作台中阅读与编辑正文、查看 Design / 人物 / Contract、比较修改并与 Agent 协作；主进程运行 Runtime，renderer 经 IPC 接入。
-- Cloud Web：后续可选入口，复用桌面工作台，通过 Domain API 读取作品与观察远程 Agent；创作闭环验证门之后实施。
-
-本地 CLI 与桌面共用持久 AG-UI 与类型化 Suiming 扩展。subscription 与 IPC 只负责传输；命令启动与只读 attach 分开，重连不重执行模型。Cloud 执行和 SSE 已删除，远程 Agent 保持冻结。作品、Review 与 diff 从 Runtime 回读，客户端不拥有运行真源。
-
-## 文档
-
-阅读顺序与各自管什么见 [AGENTS.md](AGENTS.md)「真源与阅读顺序」，这里只列入口：
-
-- [需求与目标](docs/vision-and-requirements.md)
-- [故事创作宪法](strategies/story-constitution.md)
-- [Story Language](story-language/README.md)
-- [系统架构](docs/architecture.md)
-- [作者工作台设计](docs/web-product-design.md)、[可视化设计](docs/visualization-design.md)
-- [Harness 设计](docs/harness-design.md)、[evidence 派生设计](docs/derived-evidence-design.md)
-- [技术栈](docs/technology.md)
-- [当前状态](docs/current-status.md)
-- [实施路线图](docs/roadmap.md)
-- [从 suiming-story 迁移](docs/migration-from-suiming-story.md)
-- [ADR](docs/adr/README.md)（历史决策，不是现行规范；已完成的重构方案与收敛方案同理）
-
-## 代码形态
-
-当前只创建已经承载真实行为的边界：
+## 一部作品长什么样
 
 ```text
-apps/
-  api/       Domain API handler、Fastify-compatible 注册边界与 OpenAPI projection
-  cli/       suim executable、agent-facing JSON contract 与 headless 入口
-  desktop/   Electron 主进程、凭据与共享 Runtime
-  web/       React 作者工作台，经 typed IPC 接入桌面
-
-packages/
-  story/     Story Language、Story Core、Checker
-  runtime/   artifact、SuimingHarness、events、model、local / cloud / sync
-  cloud-postgres/  PostgreSQL Canon persistence adapter
-  cloud-s3/  S3-compatible object storage adapter
-  sdk/       Cloud Domain API schema、route catalog、wire codec 与 typed client
-
-integrations/
-  shared/    三类 coding-agent 共用的薄 Skill
-  codex/     Codex project-scoped 入口
-  claude-code/  Claude Code project-scoped 入口
-  grok/      Grok project-scoped 入口
+my-book/
+  intent/                  作者意图：当前仍然有效的创作要求
+  outline/story/index.yaml 卷与节的顺序
+  outline/story/vol-0001/  每一节（StoryBeat）的完整因果设计
+  outline/contracts/       需要跨多节回应的长期期待
+  world/                   世界设定；characters/、places/、resources/ 是人物、地点与物品
+  text/                    正文，一节一个文件
+  review/                  独立审稿
+  reference/style/         作者选定的样章
+  source/                  导入的原作材料与忠实抽取（改编时用）
 ```
 
-`apps/api` 已接通 PostgreSQL / S3 Canon 与显式同步；`apps/worker` 和 Cloud 执行已删除，Cloud 目前没有 Agent，共享 SuimingHarness 的 Cloud host 在解冻时实现。桌面主进程 `apps/desktop` 与共享工作台 `apps/web` 已接入同一 Runtime；`packages/eval` 尚未建立，Eval 按真实证据需求推进。
-
-## 当前检查
-
-需要 Node 24：
-
-```sh
-npm run check
-npm test
-npm run build
-```
+字段的含义与写法见 [Story Language](story-language/README.md)；最小的完整例子是测试样例里的苦肉计与火烧赤壁（[`packages/runtime/test/sample-work.ts`](packages/runtime/test/sample-work.ts)）。
 
 ## 模型配置
 
-Model Gateway 支持按任务配置 `main`（对话用的根 Agent）、`reviewer`、`writer`、`source-reader`、`source-extractor` 与 `judge`（盲读评委，应与 writer 不同的模型）profile。正式本地产品从 `~/.suiming/config.toml` 读取路由，从 `~/.suiming/auth.json` 或 provider credential store 读取 secret；开发和 CI 可以使用 [`.env.example`](.env.example) 中的 `SUIMING_*` 覆盖。`main` 的 provider / model 必填，其余 profile 未配置时复用 `main`，也可以使用不同 provider 或模型。每次模型调用会向显式注入的 telemetry context 发出不含 Prompt、响应正文或 secret 的 span；默认使用 NOOP。Langfuse 是可选观测后端，不是模型调用前置条件。
+模型调用基于 [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai)，可以用它支持的各家服务商。不同角色可以用不同模型：`main`（对话的根 Agent）、`writer`、`reviewer`、`source-reader`、`source-extractor`、`judge`（盲读评委，最好与 writer 不同）；除 `main` 外都可以省略，省略时用 `main`。
 
-Cloud API 开发进程使用 `.env` 中显式的 `SUIMING_POSTGRES_*` 与 `SUIMING_S3_*` 配置：
+配置在 `~/.suiming/config.toml`，桌面「设置」改的也是这份文件：
 
-```sh
-npm run dev:api
+```toml
+version = 1
+
+[models.profiles.main]
+provider = "deepseek"
+model = "deepseek-flash"
 ```
 
-API 常驻运行，响应 SIGINT / SIGTERM，默认监听 `127.0.0.1:3001`。当前 executable 用 `SUIMING_CLOUD_ACTOR_ID` + `SUIMING_CLOUD_ACCESS_TOKEN` 提供单 actor 开发认证，生产部署应替换注入的 authenticator，而不是共享这枚 token。S3 使用 AWS 默认 credential chain；只有 MinIO 等显式 endpoint 才通常需要同时配置 access key、secret key 与 `forcePathStyle=true`。完整字段见 [`.env.example`](.env.example)。
+完整形状见[技术栈](docs/technology.md)「本地配置与凭据」。凭据存在 `~/.suiming/auth.json`，经桌面设置或服务商自己的登录流程写入；开发时也可以用 [`.env.example`](.env.example) 里的 `SUIMING_*` 变量覆盖。
 
-模型调用复用 pi-ai，loop、交接与恢复由 Suiming 自行实现；不建设通用 Agent 平台或 Codex App Server 第二后端。Cloud Web、生产云服务与全功能 MCP 保持冻结。作者选择、实际修订与 Dataset 持续积累，旧仓不是默认质量标准。
+部分服务商支持用订阅账号登录。各家对第三方应用使用订阅登录的条款不同，以服务商的条款为准。产品只使用你自己的系统代理与环境变量里的代理设置，不内置任何代理。
 
-## 运行桌面工作台
+## 参与开发
+
+规范真源是 [AGENTS.md](AGENTS.md)：产品目标、核心不变量与工程边界都在那里，人和 coding agent 共用；[CLAUDE.md](CLAUDE.md) 补充命令、检查脚本的隐含约束和踩过的坑。动手之前先读这两份。
 
 ```sh
-npm install
-npm run dev:desktop
+npm run check          # 文档链接、生成文件对账、biome、类型检查
+npm test               # 单元与集成测试；需要真实 PostgreSQL / S3 的 5 个用例默认跳过
+npm run test:desktop   # 构建桌面端并跑真实 Electron E2E
+npm run format         # biome 自动格式化
 ```
 
-打开已有 Suiming 作品，或选择空目录创建。桌面主进程直接运行 Runtime，无需启动 API。模型使用现有 `~/.suiming/config.toml` 与凭据存储，也可在导航轨底部的「设置」里配置（「模型配置」管 profile，「提供商」管 API key 与登录）；阅读和编辑无需模型。开发环境变量可用 `node --env-file=.env node_modules/electron/cli.js apps/desktop/dist/bin.js --project=/absolute/project/path` 显式加载。
+- workspace 包互相引用的是 `dist`：改了 `packages/*` 之后先 `npm run check` 或 `npm run build`，再 `npm test`。
+- 生成文件不要手改：故事宪法、Story Language 文档与 host 接入文件各有 `npm run generate:*`，`check` 会核对。
+- 修缺陷先写能复现它的测试；不靠弱化断言、跳过或吞掉错误让测试变绿。
+- 提交信息用 `type(scope): 中文摘要`，正文写为什么。文档与代码注释用中文。
+- 开源前的开发历史压成了一个初始提交；文档里 2026-10-03 及之前的提交号指那段历史，在本仓里查不到（见 AGENTS.md）。
 
-验证使用 `npm run check`、`npm test` 与 `npm run test:desktop`。最后一项启动真实 Electron，验收中文编辑、正文 / Review / 提交、外部文件冲突、renderer 重载和主进程恢复。此入口是开发构建；安装包、签名与升级仍属于发行阶段。
+Cloud（PostgreSQL / S3 上的作品存储与显式同步）目前冻结：`npm run dev:api` 能起开发进程，配置见 [`.env.example`](.env.example)，但不在当前开发重点内。
+
+## 文档
+
+各文档管什么、按什么顺序读，见 AGENTS.md「真源与阅读顺序」。常用入口：
+
+- [需求与目标](docs/vision-and-requirements.md)、[故事创作宪法](strategies/story-constitution.md)
+- [Story Language](story-language/README.md)：作品的语义与目录格式
+- [系统架构](docs/architecture.md)、[Harness 设计](docs/harness-design.md)：执行模型、恢复与故障验收
+- [作者工作台设计](docs/web-product-design.md)、[可视化设计](docs/visualization-design.md)
+- [技术栈](docs/technology.md)
+- [当前状态](docs/current-status.md)、[实施路线图](docs/roadmap.md)
+- [ADR](docs/adr/README.md)：历史决策，不是现行规范
+
+## 代码结构
+
+```text
+apps/
+  desktop/   Electron 主进程：持有 Runtime 与凭据
+  web/       React 作者工作台，经 typed IPC 接入桌面
+  cli/       suim 命令行与给程序用的 JSON 契约
+  api/       Cloud Domain API（冻结）
+
+packages/
+  story/     Story Language、Story Core、Checker（不依赖网络、数据库与模型）
+  runtime/   作品存储、SuimingHarness（Agent loop 与恢复）、事件、模型网关、本地服务
+  sdk/       命令目录、领域 schema 与事件信封
+  cloud-postgres/  Cloud 的 PostgreSQL 存储
+  cloud-s3/        Cloud 的 S3 兼容对象存储
+
+integrations/  Codex / Claude Code / Grok 的薄接入（Skill 与入口说明）
+story-language/  Story Language 文档（生成进 packages/story）
+strategies/      故事创作宪法
+```
+
+## 许可证
+
+[MIT](LICENSE)。Story Language 与测试里的故事示例取自《三国演义》，属于公有领域。
+
+## English
+
+Suiming is a desktop-first AI workbench for writing long-form fiction. A dedicated agent reads and edits your manuscript directory, delegates drafting and independent review to sub-agents, and commits in stages. A work is a plain directory of Markdown files (outline, characters, world, prose, reviews) that is also a git repository; only changes that pass a deterministic Checker — schema, references, ordering, hard state such as who holds what or which secret is revealed when, and deadlines of long-running reader expectations — become a version of the work. Literary quality is left to models and independent review, not to rules. The same runtime is available from the `suim` CLI and from Codex, Claude Code and Grok.
+
+**Status: development preview.** It has been exercised with real models on real material but no complete novel has been written with it yet, there is no installer, and only macOS has been verified.
+
+**Try it** (Node.js 24+, git): `npm install && npm run dev:desktop` for the desktop app, or `npm install && npm run build && npm link -w @suiming/cli` for the CLI, then `suim init <dir> --intent-file intent.md`. Configure models in the desktop settings or in `~/.suiming/config.toml`; any provider supported by [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) works.
+
+Documentation and code comments are in Chinese. [AGENTS.md](AGENTS.md) is the source of truth for the product's invariants and engineering rules. Licensed under [MIT](LICENSE).
