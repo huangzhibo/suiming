@@ -232,6 +232,8 @@ export class LocalWorkspace implements LocalCommandClient {
 		const spec = LOCAL_COMMANDS[command];
 		if (!spec || !Value.Check(spec.input, input)) throw new ArtifactError("invalid_command_input", command);
 		const output = await this.#execute(command, input);
+		// 输出也校验，是有意保留的：它守的是 renderer 依赖的命令契约。斗破作品上 workspace.show 一次约 11ms，
+		// 其中这一步约 2.5ms（2026-10-02 量），不值得为它拆掉契约检查。
 		if (!Value.Check(spec.output, output)) throw new ArtifactError("invalid_command_result", command);
 		return output as LocalCommandOutput<K>;
 	}

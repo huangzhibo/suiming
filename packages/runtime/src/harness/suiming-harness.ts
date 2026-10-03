@@ -557,6 +557,9 @@ export class HarnessSession {
 			delete loop.unsubmittedStops;
 		}
 		const systemPrompt = restored?.systemPrompt ?? input.systemPrompt;
+		// 增量事件上的 sessionId / taskId（以及 state-events.ts 里 suiming.session / suiming.task 上的同类字段）
+		// 与信封、threadId 有重复，刻意保留：`suim session send --events` 把事件流原样交给 host，
+		// 仓库里没有消费者不等于没人用。
 		const metadata = { suiming: { sessionId: this.sessionId, taskId: input.loopId, taskKind: input.label } };
 		const outcome = await runTaskLoop({
 			model: input.model,
