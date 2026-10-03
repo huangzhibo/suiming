@@ -55,7 +55,7 @@ test("统一文档：文件树准确切换设计与正文，草稿分别保存�
 		const designFile = page.locator(`[data-file-path="${design}"]`);
 		await designFile.click();
 		await page.getByRole("radio", { name: "设计", exact: true, checked: true }).waitFor();
-		await page.locator(".cm-content").filter({ hasText: "黄盖进入赤壁" }).waitFor();
+		await page.locator(".cm-content").filter({ hasText: "黄盖当众顶撞" }).waitFor();
 		const updatedDesign = `${originalDesign}\n设计补充。`;
 		await page.locator(".cm-content").fill(updatedDesign);
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();

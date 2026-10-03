@@ -14,7 +14,7 @@ import { mergeGroup, splitGroup, workspaceLayout } from "../src/workspace-layout
 
 test("发送冻结文字与引用，等待期间的新输入跟随新 session，迟到回执不清空其他草稿", () => {
 	const before = {
-		goal: "公开火船",
+		goal: "诈降",
 		attachments: [
 			{ id: "1", label: "外部笔记", kind: "text" as const, status: "ready" as const, content: "笔记内容" },
 		],

@@ -145,7 +145,7 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 		assert.equal((await page.evaluate(() => window.suiming?.invoke("session.list", {})))?.sessions.length, 0);
 
 		await page.getByRole("button", { name: "发送", exact: true }).click();
-		await page.locator(".message.assistant").filter({ hasText: "主角要公开火船，还是暂时保留？" }).waitFor();
+		await page.locator(".message.assistant").filter({ hasText: "黄盖要当众挨这顿打，还是另想办法？" }).waitFor();
 		const sent = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
 		assert.equal(sent?.sessions.length, 1);
 		const sessionId = sent?.sessions[0]?.id ?? "";
@@ -210,7 +210,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.focus());
 		await page.locator(".cm-editor .cm-content").first().click();
 		await page.keyboard.press("Meta+A");
-		await page.keyboard.insertText("主角公开真相必须承担不可逆的代价。");
+		await page.keyboard.insertText("主角的计谋必须当场付出不可逆的代价。");
 		await page.getByText("未保存", { exact: true }).waitFor();
 		await page.reload();
 		await page.getByText("未保存", { exact: true }).waitFor();
@@ -233,15 +233,15 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.getByRole("button", { name: "提交版本", exact: true }).click();
 		await page.getByText("已提交一个新版本", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();
-		await page.getByRole("textbox", { name: "输入消息" }).fill("确认作者想要公开火船还是保留筹码");
+		await page.getByRole("textbox", { name: "输入消息" }).fill("确认作者想要真打还是做做样子");
 		await page.getByRole("textbox", { name: "输入消息" }).press("Meta+Enter");
 		await page.locator(".run-status").getByText("正在处理", { exact: true }).waitFor();
 		await page.reload();
-		await page.locator(".message.assistant").filter({ hasText: "主角要公开火船，还是暂时保留？" }).waitFor();
+		await page.locator(".message.assistant").filter({ hasText: "黄盖要当众挨这顿打，还是另想办法？" }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/waiting.png" });
 		const state = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
 		assert.equal(state?.sessions.length, 1);
-		await page.getByRole("textbox", { name: "输入消息" }).fill("公开火船");
+		await page.getByRole("textbox", { name: "输入消息" }).fill("诈降");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		// turn 结束对账：只问不改的第一轮不显示；这一轮写了正文、留了审稿、提交了两次，意图没动。
@@ -252,7 +252,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			await turnSummary.innerText(),
 			"本轮：作者 1 条 · 意图未改动 · 正文改了 1 个文件 · 审稿改了 1 个文件 · 提交了 2 个版本",
 		);
-		await page.locator(".message.user").filter({ hasText: "公开火船" }).first().waitFor();
+		await page.locator(".message.user").filter({ hasText: "诈降" }).first().waitFor();
 		await page.locator(".activities").first().waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/workspace.png" });
 		// 活动的 target 指向真实作品路径时可直接点开。活动按连续性分组，作者回答会把它们隔成多组，所以逐组展开。
@@ -278,10 +278,10 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		// finding 标题按钮里还带「第 N 段」标签：引文现在都锚得到段落，名字不再是纯标题。
 		await findings.getByRole("button", { name: /^补充审读问题 5/ }).click();
 		await findings.getByRole("button", { name: /取信动作略显概括/ }).click();
-		await page.locator(".evidence-text").filter({ hasText: "他还是伸手取了" }).waitFor();
+		await page.locator(".evidence-text").filter({ hasText: "他没有喊" }).waitFor();
 		// finding 的引文对回当前稿：标出第 2 段，当前稿里那一段带 data-mark。
 		await page.getByText("第 2 段", { exact: true }).first().waitFor();
-		await page.locator(".issue-current p[data-mark='true']").filter({ hasText: "他还是伸手取了" }).waitFor();
+		await page.locator(".issue-current p[data-mark='true']").filter({ hasText: "他没有喊" }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/review.png" });
 		await page
 			.getByRole("button", { name: /在正文中打开/ })
@@ -289,8 +289,8 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			.click();
 		await page.locator(".cm-editor .cm-content").first().click();
 		await page.keyboard.press("Meta+A");
-		await page.keyboard.insertText("黄盖推开赤壁的门，手指碰到匣上的封蜡。他停了一下，仍然揭开了它。");
-		await writeFile(join(root, "text/beat-0001.md"), "外部作者修改：黄盖在封蜡前停了一下。\n");
+		await page.keyboard.insertText("军杖落到第三十下，黄盖背上已经见了血。他抬头看了周瑜一眼，仍然一声没吭。");
+		await writeFile(join(root, "text/beat-0001.md"), "外部作者修改：黄盖在军杖落下前停了一下。\n");
 		await page.getByText("文件在外部发生了修改", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "比较外部修改", exact: true }).click();
 		await page.locator(".cm-mergeView").waitFor();
@@ -306,7 +306,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			.first()
 			.click();
 		await page.getByText("稿子已改，需重新核对", { exact: true }).waitFor();
-		await page.locator(".evidence-text").filter({ hasText: "他还是伸手取了" }).waitFor();
+		await page.locator(".evidence-text").filter({ hasText: "他没有喊" }).waitFor();
 		// 专注阅读 = 收起两侧面板；重新展开后回到原对象。
 		await page
 			.getByRole("button", { name: /在正文中打开/ })
@@ -842,7 +842,7 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
-	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的门。\n\n".repeat(80));
+	await writeFile(join(root, "text/beat-0001.md"), "军杖落到第三十下。\n\n".repeat(80));
 	const app = await electron.launch({
 		args: [
 			resolve("apps/desktop/test-dist/entry.js"),

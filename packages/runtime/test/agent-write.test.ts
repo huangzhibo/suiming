@@ -42,8 +42,8 @@ function gateway(responses: Parameters<ReturnType<typeof fauxProvider>["setRespo
 }
 
 const beatOneText =
-	"黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走火船之后，自己就再没有可以讨价还价的东西。\n\n他还是伸手取了。";
-const beatTwoText = "天亮前，他在众人面前展开火船，念完最后一行，把纸送进火里。没有人拦他。";
+	"军杖落到第三十下，黄盖咬住了衣角。他知道曹操的人就在辕门外看着，也知道这顿打少一下都不像真的。\n\n他没有喊。";
+const beatTwoText = "约定那夜，二十艘船一齐点火，借着风冲进曹营。没有人拦得住。";
 
 const call = (name: string, args: JsonObject) => fauxAssistantMessage(fauxToolCall(name, args));
 const reply = (text: string) => fauxAssistantMessage(text);
@@ -346,7 +346,7 @@ test("作品状态点名过时的正文与审稿：Agent 的 project_status 与 
 		assert.deepEqual(fresh.stale, { texts: { count: 0, ids: [] }, reviews: { count: 0, ids: [] } });
 
 		const beat = join(checkoutPath, "outline/story/vol-0001/beat-0001.md");
-		await writeFile(beat, (await readFile(beat, "utf8")).replace("唯一火船", "唯一一封火船"));
+		await writeFile(beat, (await readFile(beat, "utf8")).replace("早已备好的火船", "早已备好的二十艘火船"));
 		await project.commitCheckout();
 		const after = await readProjectStatus(project, await project.checkoutCandidate());
 		assert.deepEqual(after.stale, {
@@ -384,7 +384,7 @@ changes:
     黄盖:
       苦肉计.revealed: true
 ---
-黄盖进入赤壁，取得能证明旧案的唯一火船，也在信里读到了旧案的真相。
+黄盖在赤壁大营挨了军杖，也明白了这是一场苦肉计。
 `),
 	});
 	const candidate = candidateFromStoryFiles("r1", files);

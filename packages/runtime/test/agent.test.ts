@@ -176,7 +176,7 @@ test("turn 结束事件带对账：作者几条、意图 / Design / 正文各改
 		f.provider.setResponses([
 			call("write", { path: "intent/计谋的代价.md", content: "真相公开必须当场付出不可逆的代价。" }),
 			call("commit", { summary: "写回意图" }),
-			call("write", { path: "text/beat-0001.md", content: "黄盖推开赤壁的门。" }),
+			call("write", { path: "text/beat-0001.md", content: "军杖落到第三十下。" }),
 			reply("意图已写回并提交；正文初稿还没提交。"),
 		]);
 		await f.say("真相必须当场付出代价，记进意图", id);
@@ -229,9 +229,9 @@ test("对账点名根 Agent 没取写作依据就整篇写入的正文；取过 
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
 			call("write_context", { storyBeatId: "beat-0001" }),
-			call("write", { path: "text/beat-0001.md", content: "黄盖推开赤壁的门，木匣就在案上。" }),
+			call("write", { path: "text/beat-0001.md", content: "军杖落下，周瑜就坐在帐前。" }),
 			call("write", { path: "text/beat-0002.md", content: "他把火船藏进袖中。" }),
-			call("edit", { path: "text/beat-0001.md", oldText: "木匣就在案上", newText: "木匣压在旧档下面" }),
+			call("edit", { path: "text/beat-0001.md", oldText: "周瑜就坐在帐前", newText: "周瑜背过身去" }),
 			reply("两节都写了。"),
 		]);
 		await f.say("写前两节", id);
@@ -290,19 +290,19 @@ test("作者消息后的状态附注在取走消息时现算；开场写明是�
 test("说完就停；同一 session 的下一句接着消息列表，新 session 隔离；只讨论不产生作品版本", async () => {
 	const f = await fixture();
 	try {
-		f.provider.setResponses([reply("可选方案：让黄盖主动公开火船，并承担失去信任的代价。")]);
-		const first = await f.say("讨论黄盖公开火船的代价，不修改作品");
+		f.provider.setResponses([reply("可选方案：让黄盖主动挨打诈降，并承担被自己人误会的代价。")]);
+		const first = await f.say("讨论黄盖诈降的代价，不修改作品");
 		assert.equal(first.session.status, "idle");
 		assert.equal(first.session.turn, 1);
 		assert.equal(first.value?.stop, "model_stopped");
-		assert.equal(first.value?.reply, "可选方案：让黄盖主动公开火船，并承担失去信任的代价。");
+		assert.equal(first.value?.reply, "可选方案：让黄盖主动挨打诈降，并承担被自己人误会的代价。");
 		assert.equal(f.provider.state.callCount, 1);
 		assert.equal((await f.project.history()).length, 1);
 
 		f.provider.setResponses([
 			async (context) => {
 				const input = JSON.stringify(context.messages);
-				assert.match(input, /讨论黄盖公开火船的代价/);
+				assert.match(input, /讨论黄盖诈降的代价/);
 				assert.match(input, /承担失去信任的代价/);
 				assert.match(input, /这个方案还有什么问题/);
 				assert.match(input, /\[系统附注：当前版本/, "作者消息后面附确定性状态行");
@@ -355,11 +355,11 @@ test("turn 进行中作者补一句：模型停下时 inbox 有新消息就在�
 						(message) => message.role === "user" && String(message.content).startsWith(correction),
 					),
 				);
-				return reply("黄盖主动选择公开真相");
+				return reply("黄盖主动选择挨打诈降");
 			},
 		]);
 		const outcome = await f.say("讨论赤壁", id);
-		assert.equal(outcome.value?.reply, "黄盖主动选择公开真相");
+		assert.equal(outcome.value?.reply, "黄盖主动选择挨打诈降");
 		assert.equal(f.provider.state.callCount, 2);
 		assert.equal(outcome.session.inboxSequence, 2);
 		assert.ok(JSON.stringify(f.project.readSessionEvents(id)).includes(correction), "事件里是作者原话");
@@ -958,16 +958,16 @@ test("模型调用失败：turn 回 idle 记 lastFailure；已确认的文件动
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
-			call("edit", { path: "intent/计谋的代价.md", oldText: "主角不能靠巧合取胜", newText: "主角不能依赖巧合" }),
+			call("edit", { path: "intent/计谋的代价.md", oldText: "骗局的每一步", newText: "骗局的每一环" }),
 			{ ...fauxAssistantMessage("模型服务失败"), stopReason: "error", errorMessage: "provider unavailable" },
 		]);
-		const failed = await f.say("去掉依赖巧合的可能");
+		const failed = await f.say("把「每一步」改成「每一环」");
 		assert.equal(failed.failure?.code, "model_call_failed");
 		assert.equal(failed.session.status, "idle");
 		assert.equal(failed.session.lastFailure?.retryable, true);
 		f.provider.setResponses([
 			async (context) => {
-				assert.match(JSON.stringify(context.messages), /主角不能依赖巧合/);
+				assert.match(JSON.stringify(context.messages), /骗局的每一环/);
 				return call("commit", { summary: "保存已完成的修改" });
 			},
 			reply("修改已提交"),

@@ -86,7 +86,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 	await withProject(async (project, checkoutPath) => {
 		await mkdir(join(checkoutPath, "text"), { recursive: true });
 		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的火船送进火里。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "约定那夜，二十艘火船一齐点火，直冲曹营。\n");
 		await project.commitCheckout();
 
 		const write = await compileHostContext(project, "write:beat-0002");
@@ -123,7 +123,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 				{
 					severity: "minor",
 					anchor: { kind: "artifact", path: "text/beat-0001.md" },
-					issue: "取得火船没有阻力，读者感受不到它是唯一筹码。",
+					issue: "挨打写得太顺，读者感受不到这顿打的分量。",
 					evidence: "黄盖走入赤壁，在木匣中找到火船。",
 					repairLayer: "text",
 				},
@@ -182,7 +182,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 			revision: composed.file.revision,
 		});
 
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖当众挨了军杖。\n");
 		await project.commitCheckout();
 		head = project.project().headRevisionId;
 		reviews = reviewsIn(await reader.snapshot(head));

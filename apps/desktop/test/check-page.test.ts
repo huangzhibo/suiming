@@ -55,7 +55,7 @@ test("检查结果页：按文件列出诊断，绑定失败也列全，作品�
 		// 文件组的标题打开那份文件，后退回到同一份结果。
 		await contract.getByRole("button", { name: "诈降", exact: true }).click();
 		await page
-			.getByText(/公开真相必须让黄盖/)
+			.getByText(/黄盖的投降是假的/)
 			.first()
 			.waitFor();
 		await page.getByRole("button", { name: "后退", exact: true }).click();

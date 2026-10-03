@@ -85,7 +85,7 @@ function bigTool(size: number): HarnessTool {
 		replay: "read",
 		async prepare() {
 			count += 1;
-			return { content: [{ type: "text" as const, text: `第${count}段：${"黄盖封蜡".repeat(size / 4)}` }] };
+			return { content: [{ type: "text" as const, text: `第${count}段：${"黄盖受刑".repeat(size / 4)}` }] };
 		},
 		async execute(_id, _params, _signal, _update, prepared) {
 			return prepared as { content: { type: "text"; text: string }[] };
@@ -135,7 +135,7 @@ test("请求接近窗口时清掉较早的工具结果：发出的请求不超�
 	const stored = (checkpoint?.messages ?? []).filter((message) => message.role === "toolResult");
 	assert.equal(stored.length, 8);
 	assert.ok(
-		stored.every((message) => JSON.stringify(message.content).includes("黄盖封蜡")),
+		stored.every((message) => JSON.stringify(message.content).includes("黄盖受刑")),
 		"checkpoint 里的原消息一字不改",
 	);
 });
@@ -191,12 +191,12 @@ test("清掉工具结果后仍然偏大：请求末尾请模型先 compact_conte
 		const asked = last?.role === "user" && JSON.stringify(last.content).includes("compact_context");
 		if (asked && !compacted) {
 			compacted = true;
-			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "已经讨论了黄盖公开火船的代价。" }));
+			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "已经讨论了黄盖诈降的代价。" }));
 		}
 		if (compacted) return fauxAssistantMessage("压缩后接着说完。");
 		// 工具结果很小，清不出多少；占地方的是模型自己的长回复。
 		return fauxAssistantMessage([
-			{ type: "text", text: "黄盖在封蜡前停了一下。".repeat(120) },
+			{ type: "text", text: "黄盖在军杖落下前停了一下。".repeat(120) },
 			fauxToolCall("note", {}),
 		]);
 	};

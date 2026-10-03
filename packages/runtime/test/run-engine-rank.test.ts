@@ -69,7 +69,7 @@ function blindLabelsIn(context: Context): string[] {
 }
 
 const candidates = [
-	{ label: "flash", text: "黄盖推开赤壁的门。霉味先于灯光涌出来。他伸手取了信。" },
+	{ label: "flash", text: "军杖落到第三十下。黄盖咬住了衣角。他一声没吭。" },
 	{ label: "pro", text: "赤壁的门吱呀一声。黄盖站在门口，没有马上进去；等他出来时，袖子里多了一封信。" },
 ];
 

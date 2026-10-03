@@ -112,7 +112,7 @@ test("工作台查询无需模型；读写只有 workspace.file.* 一组：编�
 		await workspace.invoke("workspace.file.save", {
 			path: file.path,
 			expectedSHA: baseline.sha256,
-			content: "主角主动公开真相，付出不可逆的代价。\n",
+			content: "主角主动受刑，付出不可逆的代价。\n",
 		});
 		assert.equal((await workspace.invoke("workspace.show", {})).dirty, true);
 		// 比较页只拿清单，选中哪个文件再按路径读两侧：一次大改不再把全部正文经 IPC 搬一遍（2026-10-02）。
@@ -351,7 +351,7 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		// 写好正文提交：时效 current 且记下写成的版本；再改一个 Design 文件提交，正文就 design-changed。
 		await mkdir(join(root, "text"), { recursive: true });
 		await writeFile(join(root, "text/beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
-		await writeFile(join(root, "text/beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的火船送进火里。\n");
+		await writeFile(join(root, "text/beat-0002.md"), "约定那夜，二十艘火船一齐点火，直冲曹营。\n");
 		await workspace.invoke("project.commit", {});
 		const written = await workspace.invoke("workspace.show", {});
 		assert.deepEqual(written.storyText, [
@@ -360,7 +360,7 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		]);
 		await writeFile(
 			join(root, "outline/story/vol-0001/beat-0002.md"),
-			(await readFile(join(root, "outline/story/vol-0001/beat-0002.md"), "utf8")).replace("焚毁火船", "撕碎火船"),
+			(await readFile(join(root, "outline/story/vol-0001/beat-0002.md"), "utf8")).replace("同时点火", "先后点火"),
 		);
 		await workspace.invoke("project.commit", {});
 		const changed = await workspace.invoke("workspace.show", {});
@@ -400,7 +400,7 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		await rm(join(root, "text/beat-0002.md"));
 		await writeFile(
 			join(root, "outline/story/vol-0001/beat-0001.md"),
-			"---\nrefs:\n  character: [黄盖]\n  place: [赤壁]\n  resource: [火船]\n---\n黄盖取得并公开火船。\n",
+			"---\nrefs:\n  character: [黄盖]\n  place: [赤壁]\n  resource: [火船]\n---\n黄盖挨打诈降，火船烧尽。\n",
 		);
 		await rm(join(root, "outline/contracts/诈降.md"));
 		await workspace.invoke("project.commit", {});
@@ -498,7 +498,7 @@ test("目录投影按文件状态复用解析结果：同长度改写、mtime �
 		});
 		const placePath = join(root, "world/places/赤壁.md");
 		const old = new Date(Date.now() - 60_000);
-		const titled = (title: string) => `---\ntitle: ${title}\n---\n收藏旧朝档案的封闭库房。\n`;
+		const titled = (title: string) => `---\ntitle: ${title}\n---\n长江南岸，孙刘联军扎营之处。\n`;
 		await writeFile(placePath, titled("皇家档案"));
 		await utimes(placePath, old, old);
 		const place = async () =>
@@ -522,12 +522,15 @@ test("目录投影带正文的第一个一级标题：没有 title / name 的文
 		const contractPath = join(root, "outline/contracts/诈降.md");
 		await writeFile(
 			contractPath,
-			(await readFile(contractPath, "utf8")).replace("---\n公开真相", "---\n# 真相要有人付账\n\n公开真相"),
+			(await readFile(contractPath, "utf8")).replace(
+				"---\n黄盖的投降是假的",
+				"---\n# 一把火的约定\n\n黄盖的投降是假的",
+			),
 		);
 		const shown = await workspace.invoke("workspace.show", {});
 		const byPath = (path: string) => shown.files.find((file) => file.path === path);
 		assert.equal(byPath("world/overview.md")?.heading, "世界总纲");
-		assert.equal(byPath("outline/contracts/诈降.md")?.heading, "真相要有人付账");
+		assert.equal(byPath("outline/contracts/诈降.md")?.heading, "一把火的约定");
 		assert.equal(byPath("world/places/赤壁.md")?.heading, undefined, "没有一级标题就不带这个字段");
 	}));
 

@@ -13,8 +13,8 @@ function sourceExtraction(): SourceExtractionDocuments {
 function sourceWith(extraction: SourceExtractionDocuments) {
 	return bindSourceDocuments("原作", {
 		descriptor: { schema_version: 1, name: "原作.txt", encoding: "utf-8" },
-		original: encoder.encode("黄盖取得火船，最终公开真相。"),
-		material: "黄盖取得火船，最终公开真相。",
+		original: encoder.encode("黄盖挨打诈降，最终火烧曹营。"),
+		material: "黄盖挨打诈降，最终火烧曹营。",
 		extraction,
 	});
 }

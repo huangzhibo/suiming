@@ -67,12 +67,12 @@ test("session 的模型独立于全局默认，思考参数真实传入；turn �
 				assert.equal(model.id, "second");
 				assert.equal((options as Record<string, unknown>).reasoningEffort, "high");
 				await gate;
-				return fauxAssistantMessage("要公开火船吗？");
+				return fauxAssistantMessage("要诈降吗？");
 			},
 			async (context, options, _state, model) => {
 				assert.equal(model.id, "first");
 				assert.equal((options as Record<string, unknown>).reasoningEffort, "medium");
-				assert.match(JSON.stringify(context.messages), /要公开火船吗/, "换绑接着同一份消息列表");
+				assert.match(JSON.stringify(context.messages), /要诈降吗/, "换绑接着同一份消息列表");
 				return fauxAssistantMessage("继续同一对话，保留已确认的选择。");
 			},
 			async (_context, options, _state, model) => {
@@ -81,7 +81,7 @@ test("session 的模型独立于全局默认，思考参数真实传入；turn �
 				return fauxAssistantMessage("新 session 使用更新后的默认配置。");
 			},
 		]);
-		const send = { commandId: "send-choice", text: "讨论公开火船", model: choice };
+		const send = { commandId: "send-choice", text: "讨论诈降", model: choice };
 		const started = await workspace.invoke("session.send", send);
 		assert.deepEqual(await workspace.invoke("session.send", send), started);
 		await assert.rejects(workspace.invoke("session.send", { ...send, model: { ...choice, thinking: "low" } }), {

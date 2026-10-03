@@ -145,7 +145,7 @@ test("cloud import 与单侧 push / pull 只移动已提交 revision", async () 
 		await sync.import({ cloudProjectId: "cloud-project-1", idempotencyKey: "import-1" });
 		assert.equal((await sync.status()).state, "in_sync");
 
-		await editAndCommitLocal(local, "world/characters/黄盖.md", "他习惯先保留筹码", "他习惯先核验证据再保留筹码");
+		await editAndCommitLocal(local, "world/characters/黄盖.md", "他宁可自己受刑", "他宁可自己当众受刑");
 		assert.equal((await sync.status()).state, "local_ahead");
 		const pushed = await sync.push({ idempotencyKey: "push-1" });
 		assert.equal(pushed.cloudRevisionCreated, true);
@@ -157,8 +157,8 @@ test("cloud import 与单侧 push / pull 只移动已提交 revision", async () 
 			"cloud-project-1",
 			"story-beat",
 			"beat-0002",
-			"亲手焚毁火船",
-			"主动亲手焚毁火船",
+			"各船同时点火",
+			"各船立刻同时点火",
 			"cloud-edit-1",
 		);
 		assert.equal((await sync.status()).state, "cloud_ahead");
@@ -168,7 +168,7 @@ test("cloud import 与单侧 push / pull 只移动已提交 revision", async () 
 		assert.equal(pulled.after.state, "in_sync");
 		assert.match(
 			await readFile(join(local.paths.checkoutPath, "outline/story/vol-0001/beat-0002.md"), "utf8"),
-			/主动亲手焚毁火船/u,
+			/各船立刻同时点火/u,
 		);
 		const dirtyPath = join(local.paths.checkoutPath, "world/places/赤壁.md");
 		await writeFile(dirtyPath, `${await readFile(dirtyPath, "utf8")}未提交。\n`);
@@ -195,23 +195,26 @@ test("pull 合并非交叉分叉后保留 Local ahead，随后 push 收敛到同
 		local = await createLocal(root, "local-project-1");
 		const sync = new LocalCloudSyncService({ local, cloud, endpoint, actorId });
 		await sync.import({ cloudProjectId: "cloud-project-1", idempotencyKey: "import-1" });
-		await editAndCommitLocal(local, "world/characters/黄盖.md", "公开火船", "公开唯一火船");
+		await editAndCommitLocal(local, "world/characters/黄盖.md", "也不让这条计露出破绽", "也绝不让这条计露出破绽");
 		await commitCloudArtifact(
 			cloud,
 			"cloud-project-1",
 			"story-beat",
 			"beat-0002",
-			"亲手焚毁火船",
-			"主动亲手焚毁火船",
+			"各船同时点火",
+			"各船立刻同时点火",
 			"cloud-edit-1",
 		);
 		assert.equal((await sync.status()).state, "diverged_mergeable");
 		const pulled = await sync.pull();
 		assert.equal(pulled.after.state, "local_ahead");
-		assert.match(await readFile(join(local.paths.checkoutPath, "world/characters/黄盖.md"), "utf8"), /公开唯一火船/u);
+		assert.match(
+			await readFile(join(local.paths.checkoutPath, "world/characters/黄盖.md"), "utf8"),
+			/也绝不让这条计露出破绽/u,
+		);
 		assert.match(
 			await readFile(join(local.paths.checkoutPath, "outline/story/vol-0001/beat-0002.md"), "utf8"),
-			/主动亲手焚毁火船/u,
+			/各船立刻同时点火/u,
 		);
 		const pushed = await sync.push({ idempotencyKey: "push-merge-1" });
 		assert.equal(pushed.after.state, "in_sync");
@@ -246,14 +249,14 @@ test("同 artifact 双改产生显式 conflict", async () => {
 		local = await createLocal(root, "local-project-1");
 		const sync = new LocalCloudSyncService({ local, cloud, endpoint, actorId });
 		await sync.import({ cloudProjectId: "cloud-project-1", idempotencyKey: "import-1" });
-		await editAndCommitLocal(local, "outline/story/vol-0001/beat-0002.md", "亲手焚毁火船", "主动焚毁火船");
+		await editAndCommitLocal(local, "outline/story/vol-0001/beat-0002.md", "各船同时点火", "各船先后点火");
 		await commitCloudArtifact(
 			cloud,
 			"cloud-project-1",
 			"story-beat",
 			"beat-0002",
-			"亲手焚毁火船",
-			"当众焚毁火船",
+			"各船同时点火",
+			"各船一齐点火",
 			"cloud-edit-1",
 		);
 		const conflict = await sync.status();

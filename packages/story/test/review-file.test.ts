@@ -13,15 +13,15 @@ function textReview(): ReviewFile {
 		subjects: new Map([["text/beat-0001.md", digest]]),
 		draft: {
 			verdict: "revise",
-			summary: "取得火船的过程没有阻力。",
+			summary: "挨打的过程写得太顺。",
 			findings: [
 				{
 					severity: "minor",
 					anchor: { kind: "artifact", path: "text/beat-0001.md" },
-					issue: "读者感受不到火船是唯一筹码。",
+					issue: "读者感受不到这顿打的分量。",
 					evidence: "黄盖走入赤壁，在木匣中找到火船。",
 					repairLayer: "text",
-					suggestion: "写出手指遇到封蜡时的停顿。",
+					suggestion: "写出军杖落下前的那一下停顿。",
 				},
 			],
 			uncovered: [],

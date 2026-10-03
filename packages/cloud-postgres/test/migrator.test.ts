@@ -268,7 +268,7 @@ test("PostgreSQL CloudProjectStore 保持权限、幂等、线性 revision 与�
 	);
 	assert.ok(beat);
 	const replacementBytes = new TextEncoder().encode(
-		new TextDecoder().decode(beat.bytes).replace("亲手焚毁火船", "主动亲手焚毁火船"),
+		new TextDecoder().decode(beat.bytes).replace("各船同时点火", "各船立刻同时点火"),
 	);
 	const commitInput = {
 		projectId: createInput.projectId,
@@ -376,7 +376,7 @@ test("PostgreSQL CloudProjectStore 保持权限、幂等、线性 revision 与�
 					path: currentBeat.path,
 					mediaType: currentBeat.mediaType,
 					bytes: new TextEncoder().encode(
-						new TextDecoder().decode(currentBeat.bytes).replace("焚毁火船", "果断焚毁火船"),
+						new TextDecoder().decode(currentBeat.bytes).replace("同时点火", "果断同时点火"),
 					),
 				},
 			],

@@ -69,7 +69,7 @@ test("snapshot commit derives ChangeSet inside Runtime and keeps idempotent retr
 		idempotencyKey: "import-1",
 		files,
 	});
-	const changed = replaceInFile(files, "world/characters/黄盖.md", "他习惯先保留筹码", "他习惯先核验证据再保留筹码");
+	const changed = replaceInFile(files, "world/characters/黄盖.md", "他宁可自己受刑", "他宁可自己当众受刑");
 	const input = {
 		projectId: "cloud-project-1",
 		actorId,
@@ -117,7 +117,7 @@ test("Cloud application service cannot bypass project membership", async () => {
 		role: "viewer",
 	});
 	assert.equal((await service.project({ projectId: "cloud-project-1", actorId: "reader-1" })).role, "viewer");
-	const changed = replaceInFile(files, "world/characters/黄盖.md", "先保留筹码", "先核对筹码");
+	const changed = replaceInFile(files, "world/characters/黄盖.md", "宁可自己受刑", "宁可自己先受刑");
 	await assert.rejects(
 		service.commitSnapshot({
 			projectId: "cloud-project-1",

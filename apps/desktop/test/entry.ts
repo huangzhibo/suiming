@@ -100,7 +100,7 @@ if (process.argv.includes("--workspace-callback-test")) {
 provider.setResponses([
 	async () => {
 		await new Promise((resolve) => setTimeout(resolve, 1200));
-		return fauxAssistantMessage("主角要公开火船，还是暂时保留？");
+		return fauxAssistantMessage("黄盖要当众挨这顿打，还是另想办法？");
 	},
 	fauxAssistantMessage(fauxToolCall("commit", { summary: "提交设计" })),
 	fauxAssistantMessage(fauxToolCall("write_context", { storyBeatId: "beat-0001" })),
@@ -108,7 +108,7 @@ provider.setResponses([
 		fauxToolCall("write", {
 			path: "text/beat-0001.md",
 			content:
-				"黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走火船之后，自己就再没有可以讨价还价的东西。\n\n他还是伸手取了。",
+				"军杖落到第三十下，黄盖咬住了衣角。他知道曹操的人就在辕门外看着，也知道这顿打少一下都不像真的。\n\n他没有喊。",
 		}),
 	),
 	fauxAssistantMessage(fauxToolCall("commit", { summary: "采用第一场正文" })),
@@ -122,15 +122,15 @@ provider.setResponses([
 					severity: "minor",
 					anchor: { kind: "artifact", path: "text/beat-0001.md" },
 					issue: "取信动作略显概括",
-					evidence: "结尾只有“他还是伸手取了”，缺少一次有阻力的身体动作。",
+					evidence: "结尾只有“他没有喊”，缺少一次有阻力的身体动作。",
 					repairLayer: "text",
-					suggestion: "写出手指遇到封蜡时的停顿。",
+					suggestion: "写出军杖落下前的那一下停顿。",
 				},
 				...Array.from({ length: 5 }, (_, index) => ({
 					severity: "minor",
 					anchor: { kind: "artifact", path: "text/beat-0001.md" },
 					issue: `补充审读问题 ${index + 1}`,
-					evidence: `“他还是伸手取了”——${"长报告布局验收用的审读说明，覆盖完整意见的滚动和正文对照。".repeat(6)}`,
+					evidence: `“他没有喊”——${"长报告布局验收用的审读说明，覆盖完整意见的滚动和正文对照。".repeat(6)}`,
 					repairLayer: "text",
 					suggestion: "逐项核对当前稿与被审快照。".repeat(4),
 				})),
@@ -156,9 +156,9 @@ if (process.argv.includes("--composer-test"))
 	provider.setResponses([
 		async () => {
 			await new Promise((resolve) => setTimeout(resolve, 700));
-			return fauxAssistantMessage("需要公开火船吗？");
+			return fauxAssistantMessage("需要让黄盖当众挨打吗？");
 		},
-		fauxAssistantMessage("对话回看测试。黄盖在封蜡前停了一下，仍决定公开火船。\n\n".repeat(120)),
+		fauxAssistantMessage("对话回看测试。黄盖在军杖落下前停了一下，仍决定诈降。\n\n".repeat(120)),
 	]);
 // 选段就地修改：模型读正文、只改选中的那句，再回一句改了什么
 if (process.argv.includes("--selection-edit-test"))
@@ -167,8 +167,8 @@ if (process.argv.includes("--selection-edit-test"))
 		fauxAssistantMessage(
 			fauxToolCall("edit", {
 				path: "text/beat-0001.md",
-				oldText: "黄盖推开赤壁的门。",
-				newText: "黄盖在赤壁门前停了一下，才推开门。",
+				oldText: "军杖落到第三十下。",
+				newText: "军杖落下之前，黄盖抬头看了周瑜一眼。",
 			}),
 		),
 		fauxAssistantMessage("改好了：推门前先停了一下，其余没动。"),
@@ -185,15 +185,15 @@ if (process.argv.includes("--conversation-test")) {
 			return fauxAssistantMessage("停止没有生效");
 		}
 		if (!encoded.includes("继续分析这个选择")) throw new Error("停止前那句不见了");
-		return fauxAssistantMessage("接着停下前的分析：他公开火船，是在赌朝廷还肯认旧案。");
+		return fauxAssistantMessage("接着停下前的分析：他甘愿挨打，是在赌曹操只信亲眼所见。");
 	};
 	provider.setResponses([
 		fauxAssistantMessage(fauxToolCall("read", { path: "outline/story/vol-0001/beat-0001.md" })),
-		fauxAssistantMessage("可以让黄盖主动公开火船，把失去谈判筹码作为代价。先讨论这个选择，不修改作品。"),
+		fauxAssistantMessage("可以让黄盖主动挨这顿打，把皮肉之苦作为代价。先讨论这个选择，不修改作品。"),
 		async (context) => {
-			if (!JSON.stringify(context.messages).includes("把失去谈判筹码作为代价")) throw new Error("追问缺少前文");
+			if (!JSON.stringify(context.messages).includes("把皮肉之苦作为代价")) throw new Error("追问缺少前文");
 			return fauxAssistantMessage(
-				"接着刚才的方案，关键是补足他为什么愿意失去筹码，以及这个决定如何影响后面的关系。",
+				"接着刚才的方案，关键是补足他为什么愿意挨这顿打，以及这顿打如何影响他和周瑜的关系。",
 			);
 		},
 		async (context) => {

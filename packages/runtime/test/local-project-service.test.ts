@@ -56,7 +56,7 @@ test("Local Project application service 从真实 checkout 计算、检查并提
 
 		const beatPath = join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const beat = decoder.decode(await readFile(beatPath));
-		await writeFile(beatPath, beat.replace("亲手焚毁火船", "亲手焚毁唯一火船"));
+		await writeFile(beatPath, beat.replace("各船同时点火", "二十艘船同时点火"));
 
 		const diff = await service.diff();
 		assert.equal(diff.state, "dirty");
@@ -101,7 +101,7 @@ test("另一个进程推进了 Canon：本实例读状态、提交都以当前 C
 		cli = await LocalProjectService.open(fixture.checkoutPath);
 		const beatPath = join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const beat = decoder.decode(await readFile(beatPath));
-		await writeFile(beatPath, beat.replace("亲手焚毁火船", "亲手焚毁唯一火船"));
+		await writeFile(beatPath, beat.replace("各船同时点火", "二十艘船同时点火"));
 		const elsewhere = await cli.commitCheckout();
 		assert.equal(elsewhere.created, true);
 
@@ -110,7 +110,7 @@ test("另一个进程推进了 Canon：本实例读状态、提交都以当前 C
 		assert.equal(status.baseRevisionId, elsewhere.revision.id);
 		assert.equal(desktop.project().headRevisionId, elsewhere.revision.id);
 
-		await writeFile(beatPath, beat.replace("亲手焚毁火船", "当众焚毁唯一火船"));
+		await writeFile(beatPath, beat.replace("各船同时点火", "各船一齐点火"));
 		const mine = await desktop.commitCheckout();
 		assert.equal(mine.created, true);
 		assert.equal(mine.revision.parentId, elsewhere.revision.id);
@@ -192,10 +192,7 @@ test("host 提交 StoryText 后正文时效从 git 历史派生：Design 闭包�
 		service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
 		await mkdir(join(fixture.checkoutPath, "text"), { recursive: true });
 		await writeFile(join(fixture.checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
-		await writeFile(
-			join(fixture.checkoutPath, "text", "beat-0002.md"),
-			"天亮前，他公开真相，并亲手把唯一的火船送进火里。\n",
-		);
+		await writeFile(join(fixture.checkoutPath, "text", "beat-0002.md"), "约定那夜，二十艘火船一齐点火，直冲曹营。\n");
 		const committed = await service.commitCheckout();
 		assert.equal(committed.created, true);
 		const currencies = async (project: LocalProjectService) => {
@@ -214,7 +211,7 @@ test("host 提交 StoryText 后正文时效从 git 历史派生：Design 闭包�
 
 		await writeFile(
 			join(fixture.checkoutPath, "world", "characters", "黄盖.md"),
-			"---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担。\n",
+			"---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽。\n",
 		);
 		await service.commitCheckout();
 		assert.deepEqual(
@@ -258,7 +255,7 @@ test("host 换卷是改 index 加 mv 两步，diff 里两个 artifact 都算改�
 		assert.equal(beatEntry?.after?.path, "outline/story/vol-0002/beat-0002.md");
 		await service.commitCheckout();
 		assert.equal((await service.status()).state, "clean");
-		assert.equal(decoder.decode(await readFile(to)).includes("公开真相"), true);
+		assert.equal(decoder.decode(await readFile(to)).includes("各船同时点火"), true);
 	} finally {
 		service?.close();
 		await cleanup(fixture);
@@ -351,7 +348,7 @@ test("Agent managed ChangeSet 原子回写 checkout，且保留仓库辅助文�
 					identity: targetArtifactIdentity("character", "黄盖"),
 					path: "world/characters/黄盖.md",
 					mediaType: "text/markdown; charset=utf-8",
-					bytes: encoder.encode("---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担，也愿意公开承担后果。\n"),
+					bytes: encoder.encode("---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽，事后也认这顿打。\n"),
 				},
 			],
 		});
@@ -360,7 +357,7 @@ test("Agent managed ChangeSet 原子回写 checkout，且保留仓库辅助文�
 		assert.equal(
 			decoder
 				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
-				.includes("公开承担后果"),
+				.includes("这顿打"),
 			true,
 		);
 		assert.equal(decoder.decode(await readFile(join(fixture.checkoutPath, "README.md"))), "# Repository auxiliary\n");
@@ -547,7 +544,7 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 						path: "world/characters/黄盖.md",
 						mediaType: "text/markdown; charset=utf-8",
 						bytes: encoder.encode(
-							"---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担，并愿意公开承担后果。\n",
+							"---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽，并愿意事后认下这顿打。\n",
 						),
 					},
 					{
@@ -571,7 +568,7 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 		assert.equal(
 			decoder
 				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
-				.includes("公开承担后果"),
+				.includes("这顿打"),
 			true,
 		);
 		assert.equal(await readFile(join(fixture.checkoutPath, review.path), "utf8"), review.content);

@@ -77,7 +77,7 @@ const extractionFiles: Array<[string, string]> = [
 	],
 	["source/访谈/world/characters/黄盖.md", "先核对证据再决定是否公开的人。\n"],
 	["source/访谈/world/characters/旧友.md", "劝黄盖销毁证据的旧相识。\n"],
-	["source/访谈/world/resources/火船.md", "能证明旧案的信件。\n"],
+	["source/访谈/world/resources/火船.md", "黄盖备下的引火船。\n"],
 	[
 		"source/访谈/outline/contracts/火船去向.md",
 		"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: book_end\n---\n材料建立了火船最终去向的期待，边界内尚未回答。\n",
@@ -577,7 +577,7 @@ test("委派的 source-reader 与 source-extractor：Reader 判断标准与 host
 		assert.match(SOURCE_READER_METHOD, /两到三成/u);
 		for (const { system, prompt } of seen) {
 			assert.doesNotMatch(system, /故事创作宪法/u);
-			assert.doesNotMatch(prompt, /主角不能靠巧合取胜/u, "不带 Target 意图");
+			assert.doesNotMatch(prompt, /骗局的每一步，都由人物亲身承担/u, "不带 Target 意图");
 			assert.match(prompt, /全文 \d+ 码点/u, "输入是这个 Source 的覆盖情况");
 		}
 		assert.match(results[0] ?? "", /permission_denied|不能读|无权/u, "Source 角色读不到 Target 意图");

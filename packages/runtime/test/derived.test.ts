@@ -77,8 +77,8 @@ const markdown = (path: string, text: string): OpenPackageFile => ({
 const replace = (files: OpenPackageFile[], path: string, text: string) =>
 	files.map((file) => (file.path === path ? markdown(path, text) : file));
 const texts = () => [
-	markdown("text/beat-0001.md", "黄盖走入赤壁。\n\n他在尘封木匣里找到了火船。"),
-	markdown("text/beat-0002.md", "天亮前，他公开真相，亲手把唯一的火船送进火里。"),
+	markdown("text/beat-0001.md", "黄盖当众挨了军杖。\n\n他一声没吭。"),
+	markdown("text/beat-0002.md", "约定那夜，二十艘火船一齐点火，冲进了曹营。"),
 ];
 
 test("正文时效从历史派生：写成时的 Design 闭包没变就是 current，闭包里任一文件变了就是 design-changed，重写正文后重新起算", async () => {
@@ -108,7 +108,7 @@ test("正文时效从历史派生：写成时的 Design 闭包没变就是 curre
 	]);
 
 	const r3 = history.commit(
-		replace(withText, "world/characters/黄盖.md", "---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担。\n"),
+		replace(withText, "world/characters/黄盖.md", "---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽。\n"),
 	);
 	const changed = await textCurrencies(history, r3, history.candidate(r3));
 	assert.deepEqual(
@@ -120,7 +120,7 @@ test("正文时效从历史派生：写成时的 Design 闭包没变就是 curre
 	);
 
 	// r4：黄盖改回 r2 的样子，同时重写 beat-0001 的正文。
-	const r4 = history.commit(replace(withText, "text/beat-0001.md", "黄盖推开赤壁的门。"));
+	const r4 = history.commit(replace(withText, "text/beat-0001.md", "军杖落到第三十下。"));
 	assert.deepEqual(
 		(await textCurrencies(history, r4, history.candidate(r4))).map((item) => [item.state, item.writtenAt]),
 		[
@@ -204,7 +204,7 @@ test("审稿时效比的是审的时候主体文件的摘要，不是审稿进�
 		revision: r2,
 	});
 
-	const r3 = history.commit(replace(withText, "text/beat-0002.md", "他公开真相。人群沉默许久。"));
+	const r3 = history.commit(replace(withText, "text/beat-0002.md", "火船点着了。江面上许久没有人声。"));
 	const at3 = history.candidate(r3);
 	assert.deepEqual(await reviewCurrency(history, r3, at3, at(bookText)), {
 		state: "stale",
@@ -240,7 +240,7 @@ test("审稿时效比的是审的时候主体文件的摘要，不是审稿进�
 	const beforeFix = history.candidate(r4);
 	const sameCommitReview = compose(beforeFix, "text", { kind: "beats", storyBeatIds: ["beat-0001"] }, "candidate");
 	const fixed = [
-		...replace(history.candidateFiles(r4), "text/beat-0001.md", "黄盖推开赤壁的门，在尘封木匣里找到火船。"),
+		...replace(history.candidateFiles(r4), "text/beat-0001.md", "军杖落下，黄盖咬住衣角，一声没吭。"),
 		markdown("review/same.md", renderReviewFile(sameCommitReview)),
 	];
 	const r5 = history.commit(fixed);
@@ -251,11 +251,11 @@ test("审稿时效比的是审的时候主体文件的摘要，不是审稿进�
 	);
 
 	// 审稿时还不存在、后来成了主体的文件，也让全书正文审稿过时。
-	const onlyOne = [...design, markdown("text/beat-0001.md", "黄盖走入赤壁。")];
+	const onlyOne = [...design, markdown("text/beat-0001.md", "黄盖当众挨了军杖。")];
 	const r6 = history.commit(onlyOne);
 	const partial = compose(history.candidate(r6), "text", book, r6);
 	assert.deepEqual(partial.subjects.has("text/beat-0002.md"), false, "审的时候 beat-0002 还没有正文");
-	const r7 = history.commit([...onlyOne, markdown("text/beat-0002.md", "他公开真相。")]);
+	const r7 = history.commit([...onlyOne, markdown("text/beat-0002.md", "火船点着了。")]);
 	assert.deepEqual(await reviewCurrency(history, r7, history.candidate(r7), at(partial)), {
 		state: "stale",
 		changed: ["text/beat-0002.md"],
@@ -290,7 +290,7 @@ test("Release 从完整且 current 的正文派生，Review 意见不拥有发�
 					severity: "minor" as const,
 					anchor: { kind: "artifact" as const, path: "text/beat-0002.md" },
 					issue: "焚信后的旁观者反馈偏少。",
-					evidence: "亲手把唯一的火船送进火里。",
+					evidence: "二十艘火船一齐点火，冲进了曹营。",
 					repairLayer: "text" as const,
 				},
 			],
@@ -350,7 +350,11 @@ test("Release 从完整且 current 的正文派生，Review 意见不拥有发�
 	);
 
 	const r5 = history.commit(
-		replace([...reviewed, ...releaseFiles], "text/beat-0002.md", "他公开真相，人群沉默许久，才有人喊出他的名字。"),
+		replace(
+			[...reviewed, ...releaseFiles],
+			"text/beat-0002.md",
+			"火船点着了，江面上许久没有人声，才有人喊出他的名字。",
+		),
 	);
 	const stale = await inspectRelease(history, r5, history.candidate(r5));
 	assert.equal(stale.state, "stale");

@@ -34,7 +34,8 @@ test("index 声明 open_ended：全书未完待续时，已建立未回应的 bo
 	// 全书期限、已在 beat-0001 建立、到最后一个 Beat 仍未回应：连载写到一半的常态
 	docs.contracts[0] = {
 		...(docs.contracts[0] as (typeof docs.contracts)[number]),
-		markdown: "---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n黄盖公开真相时，必须失去唯一火船。",
+		markdown:
+			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n黄盖的投降是假的，约定之夜火船必须烧尽。",
 	};
 	docs.beats[1] = {
 		...(docs.beats[1] as (typeof docs.beats)[number]),

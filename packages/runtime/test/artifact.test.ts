@@ -49,22 +49,22 @@ function designPackage(): OpenPackageFile[] {
 		),
 		file(
 			"outline/story/vol-0001/beat-0001.md",
-			"---\nrefs:\n  character: [黄盖]\n  place: [赤壁]\n  resource: [火船]\ncontracts:\n  open: [诈降]\nchanges:\n  world:\n    黄盖.location: 赤壁\n---\n黄盖进入赤壁，取得火船。\n",
+			"---\nrefs:\n  character: [黄盖]\n  place: [赤壁]\n  resource: [火船]\ncontracts:\n  open: [诈降]\nchanges:\n  world:\n    黄盖.location: 赤壁\n---\n黄盖在赤壁挨打诈降。\n",
 		),
 		file(
 			"outline/story/vol-0001/beat-0002.md",
-			"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\n  beat: [beat-0001]\ncontracts:\n  resolve: [诈降]\nchanges:\n  world:\n    火船.consumed: true\n---\n黄盖公开真相并焚毁火船。\n",
+			"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\n  beat: [beat-0001]\ncontracts:\n  resolve: [诈降]\nchanges:\n  world:\n    火船.consumed: true\n---\n火船冲进曹营，烧得一艘不剩。\n",
 		),
-		file("world/characters/黄盖.md", "---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担。\n"),
-		file("world/places/赤壁.md", "收藏旧朝档案的封闭库房。\n"),
-		file("world/resources/火船.md", "---\ninitial:\n  holder: 黄盖\n---\n唯一能证明旧案的火船。\n"),
+		file("world/characters/黄盖.md", "---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽。\n"),
+		file("world/places/赤壁.md", "长江南岸，孙刘联军扎营之处。\n"),
+		file("world/resources/火船.md", "---\ninitial:\n  holder: 黄盖\n---\n黄盖备下的二十艘火船。\n"),
 		file(
 			"outline/contracts/诈降.md",
-			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: beat-0002\n---\n公开真相必须失去唯一火船。\n",
+			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: beat-0002\n---\n诈降必须兑现成一把火，火船随之烧尽。\n",
 		),
 		file(
 			"intent/计谋的代价.md",
-			"---\nstyle_refs: [style_contemporary_restraint]\n---\n主角不能靠巧合取胜，揭示必须带来不可恢复的代价。\n",
+			"---\nstyle_refs: [style_contemporary_restraint]\n---\n计谋要让读者看见代价，不能靠巧合取胜。\n",
 		),
 		binaryFile(
 			"reference/materials/旧案/卷宗.pdf",
@@ -84,8 +84,8 @@ function sourcePackage(sourceId: string): OpenPackageFile[] {
 			`schema_version: 1\nname: ${sourceId}.txt\nencoding: utf-8\n`,
 			"application/yaml; charset=utf-8",
 		),
-		file(`${root}/original.bin`, "黄盖从旧档中取得火船。", "application/octet-stream"),
-		file(`${root}/material.txt`, "黄盖从旧档中取得火船。\n", "text/plain; charset=utf-8"),
+		file(`${root}/original.bin`, "黄盖备下火船，准备诈降。", "application/octet-stream"),
+		file(`${root}/material.txt`, "黄盖备下火船，准备诈降。\n", "text/plain; charset=utf-8"),
 		file(
 			`${root}/outline/story/index.yaml`,
 			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 来源\n    beat_ids: [beat-0001]\n",
@@ -93,9 +93,9 @@ function sourcePackage(sourceId: string): OpenPackageFile[] {
 		),
 		file(
 			`${root}/outline/story/vol-0001/beat-0001.md`,
-			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖从旧档中取得火船，材料没有交代它最终去了哪里。\n",
+			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖备下火船，材料没有交代它最终去了哪里。\n",
 		),
-		file(`${root}/world/characters/黄盖.md`, "习惯先核对证据，再决定是否公开。\n"),
+		file(`${root}/world/characters/黄盖.md`, "上阵前先算清退路。\n"),
 		file(
 			`${root}/outline/contracts/火船去向.md`,
 			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",

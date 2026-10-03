@@ -22,11 +22,11 @@ import { sampleWorkFiles } from "../packages/runtime/test/sample-work.ts";
 const run = promisify(execFile);
 const CLI = resolve("apps/cli/dist/bin.js");
 
-const PROSE = `黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走火船之后，自己就再没有可以讨价还价的东西。
+const PROSE = `军杖落到第三十下，黄盖咬住了衣角。他知道曹操的人就在辕门外看着，也知道这顿打少一下都不像真的。
 
-守档的老吏咳了一声，没有回头。黄盖把手按在匣盖上，停了很久。
+执杖的军士手软了一下，周瑜在帐前喝了一声。黄盖把脸埋进臂弯，背上的血顺着腰带往下淌。
 
-他还是伸手取了。蜡封在指腹下碎开的时候，他想起父亲说过的话：真相要有人付账。`;
+他没有喊。被人架起来的时候，他想起自己对周瑜说过的话：这条计，要有人拿皮肉去换。`;
 
 async function suim(dir, args) {
 	try {
@@ -115,7 +115,7 @@ async function unpaidContract(dir, service, id) {
 const TASKS = [
 	{
 		id: "discuss",
-		prompt: "讨论一下黄盖公开火船要付出什么代价，先不要修改作品。",
+		prompt: "讨论一下黄盖诈降要付出什么代价，先不要修改作品。",
 		grade: (r) => [
 			expect("没有改动作品", total(r.summary.changed) === 0),
 			expect("没有提交", r.summary.revisions === 0),
@@ -124,15 +124,15 @@ const TASKS = [
 	},
 	{
 		id: "write-back",
-		prompt: "记住一个以后都成立的设定：黄盖从不说谎，哪怕对敌人也一样。",
+		prompt: "记住一个以后都成立的设定：黄盖年过五十，左臂有旧伤，拉不开硬弓。",
 		grade: (r) => [
 			expect("写回了意图或 Design", r.summary.changed.intent.count + r.summary.changed.design.count > 0),
 		],
 	},
 	{
 		id: "design-edit",
-		// 样例的 beat-0002 已经是「当众焚毁火船」，要求一个它确实没有的改动，否则「不用改」才是对的回答。
-		prompt: "在 beat-0002 里加上守档的老吏想拦住黄盖、被他推开的情节。改完检查并提交。",
+		// 样例的 beat-0002 只有火船冲营，要求一个它确实没有的改动，否则「不用改」才是对的回答。
+		prompt: "在 beat-0002 里加上曹军巡江的船过来盘问、被黄盖拿降书应付过去的情节。改完检查并提交。",
 		grade: (r) => [
 			expect("改了 Design", r.summary.changed.design.count > 0),
 			expect("提交了版本", r.summary.revisions > 0),

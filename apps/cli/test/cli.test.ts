@@ -82,8 +82,8 @@ function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 			`schema_version: 1\nname: ${sourceId}.txt\nencoding: utf-8\n`,
 			"application/yaml; charset=utf-8",
 		),
-		text(`${root}/original.bin`, "黄盖从旧档中取得火船。", "application/octet-stream"),
-		text(`${root}/material.txt`, "黄盖从旧档中取得火船。\n", "text/plain; charset=utf-8"),
+		text(`${root}/original.bin`, "黄盖备下火船，准备诈降。", "application/octet-stream"),
+		text(`${root}/material.txt`, "黄盖备下火船，准备诈降。\n", "text/plain; charset=utf-8"),
 		text(
 			`${root}/outline/story/index.yaml`,
 			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 来源\n    beat_ids: [beat-0001]\n",
@@ -91,9 +91,9 @@ function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 		),
 		text(
 			`${root}/outline/story/vol-0001/beat-0001.md`,
-			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖从旧档中取得火船，材料没有交代它最终去了哪里。\n",
+			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖备下火船，材料没有交代它最终去了哪里。\n",
 		),
-		text(`${root}/world/characters/黄盖.md`, "习惯先核对证据，再决定是否公开。\n"),
+		text(`${root}/world/characters/黄盖.md`, "上阵前先算清退路。\n"),
 		text(
 			`${root}/outline/contracts/火船去向.md`,
 			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
@@ -231,7 +231,7 @@ function sourceExtractGateway(): ModelGateway {
 			"source/访谈/outline/story/vol-0001/beat-0001.md",
 			"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\n---\n访谈记录黄盖先核对火船，再决定如何处理。\n",
 		),
-		write("source/访谈/world/characters/黄盖.md", "处理火船前先核对证据的人。\n"),
+		write("source/访谈/world/characters/黄盖.md", "点火前先看风向的人。\n"),
 		write("source/访谈/world/resources/火船.md", "黄盖核对的信件。\n"),
 		fauxAssistantMessage(fauxToolCall("commit", { summary: "保存 extraction" })),
 		fauxAssistantMessage("把访谈抽取为黄盖核对火船的事件。"),
@@ -293,7 +293,7 @@ function writeRunGateway(): ModelGateway {
 		fauxAssistantMessage(
 			fauxToolCall("write", {
 				path: "text/beat-0001.md",
-				content: "黄盖走入赤壁。\n\n他在尘封木匣里找到了火船。\n",
+				content: "黄盖当众挨了军杖。\n\n他一声没吭。\n",
 			}),
 		),
 		fauxAssistantMessage(fauxToolCall("commit", { summary: "采用正文" })),
@@ -463,7 +463,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 		assert.equal(Value.Check(SuimCliResponseSchema, clean.value), true);
 		assert.equal((clean.value.data as { state: string }).state, "clean");
 
-		const searched = await jsonCommand(checkoutPath, ["search", "真相", "--kind", "character"]);
+		const searched = await jsonCommand(checkoutPath, ["search", "火攻", "--kind", "character"]);
 		assert.equal(searched.exitCode, SUIM_CLI_EXIT.success);
 		assert.equal(Value.Check(SuimCliSuccessSchema, searched.value), true);
 		assert.equal(searched.value.command, "read.search");
@@ -516,7 +516,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 		);
 		assert.equal(written.exitCode, 0, JSON.stringify(written.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, written.value.data));
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，亲手把唯一的火船送进火里。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "约定那夜，二十艘火船一齐点火，冲进了曹营。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, 0);
 		const reviewed = await jsonCommand(
 			checkoutPath,
@@ -575,7 +575,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 
 		const beatPath = join(checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const beat = await readFile(beatPath, "utf8");
-		await writeFile(beatPath, beat.replace("亲手焚毁火船", "亲手焚毁唯一火船"));
+		await writeFile(beatPath, beat.replace("各船同时点火", "二十艘船同时点火"));
 
 		const diff = await jsonCommand(checkoutPath, ["diff"]);
 		assert.equal(diff.exitCode, SUIM_CLI_EXIT.success);
@@ -1125,7 +1125,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
 		await mkdir(join(checkoutPath, "text"), { recursive: true });
 		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的火船送进火里。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "约定那夜，二十艘火船一齐点火，直冲曹营。\n");
 
 		const checked = await jsonCommand(checkoutPath, ["text", "check", "beat-0001"]);
 		assert.equal(checked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(checked.value));
@@ -1172,7 +1172,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 			draftPath,
 			JSON.stringify({
 				verdict: "pass",
-				summary: "beat-0001 的正文兑现了取得火船的过程。",
+				summary: "beat-0001 的正文兑现了苦肉计的过程。",
 				findings: [],
 				uncovered: [],
 				uncertainties: [],
@@ -1209,7 +1209,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 		assert.ok(listedReview);
 		assert.equal(listedReview.current, true);
 		// 改了被审正文再提交：审稿还在，但不再 current。
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖当众挨了军杖。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const relisted = await jsonCommand(checkoutPath, ["review", "list"]);
 		assert.equal(
@@ -1500,7 +1500,7 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 		await mkdir(join(checkoutPath, "source", "访谈", "notes"), { recursive: true });
 		await writeFile(
 			join(checkoutPath, "source", "访谈", "notes", "1.md"),
-			`---\nspan: [0, ${total}]\nmaterial_sha256: ${data.source.materialSha256}\n---\n黄盖找到火船后去见旧友。\n`,
+			`---\nspan: [0, ${total}]\nmaterial_sha256: ${data.source.materialSha256}\n---\n黄盖备好火船后去见周瑜。\n`,
 			"utf8",
 		);
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
@@ -1530,7 +1530,7 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 		const review = await jsonCommand(checkoutPath, ["context", "compile", "review:source:访谈"]);
 		assert.equal(review.exitCode, SUIM_CLI_EXIT.success, "读完并提交抽取后 Source Review 可编译");
 		const reviewText = (review.value.data as { text: string }).text;
-		assert.ok(reviewText.includes("黄盖找到火船后去见旧友。"));
+		assert.ok(reviewText.includes("黄盖备好火船后去见周瑜。"));
 		assert.ok(reviewText.includes("黄盖拿着火船去见旧友，核对来历。"));
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
@@ -1581,7 +1581,7 @@ test("suim run rank：多版候选文件匿名交给评委，输出合并名次�
 		await mkdir(join(checkoutPath, ".suim-host"), { recursive: true });
 		const first = join(checkoutPath, ".suim-host", "flash.md");
 		const second = join(checkoutPath, ".suim-host", "pro.md");
-		await writeFile(first, "黄盖推开赤壁的门。\n", "utf8");
+		await writeFile(first, "军杖落到第三十下。\n", "utf8");
 		await writeFile(second, "赤壁的门吱呀一声。\n", "utf8");
 		const ranked = await jsonCommand(
 			checkoutPath,

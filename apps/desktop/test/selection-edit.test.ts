@@ -20,7 +20,7 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
-	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的门。霉味先于灯光涌出来。\n\n他伸手取了信。\n");
+	await writeFile(join(root, "text/beat-0001.md"), "军杖落到第三十下。黄盖咬住了衣角。\n\n他一声没吭。\n");
 	const app = await electron.launch({
 		args: [
 			resolve("apps/desktop/test-dist/entry.js"),
@@ -63,8 +63,8 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 		const sent = inbox?.[0]?.text ?? "";
 		assert.match(sent, /请修改这一段：门前先停一下再推门/);
 		assert.match(sent, /作品引用：text\/beat-0001\.md/, "带着选段的定位");
-		assert.match(sent, /黄盖推开赤壁的门。/);
-		assert.match(await readFile(join(root, "text/beat-0001.md"), "utf8"), /黄盖在赤壁门前停了一下，才推开门。/);
+		assert.match(sent, /军杖落到第三十下。/);
+		assert.match(await readFile(join(root, "text/beat-0001.md"), "utf8"), /军杖落下之前，黄盖抬头看了周瑜一眼。/);
 		assert.equal(await composer.inputValue(), "", "就地发送不经过输入框，也不在里面留东西");
 
 		// 输入框里有作者没发出的话：就地要求接进输入框，选段成为引用，不直接发出、不顶掉草稿

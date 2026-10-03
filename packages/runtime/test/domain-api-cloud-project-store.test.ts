@@ -114,7 +114,7 @@ test("DomainApiCloudProjectStore preserves CloudProjectStore semantics over publ
 						identity: character.identity,
 						path: character.path,
 						mediaType: character.mediaType,
-						bytes: encoder.encode(text.replace("先保留筹码", "先核验证据")),
+						bytes: encoder.encode(text.replace("宁可自己受刑", "宁可自己挨打")),
 					},
 				],
 			},
@@ -135,7 +135,7 @@ test("DomainApiCloudProjectStore preserves CloudProjectStore semantics over publ
 		actorId,
 		artifactVersionId: committedCharacter.artifactVersionId,
 	});
-	assert.match(decoder.decode(version.bytes), /先核验证据/u);
+	assert.match(decoder.decode(version.bytes), /宁可自己挨打/u);
 	assert.equal(
 		await remote.setMember({
 			projectId: "project-1",

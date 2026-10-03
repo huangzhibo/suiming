@@ -31,7 +31,7 @@ test("连续对话：停下后追问接着同一 session、重载历史、草稿
 	const input = page.getByRole("textbox", { name: "输入消息", exact: true });
 	const read = () => page.evaluate(() => window.suiming?.invoke("session.list", {}));
 	try {
-		await input.fill("讨论黄盖公开火船的选择");
+		await input.fill("讨论黄盖诈降的选择");
 		await input.press("Meta+Enter");
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		const first = (await read())?.sessions[0];
@@ -69,7 +69,7 @@ test("连续对话：停下后追问接着同一 session、重载历史、草稿
 		assert.equal((await read())?.sessions.length, 2);
 		await page.getByRole("button", { name: "选择对话", exact: true }).click();
 		await page
-			.getByRole("button", { name: /讨论黄盖公开火船的选择/ })
+			.getByRole("button", { name: /讨论黄盖诈降的选择/ })
 			.last()
 			.click();
 		assert.equal(await input.inputValue(), "这个对话的未发送草稿");
