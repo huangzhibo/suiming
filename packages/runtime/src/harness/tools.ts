@@ -12,7 +12,12 @@ import { parseStoryImpactSubject, storyImpact } from "../artifact/story-impact.j
 import { storyPackageCodec } from "../artifact/story-package-codec.js";
 import { searchStoryCandidate } from "../artifact/story-search.js";
 import type { ArtifactCandidate } from "../artifact/types.js";
-import type { ConfinedEnvPolicy, ConfinedExecutionEnv, FileMutation } from "./confined-env.js";
+import {
+	type ConfinedEnvPolicy,
+	type ConfinedExecutionEnv,
+	conflictMessage,
+	type FileMutation,
+} from "./confined-env.js";
 import { type HarnessTool, type HarnessToolResult, type ToolDetails, ToolRejection } from "./tool.js";
 import { renderState, styleEvidenceFor } from "./write-context.js";
 
@@ -267,7 +272,7 @@ export function fileTools(
 			const mutation = await env.prepareWrite(params.path, original.replace(params.oldText, params.newText));
 			// 在读和准备之间有外部修改时不能把新文件当成刚才读到的输入。
 			if (mutation.before !== createHash("sha256").update(original).digest("hex"))
-				throw new ToolRejection("file_write_conflict", params.path);
+				throw new ToolRejection("file_write_conflict", conflictMessage(params.path));
 			return mutation;
 		},
 		async execute(_id, params, signal, _update, prepared) {

@@ -107,6 +107,86 @@ test("进程在文件已改、结果未保存时退出：原动作 journal 续�
 	}
 });
 
+test("准备写入之后作者改了同一个文件：写冲突作为工具错误交给模型，turn 继续，作者的内容不被覆盖", async () => {
+	const root = await mkdtemp(join(tmpdir(), "suiming-loop-conflict-"));
+	try {
+		await mkdir(join(root, "intent"));
+		await writeFile(join(root, "intent/a.md"), "A");
+		const { provider, model } = await fixture();
+		provider.setResponses([
+			fauxAssistantMessage(fauxToolCall("edit", { path: "intent/a.md", oldText: "A", newText: "AA" })),
+			fauxAssistantMessage("完成"),
+		]);
+		let authorEdited = false;
+		const result = await runTaskLoop({
+			model,
+			tools: fileTools(new ConfinedExecutionEnv({ rootPath: root, policy: "write" }), "write"),
+			systemPrompt: "修改",
+			prompt: "执行",
+			budget: { maxTurns: 3 },
+			saveCheckpoint: async (next: LoopCheckpoint) => {
+				// 动作已落 journal、还没落盘时，作者在编辑器里存了同一个文件。
+				if (!authorEdited && next.actions.some((action) => action.state === "effect_pending")) {
+					authorEdited = true;
+					await writeFile(join(root, "intent/a.md"), "作者改的");
+				}
+			},
+		});
+		assert.equal(result.stop, "model_stopped");
+		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "作者改的");
+		assert.equal(provider.state.callCount, 2);
+		const toolResult = result.messages.find((message) => message.role === "toolResult");
+		assert.equal(toolResult?.isError, true);
+		const text = toolResult?.content.map((part) => (part.type === "text" ? part.text : "")).join("");
+		assert.match(text ?? "", /file_write_conflict/u);
+		assert.match(text ?? "", /重新读取/u);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("动作已落 journal 时进程退出、重启前作者改了同一个文件：续接报写冲突给模型，不会每个 turn 撞同一个冲突", async () => {
+	const root = await mkdtemp(join(tmpdir(), "suiming-loop-conflict-resume-"));
+	try {
+		await mkdir(join(root, "intent"));
+		await writeFile(join(root, "intent/a.md"), "A");
+		const { provider, model } = await fixture();
+		provider.setResponses([
+			fauxAssistantMessage(fauxToolCall("edit", { path: "intent/a.md", oldText: "A", newText: "AA" })),
+			fauxAssistantMessage("完成"),
+		]);
+		let checkpoint: LoopCheckpoint | undefined;
+		let crash = true;
+		const options = {
+			model,
+			loopId: "loop-conflict",
+			tools: fileTools(new ConfinedExecutionEnv({ rootPath: root, policy: "write" }), "write"),
+			systemPrompt: "修改",
+			prompt: "执行",
+			budget: { maxTurns: 3 },
+			saveCheckpoint: async (next: LoopCheckpoint) => {
+				checkpoint = structuredClone(next);
+				if (crash && next.actions.some((action) => action.state === "effect_pending"))
+					throw new Error("process exited after journal");
+			},
+		};
+		await assert.rejects(runTaskLoop(options), /process exited/u);
+		assert.equal(checkpoint?.actions[0]?.state, "effect_pending");
+		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "A");
+		await writeFile(join(root, "intent/a.md"), "作者改的");
+		crash = false;
+		assert.ok(checkpoint);
+		const result = await runTaskLoop({ ...options, checkpoint });
+		assert.equal(result.stop, "model_stopped");
+		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "作者改的");
+		assert.equal(provider.state.callCount, 2);
+		const toolResult = result.messages.find((message) => message.role === "toolResult");
+		assert.equal(toolResult?.isError, true);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test("已保存的终止结果可在新闭包中交付，不重复执行提交工具", async () => {
 	const { provider, model } = await fixture();
 	provider.setResponses([fauxAssistantMessage(fauxToolCall("submit", {}))]);

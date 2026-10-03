@@ -189,7 +189,7 @@ export class ConfinedExecutionEnv {
 		const currentHash = current === null ? null : hash(current);
 		if (currentHash === mutation.after) return;
 		if (currentHash !== mutation.before)
-			throw new ToolRejection("file_write_conflict", `${mutation.path} changed after the action was prepared`);
+			throw new ToolRejection("file_write_conflict", conflictMessage(mutation.path));
 		if (bytes === null) {
 			await unlink(absolute);
 		} else {
@@ -208,7 +208,7 @@ export class ConfinedExecutionEnv {
 				await this.#confine(mutation.path, true);
 				const latest = await this.#readExisting(absolute);
 				if ((latest === null ? null : hash(latest)) !== mutation.before)
-					throw new ToolRejection("file_write_conflict", mutation.path);
+					throw new ToolRejection("file_write_conflict", conflictMessage(mutation.path));
 				await rename(temporary, absolute);
 			} finally {
 				await unlink(temporary).catch((error: unknown) => {
@@ -241,4 +241,9 @@ export class ConfinedExecutionEnv {
 			throw directoryRejection(logical, error) ?? error;
 		}
 	}
+}
+
+/** 作者或别的程序在准备写入之后改了同一个文件：这次没有写入，交还给模型重读再改。 */
+export function conflictMessage(path: string): string {
+	return `${path} 在准备写入之后被改过（可能是作者或别的程序），这次没有写入；先重新读取，再在新内容上修改`;
 }

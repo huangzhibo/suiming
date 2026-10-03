@@ -532,7 +532,9 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 							message: "Tool action failed",
 						},
 					});
-					if (!(error instanceof ToolRejection) || error.code === "file_write_conflict") throw error;
+					// 写冲突也在这里交给模型：落盘前核对过，这次没有写入，模型重读再改就行；抛出去会让 turn 失败，
+					// 而动作还停在 effect_pending，续接时会撞同一个冲突。
+					if (!(error instanceof ToolRejection)) throw error;
 					result = { content: [{ type: "text", text: error.message }] };
 					isError = true;
 				}
