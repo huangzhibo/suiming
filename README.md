@@ -115,7 +115,7 @@ npm run format         # biome 自动格式化
 - 生成文件不要手改：故事宪法、Story Language 文档与 host 接入文件各有 `npm run generate:*`，`check` 会核对。
 - 修缺陷先写能复现它的测试；不靠弱化断言、跳过或吞掉错误让测试变绿。
 - 提交信息用 `type(scope): 中文摘要`，正文写为什么。文档与代码注释用中文。
-- 开源前的开发历史压成了一个初始提交；文档里 2026-10-03 及之前的提交号指那段历史，在本仓里查不到（见 AGENTS.md）。
+- 开源前的开发历史压成了一个基线提交（`chore: 开源基线（MIT）`）；文档里 2026-10-03 及之前的提交号指那段历史，在本仓里查不到（见 AGENTS.md）。
 
 Cloud（PostgreSQL / S3 上的作品存储与显式同步）目前冻结：`npm run dev:api` 能起开发进程，配置见 [`.env.example`](.env.example)，但不在当前开发重点内。
 
