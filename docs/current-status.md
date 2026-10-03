@@ -11,7 +11,7 @@
 - **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
 - **证据**：最高到「真实调用」——2026-09-16 重构后第一次完整真实对话（[基线](validation/2026-09-16-first-real-session/README.md)），以及 2026-10 起斗破前 120 章的忠实抽取与留出评测。没有任何能力达到「真实长篇」。
 
-验证（2026-10-04）：`npm run check` 通过；`npm test` 392 项，387 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
+验证（2026-10-04）：`npm run check` 通过；`npm test` 397 项，392 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
 
 ## 能力与证据
 
@@ -50,6 +50,7 @@
 - **模型预检范围**：启动只预检实际对话模型——`session.send` 在建 session 前 bind 一次 `main` profile，未配置的专用角色不挡住讨论（有意收窄）。代价是 Agent 委派到凭据或模型有问题的 writer / reviewer / source-extractor 时，失败发生在 turn 中途、token 已经花掉，而不是创建前。按实际会用到的 profile 预检需要先知道 Agent 会不会委派，未实现。
 - **无人值守没有方向闸**：创作路径没有预算，兜底只有 `run_no_progress` 与作者打断，**停不住「持续产出但方向错了」的 turn**，只能靠作者发现（完整说明见 [Harness 设计](harness-design.md)第 10 节）。带交付工具的子任务另有 `unsubmittedStops >= 3` 的收口，那不是方向闸。真正的结构性改善是让作者补充的意图能沉淀回作品，见 [AGENTS.md](../AGENTS.md) 不变量 5。
 - **意图库还不会生长**：写回 `intent/**` 只靠 `AGENT_PROMPT` 的一句指示。2026-10-01 起每个 turn 结束有一行确定性对账（作者说了几条、意图 / Design / 正文 / 审稿各改了什么），刻意由系统算而不是让 Agent 自报；但「作者说了长期事实却没写回」仍要作者自己从「意图未改动」看出来，漏报规模要等一次有真实作者介入的长跑给出，用来定呈现形态。「什么时候该另起一页」的拆分压力还没有，写回通了也只会往单个文件追加。来由见 AGENTS.md「能力交给模型，可见性交给系统」。
+- **书一大，Source 补全就做不了**：补全子任务要带整份抽取回头查漏，《三国演义》前五十回抽成 231 节、329 个人物之后，光开场消息就超过 GPT-6.1 Sol 窗口的七成。2026-10-04 修掉了由此引起的无限压缩，但补全本身仍然放不下；[Harness 设计](harness-design.md)第 9 节写的「先按卷整合、再整书整合」还没做，补全也要跟着按卷做。
 - **只活在对话里的事实，在别处看不见**：Session 的消息列表持久、完整，但不过 Checker、没有版本、不进 Open Story Package，换一个 Session 或换 host agent 就看不见；Context 头部那句「非作品事实」只是标签，不是边界。风险判断见 [Harness 设计](harness-design.md)第 2 节。
 - **执行对象没有生命周期管理**：既没人回收，也没人发现丢失。2026-09-12 在 eval-022 的旧库上数过：1299 条执行对象里 1225 条的字节早已不在磁盘上，在未迁移的原库里就成立。那个库已随 SQLite schema v5 归档清空，但结论没失效——产品代码里至今既没有删除路径也没有丢失检测，`collectObjects` 只有测试在调用。丢的是 harness checkpoint 与模型输入这类执行残骸，不含 Canon 或作者记录。回收机制在，接线未做：它要处理「put 完成到插入行之间的对象会被并发 GC 当孤儿删掉」这个竞态。
 - **命令回执从不清理**：每个 turn 开始构造执行状态时整份读一次。簿记成本随历史平方增长的问题 2026-10-01 已修（[Harness 审查](validation/2026-10-01-harness-review/README.md) F1，数字在那里）；一整部长篇的 Context payload 与主进程响应仍需真实负载验收。

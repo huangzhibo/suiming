@@ -165,6 +165,8 @@ function summarize(result: unknown): string {
 const CLEAR_AT = 0.8;
 const CLEAR_TO = 0.5;
 const COMPACT_AT = 0.7;
+/** 压缩至少要能腾出这么多窗口才值得请模型做；压不动的开场消息不能让每次请求都要求压缩。 */
+const COMPACT_MIN_GAIN = 0.1;
 /** 估计值超过整个窗口才不发：差一点的照发，真超了由 provider 的报错兜住。 */
 const GIVE_UP_AT = 1;
 /** 没有校准数据时按每 3 字节 1 token 估：中文一个字 3 字节，偏保守。 */
@@ -591,8 +593,14 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 					}
 				}
 				if (promptBytes * ratio > window * GIVE_UP_AT) throw contextOverflowError();
+				// 压缩只压得动模型回复与工具结果，作者消息原样保留：可压的部分不到窗口的一成就不再要求，
+				// 否则开场消息本身就超线时，每次请求都要求压缩，模型每次照做，永远不往下干活。
+				const compactable = projectMessages(state)
+					.filter((message) => message.role !== "user")
+					.reduce((sum, message) => sum + bytesOf(message), 0);
 				if (
 					promptBytes * ratio > window * COMPACT_AT &&
+					compactable * ratio > window * COMPACT_MIN_GAIN &&
 					declarations.some((tool) => tool.name === "compact_context")
 				) {
 					// 只加在这次请求的末尾，不进消息列表：前缀不变，压缩之后自然消失。

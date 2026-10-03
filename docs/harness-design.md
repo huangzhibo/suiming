@@ -169,7 +169,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 **窗口保护（[Harness 审查](validation/2026-10-01-harness-review/README.md) F3）。**会话永续、消息列表只增不减，请求必须有办法变小。上下文的生命周期在请求投影里，不在消息列表上：每次请求前按模型目录的 `contextWindow` 估大小（上一次请求的字节数与返回的 input tokens 校准，没有数据时按 3 字节 1 token），由轻到重，只改请求的投影，`state.messages` 与 checkpoint 一字不改：
 
 - 超过窗口的 80%：从旧到新把工具结果换成占位（「较早的工具结果已清除……需要时重新读取」），清到 50% 以下；最近一条模型回复之后的结果不清。清理点（`cleared`）只往前推，两次清理之间请求前缀不变，prompt cache 不断。
-- 清完仍超过 70%、且工具面里有 `compact_context`：在这次请求末尾加一句附注请模型先压缩，附注不进消息列表。
+- 清完仍超过 70%、工具面里有 `compact_context`，且可压的部分（模型回复与工具结果；作者消息原样保留）至少占窗口一成：在这次请求末尾加一句附注请模型先压缩，附注不进消息列表。没有最后这个条件时，开场消息本身就超线（2026-10-04 三国前五十回的补全子任务带整份抽取），每次请求都要求压缩、模型每次照做，5 个子任务各压了 40–50 次、一个文件没写。
 - 估计值超过整个窗口：不发，报 `context_overflow`，提示开新对话或换更大窗口的模型。
 - provider 自己报超限（pi-ai `isContextOverflow`）：撤回那次响应，把能清的全清掉重试一次；清无可清或已经试过就报 `context_overflow`，不无限重发。
 
@@ -410,7 +410,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | DB 写入失败、对象写入失败、IPC 发出失败 | 前两者不发布未保存结果或继续副作用；后者从持久游标重放 | `execution-state`「持久确认失败回滚命令，并禁止该实例继续推进」；`run-event-stream`「事件保存失败后不发布、不给后续事件放行」；`workspace`「状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先收口」 |
 | renderer reload / 重复 attach / 消息截断后重连 | 快照和游标一致，补齐已保存内容，模型调用与提交计数不增加 | `workspace`「状态与产品事件原子确认…」里的 `session.attach` 快照与 `afterSequence` 续读；`run-event-stream`「合批消息先保存，恢复用完整响应补齐尾部并按 id 去重」；`apps/desktop/test/desktop.test.ts`「Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、作者回应、正文与独立审稿贯通」 |
 | 模型主动压缩 | 只改变下一次输入，原消息、动作与作者指令保留 | `agent`「Context 压缩只改变下一次输入，原消息与动作在 checkpoint 里保留」 |
-| 请求接近窗口；provider 报上下文超限 | 清掉较早的工具结果，请求不超窗口，原消息不改；清不动时请模型压缩；provider 超限时清理重试一次，放不下报 `context_overflow` | `context-window` 四条：「请求接近窗口时清掉较早的工具结果」「provider 报上下文超限时清掉较早的工具结果重试一次」「清掉工具结果后仍然偏大：请求末尾请模型先 compact_context」「清完仍放不下：重试一次后如实报 context_overflow」 |
+| 请求接近窗口；provider 报上下文超限 | 清掉较早的工具结果，请求不超窗口，原消息不改；清不动时请模型压缩；provider 超限时清理重试一次，放不下报 `context_overflow` | `context-window` 五条：「请求接近窗口时清掉较早的工具结果」「provider 报上下文超限时清掉较早的工具结果重试一次」「清掉工具结果后仍然偏大：请求末尾请模型先 compact_context」「作者的开场消息本身就超过压缩线：压不动就不再要求压缩」「清完仍放不下：重试一次后如实报 context_overflow」 |
 | **commit 后 / turn 结束后的系统压缩** | 摘要经 ModelCall；失败保留旧 Context；压缩后 Frame 重建 | **没有测试**（切片 C） |
 | **大结果折叠后模型取回** | 第三次请求起换占位符；`read` 重读或 `recall` 取回原文与 checkpoint 一致 | **没有测试**（切片 C） |
 | `write` / `edit` 带 `check` | 写入失败不跑 Checker；写入成功后 Checker 结果与写入结果在同一观察里，检查不过也如实返回 | `agent`「write / edit 带 check: true：写完一并返回 Checker 结论，省掉紧跟着的一次 check 来回」；写入失败不跑 Checker 的分支没有单独断言 |

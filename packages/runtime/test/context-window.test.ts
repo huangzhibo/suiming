@@ -93,6 +93,9 @@ function bigTool(size: number): HarnessTool {
 	};
 }
 
+/** 校准前的估计不超过窗口、校准后又高于压缩线的长度；faux 按字符数 / 4 计，harness 起初按字节数 / 3 估。 */
+const PROMPT_CHARS = 17000;
+
 function lastToolResults(context: Transcript): string[] {
 	return context.messages
 		.filter((message) => message.role === "toolResult")
@@ -225,6 +228,48 @@ test("清掉工具结果后仍然偏大：请求末尾请模型先 compact_conte
 		"没有请求超出窗口",
 	);
 	assert.ok(tokensOf(seen.at(-1) as Transcript) < tokensOf(seen.at(-2) as Transcript), "压缩之后请求变小");
+});
+
+test("作者的开场消息本身就超过压缩线：压不动就不再要求压缩，接着做，不陷入一次次压缩", async () => {
+	// 2026-10-04 三国前五十回的抽取：补全子任务的开场消息带整份抽取，光它就超过压缩线。压缩只压得动工具结果与
+	// 模型回复，作者消息原样保留，于是每次请求都要求压缩、模型每次照做，5 个子任务各压了 40–50 次、一个文件没写，
+	// 没有预算的创作路径就这样一直烧下去。
+	const window = 6000;
+	const { provider, model } = await fixture(window);
+	let compactions = 0;
+	let notes = 0;
+	const step = async (context: Transcript) => {
+		const tokens = tokensOf(context);
+		if (tokens > window) return overflow(tokens, window);
+		const last = context.messages.at(-1);
+		if (last?.role === "user" && JSON.stringify(last.content).includes("compact_context")) {
+			compactions += 1;
+			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "还没开始补全。" }));
+		}
+		notes += 1;
+		return notes <= 3 ? fauxAssistantMessage(fauxToolCall("note", {})) : fauxAssistantMessage("补完了。");
+	};
+	provider.setResponses(Array.from({ length: 40 }, () => step));
+	const note: HarnessTool = {
+		name: "note",
+		description: "记一笔",
+		parameters: Type.Object({}, { additionalProperties: false }),
+		replay: "read",
+		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
+		execute: async (_id, _params, _signal, _update, prepared) =>
+			prepared as { content: { type: "text"; text: string }[] },
+	};
+	const { compactContextTool } = await import("../src/harness/tools.js");
+	const outcome = await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: `整份抽取：${"x".repeat(PROMPT_CHARS)}`,
+		tools: [note, compactContextTool()],
+		budget: { maxTurns: 30 },
+	});
+	assert.equal(outcome.stop, "model_stopped", `停在 ${outcome.stop}，压缩了 ${compactions} 次`);
+	assert.ok(compactions <= 1, `压缩了 ${compactions} 次`);
+	assert.equal(notes, 4, "压不动之后照常干活");
 });
 
 test("清完仍放不下：重试一次后如实报 context_overflow，不无限重发", async () => {
