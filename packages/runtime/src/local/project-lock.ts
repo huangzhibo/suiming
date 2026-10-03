@@ -21,6 +21,11 @@ export function processExists(pid: number): boolean {
 	}
 }
 
+/** session lease 的持有进程还在不在：只认本机、pid 还活着的；别的机器上的持有者无从判断，按已不在处理。 */
+export function leaseHolderAlive(lease: { pid: number; hostname: string }): boolean {
+	return lease.hostname === hostname() && processExists(lease.pid);
+}
+
 export class LocalProjectLock {
 	readonly path: string;
 	readonly #token: string;

@@ -57,7 +57,7 @@ Session 只有三个状态：
 1. 拿 lease，按当前模型、systemPrompt、工具面重算 binding。工具面与宪法的升级在 turn 边界生效；中途恢复（有 `effect_pending` 的调用或动作）仍要求同一绑定。
 2. 在作者消息后附一行确定性状态：当前版本、自上个 turn 是否有人提交过、checkout 里未提交的文件数，在消息被取走的那一刻算（turn 中途 Agent 改过或提交过，附注跟着变）。不注入历史文本（以前按 32,000 码点注入之前所有 Run 的消息）：历史就在消息列表里，这样对 provider 的 prompt cache 也更友好。会话第一次跑时的开场（作品状态与 Design Frame）只写一次，标明是「会话开始时的快照」。
 
-Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两个 turn 之间改过、提交过什么，Agent 下一步 `read` 到的就是什么。**一个 Project 同时只有一个 `running` session**：前一个停下之前，同一进程里另一个 session 的 `session.send` 直接被拒绝（`session_running`；只按 `LocalSessionController` 本进程在跑的 session 判，桌面与 CLI 两个进程各跑一个 session 时不拦），同一个 session 再说一句则排进它的 inbox（`local-session-controller.test.ts`「一句话开一个 turn；同一作品同时只跑一个」）。
+Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两个 turn 之间改过、提交过什么，Agent 下一步 `read` 到的就是什么。**一个 Project 同时只有一个 `running` session**：前一个停下之前，另一个 session 开 turn 直接被拒绝（`session_running`），同一个 session 再说一句则排进它的 inbox（`local-session-controller.test.ts`「一句话开一个 turn；同一作品同时只跑一个」）。进程内由 `LocalSessionController` 先拦；桌面与 CLI 两个进程各自的内存状态看不到对方，由 SQLite 写事务在落 running 时查一遍别的 running session，持有进程已经不在的是崩溃遗留、不拦（`local-project-regressions`「同一作品同时只有一个 running session，跨进程也一样…」，2026-10-04 补；此前两个进程会在同一份 checkout 上互相覆盖）。
 
 **作者消息走持久 inbox**（`session_inbox`，第一条消息也走它）。只有根 loop 在 `ready` 阶段取走，取到第几条记在 `SessionRecord.inboxSequence` 上，不另存「已消费」标记；模型停下时 inbox 里已有新消息，就在同一个 turn 里接着跑，turn 结束后才来的消息由 `LocalSessionController` 开下一个 turn。`paused` 的 session 拒收消息（第 10 节）。`session.send` 按 commandId 幂等：重发只拿回原回执，不会再开一个什么都不做的 turn；幂等指纹包含 `model`，同一 commandId 换了模型是 `command_conflict`。
 

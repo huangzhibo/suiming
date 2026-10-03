@@ -17,6 +17,7 @@ import type {
 import type { SessionEvent } from "../harness/events.js";
 import type { ConfirmedStateEvent } from "../harness/state-events.js";
 import { ContentAddressedObjectStore } from "./content-addressed-object-store.js";
+import { leaseHolderAlive } from "./project-lock.js";
 
 export interface SqliteLocalStoreOptions {
 	databasePath: string;
@@ -202,12 +203,38 @@ export class SqliteLocalStore {
 	applyExecutionDelta(delta: ExecutionStateDelta, events: readonly ConfirmedStateEvent[] = []): void {
 		this.#transaction(() => {
 			this.#assertOwner(delta.ownerFence);
+			this.#assertSingleRunning(delta);
 			const replay = this.#receiptPersisted(delta.receipt);
 			for (const item of delta.changed) this.#upsertEntity(item.type, item.record, item.baselineVersion, replay);
 			for (const id of delta.deletedSessionIds) this.#deleteSessionRows(id);
 			this.#insertReceipt(delta.receipt);
 			this.#appendConfirmedEvents(events);
 		});
+	}
+
+	/**
+	 * 一个作品同时只有一个 turn 在跑，跨进程也一样：桌面与 suim 各开一个 session 同时跑，会在同一份 checkout 上
+	 * 互相覆盖（没有 per-session worktree）。进程内由 LocalSessionController 先拦；进程之间各自的内存状态看不到
+	 * 对方，只能在这里查——写事务是 BEGIN IMMEDIATE，两个进程同时开 turn 也只有一个成功。
+	 * 持有进程已经不在的 running 是崩溃遗留，不拦，判断与重开时的收敛同一条。
+	 */
+	#assertSingleRunning(delta: ExecutionStateDelta): void {
+		for (const item of delta.changed) {
+			if (item.type !== "session") continue;
+			const record = item.record as SessionRecord;
+			if (record.status !== "running") continue;
+			const rows = this.#database
+				.prepare("SELECT data_json FROM sessions WHERE project_id = ? AND status = 'running' AND id <> ?")
+				.all(record.projectId, record.id) as { data_json: string }[];
+			for (const row of rows) {
+				const other = json<SessionRecord>(row.data_json, "sessions");
+				if (other.lease === undefined || !leaseHolderAlive(other.lease)) continue;
+				throw new ArtifactError(
+					"session_running",
+					`session ${other.id} 正在跑（桌面或另一个 suim）；一个作品同时只跑一个 turn，等它结束或在那边停下`,
+				);
+			}
+		}
 	}
 
 	/** 只读查询用：session 与 task，不读命令回执。 */

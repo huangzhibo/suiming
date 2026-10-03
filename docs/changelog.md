@@ -4,6 +4,7 @@
 
 本文管「发生了什么」。现在成立什么、还缺什么看[当前状态](current-status.md)，接下来做什么看[路线图](roadmap.md)第 6 节。2026-10-03 从当前状态整节迁来时，条目照原样搬，只去掉了本机路径与地区表述，并把当时挂在当前状态里的验证起伏与 E2E 排查经过并进了对应日期。
 
+- **2026-10-04** 「同一作品同时只有一个 running session」跨进程成立：原先只有 `LocalSessionController` 在本进程里拦，桌面与 `suim` 各开一个 session 同时跑时不拦，两边在同一份 checkout 上互相覆盖。现在 SQLite 写事务落 running 时查别的 running session，持有进程还活着就报 `session_running`；崩溃遗留的不拦，判断与重开时的收敛共用同一个函数。
 - **2026-10-04** 正文时效的 Design 闭包收窄到 Writer 实际读到的部分：这一节、它引用的人物 / 地点 / 资源 / World 文档、它碰到的 Contract、覆盖它的 Intent，加 world/core 与 index 里它那一段。原先借用 Design Frame，载入整卷 Beat 与全部 Contract、Intent，同卷任何一节一改，整卷正文都标成「设计已变」，长篇里这个信号等于没有。正文审稿的主体文件用同一个闭包，此前写下的审稿记着更宽的主体，重审之前仍可能比现在更早变 stale。
 - **2026-10-04** 写冲突改回设计的样子：Agent 准备写一个文件之后、落盘之前，作者（或别的程序）改了同一个文件，原先 loop 把 `file_write_conflict` 重新抛出，turn 失败回 idle；动作停在 effect_pending，下一个 turn 续接时又撞同一个冲突，会话一直卡住，直到文件被还原。现在作为工具错误交给模型（落盘前核对过，这次没有写入），提示写成中文、让它先重读再改。两条 loop 侧回归分别复现了当场冲突与重启续接时的冲突。
 - **2026-10-04** 逐条对照代码核对现行文档：改正几十处与代码不符的事实（可视化设计按代码重写了未落地的几项，Harness 设计的执行细节、派生状态、技术栈与 Story Language 的几句）；顺带修了故事轴把未提交正文画成已提交、审稿时效说法不统一、`context compile` 帮助漏了 `design:state`、story 隔离检查认不出带 scope 的 pi-ai、check-docs 会扫到后台任务的 worktree；补了 Write Context 按 index 取前一节的测试。要改核心逻辑的三处（正文时效闭包取了整卷、写冲突被重新抛出、跨进程不拦第二个 running session）记进当前状态的已知缺陷。桌面 E2E 19 / 19，相关回归 2 / 2。

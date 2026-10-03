@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, realpath, rm } from "node:fs/promises";
-import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import type { ProjectCommitCommand } from "../artifact/canon-store.js";
 import {
@@ -47,7 +46,7 @@ import type {
 import type { SessionEvent } from "../harness/events.js";
 import { executionProductEvents } from "../harness/state-events.js";
 import { LocalCheckoutSynchronizer } from "./checkout-synchronizer.js";
-import { LocalProjectLock, processExists } from "./project-lock.js";
+import { LocalProjectLock, leaseHolderAlive } from "./project-lock.js";
 import { scaffoldOpenStoryDirectory } from "./starter-project.js";
 
 /** 并行 `suim` 调用重叠在 open / commit 临界区时的最长等待；超过就是真的有人长期持锁。 */
@@ -895,7 +894,7 @@ export class LocalProjectService {
 		const execution = this.createExecutionState();
 		// 只收敛持有进程已经不在的 session：另一个进程正在跑的不是崩溃遗留，任何 `suim` 调用都不能把它打断。
 		execution.recoverUnfinished(`process-restart:${unfinished.join(",")}`, {
-			holderAlive: (lease) => lease.hostname === hostname() && processExists(lease.pid),
+			holderAlive: leaseHolderAlive,
 		});
 	}
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
@@ -205,6 +205,84 @@ test("执行状态按行保存：另一进程新增的 session 不被抹掉，�
 		const current = new InMemoryExecutionState({ snapshot: first.loadExecutionState() }).session("session-a");
 		assert.equal(current.status, "running");
 		assert.equal(current.lease?.ownerId, "owner");
+	} finally {
+		first?.close();
+		second?.close();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("同一作品同时只有一个 running session，跨进程也一样；持有进程已经不在的 running 是崩溃遗留，不拦", async () => {
+	const { root, checkoutPath } = await smokeCheckout();
+	let first: SqliteLocalStore | undefined;
+	let second: SqliteLocalStore | undefined;
+	try {
+		const service = await LocalProjectService.init({ checkoutPath, projectId: "one-turn" });
+		const paths = service.paths;
+		const genesis = service.project().headRevisionId;
+		service.close();
+		// 两个 store 打开同一个库，就是桌面与 suim 两个进程：各自的内存状态只看得到自己开库时的样子。
+		const options = { databasePath: paths.databasePath, objectRootPath: paths.objectRootPath };
+		first = new SqliteLocalStore(options);
+		second = new SqliteLocalStore(options);
+		const desktop = new InMemoryExecutionState({
+			snapshot: first.loadExecutionState(),
+			commit: (delta) => first?.applyExecutionDelta(delta),
+		});
+		desktop.createSession({
+			commandId: "a:session",
+			id: "session-a",
+			projectId: "one-turn",
+			baseRevisionId: genesis,
+		});
+		const cli = new InMemoryExecutionState({
+			snapshot: second.loadExecutionState(),
+			commit: (delta) => second?.applyExecutionDelta(delta),
+		});
+		cli.createSession({ commandId: "b:session", id: "session-b", projectId: "one-turn", baseRevisionId: genesis });
+		const alive = {
+			ownerId: "desktop",
+			pid: process.pid,
+			hostname: hostname(),
+			acquiredAt: new Date().toISOString(),
+		};
+		desktop.startTurn({ commandId: "a:start", sessionId: "session-a", lease: alive });
+
+		assert.throws(
+			() => cli.startTurn({ commandId: "b:start", sessionId: "session-b", lease: { ...alive, ownerId: "cli" } }),
+			(error: unknown) =>
+				error instanceof ArtifactError && error.code === "session_running" && error.message.includes("session-a"),
+		);
+		assert.equal(
+			new InMemoryExecutionState({ snapshot: second.loadExecutionState() }).session("session-b").status,
+			"idle",
+		);
+
+		// 桌面那一轮结束后，命令行就能开。
+		desktop.endTurn({ commandId: "a:end", sessionId: "session-a", status: "idle" });
+		const retry = new InMemoryExecutionState({
+			snapshot: second.loadExecutionState(),
+			commit: (delta) => second?.applyExecutionDelta(delta),
+		});
+		retry.startTurn({ commandId: "b:start-2", sessionId: "session-b", lease: { ...alive, ownerId: "cli" } });
+		retry.endTurn({ commandId: "b:end", sessionId: "session-b", status: "idle" });
+
+		// 崩溃遗留：session-a 还标着 running，持有进程已经不在了，不挡别的 session。
+		const crashed = new InMemoryExecutionState({
+			snapshot: first.loadExecutionState(),
+			commit: (delta) => first?.applyExecutionDelta(delta),
+		});
+		crashed.startTurn({
+			commandId: "a:start-2",
+			sessionId: "session-a",
+			lease: { ...alive, ownerId: "dead", pid: 2 ** 22 + 17 },
+		});
+		const after = new InMemoryExecutionState({
+			snapshot: second.loadExecutionState(),
+			commit: (delta) => second?.applyExecutionDelta(delta),
+		});
+		after.startTurn({ commandId: "b:start-3", sessionId: "session-b", lease: { ...alive, ownerId: "cli" } });
+		assert.equal(after.session("session-b").status, "running");
 	} finally {
 		first?.close();
 		second?.close();
