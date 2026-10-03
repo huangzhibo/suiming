@@ -232,7 +232,7 @@ test("durable 进程：API 进程重启前后，suim Cloud sync 跨进程 import
 				true,
 			);
 
-			const intentPath = join(primaryRoot, "intent", "揭开真相.md");
+			const intentPath = join(primaryRoot, "intent", "计谋的代价.md");
 			await appendFile(intentPath, "\n跨进程 Cloud push 约束。\n");
 			assert.equal(((await runCli(primaryRoot, ["commit"], cliEnvironment)) as { ok: boolean }).ok, true);
 			assert.equal(
@@ -255,9 +255,9 @@ test("durable 进程：API 进程重启前后，suim Cloud sync 跨进程 import
 				).ok,
 				true,
 			);
-			assert.match(await readFile(join(checkoutPath, "intent", "揭开真相.md"), "utf8"), /Cloud push/u);
+			assert.match(await readFile(join(checkoutPath, "intent", "计谋的代价.md"), "utf8"), /Cloud push/u);
 
-			const characterPath = join(checkoutPath, "world", "characters", "李牧.md");
+			const characterPath = join(checkoutPath, "world", "characters", "黄盖.md");
 			await appendFile(characterPath, "\nCloud checkout 跨进程追加事实。\n");
 			assert.equal(((await runCli(checkoutPath, ["commit"], cliEnvironment)) as { ok: boolean }).ok, true);
 			assert.equal(
@@ -278,7 +278,7 @@ test("durable 进程：API 进程重启前后，suim Cloud sync 跨进程 import
 				).ok,
 				true,
 			);
-			assert.match(await readFile(join(primaryRoot, "world", "characters", "李牧.md"), "utf8"), /跨进程追加/u);
+			assert.match(await readFile(join(primaryRoot, "world", "characters", "黄盖.md"), "utf8"), /跨进程追加/u);
 		} finally {
 			await Promise.all([
 				rm(primaryRoot, { recursive: true, force: true }),

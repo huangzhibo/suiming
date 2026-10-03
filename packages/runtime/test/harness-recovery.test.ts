@@ -372,13 +372,13 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 		const original = project.project().headRevisionId;
 		provider.setResponses([
 			fauxAssistantMessage(
-				fauxToolCall("write", { path: "intent/揭开真相.md", content: "主角必须为真相承担代价。" }),
+				fauxToolCall("write", { path: "intent/计谋的代价.md", content: "主角必须为真相承担代价。" }),
 			),
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "第一阶段" })),
 			fauxAssistantMessage(
 				fauxToolCall("write", {
-					path: "world/characters/李牧.md",
-					content: "李牧相信证据，愿意为自己的选择承担后果。",
+					path: "world/characters/黄盖.md",
+					content: "黄盖相信证据，愿意为自己的选择承担后果。",
 				}),
 			),
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "第二阶段" })),

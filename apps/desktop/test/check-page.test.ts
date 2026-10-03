@@ -37,13 +37,13 @@ test("检查结果页：按文件列出诊断，绑定失败也列全，作品�
 		assert.equal(await details.count(), 0);
 
 		// 设计层未通过：Contract 到期没有兑现。提示点名、给详情入口，详情页按文件归类。
-		await writeFile(beat2, original2.replace("contracts:\n  resolve: [真相的代价]\n", ""));
+		await writeFile(beat2, original2.replace("contracts:\n  resolve: [诈降]\n", ""));
 		await check.click();
 		await page.getByText(/^检查未通过：设计；1 处错误。/).waitFor();
 		await details.click();
 		await page.getByRole("heading", { name: "检查结果 · 1 处错误" }).waitFor();
-		const contract = page.locator("[data-check-path='outline/contracts/真相的代价.md']");
-		await contract.getByRole("listitem").filter({ hasText: "真相的代价" }).waitFor();
+		const contract = page.locator("[data-check-path='outline/contracts/诈降.md']");
+		await contract.getByRole("listitem").filter({ hasText: "诈降" }).waitFor();
 		assert.doesNotMatch(
 			(await contract.getByRole("listitem").textContent()) ?? "",
 			/outline\/contracts\//,
@@ -53,16 +53,16 @@ test("检查结果页：按文件列出诊断，绑定失败也列全，作品�
 		await mkdir("/tmp/suiming-desktop-qa", { recursive: true });
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/check-design.png" });
 		// 文件组的标题打开那份文件，后退回到同一份结果。
-		await contract.getByRole("button", { name: "真相的代价", exact: true }).click();
+		await contract.getByRole("button", { name: "诈降", exact: true }).click();
 		await page
-			.getByText(/公开真相必须让李牧/)
+			.getByText(/公开真相必须让黄盖/)
 			.first()
 			.waitFor();
 		await page.getByRole("button", { name: "后退", exact: true }).click();
 		await page.getByRole("heading", { name: "检查结果 · 1 处错误" }).waitFor();
 
 		// 改了作品：结果标为可能过期。绑定期失败（引用不存在的人物）也是检查的答案，诊断带字段位置。
-		await writeFile(beat1, original1.replace("character: [李牧]", "character: [李牧, 不存在]"));
+		await writeFile(beat1, original1.replace("character: [黄盖]", "character: [黄盖, 不存在]"));
 		await page.getByText("作品在这次检查之后有改动，结果可能已过期。", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "重新检查", exact: true }).click();
 		await page.getByText("无法检查", { exact: true }).waitFor();

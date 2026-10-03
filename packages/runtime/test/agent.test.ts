@@ -83,30 +83,30 @@ test("write / edit 带 check: true：写完一并返回 Checker 结论，省掉�
 		};
 		f.provider.setResponses([
 			call("write", {
-				path: "intent/揭开真相.md",
+				path: "intent/计谋的代价.md",
 				content: "揭示真相必须让选择者承担不可逆的后果。",
 				check: true,
 			}),
 			async (context) => {
 				const result = lastText(context);
-				assert.match(result, /^已写入 intent\/揭开真相\.md，\d+ 字/u);
+				assert.match(result, /^已写入 intent\/计谋的代价\.md，\d+ 字/u);
 				assert.match(result, /\n\n检查：PASSED/u, "写入结果后面接着 Checker 结论");
 				return call("edit", {
-					path: "world/characters/李牧.md",
-					oldText: "name: 李牧",
-					newText: "name: 李牧\nfamily:\n  parent: [不存在的人]",
+					path: "world/characters/黄盖.md",
+					oldText: "name: 黄盖",
+					newText: "name: 黄盖\nfamily:\n  parent: [不存在的人]",
 					check: true,
 				});
 			},
 			async (context) => {
 				const result = lastText(context);
-				assert.match(result, /^已修改 world\/characters\/李牧\.md/u);
+				assert.match(result, /^已修改 world\/characters\/黄盖\.md/u);
 				assert.match(result, /检查：FAILED/u, "检查不过也如实返回，改动已经落盘");
 				return call("write", { path: "intent/另一条.md", content: "不带 check 的写入只返回写入结果。" });
 			},
 			async (context) => {
 				assert.doesNotMatch(lastText(context), /检查：/u);
-				return reply("改完了，李牧的引用还要修。");
+				return reply("改完了，黄盖的引用还要修。");
 			},
 		]);
 		const outcome = await f.say("改两处");
@@ -121,7 +121,7 @@ test("delete 从候选里真的移除 artifact；删掉仍被引用的文件由 
 	try {
 		// 删一份已经结晶进故事事实的 Intent——Story Language 明写这类 Intent 应当合并或删除。
 		f.provider.setResponses([
-			call("delete", { path: "intent/揭开真相.md" }),
+			call("delete", { path: "intent/计谋的代价.md" }),
 			call("commit", { summary: "这条 Intent 已经落进 Beat，删除" }),
 			reply("已删除并提交"),
 		]);
@@ -131,27 +131,27 @@ test("delete 从候选里真的移除 artifact；删掉仍被引用的文件由 
 		assert.equal(removed.value?.reply, "已删除并提交");
 		const after = await f.project.exportRevision();
 		assert.equal(
-			after.some((file) => file.path === "intent/揭开真相.md"),
+			after.some((file) => file.path === "intent/计谋的代价.md"),
 			false,
 			"删除必须进入 Canon，而不是只改了工作区",
 		);
 
 		// 删一个仍被 refs 指着的人物：Checker 必须挡住，而且拒绝要作为可修复的工具失败回到模型手里。
 		const head = f.project.project().headRevisionId;
-		const liMu = await readFile(join(f.root, "world/characters/李牧.md"), "utf8");
+		const liMu = await readFile(join(f.root, "world/characters/黄盖.md"), "utf8");
 		f.provider.setResponses([
-			call("delete", { path: "world/characters/李牧.md" }),
-			call("commit", { summary: "删掉李牧" }),
+			call("delete", { path: "world/characters/黄盖.md" }),
+			call("commit", { summary: "删掉黄盖" }),
 			async (context) => {
 				const last = JSON.stringify(context.messages.at(-1));
-				assert.match(last, /李牧/u, "Checker 的拒绝要回到模型手里");
+				assert.match(last, /黄盖/u, "Checker 的拒绝要回到模型手里");
 				assert.match(last, /找不到引用 character/u, "诊断逐条给出，模型才知道改哪里");
 				assert.match(last, /换掉这条引用/u, "Checker 算出的修复提示也要到模型手里，不能只给路径和 message");
-				return call("write", { path: "world/characters/李牧.md", content: liMu });
+				return call("write", { path: "world/characters/黄盖.md", content: liMu });
 			},
-			reply("李牧仍被引用，已放回"),
+			reply("黄盖仍被引用，已放回"),
 		]);
-		const blocked = await f.say("删掉李牧", removed.sessionId);
+		const blocked = await f.say("删掉黄盖", removed.sessionId);
 		assert.equal(blocked.failure, undefined, "被 Checker 拒绝是一次可修复的失败，不是 turn 崩溃");
 		assert.equal(f.project.project().headRevisionId, head, "被 Checker 拒绝的删除不得推进 Canon");
 
@@ -174,9 +174,9 @@ test("turn 结束事件带对账：作者几条、意图 / Design / 正文各改
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "真相公开必须当场付出不可逆的代价。" }),
+			call("write", { path: "intent/计谋的代价.md", content: "真相公开必须当场付出不可逆的代价。" }),
 			call("commit", { summary: "写回意图" }),
-			call("write", { path: "text/beat-0001.md", content: "李牧推开皇档的门。" }),
+			call("write", { path: "text/beat-0001.md", content: "黄盖推开赤壁的门。" }),
 			reply("意图已写回并提交；正文初稿还没提交。"),
 		]);
 		await f.say("真相必须当场付出代价，记进意图", id);
@@ -191,7 +191,7 @@ test("turn 结束事件带对账：作者几条、意图 / Design / 正文各改
 		assert.deepEqual(first.content, {
 			authorMessages: 1,
 			changed: {
-				intent: { count: 1, paths: ["intent/揭开真相.md"] },
+				intent: { count: 1, paths: ["intent/计谋的代价.md"] },
 				design: none,
 				text: { count: 1, paths: ["text/beat-0001.md"] },
 				review: none,
@@ -229,8 +229,8 @@ test("对账点名根 Agent 没取写作依据就整篇写入的正文；取过 
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
 			call("write_context", { storyBeatId: "beat-0001" }),
-			call("write", { path: "text/beat-0001.md", content: "李牧推开皇档的门，木匣就在案上。" }),
-			call("write", { path: "text/beat-0002.md", content: "他把密信藏进袖中。" }),
+			call("write", { path: "text/beat-0001.md", content: "黄盖推开赤壁的门，木匣就在案上。" }),
+			call("write", { path: "text/beat-0002.md", content: "他把火船藏进袖中。" }),
 			call("edit", { path: "text/beat-0001.md", oldText: "木匣就在案上", newText: "木匣压在旧档下面" }),
 			reply("两节都写了。"),
 		]);
@@ -249,7 +249,7 @@ test("对账点名根 Agent 没取写作依据就整篇写入的正文；取过 
 		// 委派 writer 的那一节：子任务自己拿 Write Context，它的写入不算
 		f.provider.setResponses([
 			call("delegate", { profile: "writer", storyBeatId: "beat-0002", goal: "重写第二节" }),
-			call("write", { path: "text/beat-0002.md", content: "他把密信折好，藏进袖中最深处。" }),
+			call("write", { path: "text/beat-0002.md", content: "他把火船折好，藏进袖中最深处。" }),
 			call("submit_task", { summary: "写好了" }),
 			reply("交给 Writer 重写了第二节。"),
 		]);
@@ -268,7 +268,7 @@ test("作者消息后的状态附注在取走消息时现算；开场写明是�
 			async () => {
 				// turn 进行中作者又说了一句：它在 Agent 改过文件之后才进消息列表。
 				f.project.queueInbox(id, "补充：代价要当场兑现");
-				return call("write", { path: "intent/揭开真相.md", content: "真相公开须承担不可逆代价。" });
+				return call("write", { path: "intent/计谋的代价.md", content: "真相公开须承担不可逆代价。" });
 			},
 			async (context) => {
 				// pi-ai 0.99 起 transcript 开头是折进去的 system message，作者的开场是第一条 user 消息。
@@ -290,23 +290,23 @@ test("作者消息后的状态附注在取走消息时现算；开场写明是�
 test("说完就停；同一 session 的下一句接着消息列表，新 session 隔离；只讨论不产生作品版本", async () => {
 	const f = await fixture();
 	try {
-		f.provider.setResponses([reply("可选方案：让李牧主动公开密信，并承担失去信任的代价。")]);
-		const first = await f.say("讨论李牧公开密信的代价，不修改作品");
+		f.provider.setResponses([reply("可选方案：让黄盖主动公开火船，并承担失去信任的代价。")]);
+		const first = await f.say("讨论黄盖公开火船的代价，不修改作品");
 		assert.equal(first.session.status, "idle");
 		assert.equal(first.session.turn, 1);
 		assert.equal(first.value?.stop, "model_stopped");
-		assert.equal(first.value?.reply, "可选方案：让李牧主动公开密信，并承担失去信任的代价。");
+		assert.equal(first.value?.reply, "可选方案：让黄盖主动公开火船，并承担失去信任的代价。");
 		assert.equal(f.provider.state.callCount, 1);
 		assert.equal((await f.project.history()).length, 1);
 
 		f.provider.setResponses([
 			async (context) => {
 				const input = JSON.stringify(context.messages);
-				assert.match(input, /讨论李牧公开密信的代价/);
+				assert.match(input, /讨论黄盖公开火船的代价/);
 				assert.match(input, /承担失去信任的代价/);
 				assert.match(input, /这个方案还有什么问题/);
 				assert.match(input, /\[系统附注：当前版本/, "作者消息后面附确定性状态行");
-				return reply("需要补足李牧为何愿意承担这个代价的依据。");
+				return reply("需要补足黄盖为何愿意承担这个代价的依据。");
 			},
 		]);
 		const second = await f.say("这个方案还有什么问题？", first.sessionId);
@@ -343,7 +343,7 @@ test("turn 进行中作者补一句：模型停下时 inbox 有新消息就在�
 	const f = await fixture();
 	try {
 		const id = (await f.harness.createSession()).id;
-		const correction = "请改为分析李牧的选择";
+		const correction = "请改为分析黄盖的选择";
 		f.provider.setResponses([
 			async () => {
 				f.project.queueInbox(id, correction);
@@ -355,11 +355,11 @@ test("turn 进行中作者补一句：模型停下时 inbox 有新消息就在�
 						(message) => message.role === "user" && String(message.content).startsWith(correction),
 					),
 				);
-				return reply("李牧主动选择公开真相");
+				return reply("黄盖主动选择公开真相");
 			},
 		]);
-		const outcome = await f.say("讨论皇档", id);
-		assert.equal(outcome.value?.reply, "李牧主动选择公开真相");
+		const outcome = await f.say("讨论赤壁", id);
+		assert.equal(outcome.value?.reply, "黄盖主动选择公开真相");
 		assert.equal(f.provider.state.callCount, 2);
 		assert.equal(outcome.session.inboxSequence, 2);
 		assert.ok(JSON.stringify(f.project.readSessionEvents(id)).includes(correction), "事件里是作者原话");
@@ -401,7 +401,7 @@ test("作品状态来自版本真源，候选修改不会冒充已提交版本",
 		f.provider.setResponses([
 			async (context) => {
 				assert.match(JSON.stringify(context.messages), /committedRevisionCount/);
-				return call("write", { path: "intent/揭开真相.md", content: "选择必须承担后果。" });
+				return call("write", { path: "intent/计谋的代价.md", content: "选择必须承担后果。" });
 			},
 			call("project_status", {}),
 			async (context) => {
@@ -432,7 +432,7 @@ test("Agent 直接修改与阶段提交，不强制 Review 或子任务；不属
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "揭示真相必须让选择者承担不可逆的后果。" }),
+			call("write", { path: "intent/计谋的代价.md", content: "揭示真相必须让选择者承担不可逆的后果。" }),
 			call("write", { path: "scripts/count.py", content: "print('统计用词频率')\n" }),
 			call("commit", { summary: "强化后果" }),
 			async (context) => {
@@ -448,7 +448,7 @@ test("Agent 直接修改与阶段提交，不强制 Review 或子任务；不属
 				assert.ok(parsed.revisionId);
 				// 作者看到的是 r2 这样的版本号；不给的话模型自己推，斗破运行里一直少报一位（r7 说成 r6）。
 				assert.equal(parsed.revisionLabel, "r2");
-				assert.deepEqual(parsed.committed, ["intent/揭开真相.md"], "进版本的文件如实列出");
+				assert.deepEqual(parsed.committed, ["intent/计谋的代价.md"], "进版本的文件如实列出");
 				// checkout 里的仓库辅助文件都点名（`.gitattributes` 是建仓时写的），与 `suim diff` 的 ignored 同一份。
 				assert.deepEqual(parsed.ignored, [".gitattributes", "scripts"], "提交结果要点名没进版本的文件");
 				return reply("已提交明确的后果要求；scripts/count.py 只在工作区");
@@ -481,7 +481,7 @@ test("Agent 按模型决定调用独立 Review，经持久引用取得报告后�
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "真相必须来自主动选择，并有不可逆代价。" }),
+			call("write", { path: "intent/计谋的代价.md", content: "真相必须来自主动选择，并有不可逆代价。" }),
 			call("review", { layer: "design", goal: "核对因果与代价" }),
 			call("submit_review", {
 				verdict: "pass",
@@ -622,7 +622,7 @@ test("执行命令只写自己改动的行：一个 turn 里整份导出与整�
 		try {
 			const id = (await f.harness.createSession()).id;
 			f.provider.setResponses([
-				...Array.from({ length: rounds }, () => call("read", { path: "intent/揭开真相.md" })),
+				...Array.from({ length: rounds }, () => call("read", { path: "intent/计谋的代价.md" })),
 				reply("读完了"),
 			]);
 			exported.mock.resetCalls();
@@ -697,10 +697,10 @@ test("interrupt：打断的 turn 回 idle 不记故障；消息列表与候选�
 		const id = (await f.harness.createSession()).id;
 		const controller = new AbortController();
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "真相公开须承担不可逆代价。" }),
+			call("write", { path: "intent/计谋的代价.md", content: "真相公开须承担不可逆代价。" }),
 			async () => {
 				controller.abort(new Error("作者停止了当前回复"));
-				return call("read", { path: "intent/揭开真相.md" });
+				return call("read", { path: "intent/计谋的代价.md" });
 			},
 		]);
 		const outcome = await f.say("修改意图", id, { signal: controller.signal });
@@ -708,14 +708,14 @@ test("interrupt：打断的 turn 回 idle 不记故障；消息列表与候选�
 		assert.equal(outcome.failure, undefined);
 		assert.equal(outcome.session.lastFailure, undefined);
 		assert.equal(outcome.session.lease, undefined);
-		assert.match(await f.checkoutFile("intent/揭开真相.md"), /不可逆代价/);
+		assert.match(await f.checkoutFile("intent/计谋的代价.md"), /不可逆代价/);
 		await assert.rejects(f.say("已打断的 signal 不能再开 turn", id, { signal: controller.signal }), {
 			code: "run_interrupted",
 		});
 		f.provider.setResponses([
 			async (context) => {
 				const encoded = JSON.stringify(context.messages);
-				assert.match(encoded, /揭开真相\.md/, "打断前已确认的文件动作还在消息列表里");
+				assert.match(encoded, /计谋的代价\.md/, "打断前已确认的文件动作还在消息列表里");
 				assert.match(encoded, /接着刚才的/);
 				return reply("接着刚才的改动继续");
 			},
@@ -813,12 +813,12 @@ test("作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "真相公开须承担不可逆代价。" }),
+			call("write", { path: "intent/计谋的代价.md", content: "真相公开须承担不可逆代价。" }),
 			reply("改好了，还没提交"),
 		]);
 		await f.say("完善创作意图", id);
 		// 作者在编辑器里改了另一个文件，也没提交：checkout 里现在是两个人的改动，只有一份 diff。
-		await writeFile(join(f.root, "world/places/皇档.md"), "旧朝库房，入口新添了作者设计的双锁。\n");
+		await writeFile(join(f.root, "world/places/赤壁.md"), "旧朝库房，入口新添了作者设计的双锁。\n");
 		f.provider.setResponses([
 			async (context) => {
 				assert.match(JSON.stringify(context.messages), /候选里未提交的文件 2 个/, "附注按同一份候选算");
@@ -830,10 +830,10 @@ test("作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的
 				assert.ok(part?.type === "text");
 				// 作者那份改动不能静默进版本：提交结果如实列出这次进版本的每个文件。
 				assert.deepEqual((JSON.parse(part.text) as { committed: string[] }).committed, [
-					"intent/揭开真相.md",
-					"world/places/皇档.md",
+					"intent/计谋的代价.md",
+					"world/places/赤壁.md",
 				]);
-				return reply("双方修改都已保存，其中 world/places/皇档.md 是你改的");
+				return reply("双方修改都已保存，其中 world/places/赤壁.md 是你改的");
 			},
 		]);
 		const outcome = await f.say("提交吧，保留我对库房的新设定", id);
@@ -842,8 +842,8 @@ test("作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的
 		const committed = await f.project.exportRevision();
 		const text = (path: string) =>
 			new TextDecoder().decode(committed.find((file) => file.path === path)?.bytes ?? new Uint8Array());
-		assert.match(text("world/places/皇档.md"), /双锁/);
-		assert.match(text("intent/揭开真相.md"), /不可逆/);
+		assert.match(text("world/places/赤壁.md"), /双锁/);
+		assert.match(text("intent/计谋的代价.md"), /不可逆/);
 		assert.equal(outcome.session.baseRevisionId, f.project.project().headRevisionId);
 	} finally {
 		await f.close();
@@ -856,7 +856,7 @@ test("作者在两个 turn 之间提交过：附注只在紧随其后的那个 t
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([reply("先只讨论")]);
 		await f.say("先聊聊", id);
-		await writeFile(join(f.root, "world/places/皇档.md"), "旧朝库房，入口新添了作者设计的双锁。\n");
+		await writeFile(join(f.root, "world/places/赤壁.md"), "旧朝库房，入口新添了作者设计的双锁。\n");
 		await f.project.commitCheckout();
 		f.provider.setResponses([
 			async (context) => {
@@ -882,22 +882,22 @@ test("作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，�
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "Agent 候选：真相必须付出代价。\n" }),
+			call("write", { path: "intent/计谋的代价.md", content: "Agent 候选：真相必须付出代价。\n" }),
 			reply("改好了"),
 		]);
 		await f.say("完善意图", id);
 		// 作者直接覆盖了同一个文件：Agent 记住的 oldText 已经不在文件里。
-		await writeFile(join(f.root, "intent/揭开真相.md"), "作者版本：不要放弃唯一证据。\n");
+		await writeFile(join(f.root, "intent/计谋的代价.md"), "作者版本：不要放弃唯一证据。\n");
 		f.provider.setResponses([
-			call("edit", { path: "intent/揭开真相.md", oldText: "Agent 候选：真相必须付出代价。", newText: "改写" }),
+			call("edit", { path: "intent/计谋的代价.md", oldText: "Agent 候选：真相必须付出代价。", newText: "改写" }),
 			async (context) => {
 				assert.match(JSON.stringify(context.messages.at(-1)), /edit_not_unique/);
-				return call("read", { path: "intent/揭开真相.md" });
+				return call("read", { path: "intent/计谋的代价.md" });
 			},
 			async (context) => {
 				assert.match(JSON.stringify(context.messages.at(-1)), /作者版本/, "重读拿到的是作者的内容");
 				return call("edit", {
-					path: "intent/揭开真相.md",
+					path: "intent/计谋的代价.md",
 					oldText: "不要放弃唯一证据。",
 					newText: "不要放弃唯一证据，公开它要付出代价。",
 				});
@@ -907,7 +907,7 @@ test("作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，�
 		]);
 		const outcome = await f.say("继续改", id);
 		assert.equal(outcome.failure, undefined);
-		assert.match(await f.checkoutFile("intent/揭开真相.md"), /作者版本：不要放弃唯一证据，公开它要付出代价。/);
+		assert.match(await f.checkoutFile("intent/计谋的代价.md"), /作者版本：不要放弃唯一证据，公开它要付出代价。/);
 		assert.equal((await f.project.history()).length, 2);
 	} finally {
 		await f.close();
@@ -918,9 +918,9 @@ test("Context 压缩只改变下一次输入，原消息与动作在 checkpoint 
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
-			call("read", { path: "intent/揭开真相.md" }),
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("compact_context", {
-				summary: "目标是分析代价。已读 intent/揭开真相.md；已有主动选择与不可逆代价要求，尚未修改或提交作品。",
+				summary: "目标是分析代价。已读 intent/计谋的代价.md；已有主动选择与不可逆代价要求，尚未修改或提交作品。",
 			}),
 			async (context) => {
 				const encoded = JSON.stringify(context.messages);
@@ -958,7 +958,7 @@ test("模型调用失败：turn 回 idle 记 lastFailure；已确认的文件动
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
-			call("edit", { path: "intent/揭开真相.md", oldText: "主角不能靠巧合取胜", newText: "主角不能依赖巧合" }),
+			call("edit", { path: "intent/计谋的代价.md", oldText: "主角不能靠巧合取胜", newText: "主角不能依赖巧合" }),
 			{ ...fauxAssistantMessage("模型服务失败"), stopReason: "error", errorMessage: "provider unavailable" },
 		]);
 		const failed = await f.say("去掉依赖巧合的可能");
@@ -1016,11 +1016,11 @@ test("续跑时读取权威状态失败也释放 lease，并保留 checkout 里�
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "保留作者代价要求" }),
+			call("write", { path: "intent/计谋的代价.md", content: "保留作者代价要求" }),
 			reply("改好了"),
 		]);
 		await f.say("修订意图", id);
-		const before = await f.checkoutFile("intent/揭开真相.md");
+		const before = await f.checkoutFile("intent/计谋的代价.md");
 		const exportRevision = f.project.exportRevision.bind(f.project);
 		f.project.exportRevision = async () => {
 			throw new Error("injected export failure");
@@ -1030,7 +1030,7 @@ test("续跑时读取权威状态失败也释放 lease，并保留 checkout 里�
 		assert.match(failed.failure?.message ?? "", /injected export failure/);
 		assert.equal(failed.session.status, "idle");
 		assert.equal(failed.session.lease, undefined);
-		assert.equal(await f.checkoutFile("intent/揭开真相.md"), before);
+		assert.equal(await f.checkoutFile("intent/计谋的代价.md"), before);
 	} finally {
 		await f.close();
 	}
@@ -1071,7 +1071,7 @@ test("委派观测归属 turn；工具 / Checker 带同一 session 关联", asyn
 	const f = await fixture(telemetry.context);
 	try {
 		f.provider.setResponses([
-			call("write", { path: "intent/揭开真相.md", content: "每次选择都有不可逆的代价。" }),
+			call("write", { path: "intent/计谋的代价.md", content: "每次选择都有不可逆的代价。" }),
 			call("review", { layer: "design", goal: "检查代价" }),
 			call("submit_review", { verdict: "pass", summary: "通过", findings: [], uncovered: [], uncertainties: [] }),
 			call("commit", { summary: "采用候选" }),

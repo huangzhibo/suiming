@@ -56,7 +56,7 @@ test("Local Project application service 从真实 checkout 计算、检查并提
 
 		const beatPath = join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const beat = decoder.decode(await readFile(beatPath));
-		await writeFile(beatPath, beat.replace("亲手焚毁密信", "亲手焚毁唯一密信"));
+		await writeFile(beatPath, beat.replace("亲手焚毁火船", "亲手焚毁唯一火船"));
 
 		const diff = await service.diff();
 		assert.equal(diff.state, "dirty");
@@ -101,7 +101,7 @@ test("另一个进程推进了 Canon：本实例读状态、提交都以当前 C
 		cli = await LocalProjectService.open(fixture.checkoutPath);
 		const beatPath = join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const beat = decoder.decode(await readFile(beatPath));
-		await writeFile(beatPath, beat.replace("亲手焚毁密信", "亲手焚毁唯一密信"));
+		await writeFile(beatPath, beat.replace("亲手焚毁火船", "亲手焚毁唯一火船"));
 		const elsewhere = await cli.commitCheckout();
 		assert.equal(elsewhere.created, true);
 
@@ -110,7 +110,7 @@ test("另一个进程推进了 Canon：本实例读状态、提交都以当前 C
 		assert.equal(status.baseRevisionId, elsewhere.revision.id);
 		assert.equal(desktop.project().headRevisionId, elsewhere.revision.id);
 
-		await writeFile(beatPath, beat.replace("亲手焚毁密信", "当众焚毁唯一密信"));
+		await writeFile(beatPath, beat.replace("亲手焚毁火船", "当众焚毁唯一火船"));
 		const mine = await desktop.commitCheckout();
 		assert.equal(mine.created, true);
 		assert.equal(mine.revision.parentId, elsewhere.revision.id);
@@ -151,10 +151,10 @@ test("revision rollback 从当前 head 创建恢复 revision，并准确恢复�
 			operations: [
 				{
 					operation: "replace",
-					identity: targetArtifactIdentity("character", "李牧"),
-					path: "world/characters/李牧.md",
+					identity: targetArtifactIdentity("character", "黄盖"),
+					path: "world/characters/黄盖.md",
 					mediaType: "text/markdown; charset=utf-8",
-					bytes: encoder.encode("---\nname: 李牧\n---\n这是回退前的临时人物版本。\n"),
+					bytes: encoder.encode("---\nname: 黄盖\n---\n这是回退前的临时人物版本。\n"),
 				},
 			],
 		});
@@ -163,7 +163,7 @@ test("revision rollback 从当前 head 创建恢复 revision，并准确恢复�
 		assert.equal(rolledBack.previousHeadRevisionId, changed.id);
 		assert.equal(rolledBack.revision.parentId, changed.id);
 		assert.equal(rolledBack.targetRevisionId, targetRevisionId);
-		assert.ok(rolledBack.changes.some((change) => change.path === "world/characters/李牧.md"));
+		assert.ok(rolledBack.changes.some((change) => change.path === "world/characters/黄盖.md"));
 		assert.deepEqual(byPath(await service.exportRevision()), byPath(targetFiles));
 		assert.deepEqual(byPath((await readOpenStoryDirectory(fixture.checkoutPath)).files), byPath(targetFiles));
 		assert.equal((await service.history()).length, 3);
@@ -173,7 +173,7 @@ test("revision rollback 从当前 head 创建恢复 revision，并准确恢复�
 		assert.equal(noOp.revision.id, rolledBack.revision.id);
 		assert.deepEqual(noOp.changes, []);
 
-		const characterPath = join(fixture.checkoutPath, "world", "characters", "李牧.md");
+		const characterPath = join(fixture.checkoutPath, "world", "characters", "黄盖.md");
 		await writeFile(characterPath, `${await readFile(characterPath, "utf8")}未提交候选。\n`);
 		await assert.rejects(
 			() => activeService.rollbackRevision(targetRevisionId),
@@ -191,10 +191,10 @@ test("host 提交 StoryText 后正文时效从 git 历史派生：Design 闭包�
 	try {
 		service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
 		await mkdir(join(fixture.checkoutPath, "text"), { recursive: true });
-		await writeFile(join(fixture.checkoutPath, "text", "beat-0001.md"), "李牧走入皇档，在木匣中找到密信。\n");
+		await writeFile(join(fixture.checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
 		await writeFile(
 			join(fixture.checkoutPath, "text", "beat-0002.md"),
-			"天亮前，他公开真相，并亲手把唯一的密信送进火里。\n",
+			"天亮前，他公开真相，并亲手把唯一的火船送进火里。\n",
 		);
 		const committed = await service.commitCheckout();
 		assert.equal(committed.created, true);
@@ -213,15 +213,15 @@ test("host 提交 StoryText 后正文时效从 git 历史派生：Design 闭包�
 		assert.ok((await currencies(service)).every((entry) => entry.state === "current"));
 
 		await writeFile(
-			join(fixture.checkoutPath, "world", "characters", "李牧.md"),
-			"---\nname: 李牧\n---\n相信真相必须由证据和代价共同承担。\n",
+			join(fixture.checkoutPath, "world", "characters", "黄盖.md"),
+			"---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担。\n",
 		);
 		await service.commitCheckout();
 		assert.deepEqual(
 			(await currencies(service)).map((entry) => [entry.state, entry.writtenAt, entry.changed]),
 			[
-				["design-changed", committed.revision.id, ["world/characters/李牧.md"]],
-				["design-changed", committed.revision.id, ["world/characters/李牧.md"]],
+				["design-changed", committed.revision.id, ["world/characters/黄盖.md"]],
+				["design-changed", committed.revision.id, ["world/characters/黄盖.md"]],
 			],
 		);
 	} finally {
@@ -237,7 +237,7 @@ test("host 换卷是改 index 加 mv 两步，diff 里两个 artifact 都算改�
 		const indexPath = join(fixture.checkoutPath, "outline", "story", "index.yaml");
 		await writeFile(
 			indexPath,
-			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001]\n  - id: vol-0002\n    title: 余波\n    beat_ids: [beat-0002]\n",
+			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001]\n  - id: vol-0002\n    title: 余波\n    beat_ids: [beat-0002]\n",
 		);
 		const from = join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const to = join(fixture.checkoutPath, "outline", "story", "vol-0002", "beat-0002.md");
@@ -272,8 +272,8 @@ test("非法 host candidate 不推进 ProjectRevision，Agent 也不能覆盖 di
 		service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
 		const activeService = service;
 		const genesis = service.project().headRevisionId;
-		const characterPath = join(fixture.checkoutPath, "world", "characters", "李牧.md");
-		await writeFile(characterPath, "---\nname: 李牧\nfamily:\n  parent: [不存在的人]\n---\n错误引用。\n");
+		const characterPath = join(fixture.checkoutPath, "world", "characters", "黄盖.md");
+		await writeFile(characterPath, "---\nname: 黄盖\nfamily:\n  parent: [不存在的人]\n---\n错误引用。\n");
 		await assert.rejects(() => activeService.check());
 		await assert.rejects(() => activeService.commitCheckout());
 		assert.equal(service.project().headRevisionId, genesis);
@@ -285,10 +285,10 @@ test("非法 host candidate 不推进 ProjectRevision，Agent 也不能覆盖 di
 					operations: [
 						{
 							operation: "replace",
-							identity: targetArtifactIdentity("character", "李牧"),
-							path: "world/characters/李牧.md",
+							identity: targetArtifactIdentity("character", "黄盖"),
+							path: "world/characters/黄盖.md",
 							mediaType: "text/markdown; charset=utf-8",
-							bytes: encoder.encode("---\nname: 李牧\n---\nAgent candidate。\n"),
+							bytes: encoder.encode("---\nname: 黄盖\n---\nAgent candidate。\n"),
 						},
 					],
 				}),
@@ -312,7 +312,7 @@ test("Story 根下放错路径的文件：状态与 diff 照常读得出来并�
 		const stray = join(fixture.checkoutPath, "world", "secrets", "secret-x.md");
 		await mkdir(dirname(stray), { recursive: true });
 		await writeFile(stray, "# 一个秘密\n");
-		await writeFile(join(fixture.checkoutPath, "world", "characters", "李牧.md"), "---\nname: 李牧\n---\n改过。\n");
+		await writeFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md"), "---\nname: 黄盖\n---\n改过。\n");
 
 		const status = await service.status();
 		assert.equal(status.state, "dirty");
@@ -348,10 +348,10 @@ test("Agent managed ChangeSet 原子回写 checkout，且保留仓库辅助文�
 			operations: [
 				{
 					operation: "replace",
-					identity: targetArtifactIdentity("character", "李牧"),
-					path: "world/characters/李牧.md",
+					identity: targetArtifactIdentity("character", "黄盖"),
+					path: "world/characters/黄盖.md",
 					mediaType: "text/markdown; charset=utf-8",
-					bytes: encoder.encode("---\nname: 李牧\n---\n相信真相必须由证据和代价共同承担，也愿意公开承担后果。\n"),
+					bytes: encoder.encode("---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担，也愿意公开承担后果。\n"),
 				},
 			],
 		});
@@ -359,7 +359,7 @@ test("Agent managed ChangeSet 原子回写 checkout，且保留仓库辅助文�
 		assert.equal((await service.status()).state, "clean");
 		assert.equal(
 			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "李牧.md")))
+				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
 				.includes("公开承担后果"),
 			true,
 		);
@@ -390,10 +390,10 @@ test("open 能恢复数据库已提交但 checkout 尚未 materialize 的崩溃�
 				operations: [
 					{
 						operation: "replace",
-						identity: targetArtifactIdentity("character", "李牧"),
-						path: "world/characters/李牧.md",
+						identity: targetArtifactIdentity("character", "黄盖"),
+						path: "world/characters/黄盖.md",
 						mediaType: "text/markdown; charset=utf-8",
-						bytes: encoder.encode("---\nname: 李牧\n---\n崩溃恢复后的权威人物版本。\n"),
+						bytes: encoder.encode("---\nname: 黄盖\n---\n崩溃恢复后的权威人物版本。\n"),
 					},
 				],
 			},
@@ -401,7 +401,7 @@ test("open 能恢复数据库已提交但 checkout 尚未 materialize 的崩溃�
 		);
 		assert.equal(
 			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "李牧.md")))
+				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
 				.includes("崩溃恢复后的权威人物版本"),
 			false,
 		);
@@ -411,7 +411,7 @@ test("open 能恢复数据库已提交但 checkout 尚未 materialize 的崩溃�
 		assert.equal((await service.status()).state, "clean");
 		assert.equal(
 			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "李牧.md")))
+				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
 				.includes("崩溃恢复后的权威人物版本"),
 			true,
 		);
@@ -492,10 +492,10 @@ test("open 以 head 快照恢复 managed commit 崩溃窗口", async () => {
 				operations: [
 					{
 						operation: "replace",
-						identity: targetArtifactIdentity("character", "李牧"),
-						path: "world/characters/李牧.md",
+						identity: targetArtifactIdentity("character", "黄盖"),
+						path: "world/characters/黄盖.md",
 						mediaType: "text/markdown; charset=utf-8",
-						bytes: encoder.encode("---\nname: 李牧\n---\n崩溃后应恢复到 head。\n"),
+						bytes: encoder.encode("---\nname: 黄盖\n---\n崩溃后应恢复到 head。\n"),
 					},
 				],
 			},
@@ -507,7 +507,7 @@ test("open 以 head 快照恢复 managed commit 崩溃窗口", async () => {
 		assert.equal((await service.status()).state, "clean");
 		assert.equal(
 			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "李牧.md")))
+				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
 				.includes("崩溃后应恢复到 head"),
 			true,
 		);
@@ -543,11 +543,11 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 				operations: [
 					{
 						operation: "replace",
-						identity: targetArtifactIdentity("character", "李牧"),
-						path: "world/characters/李牧.md",
+						identity: targetArtifactIdentity("character", "黄盖"),
+						path: "world/characters/黄盖.md",
 						mediaType: "text/markdown; charset=utf-8",
 						bytes: encoder.encode(
-							"---\nname: 李牧\n---\n相信真相必须由证据和代价共同承担，并愿意公开承担后果。\n",
+							"---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担，并愿意公开承担后果。\n",
 						),
 					},
 					{
@@ -570,7 +570,7 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 		assert.ok(exported.some((file) => file.path === review.path));
 		assert.equal(
 			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "李牧.md")))
+				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
 				.includes("公开承担后果"),
 			true,
 		);
@@ -589,7 +589,7 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 		// 审的是 memoryBase，head 多了一次 Design 修改：审稿已 stale，changed 点名是哪个文件。
 		assert.deepEqual(await reviewCurrency(reader, head, candidate, restored[0] as never), {
 			state: "stale",
-			changed: ["world/characters/李牧.md"],
+			changed: ["world/characters/黄盖.md"],
 			revision: memoryBase,
 		});
 	} finally {

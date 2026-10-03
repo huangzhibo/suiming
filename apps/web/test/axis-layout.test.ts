@@ -28,7 +28,7 @@ const data = {
 	revisionId: "r1",
 	dirty: false,
 	volumes: [
-		{ id: "vol-0001", title: "入局", beatIds: ["beat-0001", "beat-0005", "beat-0002"] },
+		{ id: "vol-0001", title: "赤壁之战", beatIds: ["beat-0001", "beat-0005", "beat-0002"] },
 		{ id: "vol-0002", title: "转折", beatIds: ["beat-0003", "beat-0004"] },
 	],
 	storyText: [
@@ -36,22 +36,22 @@ const data = {
 		{ storyBeatId: "beat-0002", state: "design-changed", writtenAt: "r1", changed: ["world/core.md"] },
 	],
 	files: [
-		file("story-beat", "outline/story/vol-0001/beat-0001.md", "beat-0001", { contracts: { open: ["真相的代价"] } }),
+		file("story-beat", "outline/story/vol-0001/beat-0001.md", "beat-0001", { contracts: { open: ["诈降"] } }),
 		file("story-beat", "outline/story/vol-0001/beat-0005.md", "beat-0005", {
-			contracts: { advance: ["真相的代价"] },
+			contracts: { advance: ["诈降"] },
 		}),
 		file("story-beat", "outline/story/vol-0001/beat-0002.md", "beat-0002", {
-			contracts: { resolve: ["真相的代价"] },
+			contracts: { resolve: ["诈降"] },
 		}),
 		file("story-beat", "outline/story/vol-0002/beat-0003.md", "beat-0003", {
-			contracts: { advance: ["真相的代价"] },
+			contracts: { advance: ["诈降"] },
 		}),
 		file("story-beat", "outline/story/vol-0002/beat-0004.md", "beat-0004", { contracts: { open: ["未兑现"] } }),
 		file("story-text", "text/beat-0001.md", "beat-0001", {}),
 		file("story-text", "text/beat-0002.md", "beat-0002", {}),
-		file("story-contract", "outline/contracts/真相的代价.md", "真相的代价", {
+		file("story-contract", "outline/contracts/诈降.md", "诈降", {
 			deadline: "beat-0002",
-			subjects: { character: ["李牧"] },
+			subjects: { character: ["黄盖"] },
 		}),
 		file("story-contract", "outline/contracts/未兑现.md", "未兑现", { deadline: "book_end" }),
 		file("story-contract", "outline/contracts/孤立.md", "孤立", {}),
@@ -69,7 +69,7 @@ test("故事轴按 index 顺序编号，卷分段随之；正文状态来自 lin
 	assert.deepEqual(
 		model.volumes.map((volume) => [volume.title, volume.start, volume.end]),
 		[
-			["入局", 0, 2],
+			["赤壁之战", 0, 2],
 			["转折", 3, 4],
 		],
 	);
@@ -83,13 +83,13 @@ test("承诺生命周期按 ordinal 计算：deadline、resolve 之后的 advanc
 	const model = axisModel(new Book(data), []);
 	assert.deepEqual(
 		model.contracts.map((lane) => lane.id),
-		["真相的代价", "未兑现"],
+		["诈降", "未兑现"],
 	);
 	const first = model.contracts[0];
 	assert.deepEqual([first?.open, first?.advance, first?.resolve], [[0], [1, 3], [2]]);
 	assert.deepEqual(first?.late, [3]);
 	assert.equal(first?.deadlineIndex, 2);
-	assert.deepEqual(first?.subjects, ["李牧"]);
+	assert.deepEqual(first?.subjects, ["黄盖"]);
 	assert.equal(model.contracts[1]?.deadlineIndex, 4);
 	assert.equal(contractStatus(first as NonNullable<typeof first>, 0), "等待回应");
 	assert.equal(contractStatus(first as NonNullable<typeof first>, 4), "已回应 · 第 3 个情节");
@@ -182,10 +182,10 @@ test("因果弧、人物泳道与世界文档都只读 frontmatter：refs.beat�
 							...entry,
 							frontmatter: {
 								...entry.frontmatter,
-								refs: { beat: ["beat-0001"], character: ["李牧"], world: ["旧案"] },
+								refs: { beat: ["beat-0001"], character: ["黄盖"], world: ["旧案"] },
 								changes: {
-									world: { "李牧.dead": true, "密信.location": "皇档" },
-									character: { 荀彧: { "secret:密信.revealed": true } },
+									world: { "黄盖.dead": true, "火船.location": "赤壁" },
+									character: { 荀彧: { "secret:火船.revealed": true } },
 								},
 							},
 						}
@@ -194,8 +194,8 @@ test("因果弧、人物泳道与世界文档都只读 frontmatter：refs.beat�
 								...entry,
 								frontmatter: {
 									...entry.frontmatter,
-									refs: { character: ["李牧", "荀彧"] },
-									changes: { world: { "李牧.location": "皇档" } },
+									refs: { character: ["黄盖", "荀彧"] },
+									changes: { world: { "黄盖.location": "赤壁" } },
 								},
 							}
 						: entry.localId === "beat-0004"
@@ -203,12 +203,12 @@ test("因果弧、人物泳道与世界文档都只读 frontmatter：refs.beat�
 									...entry,
 									frontmatter: {
 										...entry.frontmatter,
-										refs: { beat: ["beat-0003", "beat-0001"], character: ["李牧"] },
+										refs: { beat: ["beat-0003", "beat-0001"], character: ["黄盖"] },
 									},
 								}
 							: entry,
 			),
-			file("character", "world/characters/李牧.md", "李牧", {}),
+			file("character", "world/characters/黄盖.md", "黄盖", {}),
 			file("character", "world/characters/荀彧.md", "荀彧", {}),
 			file("character", "world/characters/路人.md", "路人", {}),
 			file("world", "world/旧案.md", "旧案", {}),
@@ -226,7 +226,7 @@ test("因果弧、人物泳道与世界文档都只读 frontmatter：refs.beat�
 	assert.deepEqual(
 		model.characters.map((lane) => [lane.id, lane.present, lane.deadAt]),
 		[
-			["李牧", [0, 3, 4], 3],
+			["黄盖", [0, 3, 4], 3],
 			["荀彧", [0], -1],
 		],
 	);
@@ -239,7 +239,7 @@ test("因果弧、人物泳道与世界文档都只读 frontmatter：refs.beat�
 	);
 	assert.deepEqual(
 		model.characters[1]?.events.map((event) => event.note),
-		["秘密揭示：密信"],
+		["秘密揭示：火船"],
 	);
 	assert.deepEqual(
 		model.worlds.map((lane) => [lane.title, lane.present]),
@@ -257,31 +257,31 @@ test("硬状态键带不带 kind 前缀等价：裸 id 的秘密揭示、带前�
 							...entry,
 							frontmatter: {
 								...entry.frontmatter,
-								refs: { character: ["李牧"] },
+								refs: { character: ["黄盖"] },
 								changes: {
-									world: { "character:李牧.dead": true, "resource:密信.holder": "荀彧" },
-									character: { 荀彧: { "密信来历.revealed": true } },
+									world: { "character:黄盖.dead": true, "resource:火船.holder": "荀彧" },
+									character: { 荀彧: { "火船来历.revealed": true } },
 								},
 							},
 						}
 					: entry,
 			),
-			file("character", "world/characters/李牧.md", "李牧", {}),
+			file("character", "world/characters/黄盖.md", "黄盖", {}),
 			file("character", "world/characters/荀彧.md", "荀彧", {}),
-			file("resource", "world/resources/密信.md", "密信", {}),
+			file("resource", "world/resources/火船.md", "火船", {}),
 		],
 	} as unknown as WorkspaceData;
 	const model = axisModel(new Book(rich), []);
 	assert.deepEqual(
 		model.characters.map((lane) => [lane.id, lane.deadAt, lane.events.map((event) => event.note)]),
 		[
-			["李牧", 2, ["死亡记录（changes.world.character:李牧.dead）"]],
-			["荀彧", -1, ["秘密揭示：密信来历"]],
+			["黄盖", 2, ["死亡记录（changes.world.character:黄盖.dead）"]],
+			["荀彧", -1, ["秘密揭示：火船来历"]],
 		],
 	);
 	assert.deepEqual(
 		model.resources.map((lane) => [lane.title, lane.events.map((event) => [event.ordinal, event.kind, event.value])]),
-		[["密信", [[2, "holder", "荀彧"]]]],
+		[["火船", [[2, "holder", "荀彧"]]]],
 	);
 });
 
@@ -297,19 +297,19 @@ test("泳道只取 Target：Source 抽取里同名的人物、资源、世界与
 							...entry,
 							frontmatter: {
 								...entry.frontmatter,
-								refs: { character: ["李牧"], world: ["旧案"] },
-								changes: { world: { "李牧.dead": true, "密信.holder": "荀彧" } },
+								refs: { character: ["黄盖"], world: ["旧案"] },
+								changes: { world: { "黄盖.dead": true, "火船.holder": "荀彧" } },
 							},
 						}
 					: entry,
 			),
-			file("character", "world/characters/李牧.md", "李牧", {}),
-			file("resource", "world/resources/密信.md", "密信", { initial: { holder: "李牧" } }),
+			file("character", "world/characters/黄盖.md", "黄盖", {}),
+			file("resource", "world/resources/火船.md", "火船", { initial: { holder: "黄盖" } }),
 			file("world", "world/旧案.md", "旧案", {}),
-			source("character", "world/characters", "李牧"),
-			source("resource", "world/resources", "密信", { initial: { holder: "李牧" } }),
+			source("character", "world/characters", "黄盖"),
+			source("resource", "world/resources", "火船", { initial: { holder: "黄盖" } }),
 			source("world", "world", "旧案"),
-			source("story-contract", "outline/contracts", "真相的代价", { deadline: "beat-0002" }),
+			source("story-contract", "outline/contracts", "诈降", { deadline: "beat-0002" }),
 			source("story-beat", "outline/story/vol-0001", "beat-0001"),
 			source("story-beat", "outline/story/vol-0001", "beat-0002"),
 		],
@@ -333,11 +333,11 @@ test("泳道只取 Target：Source 抽取里同名的人物、资源、世界与
 	assert.deepEqual([...model.findings.keys()], []);
 	assert.deepEqual(
 		model.characters.map((lane) => lane.path),
-		["world/characters/李牧.md"],
+		["world/characters/黄盖.md"],
 	);
 	assert.deepEqual(
 		model.resources.map((lane) => lane.path),
-		["world/resources/密信.md"],
+		["world/resources/火船.md"],
 	);
 	assert.deepEqual(
 		model.worlds.map((lane) => lane.path),
@@ -345,7 +345,7 @@ test("泳道只取 Target：Source 抽取里同名的人物、资源、世界与
 	);
 	assert.deepEqual(
 		model.contracts.map((lane) => lane.path),
-		["outline/contracts/真相的代价.md", "outline/contracts/未兑现.md"],
+		["outline/contracts/诈降.md", "outline/contracts/未兑现.md"],
 	);
 });
 
@@ -360,12 +360,12 @@ test("邻域：左列是它依赖的、右列是依赖它的，按 kind 分组�
 							...entry,
 							frontmatter: {
 								...entry.frontmatter,
-								refs: { beat: ["beat-0003", "beat-0001"], character: ["李牧"] },
+								refs: { beat: ["beat-0003", "beat-0001"], character: ["黄盖"] },
 							},
 						}
 					: entry,
 			),
-			file("character", "world/characters/李牧.md", "李牧", {}),
+			file("character", "world/characters/黄盖.md", "黄盖", {}),
 		],
 	} as unknown as WorkspaceData;
 	const book = new Book(rich);
@@ -375,18 +375,18 @@ test("邻域：左列是它依赖的、右列是依赖它的，按 kind 分组�
 		[
 			["情节", ["beat-0001:refs.beat", "beat-0003:refs.beat"]],
 			["读者期待", ["未兑现:contracts.open"]],
-			["人物", ["李牧:refs.character"]],
+			["人物", ["黄盖:refs.character"]],
 		],
 	);
 	assert.deepEqual(around.down, []);
-	const contract = neighborhoodFor(book, "outline/contracts/真相的代价.md");
+	const contract = neighborhoodFor(book, "outline/contracts/诈降.md");
 	assert.deepEqual(
 		contract.down.map((group) => [group.label, group.items.map((item) => item.key)]),
 		[["情节", ["contracts.open", "contracts.advance", "contracts.resolve", "contracts.advance"]]],
 	);
 	assert.deepEqual(
 		contract.up.map((group) => group.items.map((item) => `${item.title}:${item.key}`)),
-		[["beat-0002:deadline"], ["李牧:subjects.character"]],
+		[["beat-0002:deadline"], ["黄盖:subjects.character"]],
 	);
 });
 
@@ -396,12 +396,12 @@ test("资源流转与 finding 密度：initial.holder 起点、changes 的 holde
 		files: [
 			...data.files.map((entry) =>
 				entry.localId === "beat-0003"
-					? { ...entry, frontmatter: { ...entry.frontmatter, changes: { world: { "密信.holder": "荀彧" } } } }
+					? { ...entry, frontmatter: { ...entry.frontmatter, changes: { world: { "火船.holder": "荀彧" } } } }
 					: entry.localId === "beat-0004"
-						? { ...entry, frontmatter: { ...entry.frontmatter, changes: { world: { "密信.consumed": true } } } }
+						? { ...entry, frontmatter: { ...entry.frontmatter, changes: { world: { "火船.consumed": true } } } }
 						: entry,
 			),
-			file("resource", "world/resources/密信.md", "密信", { initial: { holder: "李牧" } }),
+			file("resource", "world/resources/火船.md", "火船", { initial: { holder: "黄盖" } }),
 			file("resource", "world/resources/无人用.md", "无人用", {}),
 		],
 	} as unknown as WorkspaceData;
@@ -443,8 +443,8 @@ test("资源流转与 finding 密度：initial.holder 起点、changes 的 holde
 		]),
 		[
 			[
-				"密信",
-				"李牧",
+				"火船",
+				"黄盖",
 				[
 					[3, "holder", "荀彧"],
 					[4, "consumed", ""],

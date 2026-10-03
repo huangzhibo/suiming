@@ -44,26 +44,26 @@ function designPackage(): OpenPackageFile[] {
 	return [
 		file(
 			"outline/story/index.yaml",
-			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001, beat-0002]\n",
+			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001, beat-0002]\n",
 			"application/yaml; charset=utf-8",
 		),
 		file(
 			"outline/story/vol-0001/beat-0001.md",
-			"---\nrefs:\n  character: [李牧]\n  place: [皇档]\n  resource: [密信]\ncontracts:\n  open: [真相的代价]\nchanges:\n  world:\n    李牧.location: 皇档\n---\n李牧进入皇档，取得密信。\n",
+			"---\nrefs:\n  character: [黄盖]\n  place: [赤壁]\n  resource: [火船]\ncontracts:\n  open: [诈降]\nchanges:\n  world:\n    黄盖.location: 赤壁\n---\n黄盖进入赤壁，取得火船。\n",
 		),
 		file(
 			"outline/story/vol-0001/beat-0002.md",
-			"---\nrefs:\n  character: [李牧]\n  resource: [密信]\n  beat: [beat-0001]\ncontracts:\n  resolve: [真相的代价]\nchanges:\n  world:\n    密信.consumed: true\n---\n李牧公开真相并焚毁密信。\n",
+			"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\n  beat: [beat-0001]\ncontracts:\n  resolve: [诈降]\nchanges:\n  world:\n    火船.consumed: true\n---\n黄盖公开真相并焚毁火船。\n",
 		),
-		file("world/characters/李牧.md", "---\nname: 李牧\n---\n相信真相必须由证据和代价共同承担。\n"),
-		file("world/places/皇档.md", "收藏旧朝档案的封闭库房。\n"),
-		file("world/resources/密信.md", "---\ninitial:\n  holder: 李牧\n---\n唯一能证明旧案的密信。\n"),
+		file("world/characters/黄盖.md", "---\nname: 黄盖\n---\n相信真相必须由证据和代价共同承担。\n"),
+		file("world/places/赤壁.md", "收藏旧朝档案的封闭库房。\n"),
+		file("world/resources/火船.md", "---\ninitial:\n  holder: 黄盖\n---\n唯一能证明旧案的火船。\n"),
 		file(
-			"outline/contracts/真相的代价.md",
-			"---\nsubjects:\n  character: [李牧]\n  resource: [密信]\ndeadline: beat-0002\n---\n公开真相必须失去唯一密信。\n",
+			"outline/contracts/诈降.md",
+			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: beat-0002\n---\n公开真相必须失去唯一火船。\n",
 		),
 		file(
-			"intent/揭开真相.md",
+			"intent/计谋的代价.md",
 			"---\nstyle_refs: [style_contemporary_restraint]\n---\n主角不能靠巧合取胜，揭示必须带来不可恢复的代价。\n",
 		),
 		binaryFile(
@@ -84,8 +84,8 @@ function sourcePackage(sourceId: string): OpenPackageFile[] {
 			`schema_version: 1\nname: ${sourceId}.txt\nencoding: utf-8\n`,
 			"application/yaml; charset=utf-8",
 		),
-		file(`${root}/original.bin`, "李牧从旧档中取得密信。", "application/octet-stream"),
-		file(`${root}/material.txt`, "李牧从旧档中取得密信。\n", "text/plain; charset=utf-8"),
+		file(`${root}/original.bin`, "黄盖从旧档中取得火船。", "application/octet-stream"),
+		file(`${root}/material.txt`, "黄盖从旧档中取得火船。\n", "text/plain; charset=utf-8"),
 		file(
 			`${root}/outline/story/index.yaml`,
 			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 来源\n    beat_ids: [beat-0001]\n",
@@ -93,12 +93,12 @@ function sourcePackage(sourceId: string): OpenPackageFile[] {
 		),
 		file(
 			`${root}/outline/story/vol-0001/beat-0001.md`,
-			"---\nrefs:\n  character: [李牧]\ncontracts:\n  open: [密信去向]\n---\n李牧从旧档中取得密信，材料没有交代它最终去了哪里。\n",
+			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖从旧档中取得火船，材料没有交代它最终去了哪里。\n",
 		),
-		file(`${root}/world/characters/李牧.md`, "习惯先核对证据，再决定是否公开。\n"),
+		file(`${root}/world/characters/黄盖.md`, "习惯先核对证据，再决定是否公开。\n"),
 		file(
-			`${root}/outline/contracts/密信去向.md`,
-			"---\nsubjects:\n  character: [李牧]\ndeadline: book_end\n---\n材料已经建立密信去向的期待，但当前边界尚未回答。\n",
+			`${root}/outline/contracts/火船去向.md`,
+			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
 		),
 	];
 }
@@ -313,15 +313,15 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 		storyPackageCodec,
 		validateStoryProjectCandidate,
 	);
-	const currentIntent = designPackage().find((item) => item.path === "intent/揭开真相.md");
+	const currentIntent = designPackage().find((item) => item.path === "intent/计谋的代价.md");
 	assert.ok(currentIntent);
 	const changeSet: ChangeSet = {
 		baseRevisionId: base.id,
 		operations: [
 			{
 				operation: "replace",
-				identity: targetArtifactIdentity("intent", "揭开真相"),
-				path: "intent/揭开真相.md",
+				identity: targetArtifactIdentity("intent", "计谋的代价"),
+				path: "intent/计谋的代价.md",
 				mediaType: currentIntent.mediaType,
 				bytes: encoder.encode(`${decoder.decode(currentIntent.bytes).trimEnd()}\n胜利还必须让读者获得清晰反馈。\n`),
 			},
@@ -329,7 +329,7 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 	};
 	const applied = applyChangeOperations(store.snapshot(base.id).artifacts, changeSet.operations);
 	assert.equal(store.headRevisionId("project-1"), base.id, "应用候选不推进 head");
-	const intent = applied.find((artifact) => artifact.identity.localId === "揭开真相");
+	const intent = applied.find((artifact) => artifact.identity.localId === "计谋的代价");
 	assert.ok(intent !== undefined, "被 replace 的 artifact 仍在候选里");
 	assert.equal(
 		decoder.decode(intent.bytes).endsWith("胜利还必须让读者获得清晰反馈。\n"),
@@ -341,7 +341,7 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 	);
 	assert.ok(
 		applied
-			.filter((artifact) => artifact.identity.localId !== "揭开真相")
+			.filter((artifact) => artifact.identity.localId !== "计谋的代价")
 			.every((artifact) => bytesEqual(untouched.get(artifactIdentityKey(artifact.identity)), artifact.bytes)),
 		"其余 artifact 逐字节不变",
 	);
@@ -369,7 +369,7 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 		other.readRevisionArtifacts(otherBase.id).map((artifact) => artifact.artifactVersionId),
 	);
 	assert.equal(
-		bytesByPath(exportOpenPackage(store, "project-1", base.id)).get("intent/揭开真相.md"),
+		bytesByPath(exportOpenPackage(store, "project-1", base.id)).get("intent/计谋的代价.md"),
 		decoder.decode(currentIntent.bytes),
 	);
 });
@@ -392,7 +392,7 @@ test("StoryBeat 换卷是两步：改 index 加移动文件；只改一半由 Ch
 		path: "outline/story/index.yaml",
 		mediaType: "application/yaml; charset=utf-8",
 		bytes: encoder.encode(
-			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001]\n  - id: vol-0002\n    title: 代价\n    beat_ids: [beat-0002]\n",
+			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001]\n  - id: vol-0002\n    title: 代价\n    beat_ids: [beat-0002]\n",
 		),
 	};
 
@@ -449,12 +449,12 @@ test("identity 改名表现为 delete 加 create；未同步确定性引用时�
 		storyPackageCodec,
 		validateStoryProjectCandidate,
 	);
-	const character = designPackage().find((item) => item.path === "world/characters/李牧.md");
+	const character = designPackage().find((item) => item.path === "world/characters/黄盖.md");
 	assert.ok(character);
 	const renamed: ChangeSet = {
 		baseRevisionId: base.id,
 		operations: [
-			{ operation: "delete", identity: targetArtifactIdentity("character", "李牧") },
+			{ operation: "delete", identity: targetArtifactIdentity("character", "黄盖") },
 			{
 				operation: "create",
 				identity: targetArtifactIdentity("character", "李校尉"),
@@ -484,7 +484,7 @@ test("Target 与多个 Source 使用独立 namespace，同名 StoryBeat 和 Char
 	const revision = importOpenPackage(store, "project-1", files, storyPackageCodec, validateStoryProjectCandidate);
 	const characters = store
 		.snapshot(revision.id)
-		.artifacts.filter((artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "李牧");
+		.artifacts.filter((artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "黄盖");
 	assert.equal(characters.length, 3);
 	assert.deepEqual(
 		characters.map((artifact) => artifact.identity.namespace),
@@ -494,8 +494,8 @@ test("Target 与多个 Source 使用独立 namespace，同名 StoryBeat 和 Char
 	assert.deepEqual(
 		sources.map((source) => [source.sourceId, source.state, source.check?.contracts.openContractIds]),
 		[
-			["原作一", "extracted", ["密信去向"]],
-			["原作二", "extracted", ["密信去向"]],
+			["原作一", "extracted", ["火船去向"]],
+			["原作二", "extracted", ["火船去向"]],
 		],
 	);
 	assert.deepEqual(bytesByPath(exportOpenPackage(store, "project-1", revision.id)), bytesByPath(files));
@@ -528,7 +528,7 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 		storyPackageCodec,
 		validateStoryProjectCandidate,
 	);
-	const original = encoder.encode("访谈记录：李牧先核对密信。\n");
+	const original = encoder.encode("访谈记录：黄盖先核对火船。\n");
 	const ingested = ingestSource({
 		artifactStore: store,
 		projectId: "project-1",
@@ -559,7 +559,7 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 					artifact.identity.kind === "source-material",
 			)?.bytes,
 		),
-		"访谈记录：李牧先核对密信。\n",
+		"访谈记录：黄盖先核对火船。\n",
 	);
 	assert.throws(
 		() =>

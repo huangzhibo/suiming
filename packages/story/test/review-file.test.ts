@@ -13,13 +13,13 @@ function textReview(): ReviewFile {
 		subjects: new Map([["text/beat-0001.md", digest]]),
 		draft: {
 			verdict: "revise",
-			summary: "取得密信的过程没有阻力。",
+			summary: "取得火船的过程没有阻力。",
 			findings: [
 				{
 					severity: "minor",
 					anchor: { kind: "artifact", path: "text/beat-0001.md" },
-					issue: "读者感受不到密信是唯一筹码。",
-					evidence: "李牧走入皇档，在木匣中找到密信。",
+					issue: "读者感受不到火船是唯一筹码。",
+					evidence: "黄盖走入赤壁，在木匣中找到火船。",
 					repairLayer: "text",
 					suggestion: "写出手指遇到封蜡时的停顿。",
 				},

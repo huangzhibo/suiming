@@ -13,8 +13,8 @@ function sourceExtraction(): SourceExtractionDocuments {
 function sourceWith(extraction: SourceExtractionDocuments) {
 	return bindSourceDocuments("原作", {
 		descriptor: { schema_version: 1, name: "原作.txt", encoding: "utf-8" },
-		original: encoder.encode("李牧取得密信，最终公开真相。"),
-		material: "李牧取得密信，最终公开真相。",
+		original: encoder.encode("黄盖取得火船，最终公开真相。"),
+		material: "黄盖取得火船，最终公开真相。",
 		extraction,
 	});
 }
@@ -23,14 +23,14 @@ test("Source extraction 复用 Story Language，但允许材料边界仍开放�
 	const extraction = sourceExtraction();
 	const second = extraction.beats[1];
 	assert.ok(second);
-	second.markdown = second.markdown.replace("contracts:\n  resolve: [真相的代价]\n", "");
+	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
 	const contract = extraction.contracts[0];
 	assert.ok(contract);
 	contract.markdown = contract.markdown.replace("deadline: beat-0002", "deadline: book_end");
 
 	const result = checkSource(sourceWith(extraction));
 	assert.equal(result.passed, true);
-	assert.deepEqual(result.contracts.openContractIds, ["真相的代价"]);
+	assert.deepEqual(result.contracts.openContractIds, ["诈降"]);
 });
 
 test("Source 不能用从未建立的 book_end Contract 冒充合法开放期待", () => {
@@ -39,8 +39,8 @@ test("Source 不能用从未建立的 book_end Contract 冒充合法开放期待
 	const second = extraction.beats[1];
 	const contract = extraction.contracts[0];
 	assert.ok(first && second && contract);
-	first.markdown = first.markdown.replace("contracts:\n  open: [真相的代价]\n", "");
-	second.markdown = second.markdown.replace("contracts:\n  resolve: [真相的代价]\n", "");
+	first.markdown = first.markdown.replace("contracts:\n  open: [诈降]\n", "");
+	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
 	contract.markdown = contract.markdown.replace("deadline: beat-0002", "deadline: book_end");
 
 	const result = checkSource(sourceWith(extraction));
@@ -53,7 +53,7 @@ test("Source 仍拒绝错过显式 Beat deadline 的未解决 Contract", () => {
 	const extraction = sourceExtraction();
 	const second = extraction.beats[1];
 	assert.ok(second);
-	second.markdown = second.markdown.replace("contracts:\n  resolve: [真相的代价]\n", "");
+	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
 
 	const result = checkSource(sourceWith(extraction));
 	assert.equal(result.passed, false);

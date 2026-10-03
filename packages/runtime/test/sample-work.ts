@@ -11,65 +11,65 @@ export interface SampleWorkFile {
  * 因为它是测试数据不是产品内容：它不进入任何产品包的导出面，与 packages/story/test/fixture.ts 一样是 test 目录里的普通 helper。
  */
 const SAMPLE_WORK_TEXT: Readonly<Record<string, string>> = {
-	"intent/揭开真相.md": `---
+	"intent/计谋的代价.md": `---
 style_refs: [style_contemporary_restraint]
 ---
 主角不能靠巧合取胜，真相必须由主动选择揭示，并在当场产生不可恢复的个人代价。
 `,
-	"outline/contracts/真相的代价.md": `---
+	"outline/contracts/诈降.md": `---
 subjects:
-  character: [李牧]
-  resource: [密信]
+  character: [黄盖]
+  resource: [火船]
 deadline: beat-0002
 ---
-公开真相必须让李牧不可逆地失去唯一密信与由它带来的谈判优势。
+公开真相必须让黄盖不可逆地失去唯一火船与由它带来的谈判优势。
 `,
 	"outline/story/index.yaml": `schema_version: 2
 volumes:
   - id: vol-0001
-    title: 入局
+    title: 赤壁之战
     beat_ids: [beat-0001, beat-0002]
 `,
 	"outline/story/vol-0001/beat-0001.md": `---
 refs:
-  character: [李牧]
-  place: [皇档]
-  resource: [密信]
+  character: [黄盖]
+  place: [赤壁]
+  resource: [火船]
 contracts:
-  open: [真相的代价]
+  open: [诈降]
 changes:
   world:
-    李牧.location: 皇档
+    黄盖.location: 赤壁
 ---
-李牧进入皇档，取得能证明旧案的唯一密信。他知道公开它会让自己失去最后的谈判筹码。
+黄盖进入赤壁，取得能证明旧案的唯一火船。他知道公开它会让自己失去最后的谈判筹码。
 `,
 	"outline/story/vol-0001/beat-0002.md": `---
 refs:
-  character: [李牧]
-  resource: [密信]
+  character: [黄盖]
+  resource: [火船]
   beat: [beat-0001]
 contracts:
-  resolve: [真相的代价]
+  resolve: [诈降]
 changes:
   world:
-    密信.consumed: true
+    火船.consumed: true
 ---
-李牧在众人面前公开真相，并亲手焚毁密信，以失去筹码换取证词不再被任何一方垄断。
+黄盖在众人面前公开真相，并亲手焚毁火船，以失去筹码换取证词不再被任何一方垄断。
 `,
 	"reference/style/style_contemporary_restraint.md": `短句，少解释；先让人物行动，再让读者看见代价。
 `,
-	"world/characters/李牧.md": `---
-name: 李牧
+	"world/characters/黄盖.md": `---
+name: 黄盖
 ---
-李牧相信真相必须由证据和承担代价的选择共同成立。他习惯先保留筹码，因此公开密信既符合信念，也违背自我保护本能。
+黄盖相信真相必须由证据和承担代价的选择共同成立。他习惯先保留筹码，因此公开火船既符合信念，也违背自我保护本能。
 `,
-	"world/places/皇档.md": `收藏旧朝档案的封闭库房，出入记录受到多方共同监督。
+	"world/places/赤壁.md": `收藏旧朝档案的封闭库房，出入记录受到多方共同监督。
 `,
-	"world/resources/密信.md": `---
+	"world/resources/火船.md": `---
 initial:
-  holder: 李牧
+  holder: 黄盖
 ---
-唯一能证明旧案、也能作为谈判筹码的原始密信。
+唯一能证明旧案、也能作为谈判筹码的原始火船。
 `,
 };
 

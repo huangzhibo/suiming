@@ -77,15 +77,15 @@ try {
 	const steering = await fixture("steering");
 	try {
 		let runId = "";
-		const correction = "补充要求：请分析李牧，而不是皇档";
+		const correction = "补充要求：请分析黄盖，而不是赤壁";
 		steering.provider.setResponses([
 			async () => {
 				steering.project.queueRunSteering(runId, correction);
-				return fauxAssistantMessage(fauxToolCall("finish", { summary: "皇档是档案收藏地。" }));
+				return fauxAssistantMessage(fauxToolCall("finish", { summary: "赤壁是档案收藏地。" }));
 			},
 		]);
 		const result = await runAgent(steering.harness, {
-			goal: "讨论皇档，不修改作品",
+			goal: "讨论赤壁，不修改作品",
 			onStarted(v) {
 				runId = v.runId;
 			},

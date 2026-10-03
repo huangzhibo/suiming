@@ -53,29 +53,29 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 			.waitFor();
 		await page.getByRole("button", { name: "对话", exact: true }).click();
 		await page.getByRole("button", { name: /^身份$/ }).click();
-		await page.getByRole("button", { name: /李牧\s*2 个情节/ }).waitFor();
+		await page.getByRole("button", { name: /黄盖\s*2 个情节/ }).waitFor();
 		await page.locator("[data-beat='beat-0001']").click();
-		await page.getByRole("button", { name: /李牧\s*2 个情节/ }).waitFor();
+		await page.getByRole("button", { name: /黄盖\s*2 个情节/ }).waitFor();
 		await page.locator("[data-beat='beat-0002']").click();
 		await page.getByRole("button", { name: "查看此处状态", exact: true }).click();
 		const panel = page.getByRole("region", { name: "故事状态查询" });
-		await panel.getByText(/密信 · 持有者：李牧/).waitFor();
+		await panel.getByText(/火船 · 持有者：黄盖/).waitFor();
 		await panel.getByText("本幕变化", { exact: true }).click();
-		await panel.getByText(/密信 · 持有者：李牧 → 无/).waitFor();
+		await panel.getByText(/火船 · 持有者：黄盖 → 无/).waitFor();
 		await panel.getByText("结束后", { exact: true }).click();
-		await panel.getByText(/密信 · 已消耗：是/).waitFor();
+		await panel.getByText(/火船 · 已消耗：是/).waitFor();
 		await mkdir("/tmp/suiming-desktop-qa", { recursive: true });
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/observation-after.png" });
 		// 行内来源链接打开工作稿，查询仍停在第二幕结束后。
 		await panel.locator(".design-body button").first().click();
 		await page.getByRole("radio", { name: "设计", exact: true }).waitFor();
 		assert.equal(await panel.getByRole("combobox").count(), 0, "Beat 页复用顺序导航，不重复列出所有 Beat");
-		await panel.getByText(/密信 · 已消耗：是/).waitFor();
+		await panel.getByText(/火船 · 已消耗：是/).waitFor();
 		await page.getByRole("button", { name: "后退", exact: true }).click();
-		await panel.getByText(/密信 · 已消耗：是/).waitFor();
+		await panel.getByText(/火船 · 已消耗：是/).waitFor();
 		await page.getByRole("button", { name: "前进", exact: true }).click();
 		await page.getByRole("button", { name: "新标签页", exact: true }).click();
-		await panel.getByText(/密信 · 已消耗：是/).waitFor();
+		await panel.getByText(/火船 · 已消耗：是/).waitFor();
 		// 重载期间欢迎页一次都不能出现：加载态与「没有打开作品」曾是同一个分支，作者重载时看到「开始新作」，
 		// 像是作品没了。工作台的工具行一出现就停止观察。
 		await page.addInitScript(`
@@ -87,7 +87,7 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 			observer.observe(document, { childList: true, subtree: true, characterData: true });
 		`);
 		await page.reload();
-		await panel.getByText(/密信 · 已消耗：是/).waitFor();
+		await panel.getByText(/火船 · 已消耗：是/).waitFor();
 		assert.equal(await page.evaluate("window.__welcomeSeen"), false, "重载时先给加载态，不闪欢迎页");
 		const state = await page.evaluate(() => window.suiming?.invoke("workspace.show", {}));
 		assert.equal(
@@ -102,18 +102,18 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 		// Beat 入口以自身位置发起新查询；人物页可限定主体。
 		await page.getByRole("button", { name: "故事状态", exact: true }).click();
 		await panel.getByRole("radio", { name: "进入前", exact: true }).click();
-		await panel.getByText(/密信 · 持有者：李牧/).waitFor();
+		await panel.getByText(/火船 · 持有者：黄盖/).waitFor();
 		await panel.getByText(/依据文件 ·/).click();
-		await panel.locator("details").getByRole("button", { name: "李牧", exact: true }).click();
+		await panel.locator("details").getByRole("button", { name: "黄盖", exact: true }).click();
 		await page.getByRole("button", { name: "故事状态", exact: true }).click();
-		await panel.getByText("只看 李牧", { exact: true }).waitFor();
+		await panel.getByText("只看 黄盖", { exact: true }).waitFor();
 		await panel.getByRole("combobox", { name: "选择观察位置", exact: true }).click();
 		await page.getByRole("option", { name: "beat-0001", exact: true }).click();
 		await panel.getByText("beat-0001", { exact: true }).first().waitFor();
 		await panel.getByRole("button", { name: "查看全部", exact: true }).click();
 		await panel.getByText("全部人物、资源与读者期待", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "故事状态", exact: true }).click();
-		await panel.getByText("只看 李牧", { exact: true }).waitFor();
+		await panel.getByText("只看 黄盖", { exact: true }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/observation-character.png" });
 		await page.getByRole("button", { name: "对话", exact: true }).click();
 		await panel.waitFor({ state: "hidden" });
@@ -140,12 +140,12 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 		await page.getByRole("button", { name: "查看引用内容", exact: true }).click();
 		const preview = page.getByRole("dialog").locator(".reference-preview");
 		assert.match(await preview.innerText(), /观察 Beat：beat-0002\n观察边界：after/);
-		assert.match(await preview.innerText(), /密信 · 已消耗：是/);
+		assert.match(await preview.innerText(), /火船 · 已消耗：是/);
 		await page.keyboard.press("Escape");
 		assert.equal((await page.evaluate(() => window.suiming?.invoke("session.list", {})))?.sessions.length, 0);
 
 		await page.getByRole("button", { name: "发送", exact: true }).click();
-		await page.locator(".message.assistant").filter({ hasText: "主角要公开密信，还是暂时保留？" }).waitFor();
+		await page.locator(".message.assistant").filter({ hasText: "主角要公开火船，还是暂时保留？" }).waitFor();
 		const sent = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
 		assert.equal(sent?.sessions.length, 1);
 		const sessionId = sent?.sessions[0]?.id ?? "";
@@ -153,7 +153,7 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 		const goal = inbox?.[0]?.text ?? "";
 		assert.match(goal, /观察 Beat：beat-0002\n观察边界：after/);
 		assert.ok(goal.includes(`revision: ${state?.revisionId}`));
-		assert.match(goal, /密信 · 已消耗：是/);
+		assert.match(goal, /火船 · 已消耗：是/);
 		// Agent 与作者改的是同一份 checkout。此刻还没人改文件，所以是空差异。
 		assert.deepEqual(await page.evaluate(() => window.suiming?.invoke("project.diff", {})), []);
 		const input = page.getByRole("textbox", { name: "输入消息" });
@@ -205,7 +205,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 	try {
 		await page.getByRole("button", { name: "发送", exact: true }).waitFor();
 		await page.locator("[data-navigation-icons]").getByRole("button", { name: "材料", exact: true }).click();
-		await page.getByRole("button", { name: /揭开真相/ }).click();
+		await page.getByRole("button", { name: /计谋的代价/ }).click();
 		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.focus());
 		await page.locator(".cm-editor .cm-content").first().click();
@@ -215,10 +215,10 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.reload();
 		await page.getByText("未保存", { exact: true }).waitFor();
 		assert.equal(app.process().exitCode, null);
-		assert.ok(!(await readFile(join(root, "intent/揭开真相.md"), "utf8")).includes("不可逆"));
+		assert.ok(!(await readFile(join(root, "intent/计谋的代价.md"), "utf8")).includes("不可逆"));
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
 		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
-		assert.ok((await readFile(join(root, "intent/揭开真相.md"), "utf8")).includes("不可逆"));
+		assert.ok((await readFile(join(root, "intent/计谋的代价.md"), "utf8")).includes("不可逆"));
 		await page.getByRole("button", { name: "切换到阅读视图", exact: true }).click();
 		await page.getByRole("button", { name: "更多", exact: true }).click();
 		await page.getByRole("menuitem", { name: "查看版本差异", exact: true }).click();
@@ -233,15 +233,15 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.getByRole("button", { name: "提交版本", exact: true }).click();
 		await page.getByText("已提交一个新版本", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();
-		await page.getByRole("textbox", { name: "输入消息" }).fill("确认作者想要公开密信还是保留筹码");
+		await page.getByRole("textbox", { name: "输入消息" }).fill("确认作者想要公开火船还是保留筹码");
 		await page.getByRole("textbox", { name: "输入消息" }).press("Meta+Enter");
 		await page.locator(".run-status").getByText("正在处理", { exact: true }).waitFor();
 		await page.reload();
-		await page.locator(".message.assistant").filter({ hasText: "主角要公开密信，还是暂时保留？" }).waitFor();
+		await page.locator(".message.assistant").filter({ hasText: "主角要公开火船，还是暂时保留？" }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/waiting.png" });
 		const state = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
 		assert.equal(state?.sessions.length, 1);
-		await page.getByRole("textbox", { name: "输入消息" }).fill("公开密信");
+		await page.getByRole("textbox", { name: "输入消息" }).fill("公开火船");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		// turn 结束对账：只问不改的第一轮不显示；这一轮写了正文、留了审稿、提交了两次，意图没动。
@@ -252,7 +252,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			await turnSummary.innerText(),
 			"本轮：作者 1 条 · 意图未改动 · 正文改了 1 个文件 · 审稿改了 1 个文件 · 提交了 2 个版本",
 		);
-		await page.locator(".message.user").filter({ hasText: "公开密信" }).first().waitFor();
+		await page.locator(".message.user").filter({ hasText: "公开火船" }).first().waitFor();
 		await page.locator(".activities").first().waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/workspace.png" });
 		// 活动的 target 指向真实作品路径时可直接点开。活动按连续性分组，作者回答会把它们隔成多组，所以逐组展开。
@@ -289,8 +289,8 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			.click();
 		await page.locator(".cm-editor .cm-content").first().click();
 		await page.keyboard.press("Meta+A");
-		await page.keyboard.insertText("李牧推开皇档的门，手指碰到匣上的封蜡。他停了一下，仍然揭开了它。");
-		await writeFile(join(root, "text/beat-0001.md"), "外部作者修改：李牧在封蜡前停了一下。\n");
+		await page.keyboard.insertText("黄盖推开赤壁的门，手指碰到匣上的封蜡。他停了一下，仍然揭开了它。");
+		await writeFile(join(root, "text/beat-0001.md"), "外部作者修改：黄盖在封蜡前停了一下。\n");
 		await page.getByText("文件在外部发生了修改", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "比较外部修改", exact: true }).click();
 		await page.locator(".cm-mergeView").waitFor();
@@ -347,7 +347,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.getByRole("button", { name: "查看此处状态", exact: true }).waitFor();
 		// 因果弧来自 refs.beat（beat-0002 依赖 beat-0001）；人物泳道来自 refs.character。
 		await page.locator("path[data-arc='0-1']").waitFor();
-		await page.getByRole("button", { name: "李牧", exact: true }).first().waitFor();
+		await page.getByRole("button", { name: "黄盖", exact: true }).first().waitFor();
 		// 刷选：在列头从 beat-0001 拖到 beat-0002 → 区间标出并能引用给 Agent；finding 密度开关给有 finding 的列上底色。
 		const a = await page.locator("[data-beat='beat-0001']").boundingBox();
 		const b = await page.locator("[data-beat='beat-0002']").boundingBox();
@@ -391,9 +391,9 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
 		// Beat 页末尾是以它为中心的邻域图，点节点换到那个 artifact；承诺页顶部是生命周期轨迹。
 		await page.getByRole("radio", { name: "设计", exact: true }).click();
-		await page.locator("[data-neighborhood]").getByText("李牧", { exact: true }).waitFor();
-		await page.locator("[data-neighborhood] g[role='button']").filter({ hasText: "真相的代价" }).click();
-		await page.getByRole("heading", { name: "真相的代价", exact: true }).waitFor();
+		await page.locator("[data-neighborhood]").getByText("黄盖", { exact: true }).waitFor();
+		await page.locator("[data-neighborhood] g[role='button']").filter({ hasText: "诈降" }).click();
+		await page.getByRole("heading", { name: "诈降", exact: true }).waitFor();
 		await page.locator("svg[aria-label='读者期待进展']").waitFor();
 		// 支持的最小窗口必须真正容纳操作控件，仅断言 body 无横向滚动会漏掉 overflow-hidden 裁切。
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
@@ -684,7 +684,7 @@ test("导航与文件：侧栏独立、共享草稿、固定与新开、关闭�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
-	await writeFile(join(root, "text/beat-0001.md"), "李牧推开皇档的大门，望向封存多年的密信。\n\n".repeat(80));
+	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的大门，望向封存多年的火船。\n\n".repeat(80));
 	await writeFile(join(root, "AGENTS.md"), "作者的辅助笔记\n");
 	const app = await electron.launch({
 		args: [
@@ -842,7 +842,7 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
-	await writeFile(join(root, "text/beat-0001.md"), "李牧推开皇档的门。\n\n".repeat(80));
+	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的门。\n\n".repeat(80));
 	const app = await electron.launch({
 		args: [
 			resolve("apps/desktop/test-dist/entry.js"),
@@ -1137,7 +1137,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		const breadcrumb = page.getByRole("navigation", { name: "作品位置" });
 		const location = await breadcrumb.innerText();
 		for (const target of [
-			breadcrumb.getByRole("button", { name: "入局", exact: true }),
+			breadcrumb.getByRole("button", { name: "赤壁之战", exact: true }),
 			breadcrumb.locator('[aria-current="page"]'),
 			page.locator('.tab-btn[data-active="true"] button').first(),
 		]) {
@@ -1146,7 +1146,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 			await page.waitForTimeout(500);
 			assert.equal(await tooltip.count(), 0, "完整名称不重复提示");
 		}
-		await breadcrumb.getByRole("button", { name: "入局", exact: true }).click();
+		await breadcrumb.getByRole("button", { name: "赤壁之战", exact: true }).click();
 		assert.equal(await breadcrumb.innerText(), location, "父级只定位导航，不替换当前内容");
 		// 普通文件仍显示物理路径；折叠段补全路径，作品页保持对象面包屑。
 		await button("文件").click();
@@ -1197,8 +1197,8 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 			await back.waitFor();
 			assert.equal(await volume.evaluate((element) => element.tagName), "SPAN");
 			await hover(volume);
-			await tooltip.filter({ hasText: "入局 · 2 个情节" }).waitFor();
-			assert.equal(await tooltip.innerText(), "入局 · 2 个情节");
+			await tooltip.filter({ hasText: "赤壁之战 · 2 个情节" }).waitFor();
+			assert.equal(await tooltip.innerText(), "赤壁之战 · 2 个情节");
 			await back.click();
 		}
 		await hover(button("放大"));

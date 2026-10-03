@@ -22,9 +22,9 @@ import { sampleWorkFiles } from "../packages/runtime/test/sample-work.ts";
 const run = promisify(execFile);
 const CLI = resolve("apps/cli/dist/bin.js");
 
-const PROSE = `李牧推开皇档的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走密信之后，自己就再没有可以讨价还价的东西。
+const PROSE = `黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走火船之后，自己就再没有可以讨价还价的东西。
 
-守档的老吏咳了一声，没有回头。李牧把手按在匣盖上，停了很久。
+守档的老吏咳了一声，没有回头。黄盖把手按在匣盖上，停了很久。
 
 他还是伸手取了。蜡封在指腹下碎开的时候，他想起父亲说过的话：真相要有人付账。`;
 
@@ -100,14 +100,14 @@ async function reviewAnchors(dir) {
 }
 
 /**
- * beat-0002 不再兑现「真相的代价」（期限就是 beat-0002）：设计层错误不拦提交，所以能作为起点提交；
+ * beat-0002 不再兑现「诈降」（期限就是 beat-0002）：设计层错误不拦提交，所以能作为起点提交；
  * check 对它说 ISSUES。2026-10-02 之前 Agent 的 check 对这份候选说 PASSED。
  */
 async function unpaidContract(dir, service, id) {
 	const path = join(dir, "outline/story/vol-0001/beat-0002.md");
 	const before = await readFile(path, "utf8");
-	const after = before.replace("contracts:\n  resolve: [真相的代价]\n", "");
-	if (after === before) throw new Error("样例的 beat-0002 已不再兑现「真相的代价」，出题要跟着改");
+	const after = before.replace("contracts:\n  resolve: [诈降]\n", "");
+	if (after === before) throw new Error("样例的 beat-0002 已不再兑现「诈降」，出题要跟着改");
 	await writeFile(path, after);
 	await service.commitCheckout({ commandId: `regression:${id}:setup` });
 }
@@ -115,7 +115,7 @@ async function unpaidContract(dir, service, id) {
 const TASKS = [
 	{
 		id: "discuss",
-		prompt: "讨论一下李牧公开密信要付出什么代价，先不要修改作品。",
+		prompt: "讨论一下黄盖公开火船要付出什么代价，先不要修改作品。",
 		grade: (r) => [
 			expect("没有改动作品", total(r.summary.changed) === 0),
 			expect("没有提交", r.summary.revisions === 0),
@@ -124,15 +124,15 @@ const TASKS = [
 	},
 	{
 		id: "write-back",
-		prompt: "记住一个以后都成立的设定：李牧从不说谎，哪怕对敌人也一样。",
+		prompt: "记住一个以后都成立的设定：黄盖从不说谎，哪怕对敌人也一样。",
 		grade: (r) => [
 			expect("写回了意图或 Design", r.summary.changed.intent.count + r.summary.changed.design.count > 0),
 		],
 	},
 	{
 		id: "design-edit",
-		// 样例的 beat-0002 已经是「当众焚毁密信」，要求一个它确实没有的改动，否则「不用改」才是对的回答。
-		prompt: "在 beat-0002 里加上守档的老吏想拦住李牧、被他推开的情节。改完检查并提交。",
+		// 样例的 beat-0002 已经是「当众焚毁火船」，要求一个它确实没有的改动，否则「不用改」才是对的回答。
+		prompt: "在 beat-0002 里加上守档的老吏想拦住黄盖、被他推开的情节。改完检查并提交。",
 		grade: (r) => [
 			expect("改了 Design", r.summary.changed.design.count > 0),
 			expect("提交了版本", r.summary.revisions > 0),
@@ -170,7 +170,7 @@ const TASKS = [
 		prompt: "检查一下作品现在有没有问题，先不要修改。",
 		grade: (r) => [
 			expect("没有改动作品", total(r.summary.changed) === 0),
-			expect("回复点名没兑现的期待", r.reply.includes("真相的代价")),
+			expect("回复点名没兑现的期待", r.reply.includes("诈降")),
 		],
 	},
 	{
@@ -188,7 +188,7 @@ const TASKS = [
 			expect("写了正文", r.summary.changed.text.count > 0),
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("正文过检查", r.textCheck?.data?.passed === true),
-			expect("回复提到还没兑现的期待", r.reply.includes("真相的代价")),
+			expect("回复提到还没兑现的期待", r.reply.includes("诈降")),
 		],
 	},
 	{

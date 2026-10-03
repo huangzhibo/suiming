@@ -206,8 +206,8 @@ test("copy：整个目录或单个文件原样复制，Source 提升为 Target �
 		const { fileTools } = await import("../src/harness/tools.js");
 		const files: Record<string, string> = {
 			"source/访谈/world/core.md": "世界\n",
-			"source/访谈/world/characters/李牧.md": "---\nname: 李牧\n---\n核对证据的人。\n",
-			"source/访谈/outline/story/vol-0001/beat-0001.md": "---\ntitle: 密信\n---\n找到密信。\n",
+			"source/访谈/world/characters/黄盖.md": "---\nname: 黄盖\n---\n核对证据的人。\n",
+			"source/访谈/outline/story/vol-0001/beat-0001.md": "---\ntitle: 火船\n---\n找到火船。\n",
 		};
 		for (const [path, content] of Object.entries(files)) {
 			await mkdir(join(root, path, ".."), { recursive: true });
@@ -231,8 +231,8 @@ test("copy：整个目录或单个文件原样复制，Source 提升为 Target �
 		assert.match(await run({ from: "source/访谈/world", to: "world" }), /2 个文件.*新建 1.*覆盖 1/u);
 		assert.equal(await readFile(join(root, "world/core.md"), "utf8"), files["source/访谈/world/core.md"]);
 		assert.equal(
-			await readFile(join(root, "world/characters/李牧.md"), "utf8"),
-			files["source/访谈/world/characters/李牧.md"],
+			await readFile(join(root, "world/characters/黄盖.md"), "utf8"),
+			files["source/访谈/world/characters/黄盖.md"],
 		);
 		await run({ from: "source/访谈/outline/story/vol-0001/beat-0001.md", to: "outline/story/vol-0001/beat-0001.md" });
 		assert.equal(

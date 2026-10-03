@@ -4,7 +4,7 @@ import { anchorParagraphs, paragraphSpans, quotedFragments } from "../src/anchor
 
 const text = `# 第一场
 
-李牧推开皇档的门，霉味先于灯光涌出来。他知道匣子在哪一层。
+黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层。
 
 - 要点一
 - 要点二
@@ -19,7 +19,7 @@ test("段号按 mdast paragraph 的文档顺序编，标题不算段，列表项
 	assert.deepEqual(
 		spans.map((span) => span.text),
 		[
-			"李牧推开皇档的门，霉味先于灯光涌出来。他知道匣子在哪一层。",
+			"黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层。",
 			"要点一",
 			"要点二",
 			"引语一段",
@@ -31,8 +31,8 @@ test("段号按 mdast paragraph 的文档顺序编，标题不算段，列表项
 
 test("引文优先取引号内原文，没有引号时退回长句；空白与引号差异不影响命中", () => {
 	assert.deepEqual(quotedFragments("结尾只有“他还是伸手取了”，缺少一次有阻力的身体动作。"), ["他还是伸手取了"]);
-	assert.deepEqual(quotedFragments("短。李牧推开皇档的门，霉味先于灯光涌出来。"), [
-		"李牧推开皇档的门，霉味先于灯光涌出来",
+	assert.deepEqual(quotedFragments("短。黄盖推开赤壁的门，霉味先于灯光涌出来。"), [
+		"黄盖推开赤壁的门，霉味先于灯光涌出来",
 	]);
 	assert.deepEqual(anchorParagraphs("结尾只有“他还是伸手取了”，缺少一次有阻力的身体动作。", text), [4]);
 	assert.deepEqual(anchorParagraphs("「他 知道匣子在哪一层」写得太省。", text), [0]);

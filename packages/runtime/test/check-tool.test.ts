@@ -18,7 +18,7 @@ function candidate(overrides: Record<string, string> = {}) {
 }
 const BEAT_1 = "outline/story/vol-0001/beat-0001.md";
 const BEAT_2 = "outline/story/vol-0001/beat-0002.md";
-const unresolved = { [BEAT_2]: sampleWorkText(BEAT_2).replace("contracts:\n  resolve: [真相的代价]\n", "") };
+const unresolved = { [BEAT_2]: sampleWorkText(BEAT_2).replace("contracts:\n  resolve: [诈降]\n", "") };
 
 test("check 工具：没有问题才说 PASSED", () => {
 	assert.equal(formatCheck(candidate()), "PASSED");
@@ -32,7 +32,7 @@ test("check 工具：设计层错误不拦提交，但不再说 PASSED——说 
 	assert.match(lines[0] ?? "", /^ISSUES：可以提交，但有 1 处问题要修/u);
 	assert.equal(
 		lines[1],
-		"- error: outline/contracts/真相的代价.md：StoryContract 真相的代价：到期限 beat-0002 还没有兑现；提示：在 beat-0002 或更早的 StoryBeat 里写 contracts.resolve: [真相的代价]",
+		"- error: outline/contracts/诈降.md：StoryContract 诈降：到期限 beat-0002 还没有兑现；提示：在 beat-0002 或更早的 StoryBeat 里写 contracts.resolve: [诈降]",
 	);
 });
 
@@ -45,7 +45,7 @@ test("check 工具：已有正文的问题与设计问题一起列出，正文�
 
 test("check 工具：提交会被拒的问题照旧是 FAILED，带全部诊断", () => {
 	const result = formatCheck(
-		candidate({ [BEAT_1]: sampleWorkText(BEAT_1).replace("character: [李牧]", "character: [李牧, 不存在]") }),
+		candidate({ [BEAT_1]: sampleWorkText(BEAT_1).replace("character: [黄盖]", "character: [黄盖, 不存在]") }),
 	);
 	assert.match(result, /^FAILED missing_context_reference: /u);
 	assert.match(result, /\n- outline\/story\/vol-0001\/beat-0001\.md#\/frontmatter\/refs\/character\/1：找不到引用/u);
@@ -56,11 +56,11 @@ test("check 工具：全书未完待续时，已建立未到期的 Contract 只�
 		candidate({
 			...unresolved,
 			"outline/story/index.yaml": `schema_version: 2\nopen_ended: true\n${sampleWorkText("outline/story/index.yaml").replace("schema_version: 2\n", "")}`,
-			"outline/contracts/真相的代价.md": sampleWorkText("outline/contracts/真相的代价.md").replace(
+			"outline/contracts/诈降.md": sampleWorkText("outline/contracts/诈降.md").replace(
 				"deadline: beat-0002",
 				"deadline: book_end",
 			),
 		}),
 	);
-	assert.equal(result, "PASSED\n未闭合但尚未到期的 Contract：真相的代价");
+	assert.equal(result, "PASSED\n未闭合但尚未到期的 Contract：诈降");
 });

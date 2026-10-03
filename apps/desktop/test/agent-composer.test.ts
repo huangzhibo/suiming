@@ -44,12 +44,12 @@ test("原生对话：引用与附件、IME、迟到回包及发送重试、消�
 		await page.keyboard.press("Escape");
 		await input.fill("");
 		await input.press("@");
-		await page.getByRole("textbox", { name: "搜索作品引用", exact: true }).fill("真相的代价");
+		await page.getByRole("textbox", { name: "搜索作品引用", exact: true }).fill("诈降");
 		await page
 			.getByRole("dialog")
-			.getByRole("button", { name: /真相的代价.*outline/ })
+			.getByRole("button", { name: /诈降.*outline/ })
 			.click();
-		await page.getByRole("button", { name: "移除引用：真相的代价", exact: true }).click();
+		await page.getByRole("button", { name: "移除引用：诈降", exact: true }).click();
 		assert.equal(await input.inputValue(), "");
 		await form.locator('input[type="file"]').setInputFiles({
 			name: "作者笔记.txt",

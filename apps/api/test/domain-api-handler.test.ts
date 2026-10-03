@@ -130,7 +130,7 @@ test("DomainApiHandler authenticates, validates and delegates Project routes to 
 	assert.deepEqual((exported.body as { data: unknown }).data, packageData);
 
 	const nextPackage = structuredClone(packageData);
-	const intent = nextPackage.files.find((file) => file.path === "intent/揭开真相.md");
+	const intent = nextPackage.files.find((file) => file.path === "intent/计谋的代价.md");
 	assert.ok(intent);
 	const nextBytes = new TextEncoder().encode(
 		`${Buffer.from(intent.contentBase64, "base64").toString("utf8")}\n新增代价。\n`,

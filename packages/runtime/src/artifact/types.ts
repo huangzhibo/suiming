@@ -42,7 +42,7 @@ export interface ProjectRevision {
  * 候选里的一个 artifact。
  *
  * `identity` 与 `path` 是同一个东西的两种写法，**都是事实，不是投影**：identity 是 Story Language
- * 里的引用方式（frontmatter 写 `character: [李牧]`，不写路径），path 是它在 Open Story Directory
+ * 里的引用方式（frontmatter 写 `character: [黄盖]`，不写路径），path 是它在 Open Story Directory
  * 里的位置。扫描时两者一起得到，此后一路带着。
  *
  * 曾经只有 identity，路径由 `pathForIdentity` 从 `outline/story/index.yaml` 重新推导。代价是

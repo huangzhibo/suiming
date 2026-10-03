@@ -69,8 +69,8 @@ function blindLabelsIn(context: Context): string[] {
 }
 
 const candidates = [
-	{ label: "flash", text: "李牧推开皇档的门。霉味先于灯光涌出来。他伸手取了信。" },
-	{ label: "pro", text: "皇档的门吱呀一声。李牧站在门口，没有马上进去；等他出来时，袖子里多了一封信。" },
+	{ label: "flash", text: "黄盖推开赤壁的门。霉味先于灯光涌出来。他伸手取了信。" },
+	{ label: "pro", text: "赤壁的门吱呀一声。黄盖站在门口，没有马上进去；等他出来时，袖子里多了一封信。" },
 ];
 
 test("盲读评委：候选匿名打乱、每轮一个顺序、名次经校验后按原始 label 合并，结果作为执行对象持久化", async () => {

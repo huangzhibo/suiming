@@ -33,12 +33,12 @@ test("diagnostics 汇总设计与 Source 的错误和警告：message 是拼好�
 			check: {
 				passed: false,
 				state: { passed: true },
-				diagnostics: [{ path: "outline/contracts/真相的代价.md", message: "到期未兑现", severity: "error" }],
+				diagnostics: [{ path: "outline/contracts/诈降.md", message: "到期未兑现", severity: "error" }],
 				warnings: [
 					{
 						path: "outline/story/vol-0001/beat-0001.md",
 						pointer: "/frontmatter/refs",
-						message: "提到了李牧但未引用",
+						message: "提到了黄盖但未引用",
 						severity: "warning",
 					},
 				],
@@ -72,16 +72,16 @@ test("diagnostics 汇总设计与 Source 的错误和警告：message 是拼好�
 	assert.deepEqual(summary.diagnostics, [
 		{
 			severity: "error",
-			path: "outline/contracts/真相的代价.md",
+			path: "outline/contracts/诈降.md",
 			detail: "到期未兑现",
-			message: "outline/contracts/真相的代价.md：到期未兑现",
+			message: "outline/contracts/诈降.md：到期未兑现",
 		},
 		{
 			severity: "warning",
 			path: "outline/story/vol-0001/beat-0001.md",
 			pointer: "/frontmatter/refs",
-			detail: "提到了李牧但未引用",
-			message: "outline/story/vol-0001/beat-0001.md#/frontmatter/refs：警告：提到了李牧但未引用",
+			detail: "提到了黄盖但未引用",
+			message: "outline/story/vol-0001/beat-0001.md#/frontmatter/refs：警告：提到了黄盖但未引用",
 		},
 		{
 			severity: "error",

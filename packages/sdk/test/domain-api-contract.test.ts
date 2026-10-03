@@ -88,14 +88,14 @@ test("route catalog has unique stable operations and every mutation requires ide
 test("Open Story Package codec round-trips bytes and rejects content tampering", async () => {
 	const files = [
 		{
-			path: "world/characters/李牧.md",
+			path: "world/characters/黄盖.md",
 			mediaType: "text/markdown; charset=utf-8",
 			bytes: new TextEncoder().encode("证据优先。\n"),
 		},
 		{
-			path: "intent/揭开真相.md",
+			path: "intent/计谋的代价.md",
 			mediaType: "text/markdown; charset=utf-8",
-			bytes: new TextEncoder().encode("揭开真相。\n"),
+			bytes: new TextEncoder().encode("计谋的代价。\n"),
 		},
 	];
 	const encoded = await encodeDomainApiOpenStoryPackage(files);

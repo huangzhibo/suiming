@@ -30,13 +30,13 @@ function replace(files: readonly OpenPackageFile[], path: string, before: string
 
 test("Open Story 三方合并接受互不交叉的 Local / Cloud artifact 修改", async () => {
 	const base = await fixture();
-	const local = replace(base, "world/characters/李牧.md", "他习惯先保留筹码", "他习惯先核验证据再保留筹码");
-	const cloud = replace(base, "outline/story/vol-0001/beat-0002.md", "亲手焚毁密信", "主动亲手焚毁密信");
+	const local = replace(base, "world/characters/黄盖.md", "他习惯先保留筹码", "他习惯先核验证据再保留筹码");
+	const cloud = replace(base, "outline/story/vol-0001/beat-0002.md", "亲手焚毁火船", "主动亲手焚毁火船");
 	const merged = mergeOpenStoryFiles(base, local, cloud);
 	assert.equal(merged.state, "merged");
 	assert.deepEqual(
 		merged.localChanges.map((change) => change.after?.path ?? change.before?.path),
-		["world/characters/李牧.md"],
+		["world/characters/黄盖.md"],
 	);
 	assert.deepEqual(
 		merged.cloudChanges.map((change) => change.after?.path ?? change.before?.path),
@@ -56,10 +56,10 @@ test("Open Story 三方合并按 artifact identity 处理 StoryBeat 换卷：一
 				: { ...file, bytes: new Uint8Array(file.bytes) },
 		),
 		"outline/story/index.yaml",
-		"  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001, beat-0002]",
-		"  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001]\n  - id: vol-0002\n    title: 真相\n    beat_ids: [beat-0002]",
+		"  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001, beat-0002]",
+		"  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001]\n  - id: vol-0002\n    title: 真相\n    beat_ids: [beat-0002]",
 	);
-	const cloud = replace(base, "world/characters/李牧.md", "公开密信", "公开唯一密信");
+	const cloud = replace(base, "world/characters/黄盖.md", "公开火船", "公开唯一火船");
 	const merged = mergeOpenStoryFiles(base, moved, cloud);
 	assert.equal(merged.state, "merged");
 	assert.equal(
@@ -74,8 +74,8 @@ test("Open Story 三方合并按 artifact identity 处理 StoryBeat 换卷：一
 
 test("Open Story 三方合并拒绝同一 artifact 双改，合起来不合法的快照按语义冲突拒绝", async () => {
 	const base = await fixture();
-	const local = replace(base, "outline/story/vol-0001/beat-0002.md", "亲手焚毁密信", "主动焚毁密信");
-	const cloud = replace(base, "outline/story/vol-0001/beat-0002.md", "亲手焚毁密信", "当众焚毁密信");
+	const local = replace(base, "outline/story/vol-0001/beat-0002.md", "亲手焚毁火船", "主动焚毁火船");
+	const cloud = replace(base, "outline/story/vol-0001/beat-0002.md", "亲手焚毁火船", "当众焚毁火船");
 	const conflicted = mergeOpenStoryFiles(base, local, cloud);
 	assert.equal(conflicted.state, "conflict");
 	assert.deepEqual(

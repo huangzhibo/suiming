@@ -82,8 +82,8 @@ function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 			`schema_version: 1\nname: ${sourceId}.txt\nencoding: utf-8\n`,
 			"application/yaml; charset=utf-8",
 		),
-		text(`${root}/original.bin`, "李牧从旧档中取得密信。", "application/octet-stream"),
-		text(`${root}/material.txt`, "李牧从旧档中取得密信。\n", "text/plain; charset=utf-8"),
+		text(`${root}/original.bin`, "黄盖从旧档中取得火船。", "application/octet-stream"),
+		text(`${root}/material.txt`, "黄盖从旧档中取得火船。\n", "text/plain; charset=utf-8"),
 		text(
 			`${root}/outline/story/index.yaml`,
 			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 来源\n    beat_ids: [beat-0001]\n",
@@ -91,12 +91,12 @@ function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 		),
 		text(
 			`${root}/outline/story/vol-0001/beat-0001.md`,
-			"---\nrefs:\n  character: [李牧]\ncontracts:\n  open: [密信去向]\n---\n李牧从旧档中取得密信，材料没有交代它最终去了哪里。\n",
+			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖从旧档中取得火船，材料没有交代它最终去了哪里。\n",
 		),
-		text(`${root}/world/characters/李牧.md`, "习惯先核对证据，再决定是否公开。\n"),
+		text(`${root}/world/characters/黄盖.md`, "习惯先核对证据，再决定是否公开。\n"),
 		text(
-			`${root}/outline/contracts/密信去向.md`,
-			"---\nsubjects:\n  character: [李牧]\ndeadline: book_end\n---\n材料已经建立密信去向的期待，但当前边界尚未回答。\n",
+			`${root}/outline/contracts/火船去向.md`,
+			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
 		),
 	];
 }
@@ -156,7 +156,7 @@ function designRunGateway(
 		models: [{ id: "agent-model" }, { id: "reviewer-model" }],
 	});
 	provider.setResponses([
-		fauxAssistantMessage(fauxToolCall("write", { path: "intent/揭开真相.md", content })),
+		fauxAssistantMessage(fauxToolCall("write", { path: "intent/计谋的代价.md", content })),
 		fauxAssistantMessage(fauxToolCall("review", { layer: "design" })),
 		fauxAssistantMessage(
 			fauxToolCall("submit_review", {
@@ -168,7 +168,7 @@ function designRunGateway(
 			}),
 		),
 		fauxAssistantMessage(fauxToolCall("commit", { summary: "保存设计与审查" })),
-		fauxAssistantMessage("让公开真相的代价当场可见"),
+		fauxAssistantMessage("让公开诈降当场可见"),
 	]);
 	const models = createModels();
 	models.setProvider(provider.provider);
@@ -186,7 +186,7 @@ function sourceReadGateway(): ModelGateway {
 		provider: providerId,
 		models: [{ id: "agent-model" }, { id: "reviewer-model" }, { id: "source-reader-model" }],
 	});
-	const total = [..."访谈记录：李牧先核对密信。\n"].length;
+	const total = [..."访谈记录：黄盖先核对火船。\n"].length;
 	provider.setResponses([
 		fauxAssistantMessage(fauxToolCall("read_source", { sourceId: "访谈", start: 0, end: total })),
 		fauxAssistantMessage(fauxToolCall("source_coverage", { sourceId: "访谈" })),
@@ -229,12 +229,12 @@ function sourceExtractGateway(): ModelGateway {
 		),
 		write(
 			"source/访谈/outline/story/vol-0001/beat-0001.md",
-			"---\nrefs:\n  character: [李牧]\n  resource: [密信]\n---\n访谈记录李牧先核对密信，再决定如何处理。\n",
+			"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\n---\n访谈记录黄盖先核对火船，再决定如何处理。\n",
 		),
-		write("source/访谈/world/characters/李牧.md", "处理密信前先核对证据的人。\n"),
-		write("source/访谈/world/resources/密信.md", "李牧核对的信件。\n"),
+		write("source/访谈/world/characters/黄盖.md", "处理火船前先核对证据的人。\n"),
+		write("source/访谈/world/resources/火船.md", "黄盖核对的信件。\n"),
 		fauxAssistantMessage(fauxToolCall("commit", { summary: "保存 extraction" })),
-		fauxAssistantMessage("把访谈抽取为李牧核对密信的事件。"),
+		fauxAssistantMessage("把访谈抽取为黄盖核对火船的事件。"),
 	]);
 	const models = createModels();
 	models.setProvider(provider.provider);
@@ -293,7 +293,7 @@ function writeRunGateway(): ModelGateway {
 		fauxAssistantMessage(
 			fauxToolCall("write", {
 				path: "text/beat-0001.md",
-				content: "李牧走入皇档。\n\n他在尘封木匣里找到了密信。\n",
+				content: "黄盖走入赤壁。\n\n他在尘封木匣里找到了火船。\n",
 			}),
 		),
 		fauxAssistantMessage(fauxToolCall("commit", { summary: "采用正文" })),
@@ -315,7 +315,7 @@ test("suim source ingest 原子导入本地文本并拒绝覆盖同名 Source", 
 	const inputRoot = await mkdtemp(join(tmpdir(), "suiming-source-input-"));
 	const inputPath = join(inputRoot, "访谈.txt");
 	try {
-		await writeFile(inputPath, "访谈记录：李牧先核对密信。\n");
+		await writeFile(inputPath, "访谈记录：黄盖先核对火船。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
 		const ingested = await jsonCommand(checkoutPath, [
 			"source",
@@ -334,7 +334,7 @@ test("suim source ingest 原子导入本地文本并拒绝覆盖同名 Source", 
 		assert.equal((ingested.value.data as { source: { state: string; name: string } }).source.name, "访谈.txt");
 		assert.equal(
 			await readFile(join(checkoutPath, "source", "访谈", "material.txt"), "utf8"),
-			"访谈记录：李牧先核对密信。\n",
+			"访谈记录：黄盖先核对火船。\n",
 		);
 		// 读材料、抽取、独立审查都是对 Agent 说一句话；前两件它自己做，审查才委派一个 Reviewer。
 		for (const [text, models, taskKinds] of [
@@ -392,7 +392,7 @@ test("上一个进程崩溃留下的 running session：下一次 suim 打开时�
 	const inputRoot = await mkdtemp(join(tmpdir(), "suiming-session-recovery-"));
 	const inputPath = join(inputRoot, "访谈.txt");
 	try {
-		await writeFile(inputPath, "访谈记录：李牧先核对密信。\n");
+		await writeFile(inputPath, "访谈记录：黄盖先核对火船。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
 		assert.equal(
 			(await jsonCommand(checkoutPath, ["source", "ingest", inputPath, "--id", "访谈"])).exitCode,
@@ -469,7 +469,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 		assert.equal(searched.value.command, "read.search");
 		assert.deepEqual(
 			(searched.value.data as { hits: { path: string }[] }).hits.map((hit) => hit.path),
-			["world/characters/李牧.md"],
+			["world/characters/黄盖.md"],
 		);
 
 		const sources = await jsonCommand(checkoutPath, ["source", "list"]);
@@ -484,7 +484,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 			[["原作", "extracted"]],
 		);
 
-		const ran = await jsonCommand(checkoutPath, ["session", "send", "让公开真相的代价当场可见"], designRunGateway());
+		const ran = await jsonCommand(checkoutPath, ["session", "send", "让公开诈降当场可见"], designRunGateway());
 		assert.equal(ran.exitCode, 0, JSON.stringify(ran.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, ran.value.data));
 		const sessionId = (ran.value.data as { session: { id: string } }).session.id;
@@ -516,7 +516,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 		);
 		assert.equal(written.exitCode, 0, JSON.stringify(written.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, written.value.data));
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，亲手把唯一的密信送进火里。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，亲手把唯一的火船送进火里。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, 0);
 		const reviewed = await jsonCommand(
 			checkoutPath,
@@ -575,7 +575,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 
 		const beatPath = join(checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
 		const beat = await readFile(beatPath, "utf8");
-		await writeFile(beatPath, beat.replace("亲手焚毁密信", "亲手焚毁唯一密信"));
+		await writeFile(beatPath, beat.replace("亲手焚毁火船", "亲手焚毁唯一火船"));
 
 		const diff = await jsonCommand(checkoutPath, ["diff"]);
 		assert.equal(diff.exitCode, SUIM_CLI_EXIT.success);
@@ -693,7 +693,7 @@ test("Cloud CLI 只同步 committed revision，并贯通 import、link、push、
 		const peerUnlinked = await jsonCommand(peerPath, ["cloud", "unlink", "--actor", cloud.actorId], undefined, cloud);
 		assert.equal(peerUnlinked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(peerUnlinked.value));
 
-		const intentPath = join(primaryPath, "intent", "揭开真相.md");
+		const intentPath = join(primaryPath, "intent", "计谋的代价.md");
 		await writeFile(intentPath, `${await readFile(intentPath, "utf8")}\n本地追加约束。\n`);
 		assert.equal((await jsonCommand(primaryPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const pushed = await jsonCommand(
@@ -719,7 +719,7 @@ test("Cloud CLI 只同步 committed revision，并贯通 import、link、push、
 			JSON.stringify(checkedOut.value.data),
 		);
 
-		const characterPath = join(checkoutPath, "world", "characters", "李牧.md");
+		const characterPath = join(checkoutPath, "world", "characters", "黄盖.md");
 		await writeFile(characterPath, `${await readFile(characterPath, "utf8")}\nCloud checkout 追加事实。\n`);
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const checkoutPush = await jsonCommand(
@@ -740,7 +740,7 @@ test("Cloud CLI 只同步 committed revision，并贯通 import、link、push、
 		const pulled = await jsonCommand(primaryPath, ["cloud", "pull", "--actor", cloud.actorId], undefined, cloud);
 		assert.equal(pulled.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(pulled.value));
 		assert.equal(Value.Check(SuimCliCloudSyncDataSchema, pulled.value.data), true);
-		assert.match(await readFile(join(primaryPath, "world", "characters", "李牧.md"), "utf8"), /Cloud checkout/u);
+		assert.match(await readFile(join(primaryPath, "world", "characters", "黄盖.md"), "utf8"), /Cloud checkout/u);
 
 		const unlinked = await jsonCommand(primaryPath, ["cloud", "unlink", "--actor", cloud.actorId], undefined, cloud);
 		assert.equal(unlinked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(unlinked.value));
@@ -779,7 +779,7 @@ test("suim 退出时统一由 shutdown 导出并关闭观测实例，成功与�
 		const ok = harness(checkoutPath, designRunGateway());
 		ok.io.telemetry = telemetry;
 		assert.equal(
-			await runSuimCli(["--json", "session", "send", "让公开真相的代价当场可见"], ok.io),
+			await runSuimCli(["--json", "session", "send", "让公开诈降当场可见"], ok.io),
 			SUIM_CLI_EXIT.success,
 			ok.stdout.join(""),
 		);
@@ -801,13 +801,13 @@ test("确定性校验失败、project lock、缺失项目和 usage 使用稳定�
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init", checkoutPath])).exitCode, SUIM_CLI_EXIT.success);
 		await writeFile(
-			join(checkoutPath, "world", "characters", "李牧.md"),
-			"---\nname: 李牧\nfamily:\n  parent: [不存在的人]\n---\n错误引用。\n",
+			join(checkoutPath, "world", "characters", "黄盖.md"),
+			"---\nname: 黄盖\nfamily:\n  parent: [不存在的人]\n---\n错误引用。\n",
 		);
 		const firstBeat = join(checkoutPath, "outline", "story", "vol-0001", "beat-0001.md");
 		await writeFile(
 			firstBeat,
-			(await readFile(firstBeat, "utf8")).replace("character: [李牧]", "character: [李牧, 无名氏]"),
+			(await readFile(firstBeat, "utf8")).replace("character: [黄盖]", "character: [黄盖, 无名氏]"),
 		);
 		const invalid = await jsonCommand(checkoutPath, ["check"]);
 		assert.equal(invalid.exitCode, SUIM_CLI_EXIT.validation);
@@ -819,7 +819,7 @@ test("确定性校验失败、project lock、缺失项目和 usage 使用稳定�
 		// 两处注入的问题都在，引用坏人物的级联问题也一并列出
 		assert.ok(
 			reported.some(
-				(item) => item.path === "world/characters/李牧.md" && item.message.includes("/frontmatter/family"),
+				(item) => item.path === "world/characters/黄盖.md" && item.message.includes("/frontmatter/family"),
 			),
 		);
 		assert.ok(
@@ -861,10 +861,7 @@ test("设计能绑定但 Checker 不通过时，check 成功返回逐条诊断�
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init", checkoutPath])).exitCode, SUIM_CLI_EXIT.success);
 		const beatPath = join(checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
-		await writeFile(
-			beatPath,
-			(await readFile(beatPath, "utf8")).replace("contracts:\n  resolve: [真相的代价]\n", ""),
-		);
+		await writeFile(beatPath, (await readFile(beatPath, "utf8")).replace("contracts:\n  resolve: [诈降]\n", ""));
 		const checked = await jsonCommand(checkoutPath, ["check"]);
 		assert.equal(checked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(checked.value));
 		assert.equal(Value.Check(SuimCliSuccessSchema, checked.value), true);
@@ -878,12 +875,12 @@ test("设计能绑定但 Checker 不通过时，check 成功返回逐条诊断�
 		const errors = data.diagnostics.filter((item) => item.severity === "error");
 		assert.equal(errors.length > 0, true);
 		assert.ok(
-			errors.some((item) => item.message.includes("真相的代价")),
+			errors.some((item) => item.message.includes("诈降")),
 			JSON.stringify(errors),
 		);
 
 		// 作者声明全书未完待续：期限是 book_end 的期待建立了还没回应，算进行中
-		const contractPath = join(checkoutPath, "outline", "contracts", "真相的代价.md");
+		const contractPath = join(checkoutPath, "outline", "contracts", "诈降.md");
 		await writeFile(
 			contractPath,
 			(await readFile(contractPath, "utf8")).replace("deadline: beat-0002", "deadline: book_end"),
@@ -907,7 +904,7 @@ test("作者未提交的修改与 Agent 的改动是同一份候选：一次 com
 	const checkoutPath = await fixture();
 	try {
 		await jsonCommand(checkoutPath, ["init"]);
-		const characterPath = join(checkoutPath, "world/characters/李牧.md");
+		const characterPath = join(checkoutPath, "world/characters/黄盖.md");
 		const original = await readFile(characterPath, "utf8");
 		await writeFile(characterPath, `${original}作者补的一句：他记得每一笔账。\n`);
 		const providerId = "suiming-cli-shared-candidate-faux";
@@ -918,8 +915,8 @@ test("作者未提交的修改与 Agent 的改动是同一份候选：一次 com
 		provider.setResponses([
 			fauxAssistantMessage(
 				fauxToolCall("write", {
-					path: "intent/揭开真相.md",
-					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开真相的代价当场可见。\n",
+					path: "intent/计谋的代价.md",
+					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开诈降当场可见。\n",
 				}),
 			),
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "完善设计" })),
@@ -944,7 +941,7 @@ test("作者未提交的修改与 Agent 的改动是同一份候选：一次 com
 		const diff = await jsonCommand(checkoutPath, ["diff"]);
 		assert.deepEqual((diff.value.data as { entries: unknown[] }).entries, []);
 		assert.match(await readFile(characterPath, "utf8"), /他记得每一笔账/);
-		assert.match(await readFile(join(checkoutPath, "intent/揭开真相.md"), "utf8"), /当场可见/);
+		assert.match(await readFile(join(checkoutPath, "intent/计谋的代价.md"), "utf8"), /当场可见/);
 		const history = await jsonCommand(checkoutPath, ["history"]);
 		assert.equal((history.value.data as { revisions: unknown[] }).revisions.length, 2);
 	} finally {
@@ -984,9 +981,8 @@ test("另一个 CLI 用 session send --session 往进行中的 session 补一句
 					last?.role === "user" && typeof last.content === "string" && last.content.includes("失去行医资格");
 				return fauxAssistantMessage(
 					fauxToolCall("write", {
-						path: "intent/揭开真相.md",
-						content:
-							"---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开真相的代价是当场失去行医资格。\n",
+						path: "intent/计谋的代价.md",
+						content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开诈降是当场失去行医资格。\n",
 					}),
 				);
 			},
@@ -1001,7 +997,7 @@ test("另一个 CLI 用 session send --session 往进行中的 session 补一句
 				reviewer: { provider: providerId, model: "reviewer-model" },
 			},
 		});
-		const ran = await jsonCommand(checkoutPath, ["session", "send", "让公开真相的代价当场可见"], gateway);
+		const ran = await jsonCommand(checkoutPath, ["session", "send", "让公开诈降当场可见"], gateway);
 		assert.equal(ran.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(ran.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, ran.value.data));
 		const data = ran.value.data as { session: { id: string; turn: number }; reply: string };
@@ -1049,11 +1045,11 @@ test("suim session send 收到 SIGINT：run_interrupted、exit 7、session 回 i
 			},
 			fauxAssistantMessage(
 				fauxToolCall("write", {
-					path: "intent/揭开真相.md",
-					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开真相的代价当场可见。\n",
+					path: "intent/计谋的代价.md",
+					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开诈降当场可见。\n",
 				}),
 			),
-			fauxAssistantMessage(fauxToolCall("commit", { summary: "让公开真相的代价当场可见" })),
+			fauxAssistantMessage(fauxToolCall("commit", { summary: "让公开诈降当场可见" })),
 			fauxAssistantMessage("代价当场可见。"),
 		]);
 		const models = createModels();
@@ -1065,7 +1061,7 @@ test("suim session send 收到 SIGINT：run_interrupted、exit 7、session 回 i
 			},
 		});
 		cli.io.resolveModelGateway = async () => gateway;
-		const exitCode = await runSuimCli(["--json", "session", "send", "让公开真相的代价当场可见"], cli.io);
+		const exitCode = await runSuimCli(["--json", "session", "send", "让公开诈降当场可见"], cli.io);
 		const value = response(cli.stdout);
 		assert.equal(interrupted, true);
 		assert.equal(value.ok, false, JSON.stringify(value));
@@ -1128,8 +1124,8 @@ test("host 领域命令：text check、design impact、context compile、review 
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
 		await mkdir(join(checkoutPath, "text"), { recursive: true });
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "李牧走入皇档，在木匣中找到密信。\n");
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的密信送进火里。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的火船送进火里。\n");
 
 		const checked = await jsonCommand(checkoutPath, ["text", "check", "beat-0001"]);
 		assert.equal(checked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(checked.value));
@@ -1142,7 +1138,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 		assert.equal((checked.value.data as { passed: boolean }).passed, true);
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 
-		const impact = await jsonCommand(checkoutPath, ["design", "impact", "character:李牧"]);
+		const impact = await jsonCommand(checkoutPath, ["design", "impact", "character:黄盖"]);
 		assert.equal(impact.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(impact.value));
 		assert.equal(Value.Check(SuimCliDesignImpactDataSchema, impact.value.data), true, JSON.stringify(impact.value));
 		assert.deepEqual((impact.value.data as { impact: { storyBeatIds: string[] } }).impact.storyBeatIds, [
@@ -1176,7 +1172,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 			draftPath,
 			JSON.stringify({
 				verdict: "pass",
-				summary: "beat-0001 的正文兑现了取得密信的过程。",
+				summary: "beat-0001 的正文兑现了取得火船的过程。",
 				findings: [],
 				uncovered: [],
 				uncertainties: [],
@@ -1213,7 +1209,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 		assert.ok(listedReview);
 		assert.equal(listedReview.current, true);
 		// 改了被审正文再提交：审稿还在，但不再 current。
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "李牧走入皇档。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const relisted = await jsonCommand(checkoutPath, ["review", "list"]);
 		assert.equal(
@@ -1437,7 +1433,7 @@ test("design impact --source 查 Source 的抽取：回头修前文时召回得�
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
 		const inputPath = join(checkoutPath, "访谈.txt");
-		await writeFile(inputPath, "第一段。李牧找到密信。\n", "utf8");
+		await writeFile(inputPath, "第一段。黄盖找到火船。\n", "utf8");
 		assert.equal(
 			(await jsonCommand(checkoutPath, ["source", "ingest", inputPath, "--id", "访谈"])).exitCode,
 			SUIM_CLI_EXIT.success,
@@ -1447,14 +1443,14 @@ test("design impact --source 查 Source 的抽取：回头修前文时召回得�
 				"outline/story/index.yaml",
 				"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 访谈\n    beat_ids: [beat-0001]\n",
 			],
-			["outline/story/vol-0001/beat-0001.md", "---\nrefs:\n  character: [李牧]\n---\n李牧找到密信。\n"],
-			["world/characters/李牧.md", "先核对证据再决定是否公开的人。\n"],
+			["outline/story/vol-0001/beat-0001.md", "---\nrefs:\n  character: [黄盖]\n---\n黄盖找到火船。\n"],
+			["world/characters/黄盖.md", "先核对证据再决定是否公开的人。\n"],
 		];
 		for (const [path, content] of files) {
 			await mkdir(dirname(join(checkoutPath, "source", "访谈", path)), { recursive: true });
 			await writeFile(join(checkoutPath, "source", "访谈", path), content, "utf8");
 		}
-		const impact = await jsonCommand(checkoutPath, ["design", "impact", "character:李牧", "--source", "访谈"]);
+		const impact = await jsonCommand(checkoutPath, ["design", "impact", "character:黄盖", "--source", "访谈"]);
 		assert.equal(impact.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(impact.value));
 		assert.equal(Value.Check(SuimCliDesignImpactDataSchema, impact.value.data), true, JSON.stringify(impact.value));
 		const result = (impact.value.data as { impact: { storyBeatIds: string[]; paths: string[] } }).impact;
@@ -1469,7 +1465,7 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 	const checkoutPath = await fixture();
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
-		const material = "第一段。李牧找到密信。\n第二段。他去见旧友。\n";
+		const material = "第一段。黄盖找到火船。\n第二段。他去见旧友。\n";
 		const inputPath = join(checkoutPath, "访谈.txt");
 		await writeFile(inputPath, material, "utf8");
 		assert.equal(
@@ -1504,7 +1500,7 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 		await mkdir(join(checkoutPath, "source", "访谈", "notes"), { recursive: true });
 		await writeFile(
 			join(checkoutPath, "source", "访谈", "notes", "1.md"),
-			`---\nspan: [0, ${total}]\nmaterial_sha256: ${data.source.materialSha256}\n---\n李牧找到密信后去见旧友。\n`,
+			`---\nspan: [0, ${total}]\nmaterial_sha256: ${data.source.materialSha256}\n---\n黄盖找到火船后去见旧友。\n`,
 			"utf8",
 		);
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
@@ -1528,14 +1524,14 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 		);
 		await writeFile(
 			join(checkoutPath, "source", "访谈", "outline", "story", "vol-0001", "beat-0001.md"),
-			"---\ntitle: 访旧友\n---\n李牧拿着密信去见旧友，核对来历。\n",
+			"---\ntitle: 访旧友\n---\n黄盖拿着火船去见旧友，核对来历。\n",
 		);
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const review = await jsonCommand(checkoutPath, ["context", "compile", "review:source:访谈"]);
 		assert.equal(review.exitCode, SUIM_CLI_EXIT.success, "读完并提交抽取后 Source Review 可编译");
 		const reviewText = (review.value.data as { text: string }).text;
-		assert.ok(reviewText.includes("李牧找到密信后去见旧友。"));
-		assert.ok(reviewText.includes("李牧拿着密信去见旧友，核对来历。"));
+		assert.ok(reviewText.includes("黄盖找到火船后去见旧友。"));
+		assert.ok(reviewText.includes("黄盖拿着火船去见旧友，核对来历。"));
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 	}
@@ -1585,8 +1581,8 @@ test("suim run rank：多版候选文件匿名交给评委，输出合并名次�
 		await mkdir(join(checkoutPath, ".suim-host"), { recursive: true });
 		const first = join(checkoutPath, ".suim-host", "flash.md");
 		const second = join(checkoutPath, ".suim-host", "pro.md");
-		await writeFile(first, "李牧推开皇档的门。\n", "utf8");
-		await writeFile(second, "皇档的门吱呀一声。\n", "utf8");
+		await writeFile(first, "黄盖推开赤壁的门。\n", "utf8");
+		await writeFile(second, "赤壁的门吱呀一声。\n", "utf8");
 		const ranked = await jsonCommand(
 			checkoutPath,
 			["rank", "beat-0001", "--candidate", first, second, "--goal", "看谁更像人在现场"],

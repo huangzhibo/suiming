@@ -100,7 +100,7 @@ if (process.argv.includes("--workspace-callback-test")) {
 provider.setResponses([
 	async () => {
 		await new Promise((resolve) => setTimeout(resolve, 1200));
-		return fauxAssistantMessage("主角要公开密信，还是暂时保留？");
+		return fauxAssistantMessage("主角要公开火船，还是暂时保留？");
 	},
 	fauxAssistantMessage(fauxToolCall("commit", { summary: "提交设计" })),
 	fauxAssistantMessage(fauxToolCall("write_context", { storyBeatId: "beat-0001" })),
@@ -108,7 +108,7 @@ provider.setResponses([
 		fauxToolCall("write", {
 			path: "text/beat-0001.md",
 			content:
-				"李牧推开皇档的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走密信之后，自己就再没有可以讨价还价的东西。\n\n他还是伸手取了。",
+				"黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走火船之后，自己就再没有可以讨价还价的东西。\n\n他还是伸手取了。",
 		}),
 	),
 	fauxAssistantMessage(fauxToolCall("commit", { summary: "采用第一场正文" })),
@@ -156,9 +156,9 @@ if (process.argv.includes("--composer-test"))
 	provider.setResponses([
 		async () => {
 			await new Promise((resolve) => setTimeout(resolve, 700));
-			return fauxAssistantMessage("需要公开密信吗？");
+			return fauxAssistantMessage("需要公开火船吗？");
 		},
-		fauxAssistantMessage("对话回看测试。李牧在封蜡前停了一下，仍决定公开密信。\n\n".repeat(120)),
+		fauxAssistantMessage("对话回看测试。黄盖在封蜡前停了一下，仍决定公开火船。\n\n".repeat(120)),
 	]);
 // 选段就地修改：模型读正文、只改选中的那句，再回一句改了什么
 if (process.argv.includes("--selection-edit-test"))
@@ -167,8 +167,8 @@ if (process.argv.includes("--selection-edit-test"))
 		fauxAssistantMessage(
 			fauxToolCall("edit", {
 				path: "text/beat-0001.md",
-				oldText: "李牧推开皇档的门。",
-				newText: "李牧在皇档门前停了一下，才推开门。",
+				oldText: "黄盖推开赤壁的门。",
+				newText: "黄盖在赤壁门前停了一下，才推开门。",
 			}),
 		),
 		fauxAssistantMessage("改好了：推门前先停了一下，其余没动。"),
@@ -185,11 +185,11 @@ if (process.argv.includes("--conversation-test")) {
 			return fauxAssistantMessage("停止没有生效");
 		}
 		if (!encoded.includes("继续分析这个选择")) throw new Error("停止前那句不见了");
-		return fauxAssistantMessage("接着停下前的分析：他公开密信，是在赌朝廷还肯认旧案。");
+		return fauxAssistantMessage("接着停下前的分析：他公开火船，是在赌朝廷还肯认旧案。");
 	};
 	provider.setResponses([
 		fauxAssistantMessage(fauxToolCall("read", { path: "outline/story/vol-0001/beat-0001.md" })),
-		fauxAssistantMessage("可以让李牧主动公开密信，把失去谈判筹码作为代价。先讨论这个选择，不修改作品。"),
+		fauxAssistantMessage("可以让黄盖主动公开火船，把失去谈判筹码作为代价。先讨论这个选择，不修改作品。"),
 		async (context) => {
 			if (!JSON.stringify(context.messages).includes("把失去谈判筹码作为代价")) throw new Error("追问缺少前文");
 			return fauxAssistantMessage(
@@ -235,7 +235,7 @@ if (modelTest) {
 }
 if (process.argv.includes("--telemetry-test"))
 	provider.setResponses([
-		fauxAssistantMessage(fauxToolCall("read", { path: "intent/揭开真相.md" })),
+		fauxAssistantMessage(fauxToolCall("read", { path: "intent/计谋的代价.md" })),
 		fauxAssistantMessage("Synthetic desktop telemetry probe"),
 	]);
 if (process.argv.includes("--product-audit-test")) {

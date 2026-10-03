@@ -15,7 +15,7 @@ test("suiming.turn：turn 结束对账按 schema 校验，多一个字段或少�
 	const valid = {
 		authorMessages: 2,
 		changed: {
-			intent: { count: 1, paths: ["intent/揭开真相.md"] },
+			intent: { count: 1, paths: ["intent/计谋的代价.md"] },
 			design: none,
 			text: none,
 			review: none,

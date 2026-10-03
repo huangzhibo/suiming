@@ -59,7 +59,7 @@ function gateway(responses: Responses): ModelGateway {
 }
 
 const material =
-	"第一段。李牧在皇档的木匣里找到密信，决定先不公开。\n第二段。他把密信藏在袖中，去见旧友。\n第三段。旧友劝他烧掉密信，他没有答应。\n";
+	"第一段。黄盖在赤壁的木匣里找到火船，决定先不公开。\n第二段。他把火船藏在袖中，去见旧友。\n第三段。旧友劝他烧掉火船，他没有答应。\n";
 const total = [...material].length;
 
 const extractionFiles: Array<[string, string]> = [
@@ -69,18 +69,18 @@ const extractionFiles: Array<[string, string]> = [
 	],
 	[
 		"source/访谈/outline/story/vol-0001/beat-0001.md",
-		"---\nrefs:\n  character: [李牧]\n  resource: [密信]\ncontracts:\n  open: [密信去向]\nchanges:\n  world:\n    密信.holder: 李牧\n---\n李牧在皇档找到密信，决定先不公开。\n",
+		"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\ncontracts:\n  open: [火船去向]\nchanges:\n  world:\n    火船.holder: 黄盖\n---\n黄盖在赤壁找到火船，决定先不公开。\n",
 	],
 	[
 		"source/访谈/outline/story/vol-0001/beat-0002.md",
-		"---\nrefs:\n  character: [李牧, 旧友]\n  resource: [密信]\n  beat: [beat-0001]\ncontracts:\n  advance: [密信去向]\n---\n旧友劝李牧烧掉密信，他没有答应。\n",
+		"---\nrefs:\n  character: [黄盖, 旧友]\n  resource: [火船]\n  beat: [beat-0001]\ncontracts:\n  advance: [火船去向]\n---\n旧友劝黄盖烧掉火船，他没有答应。\n",
 	],
-	["source/访谈/world/characters/李牧.md", "先核对证据再决定是否公开的人。\n"],
-	["source/访谈/world/characters/旧友.md", "劝李牧销毁证据的旧相识。\n"],
-	["source/访谈/world/resources/密信.md", "能证明旧案的信件。\n"],
+	["source/访谈/world/characters/黄盖.md", "先核对证据再决定是否公开的人。\n"],
+	["source/访谈/world/characters/旧友.md", "劝黄盖销毁证据的旧相识。\n"],
+	["source/访谈/world/resources/火船.md", "能证明旧案的信件。\n"],
 	[
-		"source/访谈/outline/contracts/密信去向.md",
-		"---\nsubjects:\n  character: [李牧]\n  resource: [密信]\ndeadline: book_end\n---\n材料建立了密信最终去向的期待，边界内尚未回答。\n",
+		"source/访谈/outline/contracts/火船去向.md",
+		"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: book_end\n---\n材料建立了火船最终去向的期待，边界内尚未回答。\n",
 	],
 ];
 
@@ -149,7 +149,7 @@ function reading(): Responses {
 			const { materialSha256 } = JSON.parse(lastToolText(context)) as { materialSha256: string };
 			return call("write", {
 				path: "source/访谈/notes/1.md",
-				content: note(materialSha256, [0, total], "李牧找到密信，拒绝烧毁。"),
+				content: note(materialSha256, [0, total], "黄盖找到火船，拒绝烧毁。"),
 			});
 		},
 		call("commit", { summary: "采用材料笔记" }),
@@ -221,10 +221,10 @@ test("委派的 source-reader 自己写笔记，但只能写这个 Source 的 no
 						const { materialSha256 } = JSON.parse(lastToolText(context)) as { materialSha256: string };
 						return call("write", {
 							path: "source/访谈/notes/1.md",
-							content: note(materialSha256, [0, total], "李牧找到密信，拒绝烧毁。"),
+							content: note(materialSha256, [0, total], "黄盖找到火船，拒绝烧毁。"),
 						});
 					},
-					call("write", { path: "source/访谈/world/characters/李牧.md", content: "越界写抽取。\n" }),
+					call("write", { path: "source/访谈/world/characters/黄盖.md", content: "越界写抽取。\n" }),
 					(context) => {
 						results.push(lastToolText(context));
 						return call("submit_task", { summary: "笔记已写在 source/访谈/notes/1.md" });
@@ -299,23 +299,23 @@ test("现成的分段：在章标题处切成不超过上限的几段，号段�
 test("按字找原文：命中给码点区间与前后文，区间能直接交给 read_source 或当审稿锚点；Agent 与 Source Reviewer 都有", async () => {
 	// 2026-10-02 审查：Agent、抽取者与 Source Reviewer 只能按码点区间盲读，核对一条主张要在 30 万码点里一段段翻；
 	// host 一条 rg 就到。
-	const text = "开头😀密信在此。中间。又见密信。";
+	const text = "开头😀火船在此。中间。又见火船。";
 	const found = findInMaterial(
 		{ sourceId: "x", identity: { kind: "source-material" } as never, text, codePoints: [...text].length, sha256: "" },
-		"密信",
+		"火船",
 		1,
 	);
 	assert.equal(found.total, 2);
 	assert.equal(found.hits.length, 1, "只列前 limit 处，总数如实给");
 	assert.deepEqual([found.hits[0]?.start, found.hits[0]?.end], [3, 5], "码点而不是 UTF-16 下标");
-	assert.equal(sliceCodePoints(text, found.hits[0]?.start ?? 0, found.hits[0]?.end ?? 0), "密信");
+	assert.equal(sliceCodePoints(text, found.hits[0]?.start ?? 0, found.hits[0]?.end ?? 0), "火船");
 	await withProject(async (project) => {
 		const results: string[] = [];
 		const outcome = await say(
 			new SuimingHarness({
 				project,
 				models: gateway([
-					call("search_source", { sourceId: "访谈", query: "密信" }),
+					call("search_source", { sourceId: "访谈", query: "火船" }),
 					(context) => {
 						results.push(lastToolText(context));
 						const [, start, end] = /\[(\d+), (\d+)\)/u.exec(lastToolText(context)) ?? [];
@@ -327,11 +327,11 @@ test("按字找原文：命中给码点区间与前后文，区间能直接交�
 					},
 				]),
 			}),
-			"原文哪里提到密信",
+			"原文哪里提到火船",
 		);
 		assert.equal(outcome.failure, undefined);
 		assert.match(results[0] ?? "", /共 3 处/u);
-		assert.match(results[1] ?? "", /\n\n密信$/u);
+		assert.match(results[1] ?? "", /\n\n火船$/u);
 	});
 	const { reviewerSystemPrompt } = await import("../src/harness/review-context.js");
 	assert.match(reviewerSystemPrompt("source"), /search_material/u);
@@ -379,7 +379,7 @@ test("抽取写到一半、Source Design 有格式错误时，委派的子任务
 						path,
 						content.replace(
 							"contracts:",
-							"changes:\n  character:\n    李牧:\n      密信.holder: 旧友\ncontracts:",
+							"changes:\n  character:\n    黄盖:\n      火船.holder: 旧友\ncontracts:",
 						),
 					]
 				: [path, content],
@@ -393,7 +393,7 @@ test("抽取写到一半、Source Design 有格式错误时，委派的子任务
 			new SuimingHarness({
 				project,
 				models: gateway([
-					call("delegate", { profile: "main", goal: "核对李牧在材料里的原话" }),
+					call("delegate", { profile: "main", goal: "核对黄盖在材料里的原话" }),
 					call("read_source", { sourceId: "访谈", start: 0, end: total }),
 					(context) => {
 						results.push(lastToolText(context));
@@ -401,7 +401,7 @@ test("抽取写到一半、Source Design 有格式错误时，委派的子任务
 					},
 					(context) => {
 						results.push(lastToolText(context));
-						return call("submit_task", { summary: "李牧拒绝烧信" });
+						return call("submit_task", { summary: "黄盖拒绝烧信" });
 					},
 					call("check", {}),
 					(context) => {
@@ -410,7 +410,7 @@ test("抽取写到一半、Source Design 有格式错误时，委派的子任务
 					},
 				]),
 			}),
-			"核对一下李牧的原话",
+			"核对一下黄盖的原话",
 		);
 		assert.equal(outcome.failure, undefined);
 		assert.equal(results[0], `Source "访谈" [0, ${total})，全文 ${total} 码点。\n\n${material}`);
@@ -530,7 +530,7 @@ test("委派的 source-reader 与 source-extractor：Reader 判断标准与 host
 					call("delegate", { profile: "source-reader", sourceId: "访谈", goal: "读全文写笔记" }),
 					(context) => {
 						capture(context);
-						return call("read", { path: "intent/揭开真相.md" });
+						return call("read", { path: "intent/计谋的代价.md" });
 					},
 					(context) => {
 						results.push(lastToolText(context));
@@ -689,12 +689,12 @@ test("Source 审稿锚在抽取文件上的 finding 可以引原作：「抽取�
 				revision: "candidate",
 				draft: {
 					verdict: "revise",
-					summary: "旧友的人物档漏了他劝烧密信。",
+					summary: "旧友的人物档漏了他劝烧火船。",
 					findings: [
 						{
 							severity: "minor",
 							anchor: { kind: "artifact", path: "source/访谈/world/characters/旧友.md" },
-							issue: "人物档没写他劝李牧烧掉密信。",
+							issue: "人物档没写他劝黄盖烧掉火船。",
 							evidence,
 							repairLayer: layer,
 						},
@@ -703,14 +703,14 @@ test("Source 审稿锚在抽取文件上的 finding 可以引原作：「抽取�
 					uncertainties: [],
 				},
 			});
-		assert.doesNotThrow(() => compose("「旧友劝他烧掉密信，他没有答应。」"), "引原作");
+		assert.doesNotThrow(() => compose("「旧友劝他烧掉火船，他没有答应。」"), "引原作");
 		assert.doesNotThrow(
-			() => compose("档里写「劝李牧销毁证据的旧相识」，原作是「旧友劝他烧掉密信」"),
+			() => compose("档里写「劝黄盖销毁证据的旧相识」，原作是「旧友劝他烧掉火船」"),
 			"两边各引一句",
 		);
 		const quoteMissing = (error: unknown) => (error as { code?: string }).code === "review_quote_not_found";
-		assert.throws(() => compose("「旧友亲手烧掉了密信」"), quoteMissing, "两边都没有的转述照样拒绝");
-		assert.throws(() => compose("「旧友劝他烧掉密信」", "design"), quoteMissing, "只有 Source 层能引原作");
+		assert.throws(() => compose("「旧友亲手烧掉了火船」"), quoteMissing, "两边都没有的转述照样拒绝");
+		assert.throws(() => compose("「旧友劝他烧掉火船」", "design"), quoteMissing, "只有 Source 层能引原作");
 	});
 });
 
@@ -776,9 +776,9 @@ test("impact 与 search 也查 Source 的抽取：读到后文要回头修人物
 			await writeFile(join(checkoutPath, path), content);
 		}
 		const candidate = await project.checkoutCandidate();
-		const person = storyImpact(candidate, { kind: "character", id: "李牧" }, "访谈");
+		const person = storyImpact(candidate, { kind: "character", id: "黄盖" }, "访谈");
 		assert.deepEqual(person.storyBeatIds, ["beat-0001", "beat-0002"]);
-		assert.ok(person.paths.includes("source/访谈/world/characters/李牧.md"));
+		assert.ok(person.paths.includes("source/访谈/world/characters/黄盖.md"));
 		assert.ok(person.paths.includes("source/访谈/outline/story/vol-0001/beat-0001.md"));
 		assert.deepEqual(storyImpact(candidate, { kind: "beat", id: "beat-0001" }, "访谈").dependentStoryBeatIds, [
 			"beat-0002",
@@ -790,7 +790,7 @@ test("impact 与 search 也查 Source 的抽取：读到后文要回头修人物
 			new SuimingHarness({
 				project,
 				models: gateway([
-					call("impact", { subject: "resource:密信", sourceId: "访谈" }),
+					call("impact", { subject: "resource:火船", sourceId: "访谈" }),
 					(context) => {
 						results.push(lastToolText(context));
 						return call("search", { query: "旧友", sourceId: "访谈" });
@@ -806,7 +806,7 @@ test("impact 与 search 也查 Source 的抽取：读到后文要回头修人物
 					reply("好"),
 				]),
 			}),
-			"查一下密信涉及哪些节",
+			"查一下火船涉及哪些节",
 		);
 		assert.equal(outcome.failure, undefined);
 		assert.match(results[0] ?? "", /source\/访谈\/outline\/story\/vol-0001\/beat-0002\.md/u);
@@ -844,17 +844,17 @@ test("分段抽取：带 span 与 beatRange 的 source-extractor 直接读原文
 						prompt = JSON.stringify(context.messages[1]);
 						return call("write", {
 							path: beat("beat-0101"),
-							content: "---\nrefs:\n  character: [李牧]\n---\n李牧找到密信。\n",
+							content: "---\nrefs:\n  character: [黄盖]\n---\n黄盖找到火船。\n",
 						});
 					},
 					step(() => call("write", { path: beat("beat-0201"), content: "越过号段。\n" })),
 					step(() =>
-						call("write", { path: "source/访谈/world/characters/李牧.md", content: "全书对象归整合。\n" }),
+						call("write", { path: "source/访谈/world/characters/黄盖.md", content: "全书对象归整合。\n" }),
 					),
 					step(() =>
 						call("write", {
 							path: "source/访谈/notes/0101-0199.md",
-							content: note("f".repeat(64), [0, total], "李牧找到密信，拒绝烧毁。"),
+							content: note("f".repeat(64), [0, total], "黄盖找到火船，拒绝烧毁。"),
 						}),
 					),
 					step(() => call("submit_task", { summary: "这段写完" })),
@@ -896,10 +896,10 @@ test("分段抽取时还没有 index，impact 查这份 Source 是回到子任�
 					}),
 					call("write", {
 						path: "source/访谈/outline/story/vol-0001/beat-0101.md",
-						content: "---\ntitle: 收到密信\nrefs:\n  character: [李牧]\n---\n李牧收到旧友寄来的密信。\n",
+						content: "---\ntitle: 收到火船\nrefs:\n  character: [黄盖]\n---\n黄盖收到旧友寄来的火船。\n",
 					}),
 					step(() => call("impact", { subject: "beat:beat-0101", sourceId: "访谈" })),
-					step(() => call("search", { query: "密信", sourceId: "访谈" })),
+					step(() => call("search", { query: "火船", sourceId: "访谈" })),
 					step(() => call("submit_task", { summary: "写完这段" })),
 					reply("好"),
 				]),
@@ -966,7 +966,7 @@ test("补全：已有 index 时带范围的 source-extractor 拿到整份抽取�
 		assert.equal(outcome.failure, undefined);
 		assert.match(system, /补全/u);
 		assert.doesNotMatch(system, /分段抽取：/u);
-		assert.match(prompt, /旧友劝李牧烧掉密信/u, "输入里带着整份抽取");
+		assert.match(prompt, /旧友劝黄盖烧掉火船/u, "输入里带着整份抽取");
 		assert.doesNotMatch(results[0] ?? "", /permission_denied/u);
 		assert.match(results[1] ?? "", /permission_denied/u, "别的段的 Beat 列进交付，不动手");
 	});
@@ -1118,7 +1118,7 @@ test("笔记没覆盖全文时 Source Review 是回到 Agent 手里的工具错�
 					}),
 					call("write", {
 						path: "source/访谈/outline/story/vol-0001/beat-0001.md",
-						content: "---\ntitle: 密信\n---\n他拿着密信去见旧友，旧友劝他烧信。\n",
+						content: "---\ntitle: 火船\n---\n他拿着火船去见旧友，旧友劝他烧信。\n",
 					}),
 					call("review", { layer: "source", sourceId: "访谈" }),
 					passReview(),

@@ -90,7 +90,7 @@ export const storyPackageCodec: ArtifactPathCodec = {
 	 * 候选里这个 artifact 的路径。**查表，不是投影**——路径是扫描得到的事实，与 identity 一起进候选。
 	 *
 	 * 手上已经有 artifact 时直接读 `artifact.path`，不要绕这里。留着这个方法是因为 Story Language
-	 * 的引用按 localId 写（frontmatter 是 `character: [李牧]`，不是路径），解析引用只有 identity。
+	 * 的引用按 localId 写（frontmatter 是 `character: [黄盖]`，不是路径），解析引用只有 identity。
 	 * 引用可能指向不存在的 artifact，所以找不到就抛；`storyImpact` 与提交回执都已按抛错处理。
 	 */
 	pathForIdentity(identity: ArtifactIdentity, candidate: ArtifactCandidate): string {

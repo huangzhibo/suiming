@@ -42,8 +42,8 @@ function gateway(responses: Parameters<ReturnType<typeof fauxProvider>["setRespo
 }
 
 const beatOneText =
-	"李牧推开皇档的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走密信之后，自己就再没有可以讨价还价的东西。\n\n他还是伸手取了。";
-const beatTwoText = "天亮前，他在众人面前展开密信，念完最后一行，把纸送进火里。没有人拦他。";
+	"黄盖推开赤壁的门，霉味先于灯光涌出来。他知道匣子在哪一层，也知道拿走火船之后，自己就再没有可以讨价还价的东西。\n\n他还是伸手取了。";
+const beatTwoText = "天亮前，他在众人面前展开火船，念完最后一行，把纸送进火里。没有人拦他。";
 
 const call = (name: string, args: JsonObject) => fauxAssistantMessage(fauxToolCall(name, args));
 const reply = (text: string) => fauxAssistantMessage(text);
@@ -258,7 +258,7 @@ test("写正文时结果附段落数与平均段长；作品没有样章时与�
 	await withProject(async (project, checkoutPath) => {
 		// 样例作品带着一份样章；拿掉它，看没有样章时的对照
 		await rm(join(checkoutPath, "reference/style/style_contemporary_restraint.md"));
-		const intentPath = join(checkoutPath, "intent/揭开真相.md");
+		const intentPath = join(checkoutPath, "intent/计谋的代价.md");
 		await writeFile(
 			intentPath,
 			(await readFile(intentPath, "utf8")).replace(
@@ -346,7 +346,7 @@ test("作品状态点名过时的正文与审稿：Agent 的 project_status 与 
 		assert.deepEqual(fresh.stale, { texts: { count: 0, ids: [] }, reviews: { count: 0, ids: [] } });
 
 		const beat = join(checkoutPath, "outline/story/vol-0001/beat-0001.md");
-		await writeFile(beat, (await readFile(beat, "utf8")).replace("唯一密信", "唯一一封密信"));
+		await writeFile(beat, (await readFile(beat, "utf8")).replace("唯一火船", "唯一一封火船"));
 		await project.commitCheckout();
 		const after = await readProjectStatus(project, await project.checkoutCandidate());
 		assert.deepEqual(after.stale, {
@@ -357,8 +357,8 @@ test("作品状态点名过时的正文与审稿：Agent 的 project_status 与 
 });
 
 test("Write Context 与 frame 的硬状态带作用域：读者知道与人物知道分得开", async () => {
-	// 2026-10-02 审查：两处打印都只有 `subject.property = value`，读者与李牧同时得知一个秘密时打出两行一模一样的
-	// `secret:旧案真相.revealed = true`，Writer 分不出谁知道，可能让人物用上只有读者知道的事。
+	// 2026-10-02 审查：两处打印都只有 `subject.property = value`，读者与黄盖同时得知一个秘密时打出两行一模一样的
+	// `secret:苦肉计.revealed = true`，Writer 分不出谁知道，可能让人物用上只有读者知道的事。
 	const { candidateFromStoryFiles } = await import("../src/index.js");
 	const { frameTool } = await import("../src/harness/tools.js");
 	const encoder = new TextEncoder();
@@ -369,32 +369,32 @@ test("Write Context 与 frame 的硬状态带作用域：读者知道与人物�
 		mediaType: "text/markdown; charset=utf-8",
 		bytes: encoder.encode(`---
 refs:
-  character: [李牧]
-  place: [皇档]
-  resource: [密信]
-  secret: [旧案真相]
+  character: [黄盖]
+  place: [赤壁]
+  resource: [火船]
+  secret: [苦肉计]
 contracts:
-  open: [真相的代价]
+  open: [诈降]
 changes:
   world:
-    李牧.location: 皇档
+    黄盖.location: 赤壁
   reader:
-    旧案真相.revealed: true
+    苦肉计.revealed: true
   character:
-    李牧:
-      旧案真相.revealed: true
+    黄盖:
+      苦肉计.revealed: true
 ---
-李牧进入皇档，取得能证明旧案的唯一密信，也在信里读到了旧案的真相。
+黄盖进入赤壁，取得能证明旧案的唯一火船，也在信里读到了旧案的真相。
 `),
 	});
 	const candidate = candidateFromStoryFiles("r1", files);
 	const state = compileWriteContext(candidate, "beat-0002").text.split("## hard_state")[1] ?? "";
-	assert.match(state, /读者：secret:旧案真相\.revealed = true/u);
-	assert.match(state, /人物 李牧：secret:旧案真相\.revealed = true/u);
-	assert.match(state, /客观：character:李牧\.location = "place:皇档"/u);
+	assert.match(state, /读者：secret:苦肉计\.revealed = true/u);
+	assert.match(state, /人物 黄盖：secret:苦肉计\.revealed = true/u);
+	assert.match(state, /客观：character:黄盖\.location = "place:赤壁"/u);
 	const frame = frameTool(async () => candidate);
 	const result = (await frame.prepare?.({ storyBeatId: "beat-0002" })) as { content: { text: string }[] };
-	assert.match(result.content[0]?.text ?? "", /人物 李牧：secret:旧案真相\.revealed = true/u);
+	assert.match(result.content[0]?.text ?? "", /人物 黄盖：secret:苦肉计\.revealed = true/u);
 });
 
 test("作品有样章时，写正文的段长对照样章而不是前一节：前文质量参差时它才是文风的依据", async () => {

@@ -12,8 +12,8 @@ declare const document: { querySelector(selector: string): { scrollTop: number }
 test("独立版本比较：单栏与并排、共享草稿、固定基线、撤销、布局偏好与重载", { timeout: 90000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-comparison-"));
 	const root = join(directory, "work");
-	const target = "intent/揭开真相.md";
-	const original = `开场：初稿。\n\n${Array.from({ length: 80 }, (_, i) => `第${i + 1}段，李牧推开皇档的大门，准备承担揭开真相的代价。\n\n`).join("")}结尾：初稿。\n`;
+	const target = "intent/计谋的代价.md";
+	const original = `开场：初稿。\n\n${Array.from({ length: 80 }, (_, i) => `第${i + 1}段，黄盖推开赤壁的大门，准备承担揭开诈降。\n\n`).join("")}结尾：初稿。\n`;
 	const committed = original.replace("开场：初稿。", "开场：第二版。");
 	const draft = committed.replace("开场：第二版。", "开场：草稿。").replace("结尾：初稿。", "结尾：草稿。");
 	await mkdir(root);
@@ -43,7 +43,7 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		await page.getByRole("menuitem", { name, exact: true }).click();
 	};
 	const activateOriginal = async () =>
-		page.locator(".tab-btn").first().getByRole("button", { name: "揭开真相", exact: true }).click();
+		page.locator(".tab-btn").first().getByRole("button", { name: "计谋的代价", exact: true }).click();
 	const right = page.locator(".cm-merge-b .cm-content");
 	const left = page.locator(".cm-merge-a .cm-content");
 	const editor = page.getByLabel("编辑文件内容", { exact: true });
@@ -52,7 +52,7 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 	try {
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
 		await page.locator("[data-navigation-icons]").getByRole("button", { name: "材料", exact: true }).click();
-		await page.getByRole("button", { name: /揭开真相/ }).click();
+		await page.getByRole("button", { name: /计谋的代价/ }).click();
 		await menu("查看版本差异");
 		await page.getByText("没有未提交修改", { exact: true }).waitFor();
 		assert.equal(await page.locator(".tab-btn").count(), 2);

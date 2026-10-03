@@ -97,7 +97,7 @@ test("DomainApiCloudProjectStore preserves CloudProjectStore semantics over publ
 	);
 
 	const character = snapshot.candidate.artifacts.find(
-		(artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "李牧",
+		(artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "黄盖",
 	);
 	assert.ok(character);
 	const text = decoder.decode(character.bytes);
@@ -127,7 +127,7 @@ test("DomainApiCloudProjectStore preserves CloudProjectStore semantics over publ
 		[genesis.id, committed.id],
 	);
 	const committedCharacter = committed.artifacts.find(
-		(artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "李牧",
+		(artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "黄盖",
 	);
 	assert.ok(committedCharacter);
 	const version = await remote.readVersion({

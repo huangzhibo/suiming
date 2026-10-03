@@ -63,7 +63,7 @@ test("turn 对账：没改作品也没提交就不显示；有改动时一行说
 		turnSummaryText({
 			...quiet,
 			authorMessages: 0,
-			changed: { ...quiet.changed, intent: { count: 1, paths: ["intent/揭开真相.md"] } },
+			changed: { ...quiet.changed, intent: { count: 1, paths: ["intent/计谋的代价.md"] } },
 			uncommitted: 1,
 		}),
 		"本轮：意图改了 1 个文件 · 没有提交 · 还有 1 个文件未提交",

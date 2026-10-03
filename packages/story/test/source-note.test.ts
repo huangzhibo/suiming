@@ -5,11 +5,11 @@ import { parseSourceNote, SuimError } from "../src/index.js";
 const sha = "b".repeat(64);
 
 test("Source 笔记是普通 Markdown：frontmatter 记码点区间与材料 sha，正文是 handoff", () => {
-	const markdown = `---\nspan:\n  - 0\n  - 120\nmaterial_sha256: ${sha}\n---\n李牧找到密信，先不公开。\n`;
+	const markdown = `---\nspan:\n  - 0\n  - 120\nmaterial_sha256: ${sha}\n---\n黄盖找到火船，先不公开。\n`;
 	assert.deepEqual(parseSourceNote(markdown, "source/访谈/notes/1.md"), {
 		span: { start: 0, end: 120 },
 		materialSha256: sha,
-		handoff: "李牧找到密信，先不公开。",
+		handoff: "黄盖找到火船，先不公开。",
 	});
 });
 

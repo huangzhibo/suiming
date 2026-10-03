@@ -98,11 +98,11 @@ test("工作台查询无需模型；读写只有 workspace.file.* 一组：编�
 		await workspace.invoke("workspace.file.save", {
 			path: "text/beat-0002.md",
 			expectedSHA: null,
-			content: "李牧当众焚毁密信。\n",
+			content: "黄盖当众焚毁火船。\n",
 		});
 		assert.match(await readFile(join(root, "text/beat-0002.md"), "utf8"), /焚毁/, "保存可以新建作品文件");
-		const file = await workspace.invoke("workspace.file.read", { path: "intent/揭开真相.md" });
-		await writeFile(join(root, file.path), "作者在外部明确了公开真相的代价。\n");
+		const file = await workspace.invoke("workspace.file.read", { path: "intent/计谋的代价.md" });
+		await writeFile(join(root, file.path), "作者在外部明确了公开诈降。\n");
 		await assert.rejects(
 			workspace.invoke("workspace.file.save", { path: file.path, expectedSHA: file.sha256, content: "过时 buffer" }),
 			{ code: "checkout_edit_conflict", message: /请比较差异后再保存/ },
@@ -143,15 +143,18 @@ test("工作台查询无需模型；读写只有 workspace.file.* 一组：编�
 		await assert.rejects(workspace.invoke("workspace.file.read", { path: "../auth.json" }));
 		// 按版本读单个文件：只读那一个 blob，原来要导出整个版本再从里面找。
 		const first = (await project.history())[0]?.id ?? assert.fail("缺少初始版本");
-		const old = await workspace.invoke("workspace.file.read", { path: "intent/揭开真相.md", revisionId: first });
+		const old = await workspace.invoke("workspace.file.read", { path: "intent/计谋的代价.md", revisionId: first });
 		assert.doesNotMatch(old.content, /不可逆/);
 		assert.equal(old.writable, false, "历史版本只读");
 		const now = await workspace.invoke("workspace.file.read", {
-			path: "intent/揭开真相.md",
+			path: "intent/计谋的代价.md",
 			revisionId: result.revision.id,
 		});
 		assert.match(now.content, /不可逆/);
-		assert.equal(now.sha256, (await workspace.invoke("workspace.file.read", { path: "intent/揭开真相.md" })).sha256);
+		assert.equal(
+			now.sha256,
+			(await workspace.invoke("workspace.file.read", { path: "intent/计谋的代价.md" })).sha256,
+		);
 		const missing = await workspace.invoke("workspace.file.read", { path: "text/beat-0002.md", revisionId: first });
 		assert.deepEqual({ content: missing.content, sha256: missing.sha256 }, { content: "", sha256: null });
 		// 恢复历史版本不倒拨 head：目标内容成为当前 head 的新子版本。
@@ -160,7 +163,7 @@ test("工作台查询无需模型；读写只有 workspace.file.* 一组：编�
 		assert.equal((await project.history()).at(-1)?.id, restored.revision.id);
 		assert.equal((await project.history()).length, 3);
 		assert.doesNotMatch(
-			(await workspace.invoke("workspace.file.read", { path: "intent/揭开真相.md" })).content,
+			(await workspace.invoke("workspace.file.read", { path: "intent/计谋的代价.md" })).content,
 			/不可逆/,
 		);
 		assert.equal((await workspace.invoke("project.rollback", { revisionId: restored.revision.id })).created, false);
@@ -206,7 +209,7 @@ test("本地执行库只认 v6：旧版本打开时说清怎么办且不动库�
 	try {
 		await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 		const project = await LocalProjectService.init({ checkoutPath: root, projectId: "old-store" });
-		await writeFile(join(root, "world/places/皇档.md"), "第二版的皇档。\n");
+		await writeFile(join(root, "world/places/赤壁.md"), "第二版的赤壁。\n");
 		await project.commitCheckout();
 		const head = project.project().headRevisionId;
 		const databasePath = project.paths.databasePath;
@@ -325,7 +328,7 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 			throw new Error("查询不应初始化模型");
 		});
 		const shown = await workspace.invoke("workspace.show", {});
-		assert.deepEqual(shown.volumes, [{ id: "vol-0001", title: "入局", beatIds: ["beat-0001", "beat-0002"] }]);
+		assert.deepEqual(shown.volumes, [{ id: "vol-0001", title: "赤壁之战", beatIds: ["beat-0001", "beat-0002"] }]);
 		assert.equal(shown.storyIndexError, undefined);
 		assert.equal(shown.openEnded, undefined, "没声明未完待续就不带这个字段");
 		const indexPath = join(root, "outline/story/index.yaml");
@@ -342,13 +345,13 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		);
 		const beat = shown.files.find((file) => file.path === "outline/story/vol-0001/beat-0001.md");
 		assert.ok(beat, "beat-0001 应在目录投影中");
-		assert.deepEqual((beat.frontmatter.refs as { character: string[] }).character, ["李牧"]);
+		assert.deepEqual((beat.frontmatter.refs as { character: string[] }).character, ["黄盖"]);
 		assert.ok((shown.files.find((file) => file.path === "outline/story/index.yaml")?.codePoints ?? 0) > 0);
 
 		// 写好正文提交：时效 current 且记下写成的版本；再改一个 Design 文件提交，正文就 design-changed。
 		await mkdir(join(root, "text"), { recursive: true });
-		await writeFile(join(root, "text/beat-0001.md"), "李牧走入皇档，在木匣中找到密信。\n");
-		await writeFile(join(root, "text/beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的密信送进火里。\n");
+		await writeFile(join(root, "text/beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
+		await writeFile(join(root, "text/beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的火船送进火里。\n");
 		await workspace.invoke("project.commit", {});
 		const written = await workspace.invoke("workspace.show", {});
 		assert.deepEqual(written.storyText, [
@@ -357,7 +360,7 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		]);
 		await writeFile(
 			join(root, "outline/story/vol-0001/beat-0002.md"),
-			(await readFile(join(root, "outline/story/vol-0001/beat-0002.md"), "utf8")).replace("焚毁密信", "撕碎密信"),
+			(await readFile(join(root, "outline/story/vol-0001/beat-0002.md"), "utf8")).replace("焚毁火船", "撕碎火船"),
 		);
 		await workspace.invoke("project.commit", {});
 		const changed = await workspace.invoke("workspace.show", {});
@@ -391,15 +394,15 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 
 		await writeFile(
 			join(root, "outline/story/index.yaml"),
-			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 入局\n    beat_ids: [beat-0001]\n",
+			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001]\n",
 		);
 		await rm(join(root, "outline/story/vol-0001/beat-0002.md"));
 		await rm(join(root, "text/beat-0002.md"));
 		await writeFile(
 			join(root, "outline/story/vol-0001/beat-0001.md"),
-			"---\nrefs:\n  character: [李牧]\n  place: [皇档]\n  resource: [密信]\n---\n李牧取得并公开密信。\n",
+			"---\nrefs:\n  character: [黄盖]\n  place: [赤壁]\n  resource: [火船]\n---\n黄盖取得并公开火船。\n",
 		);
-		await rm(join(root, "outline/contracts/真相的代价.md"));
+		await rm(join(root, "outline/contracts/诈降.md"));
 		await workspace.invoke("project.commit", {});
 		const after = await workspace.invoke("workspace.reviews", {});
 		const stale = after.find((item) => item.id === composed.id);
@@ -468,17 +471,17 @@ test("目录投影的未提交标记逐文件准确：改一个文件只标它�
 			[],
 		);
 
-		const placePath = join(root, "world/places/皇档.md");
+		const placePath = join(root, "world/places/赤壁.md");
 		await writeFile(placePath, `${await readFile(placePath, "utf8")}改过一句。\n`);
 		const edited = await workspace.invoke("workspace.show", {});
 		assert.equal(edited.dirty, true);
 		assert.deepEqual(
 			edited.files.filter((file) => file.dirty).map((file) => file.path),
-			["world/places/皇档.md"],
+			["world/places/赤壁.md"],
 		);
 
 		await workspace.invoke("project.commit", {});
-		await rm(join(root, "world/places/皇档.md"));
+		await rm(join(root, "world/places/赤壁.md"));
 		const deleted = await workspace.invoke("workspace.show", {});
 		assert.equal(deleted.dirty, true, "删掉已提交的文件也是未提交的修改");
 		assert.deepEqual(
@@ -493,13 +496,13 @@ test("目录投影按文件状态复用解析结果：同长度改写、mtime �
 		const workspace = new LocalWorkspace(project, async () => {
 			throw new Error("查询不应初始化模型");
 		});
-		const placePath = join(root, "world/places/皇档.md");
+		const placePath = join(root, "world/places/赤壁.md");
 		const old = new Date(Date.now() - 60_000);
 		const titled = (title: string) => `---\ntitle: ${title}\n---\n收藏旧朝档案的封闭库房。\n`;
 		await writeFile(placePath, titled("皇家档案"));
 		await utimes(placePath, old, old);
 		const place = async () =>
-			(await workspace.invoke("workspace.show", {})).files.find((file) => file.path === "world/places/皇档.md");
+			(await workspace.invoke("workspace.show", {})).files.find((file) => file.path === "world/places/赤壁.md");
 		assert.equal((await place())?.title, "皇家档案");
 		assert.equal((await place())?.title, "皇家档案");
 
@@ -516,7 +519,7 @@ test("目录投影带正文的第一个一级标题：没有 title / name 的文
 			throw new Error("查询不应初始化模型");
 		});
 		await writeFile(join(root, "world/overview.md"), "# 世界总纲\n\n斗气大陆的规则。\n");
-		const contractPath = join(root, "outline/contracts/真相的代价.md");
+		const contractPath = join(root, "outline/contracts/诈降.md");
 		await writeFile(
 			contractPath,
 			(await readFile(contractPath, "utf8")).replace("---\n公开真相", "---\n# 真相要有人付账\n\n公开真相"),
@@ -524,8 +527,8 @@ test("目录投影带正文的第一个一级标题：没有 title / name 的文
 		const shown = await workspace.invoke("workspace.show", {});
 		const byPath = (path: string) => shown.files.find((file) => file.path === path);
 		assert.equal(byPath("world/overview.md")?.heading, "世界总纲");
-		assert.equal(byPath("outline/contracts/真相的代价.md")?.heading, "真相要有人付账");
-		assert.equal(byPath("world/places/皇档.md")?.heading, undefined, "没有一级标题就不带这个字段");
+		assert.equal(byPath("outline/contracts/诈降.md")?.heading, "真相要有人付账");
+		assert.equal(byPath("world/places/赤壁.md")?.heading, undefined, "没有一级标题就不带这个字段");
 	}));
 
 test("文件目录独立于作品投影，辅助文件保存不进入作品 diff，非法文件仍可修复", async () =>

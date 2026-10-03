@@ -20,13 +20,13 @@ test("一次绑定报出全部跨文档错误，而不是首错即停", () => {
 	const documents = twoBeatDesignDocuments();
 	// 1. Beat 引用不存在的人物
 	beat(documents, 0).markdown = beat(documents, 0).markdown.replace(
-		"character: [李牧]",
-		"character: [李牧, 不存在的人]",
+		"character: [黄盖]",
+		"character: [黄盖, 不存在的人]",
 	);
 	// 2. Beat 依赖指向更晚的 Beat
 	beat(documents, 0).markdown = beat(documents, 0).markdown.replace(
-		"  secret: [旧案真相]",
-		"  secret: [旧案真相]\n  beat: [beat-0002]",
+		"  secret: [苦肉计]",
+		"  secret: [苦肉计]\n  beat: [beat-0002]",
 	);
 	// 3. Contract 引用不存在的 Beat 作为 deadline
 	const contract = documents.contracts[0];
@@ -38,8 +38,8 @@ test("一次绑定报出全部跨文档错误，而不是首错即停", () => {
 	intent.markdown = intent.markdown.replace("---\nstyle_refs", "---\nsubjects:\n  place: [无此地]\nstyle_refs");
 	// 5. 硬状态引用不存在的地点
 	beat(documents, 0).markdown = beat(documents, 0).markdown.replace(
-		"李牧.location: 皇档",
-		"李牧.location: 不存在的地方",
+		"黄盖.location: 赤壁",
+		"黄盖.location: 不存在的地方",
 	);
 
 	let caught: unknown;
@@ -66,7 +66,7 @@ test("单个文档解析失败只跳过该文档，其余文档继续参与检�
 		path: "world/characters/坏人物.md",
 		markdown: "---\nunknown_field: 1\n---\n",
 	});
-	beat(documents, 1).markdown = beat(documents, 1).markdown.replace("character: [李牧]", "character: [李牧, 坏人物]");
+	beat(documents, 1).markdown = beat(documents, 1).markdown.replace("character: [黄盖]", "character: [黄盖, 坏人物]");
 	let caught: unknown;
 	try {
 		bindDesignDocuments(documents);
@@ -123,37 +123,37 @@ test("Checker 把硬状态失败、未闭合 Contract 与未声明 secret 一次
 	const documents = twoBeatDesignDocuments();
 	// 硬状态冲突
 	beat(documents, 1).markdown = beat(documents, 1).markdown.replace(
-		"    密信.consumed: true\n",
-		"    密信.consumed: true\n    密信.holder: 李牧\n",
+		"    火船.consumed: true\n",
+		"    火船.consumed: true\n    火船.holder: 黄盖\n",
 	);
 	// 未声明的 secret 被揭示（拼写漂移）
 	beat(documents, 1).markdown = beat(documents, 1).markdown.replace(
-		"    secret:旧案真相.revealed: true\n  reader:",
-		"    secret:旧案真相.revealed: true\n    secret:旧案的真相.revealed: true\n  reader:",
+		"    secret:苦肉计.revealed: true\n  reader:",
+		"    secret:苦肉计.revealed: true\n    secret:旧案的真相.revealed: true\n  reader:",
 	);
 	// Contract 不再 resolve
-	beat(documents, 1).markdown = beat(documents, 1).markdown.replace("contracts:\n  resolve: [真相的代价]\n", "");
+	beat(documents, 1).markdown = beat(documents, 1).markdown.replace("contracts:\n  resolve: [诈降]\n", "");
 	const check = checkDesign(bindDesignDocuments(documents));
 	assert.equal(check.passed, false);
 	const messages = check.diagnostics.map((item) => item.message);
 	assert.equal(check.diagnostics.length, 3, messages.join("\n"));
 	assert.ok(messages.some((message) => message.includes("holder")));
 	assert.ok(messages.some((message) => message.includes("secret:旧案的真相")));
-	assert.ok(messages.some((message) => message.includes("StoryContract 真相的代价")));
+	assert.ok(messages.some((message) => message.includes("StoryContract 诈降")));
 });
 
 test("secret 的状态路径不带 secret: 前缀也按 secret 解析：revealed 只属于 secret，秘密又不对应文件", () => {
 	// 2026-10-01 斗破真实运行：Agent 写了 changes.world.<id>.revealed，解析器去有文件的对象里找、报
 	// missing secret identity，Agent 由此断定「本仓注册不了秘密」，把 7 条秘密降级成普通世界设定。
 	const bare = twoBeatDesignDocuments();
-	beat(bare, 1).markdown = beat(bare, 1).markdown.replaceAll("secret:旧案真相.revealed", "旧案真相.revealed");
+	beat(bare, 1).markdown = beat(bare, 1).markdown.replaceAll("secret:苦肉计.revealed", "苦肉计.revealed");
 	const passed = checkDesign(bindDesignDocuments(bare));
 	assert.equal(passed.passed, true, passed.diagnostics.map((item) => item.message).join("\n"));
 
 	const misspelt = twoBeatDesignDocuments();
 	beat(misspelt, 1).markdown = beat(misspelt, 1).markdown.replace(
-		"    secret:旧案真相.revealed: true\n  reader:",
-		"    secret:旧案真相.revealed: true\n    旧案的真相.revealed: true\n  reader:",
+		"    secret:苦肉计.revealed: true\n  reader:",
+		"    secret:苦肉计.revealed: true\n    旧案的真相.revealed: true\n  reader:",
 	);
 	const failed = checkDesign(bindDesignDocuments(misspelt));
 	assert.equal(failed.passed, false);
@@ -172,11 +172,11 @@ test("refs 遗漏与已死人物再被引用是 warning", () => {
 	});
 	// beat-0001 让赵谦死亡并引用他；beat-0002 正文提到老赵但 refs 未引用
 	beat(documents, 0).markdown = beat(documents, 0)
-		.markdown.replace("character: [李牧]", "character: [李牧, 赵谦]")
-		.replace("    李牧.location: 皇档\n", "    李牧.location: 皇档\n    赵谦.dead: true\n");
+		.markdown.replace("character: [黄盖]", "character: [黄盖, 赵谦]")
+		.replace("    黄盖.location: 赤壁\n", "    黄盖.location: 赤壁\n    赵谦.dead: true\n");
 	beat(documents, 1).markdown = beat(documents, 1)
-		.markdown.replace("character: [李牧]", "character: [李牧, 赵谦]")
-		.replace("李牧公开旧案真相并焚毁唯一密信。", "李牧想起老赵，公开旧案真相并焚毁唯一密信。");
+		.markdown.replace("character: [黄盖]", "character: [黄盖, 赵谦]")
+		.replace("黄盖公开苦肉计并焚毁唯一火船。", "黄盖想起老赵，公开苦肉计并焚毁唯一火船。");
 	const check = checkDesign(bindDesignDocuments(documents));
 	assert.equal(check.passed, true);
 	const messages = check.warnings.map((item) => item.message);
@@ -192,8 +192,8 @@ test("refs 遗漏与已死人物再被引用是 warning", () => {
 		markdown: "---\naliases: [老赵]\n---\n旧案中被灭口的书吏。",
 	});
 	beat(omitted, 1).markdown = beat(omitted, 1).markdown.replace(
-		"李牧公开旧案真相并焚毁唯一密信。",
-		"李牧想起老赵，公开旧案真相并焚毁唯一密信。",
+		"黄盖公开苦肉计并焚毁唯一火船。",
+		"黄盖想起老赵，公开苦肉计并焚毁唯一火船。",
 	);
 	const omittedCheck = checkDesign(bindDesignDocuments(omitted));
 	assert.ok(
@@ -204,17 +204,17 @@ test("refs 遗漏与已死人物再被引用是 warning", () => {
 
 test("Contract subjects 未出现在 open / resolve Beat 的 refs 里是 warning", () => {
 	const documents = twoBeatDesignDocuments();
-	beat(documents, 0).markdown = beat(documents, 0).markdown.replace("  resource: [密信]\n", "");
+	beat(documents, 0).markdown = beat(documents, 0).markdown.replace("  resource: [火船]\n", "");
 	const check = checkDesign(bindDesignDocuments(documents));
 	assert.equal(check.passed, true);
-	assert.ok(check.warnings.some((item) => item.message.includes("却没有引用它的主体 resource:密信")));
+	assert.ok(check.warnings.some((item) => item.message.includes("却没有引用它的主体 resource:火船")));
 });
 
 test("人物或读者 scope 只承载 secret revealed", () => {
 	const documents = twoBeatDesignDocuments();
 	beat(documents, 1).markdown = beat(documents, 1).markdown.replace(
-		"  reader:\n    secret:旧案真相.revealed: true\n",
-		"  reader:\n    secret:旧案真相.revealed: true\n  character:\n    李牧:\n      李牧.dead: true\n",
+		"  reader:\n    secret:苦肉计.revealed: true\n",
+		"  reader:\n    secret:苦肉计.revealed: true\n  character:\n    黄盖:\n      黄盖.dead: true\n",
 	);
 	assert.throws(
 		() => bindDesignDocuments(documents),

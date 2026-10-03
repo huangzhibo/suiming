@@ -56,7 +56,7 @@ ProjectRevision 保存阶段成果 → Agent 继续做下去，或如实说明�
 Artifact 的标识不能混用：
 
 - `namespace` 区分 Target 与每个 `sourceId`；
-- Story Language identity 是 namespace 内的 `(kind, localId)`；引用按它写（frontmatter 是 `character: [李牧]`，不是路径），所以跨 Volume 移动不改变 beat id；
+- Story Language identity 是 namespace 内的 `(kind, localId)`；引用按它写（frontmatter 是 `character: [黄盖]`，不是路径），所以跨 Volume 移动不改变 beat id；
 - 路径是它在 Open Story Directory 里的位置。**identity 与路径都是事实，一起扫出来一起带着**（`CandidateArtifact.path`），不是一个从另一个推出来的；
 - `artifactVersionId` 是**内容寻址**的：`av_` + sha256(mediaType‖contentHash)（`artifact/version-storage.ts`），只由字节和 mediaType 决定，与存到哪里无关。它不进入 Story Language、交换格式，也不在候选上——只有 Cloud 的版本清单（`RevisionArtifact`）带它。
 

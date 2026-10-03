@@ -8,7 +8,7 @@ export function twoBeatDesignDocuments(): MutableDesignDocuments {
 	return {
 		storyIndex: {
 			schema_version: 2,
-			volumes: [{ id: "vol-0001", title: "入局", beat_ids: ["beat-0001", "beat-0002"] }],
+			volumes: [{ id: "vol-0001", title: "赤壁之战", beat_ids: ["beat-0001", "beat-0002"] }],
 		},
 		beats: [
 			{
@@ -18,17 +18,17 @@ export function twoBeatDesignDocuments(): MutableDesignDocuments {
 				markdown: `---
 title: 旧档案
 refs:
-  character: [李牧]
-  place: [皇档]
-  resource: [密信]
-  secret: [旧案真相]
+  character: [黄盖]
+  place: [赤壁]
+  resource: [火船]
+  secret: [苦肉计]
 contracts:
-  open: [真相的代价]
+  open: [诈降]
 changes:
   world:
-    李牧.location: 皇档
+    黄盖.location: 赤壁
 ---
-李牧进入旧档案库，取得密信；位置在档案库。
+黄盖进入旧档案库，取得火船；位置在档案库。
 `,
 			},
 			{
@@ -38,59 +38,59 @@ changes:
 				markdown: `---
 title: 焚信
 refs:
-  character: [李牧]
-  resource: [密信]
-  secret: [旧案真相]
+  character: [黄盖]
+  resource: [火船]
+  secret: [苦肉计]
   beat: [beat-0001]
 contracts:
-  resolve: [真相的代价]
+  resolve: [诈降]
 changes:
   world:
-    密信.consumed: true
-    secret:旧案真相.revealed: true
+    火船.consumed: true
+    secret:苦肉计.revealed: true
   reader:
-    secret:旧案真相.revealed: true
+    secret:苦肉计.revealed: true
 ---
-李牧公开旧案真相并焚毁唯一密信。
+黄盖公开苦肉计并焚毁唯一火船。
 `,
 			},
 		],
 		characters: [
 			{
-				id: "李牧",
-				path: "world/characters/李牧.md",
-				markdown: "---\nname: 李牧\naliases: [小李]\n---\n想查明旧案真相，却必须在真相与家族安全之间选择。",
+				id: "黄盖",
+				path: "world/characters/黄盖.md",
+				markdown: "---\nname: 黄盖\naliases: [公覆]\n---\n想查明苦肉计，却必须在真相与家族安全之间选择。",
 			},
 		],
 		places: [
 			{
-				id: "皇档",
-				path: "world/places/皇档.md",
-				markdown: "---\nname: 皇档\n---\n收藏旧朝档案的封闭库房。",
+				id: "赤壁",
+				path: "world/places/赤壁.md",
+				markdown: "---\nname: 赤壁\n---\n收藏旧朝档案的封闭库房。",
 			},
 		],
 		resources: [
 			{
-				id: "密信",
-				path: "world/resources/密信.md",
-				markdown: "---\nname: 密信\ninitial:\n  holder: 李牧\n---\n唯一一封能证明旧案真相的密信。",
+				id: "火船",
+				path: "world/resources/火船.md",
+				markdown: "---\nname: 火船\ninitial:\n  holder: 黄盖\n---\n唯一一封能证明苦肉计的火船。",
 			},
 		],
 		world: [],
 		contracts: [
 			{
-				id: "真相的代价",
-				path: "outline/contracts/真相的代价.md",
+				id: "诈降",
+				path: "outline/contracts/诈降.md",
 				markdown:
-					"---\nsubjects:\n  character: [李牧]\n  resource: [密信]\n  secret: [旧案真相]\ndeadline: beat-0002\n---\n李牧公开真相时，必须失去唯一密信。",
+					"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\n  secret: [苦肉计]\ndeadline: beat-0002\n---\n黄盖公开真相时，必须失去唯一火船。",
 			},
 		],
 		intents: [
 			{
-				id: "揭开真相",
-				path: "intent/揭开真相.md",
+				id: "计谋的代价",
+				path: "intent/计谋的代价.md",
 				markdown:
-					"---\nstyle_refs: [style_contemporary_restraint]\n---\n李牧揭开真相时必须消耗不可恢复的资源，不能靠巧合脱身。",
+					"---\nstyle_refs: [style_contemporary_restraint]\n---\n黄盖计谋的代价时必须消耗不可恢复的资源，不能靠巧合脱身。",
 			},
 		],
 		styleIds: ["style_contemporary_restraint"],

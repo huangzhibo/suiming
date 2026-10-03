@@ -20,11 +20,11 @@ test("故事状态按幕前 / 变化 / 幕后区分人物与读者知情，复�
 			if (!file.path.includes("/beat-")) return file;
 			let text = new TextDecoder()
 				.decode(file.bytes)
-				.replace("  resource: [密信]", "  resource: [密信]\n  secret: [旧案]");
+				.replace("  resource: [火船]", "  resource: [火船]\n  secret: [旧案]");
 			text = text.replace(
 				"changes:\n",
 				file.path.endsWith("beat-0001.md")
-					? "changes:\n  character:\n    李牧:\n      secret:旧案.revealed: true\n"
+					? "changes:\n  character:\n    黄盖:\n      secret:旧案.revealed: true\n"
 					: "changes:\n  reader:\n    secret:旧案.revealed: true\n",
 			);
 			return { ...file, bytes: new TextEncoder().encode(text) };
@@ -39,27 +39,27 @@ test("故事状态按幕前 / 变化 / 幕后区分人物与读者知情，复�
 		const before = await query("design:state:beat-0001:before");
 		assert.equal(before.revisionId, revisionId);
 		assert.doesNotMatch(before.text, /旧案 · 已揭示/);
-		assert.match(before.text, /密信 · 持有者：李牧/);
-		assert.match(before.text, /真相的代价：尚未开启/);
+		assert.match(before.text, /火船 · 持有者：黄盖/);
+		assert.match(before.text, /诈降：尚未开启/);
 		assert.ok(!before.paths.some((path) => path.endsWith("beat-0002.md")), "未来 Beat 不成为状态依据");
 		const after = await query("design:state:beat-0001:after");
-		assert.match(after.text, /李牧 · 旧案 · 已揭示：是/);
+		assert.match(after.text, /黄盖 · 旧案 · 已揭示：是/);
 		assert.doesNotMatch(after.text, /读者 · 旧案/);
-		assert.match(after.text, /真相的代价：待兑现/);
+		assert.match(after.text, /诈降：待兑现/);
 		const changes = await query("design:state:beat-0002:changes");
-		assert.match(changes.text, /密信 · 持有者：李牧 → 无/);
+		assert.match(changes.text, /火船 · 持有者：黄盖 → 无/);
 		// 桌面只编译 Write Context 与设计视图；其余种类原来静默退回一份裁剪过的 Design Frame，结果是错的。
 		for (const task of ["design", "review:design", "source:read:原作:0:100"])
 			await assert.rejects(query(task), { code: "unsupported_context_task" }, task);
-		assert.match(changes.text, /密信 · 已消耗：未记录 → 是/);
+		assert.match(changes.text, /火船 · 已消耗：未记录 → 是/);
 		assert.match(changes.text, /读者 · 旧案 · 已揭示：未记录 → 是/);
-		assert.match(changes.text, /真相的代价：兑现/);
-		const final = await query("design:state:beat-0002:after:resource:密信");
-		assert.match(final.text, /密信 · 已消耗：是/);
-		assert.doesNotMatch(final.text, /持有者：李牧/);
-		assert.match(final.text, /真相的代价：已兑现/);
-		const character = await query("design:state:beat-0002:after:character:李牧");
-		assert.match(character.text, /李牧 · 旧案 · 已揭示：是/);
+		assert.match(changes.text, /诈降：兑现/);
+		const final = await query("design:state:beat-0002:after:resource:火船");
+		assert.match(final.text, /火船 · 已消耗：是/);
+		assert.doesNotMatch(final.text, /持有者：黄盖/);
+		assert.match(final.text, /诈降：已兑现/);
+		const character = await query("design:state:beat-0002:after:character:黄盖");
+		assert.match(character.text, /黄盖 · 旧案 · 已揭示：是/);
 		assert.doesNotMatch(character.text, /读者 · 旧案/);
 		const host = await compileHostContext(project, "design:state:beat-0002:changes");
 		assert.equal(host.text, changes.text, "host 与桌面使用相同投影");

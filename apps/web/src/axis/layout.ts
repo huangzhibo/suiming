@@ -262,8 +262,8 @@ function resourceChanges(book: Book): Map<string, ResourceEvent[]> {
 }
 
 /**
- * 状态键是扁平的 `<对象>.<属性>`，对象可以带 kind 前缀（`resource:密信.holder`），与裸 id 等价；
- * `revealed` 只属于 Secret，所以 `密信来历.revealed` 与 `secret:密信来历.revealed` 是同一个键（见 Story Language state.md）。
+ * 状态键是扁平的 `<对象>.<属性>`，对象可以带 kind 前缀（`resource:火船.holder`），与裸 id 等价；
+ * `revealed` 只属于 Secret，所以 `火船来历.revealed` 与 `secret:火船来历.revealed` 是同一个键（见 Story Language state.md）。
  */
 function stateKey(key: string): { object: string; prop: string } | undefined {
 	const dot = key.lastIndexOf(".");

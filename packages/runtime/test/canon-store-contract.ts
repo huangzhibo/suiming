@@ -194,7 +194,7 @@ export function describeCanonStore(name: string, create: () => Promise<CanonStor
 			assert.deepEqual([...previous.keys()].sort(), [...current.keys()].sort(), "路径集合不变");
 			assert.equal(previous.size, candidate.artifacts.length, "每个作品文件一条摘要");
 			const changed = [...current.keys()].filter((path) => previous.get(path) !== current.get(path));
-			assert.deepEqual(changed, ["intent/揭开真相.md"]);
+			assert.deepEqual(changed, ["intent/计谋的代价.md"]);
 			assert.deepEqual(await store.fileDigests(projectId, committed.id), current, "同一版本摘要稳定");
 		}));
 }

@@ -38,36 +38,36 @@ test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及�
 		const beat = storyImpact(candidate, parseStoryImpactSubject("beat:beat-0001"));
 		assert.deepEqual(beat.storyBeatIds, ["beat-0001"]);
 		assert.deepEqual(beat.dependentStoryBeatIds, ["beat-0002"], "beat-0002 经 refs.beat 依赖 beat-0001");
-		assert.deepEqual(beat.characterIds, ["李牧"]);
-		assert.deepEqual(beat.placeIds, ["皇档"]);
-		assert.deepEqual(beat.resourceIds, ["密信"]);
-		assert.deepEqual(beat.contractIds, ["真相的代价"]);
-		assert.deepEqual(beat.intentIds, ["揭开真相"]);
+		assert.deepEqual(beat.characterIds, ["黄盖"]);
+		assert.deepEqual(beat.placeIds, ["赤壁"]);
+		assert.deepEqual(beat.resourceIds, ["火船"]);
+		assert.deepEqual(beat.contractIds, ["诈降"]);
+		assert.deepEqual(beat.intentIds, ["计谋的代价"]);
 		for (const path of [
 			"outline/story/vol-0001/beat-0001.md",
 			"outline/story/vol-0001/beat-0002.md",
-			"world/characters/李牧.md",
-			"outline/contracts/真相的代价.md",
-			"intent/揭开真相.md",
+			"world/characters/黄盖.md",
+			"outline/contracts/诈降.md",
+			"intent/计谋的代价.md",
 		]) {
 			assert.ok(beat.paths.includes(path), `${path} 应在候选路径里`);
 		}
-		assert.deepEqual(storyImpact(candidate, { kind: "character", id: "李牧" }).storyBeatIds, [
+		assert.deepEqual(storyImpact(candidate, { kind: "character", id: "黄盖" }).storyBeatIds, [
 			"beat-0001",
 			"beat-0002",
 		]);
-		assert.deepEqual(storyImpact(candidate, { kind: "contract", id: "真相的代价" }).storyBeatIds, [
+		assert.deepEqual(storyImpact(candidate, { kind: "contract", id: "诈降" }).storyBeatIds, [
 			"beat-0001",
 			"beat-0002",
 		]);
-		assert.deepEqual(storyImpact(candidate, { kind: "resource", id: "密信" }).storyBeatIds, [
+		assert.deepEqual(storyImpact(candidate, { kind: "resource", id: "火船" }).storyBeatIds, [
 			"beat-0001",
 			"beat-0002",
 		]);
-		const place = storyImpact(candidate, { kind: "place", id: "皇档" });
+		const place = storyImpact(candidate, { kind: "place", id: "赤壁" });
 		assert.deepEqual(place.storyBeatIds, ["beat-0001"]);
 		assert.deepEqual(place.dependentStoryBeatIds, ["beat-0002"]);
-		assert.deepEqual(storyImpact(candidate, { kind: "intent", id: "揭开真相" }).storyBeatIds, [
+		assert.deepEqual(storyImpact(candidate, { kind: "intent", id: "计谋的代价" }).storyBeatIds, [
 			"beat-0001",
 			"beat-0002",
 		]);
@@ -85,8 +85,8 @@ test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及�
 test("context compile 给 host 的输入按路径列出作品文件；review record 写成 review/<id>.md，正文一变它就不再 current", async () => {
 	await withProject(async (project, checkoutPath) => {
 		await mkdir(join(checkoutPath, "text"), { recursive: true });
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "李牧走入皇档，在木匣中找到密信。\n");
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的密信送进火里。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "天亮前，他公开真相，并亲手把唯一的火船送进火里。\n");
 		await project.commitCheckout();
 
 		const write = await compileHostContext(project, "write:beat-0002");
@@ -118,13 +118,13 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 
 		const draft = {
 			verdict: "revise",
-			summary: "找到密信的过程被一句带过。",
+			summary: "找到火船的过程被一句带过。",
 			findings: [
 				{
 					severity: "minor",
 					anchor: { kind: "artifact", path: "text/beat-0001.md" },
-					issue: "取得密信没有阻力，读者感受不到它是唯一筹码。",
-					evidence: "李牧走入皇档，在木匣中找到密信。",
+					issue: "取得火船没有阻力，读者感受不到它是唯一筹码。",
+					evidence: "黄盖走入赤壁，在木匣中找到火船。",
 					repairLayer: "text",
 				},
 			],
@@ -182,7 +182,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 			revision: composed.file.revision,
 		});
 
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "李牧走入皇档。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁。\n");
 		await project.commitCheckout();
 		head = project.project().headRevisionId;
 		reviews = reviewsIn(await reader.snapshot(head));
@@ -205,7 +205,7 @@ test("什么算 Design 只有一处：Reference 不是 Design；审正文时带 
 		await mkdir(join(checkoutPath, "reference", "research"), { recursive: true });
 		await writeFile(join(checkoutPath, "reference", "research", "旧案.md"), "旧案卷宗的整理笔记。\n");
 		await mkdir(join(checkoutPath, "text"), { recursive: true });
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "李牧走入皇档，在木匣中找到密信。\n");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
 		await project.commitCheckout();
 		const marked = (text: string) =>
 			[...text.matchAll(/--- BEGIN ARTIFACT "([^"]+)" ---/gu)].map((match) => match[1] as string);
@@ -232,28 +232,28 @@ test("什么算 Design 只有一处：Reference 不是 Design；审正文时带 
 
 test("context compile 的 Design 视图：人物视角带家族、硬状态与出场 Beat，at 把证据边界收到该 Beat 开始前；家族与卷视图各自成段", async () => {
 	await withProject(async (project) => {
-		const whole = await compileHostContext(project, "design:character:李牧");
-		assert.equal(whole.task, "design:character:李牧");
-		assert.deepEqual(whole.design, { kind: "character", id: "李牧", storyBeatIds: ["beat-0001", "beat-0002"] });
-		assert.ok(whole.text.startsWith("# 人物视角：李牧（character:李牧）"));
+		const whole = await compileHostContext(project, "design:character:黄盖");
+		assert.equal(whole.task, "design:character:黄盖");
+		assert.deepEqual(whole.design, { kind: "character", id: "黄盖", storyBeatIds: ["beat-0001", "beat-0002"] });
+		assert.ok(whole.text.startsWith("# 人物视角：黄盖（character:黄盖）"));
 		assert.ok(whole.text.includes("（没有家族声明）"));
-		assert.ok(whole.text.includes("- character:李牧.location = place:皇档"), "全书末的硬状态");
-		assert.equal(whole.text.includes("- 持有 resource:密信"), false, "密信在 beat-0002 已 consumed，不再持有");
+		assert.ok(whole.text.includes("- character:黄盖.location = place:赤壁"), "全书末的硬状态");
+		assert.equal(whole.text.includes("- 持有 resource:火船"), false, "火船在 beat-0002 已 consumed，不再持有");
 		assert.ok(whole.text.includes('--- BEGIN ARTIFACT "outline/story/vol-0001/beat-0002.md" ---'));
-		assert.ok(whole.artifacts.some((artifact) => artifact.path === "world/characters/李牧.md"));
+		assert.ok(whole.artifacts.some((artifact) => artifact.path === "world/characters/黄盖.md"));
 		// 阅读契约：作者层信息不等于人物已知，带时点的视图不得用之后的事（原来是一份写 brief 的契约，要 host 没有的 frame 与 submit_brief）。
 		assert.ok(whole.systemPrompt.includes("带时点的人物视图只含那个 Beat 开始之前的依据"));
 		assert.equal(whole.systemPrompt.includes("submit_brief"), false);
 
-		const at = await compileHostContext(project, "design:character:李牧:at:beat-0002");
+		const at = await compileHostContext(project, "design:character:黄盖:at:beat-0002");
 		assert.deepEqual(at.design, {
 			kind: "character",
-			id: "李牧",
+			id: "黄盖",
 			atStoryBeatId: "beat-0002",
 			storyBeatIds: ["beat-0001"],
 		});
 		assert.ok(at.text.includes("时点：beat-0002 开始前"));
-		assert.ok(at.text.includes("- 持有 resource:密信"), "时点前密信还在李牧手里");
+		assert.ok(at.text.includes("- 持有 resource:火船"), "时点前火船还在黄盖手里");
 		assert.equal(at.text.includes('--- BEGIN ARTIFACT "outline/story/vol-0001/beat-0002.md" ---'), false);
 		assert.ok(at.text.includes("- outline/story/vol-0001/beat-0002.md"), "晚于时点的 Beat 只进目录");
 		assert.ok(at.text.includes("晚于时点，不作为证据"));
@@ -264,16 +264,16 @@ test("context compile 的 Design 视图：人物视角带家族、硬状态与�
 		);
 		assert.ok(at.artifacts.some((artifact) => artifact.path === "outline/story/vol-0001/beat-0001.md"));
 
-		const family = await compileHostContext(project, "design:family:李牧");
-		assert.deepEqual(family.design, { kind: "family", id: "李牧", storyBeatIds: ["beat-0001", "beat-0002"] });
-		assert.ok(family.text.startsWith("# 家族视角：李牧（character:李牧），成员 李牧"));
-		assert.ok(family.text.includes('--- BEGIN ARTIFACT "world/characters/李牧.md" ---'));
+		const family = await compileHostContext(project, "design:family:黄盖");
+		assert.deepEqual(family.design, { kind: "family", id: "黄盖", storyBeatIds: ["beat-0001", "beat-0002"] });
+		assert.ok(family.text.startsWith("# 家族视角：黄盖（character:黄盖），成员 黄盖"));
+		assert.ok(family.text.includes('--- BEGIN ARTIFACT "world/characters/黄盖.md" ---'));
 
 		const volume = await compileHostContext(project, "design:volume:vol-0001");
 		assert.deepEqual(volume.design, { kind: "volume", id: "vol-0001", storyBeatIds: ["beat-0001", "beat-0002"] });
 		assert.ok(volume.text.includes("- beat-0001"));
-		assert.ok(volume.text.includes("open 真相的代价"));
-		assert.ok(volume.text.includes("resolve 真相的代价"));
+		assert.ok(volume.text.includes("open 诈降"));
+		assert.ok(volume.text.includes("resolve 诈降"));
 		assert.ok(volume.text.includes('--- BEGIN ARTIFACT "outline/story/vol-0001/beat-0002.md" ---'));
 
 		await assert.rejects(
@@ -281,7 +281,7 @@ test("context compile 的 Design 视图：人物视角带家族、硬状态与�
 			(error) => code(error) === "character_not_found",
 		);
 		await assert.rejects(
-			compileHostContext(project, "design:character:李牧:at:beat-0099"),
+			compileHostContext(project, "design:character:黄盖:at:beat-0099"),
 			(error) => code(error) === "story_beat_not_found",
 		);
 		await assert.rejects(
@@ -298,7 +298,7 @@ test("context compile 的 Design 视图：人物视角带家族、硬状态与�
 test("host 自己读材料：source:read 分段 Context 带上一段笔记的位置，笔记写成 source/<id>/notes/<n>.md；覆盖全文后合并 Context 与 review:source 才可编译", async () => {
 	await withProject(async (project, checkoutPath) => {
 		const material =
-			"第一段。李牧在皇档的木匣里找到密信，决定先不公开。\n第二段。他把密信藏在袖中，去见旧友。\n第三段。旧友劝他烧掉密信，他没有答应。\n";
+			"第一段。黄盖在赤壁的木匣里找到火船，决定先不公开。\n第二段。他把火船藏在袖中，去见旧友。\n第三段。旧友劝他烧掉火船，他没有答应。\n";
 		const total = [...material].length;
 		await project.ingestSource({ sourceId: "访谈", name: "访谈.txt", original: new TextEncoder().encode(material) });
 		const split = material.indexOf("第二段");
@@ -330,14 +330,14 @@ test("host 自己读材料：source:read 分段 Context 带上一段笔记的位
 		assert.ok(first.systemPrompt.includes("Source Reader"));
 		assert.equal(first.systemPrompt.includes("submit_note"), false);
 		assert.equal(first.systemPrompt.includes("故事创作宪法"), false, "Source 是零指令权输入，Reader 契约不带宪法");
-		assert.ok(first.text.includes("第一段。李牧在皇档"));
+		assert.ok(first.text.includes("第一段。黄盖在赤壁"));
 		assert.equal(first.text.includes("第二段"), false);
 		assert.deepEqual(first.artifacts[0]?.range, { start: 0, end: split });
 
 		// 笔记的 sha 对不上当前材料就不算数：覆盖率不动，合并仍被拒。
 		await noteAt(0, [0, split], "f".repeat(64), "来自别的材料版本的笔记");
 		assert.deepEqual(sourceCoverage(await project.checkoutCandidate(), "访谈").covered, []);
-		await noteAt(1, [0, split], sha, "李牧在皇档找到密信，先不公开。");
+		await noteAt(1, [0, split], sha, "黄盖在赤壁找到火船，先不公开。");
 		const coverage = sourceCoverage(await project.checkoutCandidate(), "访谈");
 		assert.deepEqual(coverage.covered, [[0, split]]);
 		assert.deepEqual(coverage.gaps, [[split, total]]);
@@ -355,13 +355,13 @@ test("host 自己读材料：source:read 分段 Context 带上一段笔记的位
 			second.text.includes(`上一段笔记（[0, ${split})，source/访谈/notes/1.md）`),
 			"上一段笔记的位置进入下一段 Context",
 		);
-		assert.ok(second.text.includes("第三段。旧友劝他烧掉密信"));
+		assert.ok(second.text.includes("第三段。旧友劝他烧掉火船"));
 		await noteAt(2, [split, total], sha, "他去见旧友，旧友劝烧信，他没答应。");
 
 		const merge = await compileHostContext(project, "source:read:访谈");
 		assert.deepEqual(merge.source, { sourceId: "访谈", span: { start: 0, end: total }, materialSha256: sha });
 		assert.ok(merge.text.includes("2 段笔记"));
-		assert.ok(merge.text.includes("李牧在皇档找到密信，先不公开。") && merge.text.includes("旧友劝烧信"));
+		assert.ok(merge.text.includes("黄盖在赤壁找到火船，先不公开。") && merge.text.includes("旧友劝烧信"));
 		assert.equal(merge.artifacts[0]?.range, undefined, "合并 Context 引用整份材料");
 
 		// 读完了但还没有已提交的抽取：没有可审的东西，不编出一份空的审稿输入
@@ -376,12 +376,12 @@ test("host 自己读材料：source:read 分段 Context 带上一段笔记的位
 		);
 		await writeFile(
 			join(checkoutPath, "source", "访谈", "outline", "story", "vol-0001", "beat-0001.md"),
-			"---\ntitle: 密信\n---\n李牧在皇档找到密信，没有公开，也没有听旧友的劝烧掉它。\n",
+			"---\ntitle: 火船\n---\n黄盖在赤壁找到火船，没有公开，也没有听旧友的劝烧掉它。\n",
 		);
 		await project.commitCheckout();
 		const review = await compileHostContext(project, "review:source:访谈");
 		assert.deepEqual(review.review, { layer: "source", sourceId: "访谈" });
-		assert.ok(review.text.includes("李牧在皇档找到密信，先不公开。"), "Source Review 拿到 host 写的笔记");
+		assert.ok(review.text.includes("黄盖在赤壁找到火船，先不公开。"), "Source Review 拿到 host 写的笔记");
 		assert.ok(review.text.includes("也没有听旧友的劝烧掉它"), "也拿到已提交的抽取");
 	});
 });

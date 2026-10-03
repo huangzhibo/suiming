@@ -14,16 +14,16 @@ import { twoBeatDesignDocuments } from "./fixture.js";
 test("自然语言 Design 绑定为可检查的统一模型", () => {
 	const design = bindDesignDocuments(twoBeatDesignDocuments());
 	assert.equal(design.story.beats[1]?.refs.includes("beat:beat-0001"), true);
-	assert.equal(design.stateProjection.initial[0]?.subject, "resource:密信");
-	assert.equal(design.stateProjection.initial[0]?.value, "character:李牧");
-	assert.equal(design.contracts[0]?.id, "真相的代价");
+	assert.equal(design.stateProjection.initial[0]?.subject, "resource:火船");
+	assert.equal(design.stateProjection.initial[0]?.value, "character:黄盖");
+	assert.equal(design.contracts[0]?.id, "诈降");
 
 	const full = checkDesign(design);
 	assert.equal(full.passed, true);
 	assert.equal(full.contracts.results[0]?.status, "resolved");
 	assert.equal(
 		full.state.finalState.some(
-			(item) => item.subject === "resource:密信" && item.property === "consumed" && item.value === true,
+			(item) => item.subject === "resource:火船" && item.property === "consumed" && item.value === true,
 		),
 		true,
 	);
@@ -34,11 +34,11 @@ test("index 声明 open_ended：全书未完待续时，已建立未回应的 bo
 	// 全书期限、已在 beat-0001 建立、到最后一个 Beat 仍未回应：连载写到一半的常态
 	docs.contracts[0] = {
 		...(docs.contracts[0] as (typeof docs.contracts)[number]),
-		markdown: "---\nsubjects:\n  character: [李牧]\ndeadline: book_end\n---\n李牧公开真相时，必须失去唯一密信。",
+		markdown: "---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n黄盖公开真相时，必须失去唯一火船。",
 	};
 	docs.beats[1] = {
 		...(docs.beats[1] as (typeof docs.beats)[number]),
-		markdown: (docs.beats[1]?.markdown ?? "").replace("contracts:\n  resolve: [真相的代价]\n", ""),
+		markdown: (docs.beats[1]?.markdown ?? "").replace("contracts:\n  resolve: [诈降]\n", ""),
 	};
 	const finished = checkDesign(bindDesignDocuments(docs));
 	assert.equal(finished.passed, false, "没声明就是全书写完了，期待没兑现");
@@ -47,7 +47,7 @@ test("index 声明 open_ended：全书未完待续时，已建立未回应的 bo
 	docs.storyIndex = { ...(docs.storyIndex as object), open_ended: true };
 	const ongoing = checkDesign(bindDesignDocuments(docs));
 	assert.equal(ongoing.passed, true);
-	assert.deepEqual(ongoing.contracts.openContractIds, ["真相的代价"]);
+	assert.deepEqual(ongoing.contracts.openContractIds, ["诈降"]);
 	assert.deepEqual(ongoing.contracts.results, []);
 
 	// 未完待续不豁免显式的 Beat 期限，也不豁免从来没建立过的期待
@@ -57,7 +57,7 @@ test("index 声明 open_ended：全书未完待续时，已建立未回应的 bo
 	);
 	docs.beats[0] = {
 		...(docs.beats[0] as (typeof docs.beats)[number]),
-		markdown: (docs.beats[0]?.markdown ?? "").replace("open: [真相的代价]", "open: [真相的代价, 限期]"),
+		markdown: (docs.beats[0]?.markdown ?? "").replace("open: [诈降]", "open: [诈降, 限期]"),
 	};
 	const strict = checkDesign(bindDesignDocuments(docs));
 	assert.equal(strict.passed, false);
@@ -76,7 +76,7 @@ test("Contract 没兑现的诊断说清是哪一种：从未建立、到期未�
 		(checkDesign(bindDesignDocuments(docs)).diagnostics ?? []).map((item) => [item.path, item.message, item.hint]);
 	const beat = (index: number) => docs.beats[index] as (typeof docs.beats)[number];
 	// beat-0002 不再兑现：期限就是 beat-0002
-	docs.beats[1] = { ...beat(1), markdown: beat(1).markdown.replace("contracts:\n  resolve: [真相的代价]\n", "") };
+	docs.beats[1] = { ...beat(1), markdown: beat(1).markdown.replace("contracts:\n  resolve: [诈降]\n", "") };
 	docs.contracts.push(
 		{ id: "空头", path: "outline/contracts/空头.md", markdown: "---\ndeadline: book_end\n---\n从未建立。" },
 		{ id: "悬案", path: "outline/contracts/悬案.md", markdown: "---\ndeadline: book_end\n---\n一直没回应。" },
@@ -84,7 +84,7 @@ test("Contract 没兑现的诊断说清是哪一种：从未建立、到期未�
 	);
 	docs.beats[0] = {
 		...beat(0),
-		markdown: beat(0).markdown.replace("open: [真相的代价]", "open: [真相的代价, 悬案, 迟到]"),
+		markdown: beat(0).markdown.replace("open: [诈降]", "open: [诈降, 悬案, 迟到]"),
 	};
 	docs.beats[1] = {
 		...beat(1),
@@ -92,9 +92,9 @@ test("Contract 没兑现的诊断说清是哪一种：从未建立、到期未�
 	};
 	assert.deepEqual(contractDiagnostics(), [
 		[
-			"outline/contracts/真相的代价.md",
-			"StoryContract 真相的代价：到期限 beat-0002 还没有兑现",
-			"在 beat-0002 或更早的 StoryBeat 里写 contracts.resolve: [真相的代价]",
+			"outline/contracts/诈降.md",
+			"StoryContract 诈降：到期限 beat-0002 还没有兑现",
+			"在 beat-0002 或更早的 StoryBeat 里写 contracts.resolve: [诈降]",
 		],
 		[
 			"outline/contracts/空头.md",
@@ -119,21 +119,21 @@ test("Checker 报告硬状态冲突的原始 StoryBeat 位置", () => {
 	const second = documents.beats[1];
 	assert.ok(second);
 	second.markdown = second.markdown.replace(
-		"    密信.consumed: true\n",
-		"    密信.consumed: true\n    密信.holder: 李牧\n",
+		"    火船.consumed: true\n",
+		"    火船.consumed: true\n    火船.holder: 黄盖\n",
 	);
 	const result = checkDesign(bindDesignDocuments(documents));
 	assert.equal(result.passed, false);
 	assert.equal(result.state.failures[0]?.code, "conflicting_assignment");
 	assert.equal(result.diagnostics?.[0]?.path, "outline/story/vol-0001/beat-0002.md");
-	assert.equal(result.diagnostics?.[0]?.pointer, "/frontmatter/changes/world/密信.holder");
+	assert.equal(result.diagnostics?.[0]?.pointer, "/frontmatter/changes/world/火船.holder");
 });
 
 test("StoryBeat 依赖必须指向更早且真实存在的 Beat", () => {
 	const documents = twoBeatDesignDocuments();
 	const first = documents.beats[0];
 	assert.ok(first);
-	first.markdown = first.markdown.replace("  secret: [旧案真相]", "  secret: [旧案真相]\n  beat: [beat-0002]");
+	first.markdown = first.markdown.replace("  secret: [苦肉计]", "  secret: [苦肉计]\n  beat: [beat-0002]");
 	assert.throws(
 		() => bindDesignDocuments(documents),
 		(error: unknown) => error instanceof StoryParseError && error.code === "story_dependency_not_prior",
@@ -170,7 +170,7 @@ test("StoryText 完整性与 exact Intent 由纯验证器检查", () => {
 	});
 	const design = bindDesignDocuments(documents);
 	const incomplete = verifyStoryText(design.story, design.intents, [
-		{ storyBeatId: "beat-0001", text: "李牧读完密信。" },
+		{ storyBeatId: "beat-0001", text: "黄盖读完火船。" },
 	]);
 	assert.deepEqual(
 		incomplete.failures.map((failure) => failure.code),
@@ -178,14 +178,14 @@ test("StoryText 完整性与 exact Intent 由纯验证器检查", () => {
 	);
 
 	const missingExact = verifyStoryText(design.story, design.intents, [
-		{ storyBeatId: "beat-0001", text: "李牧读完密信。" },
-		{ storyBeatId: "beat-0002", text: "他烧掉密信，转身离开。" },
+		{ storyBeatId: "beat-0001", text: "黄盖读完火船。" },
+		{ storyBeatId: "beat-0002", text: "他烧掉火船，转身离开。" },
 	]);
 	assert.equal(missingExact.failures[0]?.code, "exact_intent_missing");
 
 	const complete = verifyStoryText(design.story, design.intents, [
-		{ storyBeatId: "beat-0001", text: "李牧读完密信。" },
-		{ storyBeatId: "beat-0002", text: "他烧掉密信：此事到此为止。" },
+		{ storyBeatId: "beat-0001", text: "黄盖读完火船。" },
+		{ storyBeatId: "beat-0002", text: "他烧掉火船：此事到此为止。" },
 	]);
 	assert.equal(complete.passed, true);
 });

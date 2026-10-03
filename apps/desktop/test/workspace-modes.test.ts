@@ -55,7 +55,7 @@ test("统一文档：文件树准确切换设计与正文，草稿分别保存�
 		const designFile = page.locator(`[data-file-path="${design}"]`);
 		await designFile.click();
 		await page.getByRole("radio", { name: "设计", exact: true, checked: true }).waitFor();
-		await page.locator(".cm-content").filter({ hasText: "李牧进入皇档" }).waitFor();
+		await page.locator(".cm-content").filter({ hasText: "黄盖进入赤壁" }).waitFor();
 		const updatedDesign = `${originalDesign}\n设计补充。`;
 		await page.locator(".cm-content").fill(updatedDesign);
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
@@ -111,7 +111,7 @@ test("内容意图与通用分屏：空正文回退、独立导航、共享草�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
-	await writeFile(join(root, "text/beat-0001.md"), "李牧推开皇档的大门。\n\n".repeat(80));
+	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的大门。\n\n".repeat(80));
 	const app = await electron.launch({
 		args: [
 			resolve("apps/desktop/test-dist/entry.js"),
@@ -164,7 +164,7 @@ test("内容意图与通用分屏：空正文回退、独立导航、共享草�
 		assert.equal(await page.getByRole("menuitem", { name: "查看对应作品对象", exact: true }).count(), 0);
 		await page.keyboard.press("Escape");
 		await pane().getByRole("button", { name: "切换到编辑视图", exact: true }).click();
-		await pane().locator(".cm-content").filter({ hasText: "李牧推开皇档的大门。" }).waitFor();
+		await pane().locator(".cm-content").filter({ hasText: "黄盖推开赤壁的大门。" }).waitFor();
 		await pane().getByRole("button", { name: "切换到阅读视图", exact: true }).click();
 		await pane().locator("[data-prose]").waitFor();
 		assert.equal(await page.locator(".tab-btn").count(), 1);

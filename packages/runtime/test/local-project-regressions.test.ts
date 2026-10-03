@@ -38,14 +38,14 @@ async function writeAllText(service: LocalProjectService): Promise<void> {
 				identity: targetArtifactIdentity("story-text", "beat-0001"),
 				path: "text/beat-0001.md",
 				mediaType: "text/markdown; charset=utf-8",
-				bytes: encoder.encode("李牧走入皇档。\n\n他在尘封木匣里找到了密信。"),
+				bytes: encoder.encode("黄盖走入赤壁。\n\n他在尘封木匣里找到了火船。"),
 			},
 			{
 				operation: "create",
 				identity: targetArtifactIdentity("story-text", "beat-0002"),
 				path: "text/beat-0002.md",
 				mediaType: "text/markdown; charset=utf-8",
-				bytes: encoder.encode("天亮前，他公开真相，亲手把唯一的密信送进火里。"),
+				bytes: encoder.encode("天亮前，他公开真相，亲手把唯一的火船送进火里。"),
 			},
 		],
 	};
@@ -72,7 +72,7 @@ test("发布 Release 后 host 修改正文仍能提交，Release 只变为 stale
 		await service.commitManagedChangeSet({ baseRevisionId: before.head, operations: published.operations });
 		assert.ok((await service.exportRevision()).some((file) => file.path === "release/manifest.yaml"));
 
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "李牧走入皇档。\n\n他找到了密信，并且犹豫了。");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖走入赤壁。\n\n他找到了火船，并且犹豫了。");
 		const committed = await service.commitCheckout();
 		assert.equal(committed.created, true);
 		assert.equal((await service.status()).state, "clean");
@@ -120,7 +120,7 @@ test("host 修改一章正文只让审查该章的审稿失效，其余审稿与
 
 		await writeFile(
 			join(checkoutPath, "text", "beat-0002.md"),
-			"天亮前，他公开真相，亲手把密信送进火里。人群沉默许久。",
+			"天亮前，他公开真相，亲手把火船送进火里。人群沉默许久。",
 		);
 		const committed = await service.commitCheckout();
 		assert.equal(committed.created, true);
@@ -229,7 +229,7 @@ test("Beat 文件与 index 对不上时 status / diff 仍可读，check 回到�
 		await mkdir(join(fixture.checkoutPath, "outline", "story", "vol-0001"), { recursive: true });
 		await writeFile(
 			join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0003.md"),
-			"---\nsubjects:\n  character: [李牧]\n---\n新写的一节。\n",
+			"---\nsubjects:\n  character: [黄盖]\n---\n新写的一节。\n",
 		);
 		const added = await active.status();
 		assert.equal(added.state, "dirty");
