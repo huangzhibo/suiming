@@ -1,6 +1,6 @@
 # AG-UI 采用评估
 
-**状态：历史选型研究（2026-09-07），不是现行规范。**结论「以 AG-UI 标准事件加有 schema 的 Suiming 扩展取代自定义 RunEvent，不长期并存两套协议」已进入 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md) 决定 6 与[技术栈](technology.md)「AG-UI 与传输」，2026-09-08 落地；关于 pi 内循环的建议由 [ADR-0012](adr/0012-own-suiming-harness.md) 取代。文中描述的 RunEventSchema、RunEngine、worktree、TUI 与 Conversation 都已不在：`packages/sdk/src/run-event.ts` 现在定义的就是 AG-UI 事件，threadId 是 sessionId、runId 是 turn id，桌面只读 attach 不走 SSE。TanStack 默认连接适配器的探针结论只对将来的 Web / SSE 接入有参考价值。
+**状态：历史选型研究（2026-09-07），不是现行规范。**结论「以 AG-UI 标准事件加有 schema 的 Suiming 扩展取代自定义 RunEvent，不长期并存两套协议」已进入 [ADR-0011](../adr/0011-desktop-product-and-autonomous-runtime.md) 决定 6 与[技术栈](../technology.md)「AG-UI 与传输」，2026-09-08 落地；关于 pi 内循环的建议由 [ADR-0012](../adr/0012-own-suiming-harness.md) 取代。文中描述的 RunEventSchema、RunEngine、worktree、TUI 与 Conversation 都已不在：`packages/sdk/src/run-event.ts` 现在定义的就是 AG-UI 事件，threadId 是 sessionId、runId 是 turn id，桌面只读 attach 不走 SSE。TanStack 默认连接适配器的探针结论只对将来的 Web / SSE 接入有参考价值。
 
 日期：2026-09-07。评估基线：main / 262ee4d。
 

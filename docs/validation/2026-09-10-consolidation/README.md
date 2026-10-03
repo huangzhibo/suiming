@@ -2,7 +2,7 @@
 
 ## 范围
 
-本轮检查历次工作台改动及 Desktop / SDK / Runtime 接入，实施内容见[审查与收敛记录](../../workbench-consolidation.md)。未引入依赖，未修改真实作品；原生窗口检查使用 eval-022 的临时副本，自动化使用独立临时作品与 faux provider。
+本轮检查历次工作台改动及 Desktop / SDK / Runtime 接入，实施内容见[审查与收敛记录](../../history/workbench-consolidation.md)。未引入依赖，未修改真实作品；原生窗口检查使用 eval-022 的临时副本，自动化使用独立临时作品与 faux provider。
 
 ## 自动验证
 

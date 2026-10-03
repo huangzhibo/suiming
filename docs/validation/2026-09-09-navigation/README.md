@@ -1,6 +1,6 @@
 # 2026-09-09 导航与文档交互验收
 
-依据：[优化方案](../../workbench-navigation-optimization.md)。本轮验证当前实现，不沿用上一轮截图作为通过证据。
+依据：[优化方案](../../history/workbench-navigation-optimization.md)。本轮验证当前实现，不沿用上一轮截图作为通过证据。
 
 ## 实现与验证
 

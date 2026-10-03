@@ -1,6 +1,6 @@
 # Agent 原生对话交互验收
 
-2026-09-10。依据[源码参考与实施边界](../../assistant-ui-reference-review.md)和[输入能力方案](../../agent-input-capabilities.md)，使用既有 React / shadcn / TanStack / typed IPC 自行实现，没有新增 assistant-ui 或其他运行时依赖。
+2026-09-10。依据[源码参考与实施边界](../../history/assistant-ui-reference-review.md)和[输入能力方案](../../history/agent-input-capabilities.md)，使用既有 React / shadcn / TanStack / typed IPC 自行实现，没有新增 assistant-ui 或其他运行时依赖。
 
 ## 已验收行为
 

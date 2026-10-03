@@ -1,6 +1,6 @@
 # 工作台视图、分屏与页面菜单方案
 
-状态：2026-09-09 的方案，已实施（[实现与验收](validation/2026-09-09-view-implementation/README.md)），不再维护；承接[模式审查](validation/2026-09-09-mode-review/README.md)，「版本差异的边界」一节是 2026-09-10 补的。现行规则见[作者工作台设计](web-product-design.md) 3.3 与 4.3。
+状态：2026-09-09 的方案，已实施（[实现与验收](../validation/2026-09-09-view-implementation/README.md)），不再维护；承接[模式审查](../validation/2026-09-09-mode-review/README.md)，「版本差异的边界」一节是 2026-09-10 补的。现行规则见[作者工作台设计](../web-product-design.md) 3.3 与 4.3。
 
 ## 目标与职责
 

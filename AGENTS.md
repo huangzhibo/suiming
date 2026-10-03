@@ -16,7 +16,7 @@
 - 发生过什么：[变更记录](docs/changelog.md)
 - 命令、检查脚本的隐含约束、提交规则与踩坑记录：[CLAUDE.md](CLAUDE.md)（不只写给 Claude Code，人和其他 coding agent 改代码前也要读）
 - 旧仓边界：[迁移方案](docs/migration-from-suiming-story.md)
-- ADR 是历史决策，不是当前规范；已完成的方案——[重构方案](docs/refactoring-plan.md)、[收敛方案](docs/consolidation-plan.md)——保留形成过程，也不是现行规范；撤掉「委托」概念的理由见[需求与目标](docs/vision-and-requirements.md) 5.1 节「作者意图与对话」。
+- ADR 是历史决策，不是当前规范；已完成或被取代的方案与评估在 [docs/history](docs/history/README.md)，保留形成过程，也不是现行规范。撤掉「委托」概念的理由见[需求与目标](docs/vision-and-requirements.md) 5.1 节「作者意图与对话」。
 - 开源前的提交历史不在本仓：2026-10-03 开源时，之前的 409 个提交压成了一个基线提交（`chore: 开源基线（MIT）`）；本仓的另一个起点是 2023-09-28 建仓时的 8 个提交，由合并提交接入。文档里 2026-10-03 及之前的 7 位提交号、「看当时的提交信息」都指那段历史，本仓查不到；该保留的设计理由已经写在上面这些文档里。维护者本机在本仓旁边留有完整归档（裸仓 `../suiming-history-2026-10-03.git`），在那里用 `git log -L` 或 `git blame <提交> -- <文件>` 追到逐行的旧理由；其他环境没有这份归档。
 
 Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真源；不要在架构文档、Prompt、API 或 UI 中复制字段表。以下约束定义目标架构，当前代码与差距以当前状态为准。

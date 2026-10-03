@@ -1,6 +1,6 @@
 # Graph Engineering 对 Suiming 的适配研究
 
-**状态：历史研究（2026-09-07，2026-09-12 补第 1.1 节），不是现行规范。**结论已用于 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md) 与 AGENTS.md 不变量 5、8；关于 pi 内循环与替代后端的建议由 [ADR-0012](adr/0012-own-suiming-harness.md) 取代。文中的 `RunEngine` 现为 `SuimingHarness`；Run / Attempt、worktree、ContextSnapshot、Cloud 执行存储，以及第 1 节表中「执行中调整任务结构」一行与第 1.1 节说「已经在做」的 `plan` / `execute_task`，都已于 2026-09-13 删除。现行执行模型见 [Harness 设计](harness-design.md)第 2 节。
+**状态：历史研究（2026-09-07，2026-09-12 补第 1.1 节），不是现行规范。**结论已用于 [ADR-0011](../adr/0011-desktop-product-and-autonomous-runtime.md) 与 AGENTS.md 不变量 5、8；关于 pi 内循环与替代后端的建议由 [ADR-0012](../adr/0012-own-suiming-harness.md) 取代。文中的 `RunEngine` 现为 `SuimingHarness`；Run / Attempt、worktree、ContextSnapshot、Cloud 执行存储，以及第 1 节表中「执行中调整任务结构」一行与第 1.1 节说「已经在做」的 `plan` / `execute_task`，都已于 2026-09-13 删除。现行执行模型见 [Harness 设计](../harness-design.md)第 2 节。
 
 日期：2026-09-07。代码基线：main / `262ee4d`，连同本轮[重构方案](refactoring-plan.md)。
 
@@ -72,7 +72,7 @@ LangGraph 可以实现部分图执行机制，但 Graph Engineering 与具体框
 
 一份委托可能同时要求修改人物、调整远处 Beat、续写当前正文并检查一致性。已完成步骤的结果会改变下一步工作；作者也可能在中途补充意图。这类工作有真实的依赖、分支和回查需求，适合由 Agent 维护显式结构。
 
-现有 R1 已出现关羽旧案同时涉及人物、beat-0004、beat-0069 与 Contract 的修改；完整闭环需要分成 Design、两个 Writer、Review 四个 Run，由调用方串联。这里的不足是跨能力持续决策，不是缺少更多角色。[真实运行记录](current-status.md)
+现有 R1 已出现关羽旧案同时涉及人物、beat-0004、beat-0069 与 Contract 的修改；完整闭环需要分成 Design、两个 Writer、Review 四个 Run，由调用方串联。这里的不足是跨能力持续决策，不是缺少更多角色。[真实运行记录](../current-status.md)
 
 graph 的潜在贡献是让“接下来哪些工作还成立、哪些必须重新安排”可以被系统核对，而不只由 Agent 在长对话里记住。它不需要预先拆出整部 69 Beat 作品的全部任务；远期目标可以保持粗粒度，在进入具体工作范围时再细化。
 
@@ -91,7 +91,7 @@ graph 的潜在贡献是让“接下来哪些工作还成立、哪些必须重�
 
 ### 3.3 graph 不是当前阅读质量问题的直接解法
 
-作者第一轮盲读指出：旁白替人物解释、人物转变没有页面动作、同一信息反复成立，以及 Reviewer 把弃读级问题标成 minor / note。不同组的模型、Context 和 prompt 又存在混杂。[作者原始选择记录](author-choices/2026-09-06-blind-read-beat-0004-0005.md)
+作者第一轮盲读指出：旁白替人物解释、人物转变没有页面动作、同一信息反复成立，以及 Reviewer 把弃读级问题标成 minor / note。不同组的模型、Context 和 prompt 又存在混杂。[作者原始选择记录](../author-choices/2026-09-06-blind-read-beat-0004-0005.md)
 
 graph 可以帮助定位、分派和跟踪这些问题，不能自动判断什么文字值得读。应继续改进 Writer / Reviewer 输入与判断标准，并保持真实盲选；不能把质量修订让位给多 Agent 平台建设。
 

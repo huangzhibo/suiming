@@ -117,7 +117,7 @@ Agent 的动作覆盖发现与 Context、Source、Design、正文、检查、Rev
 
 一个 Session 就是一个根 Agent；普通工具调用不新建 Task，需要独立工作目标或 Context 时才创建子 Task。**委派基本是串行的**：`executeChild` 以父动作 id 作为子 Task 的 `key` 同步 `await`，没有并发调度器。并行只开给写入不重叠的委派——同一次回复里的多个 `source-reader`，以及带 `beatRange` 的 `source-extractor`——由 `runTaskLoop` 按工具声明的 `parallel` 一起推进、按派出顺序交付，边界见 [Harness 设计](harness-design.md)第 9 节。所有任务复用一个 loop 和同一引擎，不新增 per-capability service、coordinator 或 executor。
 
-**计划不是实体**：没有 `plan` / `execute_task`，也没有显式任务图，模型要分步就在消息里分步（[Harness 设计](harness-design.md)第 2 节）。留下的是父子委派与结果依赖分开——子任务不等待尚未结束的父 Agent，已完成历史不重写。实际读取、执行依赖和可能的故事影响分别表达；不引入第二套状态库或有效性规则。详细取舍见 [Graph Engineering 研究](graph-engineering-assessment.md)。
+**计划不是实体**：没有 `plan` / `execute_task`，也没有显式任务图，模型要分步就在消息里分步（[Harness 设计](harness-design.md)第 2 节）。留下的是父子委派与结果依赖分开——子任务不等待尚未结束的父 Agent，已完成历史不重写。实际读取、执行依赖和可能的故事影响分别表达；不引入第二套状态库或有效性规则。详细取舍见 [Graph Engineering 研究](history/graph-engineering-assessment.md)。
 
 Design / Write / Source / Review 不是带权限预设的入口，只是桌面与 CLI 发出的消息模板（[Harness 设计](harness-design.md)第 6 节「scope 去掉」）；写入范围只随委派的 profile 收窄。
 

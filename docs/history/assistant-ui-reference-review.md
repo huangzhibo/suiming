@@ -1,6 +1,6 @@
 # assistant-ui 对话功能源码参考
 
-状态：2026-09-10 的源码研究笔记，不再维护。研究对象是 [assistant-ui](https://github.com/assistant-ui/assistant-ui) 的 `0bea0fc504a169ccb699c4c9efd2d7a29651c186` 提交（2026-09-09，`@assistant-ui/react` 0.15.18），只读了实现和测试，没有运行示例、测试或音频服务。其中的非音频交互已按 Suiming 自己的边界实现、没有引入依赖（[验收](validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](web-product-design.md) 4.1；语音未排期，待做边界见 [Agent 输入能力方案](agent-input-capabilities.md)。文中的 `run.launch` / `run.steer` / `run.steering` 与「委托」是当时的名字，现在分别对应 `session.send`、`session.inbox` 与「对话」。
+状态：2026-09-10 的源码研究笔记，不再维护。研究对象是 [assistant-ui](https://github.com/assistant-ui/assistant-ui) 的 `0bea0fc504a169ccb699c4c9efd2d7a29651c186` 提交（2026-09-09，`@assistant-ui/react` 0.15.18），只读了实现和测试，没有运行示例、测试或音频服务。其中的非音频交互已按 Suiming 自己的边界实现、没有引入依赖（[验收](../validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](../web-product-design.md) 4.1；语音未排期，待做边界见 [Agent 输入能力方案](agent-input-capabilities.md)。文中的 `run.launch` / `run.steer` / `run.steering` 与「委托」是当时的名字，现在分别对应 `session.send`、`session.inbox` 与「对话」。
 
 ## 结论与复用边界
 
@@ -31,7 +31,7 @@ assistant-ui 有三层可供参考：
 
 研究时的 Agent 输入处理在 `run.launch` 或 `run.steer` 返回后无条件执行 `setGoal("")` 和清除引用。等待期间文本框仍可编辑，因此存在后输入的文字或引用被清掉的源码风险；此次实现用故障注入桌面测试验证了回包丢失和继续输入场景。
 
-[工作台](../apps/web/src/workspace.tsx) 已按委托保存草稿，可以直接补强：
+[工作台](../../apps/web/src/workspace.tsx) 已按委托保存草稿，可以直接补强：
 
 - 一次发送绑定作品、原委托、草稿版本与命令 ID；冻结本次文字及引用，后续输入形成新的草稿状态。
 - 成功只确认本次提交，不清空后来加入的内容。失败只恢复未派发内容，不覆盖新草稿。
@@ -47,7 +47,7 @@ assistant-ui 的 composer 及测试对这些边界处理较细。应借鉴规则
 
 「＋」是可发现的入口，`@` 是快捷入口，两者使用同一个作品对象选择器。支持标题、类型、路径和中文搜索；插入结构化引用，不只是替换成一段名字。
 
-assistant-ui 默认附件 adapter 包含图片与部分文本文件处理。附件卡片不等于已经支持 PDF 解析、OCR 或模型多模态。当前 [SDK 命令](../packages/sdk/src/workspace-commands.ts) 的 `run.launch` / `run.steer` 只接收文字，需同时打通实际内容传递和恢复能力。
+assistant-ui 默认附件 adapter 包含图片与部分文本文件处理。附件卡片不等于已经支持 PDF 解析、OCR 或模型多模态。当前 [SDK 命令](../../packages/sdk/src/workspace-commands.ts) 的 `run.launch` / `run.steer` 只接收文字，需同时打通实际内容传递和恢复能力。
 
 ### 3. 让长对话可读、可回看
 

@@ -41,11 +41,11 @@ git 给不了的只有四件事：Checker 门禁（只有通过确定性检查�
 - **`.suiming/canon.git` bare repo 形状作废。**它本身就是一个刻意差异：作品目录是普通 git 仓库，谁都可以 commit（那是候选），`suim commit` 跑 Checker 后推进受保护的 canon ref。原形状把 Checker 门禁做成结构强制，代价是历史对 git 工具不可见。
 - **「在此之前不动」的触发条件不再成立。**当时的理由是切换收益拿不到而风险立刻要付；现在的判断是继续按自建版本走会把重复固化进端口化与 Cloud，收敛期一起做反而更便宜。
 
-仍待裁决的五条与执行顺序见[收敛方案](../consolidation-plan.md)第 3.5 节与第 4 节：git spike（用作品本体真实规模验证 isomorphic-git 的 commit / diff / 三方合并耗时与打包体积）通过后才迁移，结论写回本 ADR 并改状态。
+仍待裁决的五条与执行顺序见[收敛方案](../history/consolidation-plan.md)第 3.5 节与第 4 节：git spike（用作品本体真实规模验证 isomorphic-git 的 commit / diff / 三方合并耗时与打包体积）通过后才迁移，结论写回本 ADR 并改状态。
 
 ## 2026-09-12 spike：isomorphic-git 在真实与终局规模上的实测
 
-按[收敛方案](../consolidation-plan.md)第 4 节第 5 步执行，在 eval-022 的作品本体副本上跑（151 文件 / 776 KB，不含 `.suiming`）。isomorphic-git 1.42.2。
+按[收敛方案](../history/consolidation-plan.md)第 4 节第 5 步执行，在 eval-022 的作品本体副本上跑（151 文件 / 776 KB，不含 `.suiming`）。isomorphic-git 1.42.2。
 
 **结论：通过。**本 ADR 原本把「对纯 JS git 实现的依赖」列为主要技术风险，实测不成立。
 
@@ -76,7 +76,7 @@ Run worktree 从一个 commit 全量物化到新目录：**39 ms**（151 文件�
 
 ## 2026-09-12：五条待裁决的结论
 
-[收敛方案](../consolidation-plan.md)第 3.5 节原列「需要一起裁决的五条」，查证后只有两条是真的开放选择：
+[收敛方案](../history/consolidation-plan.md)第 3.5 节原列「需要一起裁决的五条」，查证后只有两条是真的开放选择：
 
 - **候选 commit 未过 Checker、提交语义改为 promote 校验后移 ref**——这两条是「作品目录是普通 git 仓库」这个形状的蕴含，没有第二种可能。
 - **Canon 门禁仍然是结构性的**，不是「退为工具强制」：canon ref 只由 promote 移动，普通 commit 进不了 Canon，不变量 3 照旧成立。作者可以 `git update-ref` 手动搬 ref 绕过，但那与今天直接改 `.suiming` 里的 SQLite 同级，不是新增的弱化。

@@ -1,6 +1,6 @@
 # 分栏调宽与窄栏导航验收
 
-日期：2026-09-09。对应[导航优化方案](../../workbench-navigation-optimization.md)及[作者工作台设计](../../web-product-design.md)第 3.2 节。
+日期：2026-09-09。对应[导航优化方案](../../history/workbench-navigation-optimization.md)及[作者工作台设计](../../web-product-design.md)第 3.2 节。
 
 本文保留首轮分栏验收。随后根据作者截图，菜单切换已改为实际空间测量，撤回下文的固定 280px 阈值；「顺序」更名为「大纲」并排首位。最新行为及截图见[导航收纳与默认大纲修正](../2026-09-09-navigation-fit/README.md)。
 

@@ -1,6 +1,6 @@
 # 桌面 UI / UX 与可视化重审
 
-状态：2026-09-08 的设计审查与讨论稿，已被取代，不再维护。第 14 节确认的「窄导航轨＋上下文栏」被当晚落地的 v7 布局取代，第 2 节的六模块导航从未实现；第 3、6 节的事实边界已并入[可视化设计](visualization-design.md) 1.1–1.2，第 4 节 48 个视角里数据就绪的部分收敛成了同文的故事轴与邻域图。文中的委托、Run / Task / Attempt、预算、ContextSnapshot、DesignCommit 都是当时的概念，现已删除。现行规则见[作者工作台设计](web-product-design.md)与[可视化设计](visualization-design.md)。
+状态：2026-09-08 的设计审查与讨论稿，已被取代，不再维护。第 14 节确认的「窄导航轨＋上下文栏」被当晚落地的 v7 布局取代，第 2 节的六模块导航从未实现；第 3、6 节的事实边界已并入[可视化设计](../visualization-design.md) 1.1–1.2，第 4 节 48 个视角里数据就绪的部分收敛成了同文的故事轴与邻域图。文中的委托、Run / Task / Attempt、预算、ContextSnapshot、DesignCommit 都是当时的概念，现已删除。现行规则见[作者工作台设计](../web-product-design.md)与[可视化设计](../visualization-design.md)。
 
 目标是帮助作者理解、判断和改变故事。当前实现已验证执行和版本链路，但没有形成与长篇创作相称的信息架构。分栏、配色和组件库只是表达手段；可视化的验收对象是作者完成了什么判断、依据是否准确、修改是否可控。
 
@@ -10,7 +10,7 @@
 
 ### 步骤 1：打开作品并查看情节——可操作，组织方式不足
 
-![当前作品工作台](validation/2026-09-08-desktop-ux/01-workbench.png)
+![当前作品工作台](../validation/2026-09-08-desktop-ux/01-workbench.png)
 
 - 正文区域稳定，阅读、编辑、比较以及保存状态可找到，这是可保留的基础。
 - 导航和大标题主要显示 `beat-0001`，卷的组织没有呈现。当前样例未提供 Beat title，但 UI 仍需要友好的回退标题；ID 可以进入详情，不应占据作者的主阅读层。
@@ -21,7 +21,7 @@
 
 ### 步骤 2：Agent 等待作者选择——可回应，决策表达不足
 
-![等待作者决策](validation/2026-09-08-desktop-ux/02-author-decision.png)
+![等待作者决策](../validation/2026-09-08-desktop-ux/02-author-decision.png)
 
 - 问题可见，作者可以回应，原文没有被自动切走。
 - 同一个问题同时出现在暂停提示和 transcript，但没有明确呈现两种选择影响哪些段落、涉及什么代价。
@@ -30,7 +30,7 @@
 
 ### 步骤 3：打开审稿报告——证据可达，修订空间不足
 
-![当前审稿界面](validation/2026-09-08-desktop-ux/03-review.png)
+![当前审稿界面](../validation/2026-09-08-desktop-ux/03-review.png)
 
 - 报告区分当前版本，能够打开被审快照和当前文本，也能交给 Agent。
 - 中央已经进入 Review，顶部和底部仍沿用之前选中的情节标题、字数和文件信息，作用域容易混淆。
@@ -41,7 +41,7 @@
 
 ## 2. 从空间布局转向作者工作模式
 
-骨架保持简单：左侧窄导航轨与上下文栏、中央主工作面、可收起的辅助面。没有跨全窗的作品标题栏，也不建设任意拖放的通用桌面布局框架。统一导航规则见[作者工作台设计](web-product-design.md)第 3 节。
+骨架保持简单：左侧窄导航轨与上下文栏、中央主工作面、可收起的辅助面。没有跨全窗的作品标题栏，也不建设任意拖放的通用桌面布局框架。统一导航规则见[作者工作台设计](../web-product-design.md)第 3 节。
 
 Agent 的位置随任务变化：构思和讨论时可以占据主工作面；读写时在辅助面连续保留；结构分析时可收起为状态入口。作者显式切换布局，AI 的回复、完成或失败都不能抢走主工作面。
 
@@ -265,9 +265,9 @@ Aeon Timeline 明确区分故事世界中的 chronological order 与读者看到
 
 视觉稿按本轮对话中实际展示顺序编号：
 
-- [第 1 张：文稿与边注](design/2026-09-08-workbench-concepts/01-manuscript-and-margins.png)
-- [第 2 张：故事透镜](design/2026-09-08-workbench-concepts/02-story-lens.png)
-- [第 3 张：创作与证据并置](design/2026-09-08-workbench-concepts/03-agent-and-evidence.png)
+- [第 1 张：文稿与边注](../design/2026-09-08-workbench-concepts/01-manuscript-and-margins.png)
+- [第 2 张：故事透镜](../design/2026-09-08-workbench-concepts/02-story-lens.png)
+- [第 3 张：创作与证据并置](../design/2026-09-08-workbench-concepts/03-agent-and-evidence.png)
 
 三张均为 Image Gen 独立生成的静态探索，以第 1 节的真实界面截图为参考；目标视口为 1440 × 1024，实际图片为 1487 × 1058。当前尚未选择实现目标。它们支持讨论布局、层级和主行动，不证明组件可运行、文字像素精确或交互已通过验收。实现时需统一品牌字形和字体 token、图节点与导航选中状态，并按共享交互契约核对焦点、版本与候选状态。
 
@@ -294,7 +294,7 @@ Aeon Timeline 明确区分故事世界中的 chronological order 与读者看到
 
 作者指出第 2 张的陌生样例难以理解，并要求关注信息密度。这不只是替换故事名称：上一稿用两张大卡片和“前置情节”概括选择与后果，既占用空间，又隐藏了作者需要判断的中间机制。
 
-本轮完成[修订视觉稿：失街亭](design/2026-09-08-workbench-concepts/02-story-lens-jieting-v2.png)，保留[生成与连线校正 prompt](design/2026-09-08-workbench-concepts/02-story-lens-jieting-v2.prompt.md)。使用内置 Image Gen，以原第 2 张为参考；该稿用于继续讨论密度与阅读顺序，尚未成为实现目标。生成后检查并修正了“军法追责”的起点，使其明确从“街亭失守”连接到“挥泪斩马谡”。
+本轮完成[修订视觉稿：失街亭](../design/2026-09-08-workbench-concepts/02-story-lens-jieting-v2.png)，保留[生成与连线校正 prompt](../design/2026-09-08-workbench-concepts/02-story-lens-jieting-v2.prompt.md)。使用内置 Image Gen，以原第 2 张为参考；该稿用于继续讨论密度与阅读顺序，尚未成为实现目标。生成后检查并修正了“军法追责”的起点，使其明确从“街亭失守”连接到“挥泪斩马谡”。
 
 修订采用《三国演义》第 95—96 回“失街亭—斩马谡”。依据[第九十五回原文](https://www.sanguoyanyi.cn/sanguoyanyi-95/)与[第九十六回原文](https://zh.wikisource.org/wiki/三國演義/第096回)整理小说情节；不与《三国志》中的战役记载混用。这是用于理解界面的手工整理样例，不是已导入作品或自动图提取的验收结果。
 
@@ -322,7 +322,7 @@ Aeon Timeline 明确区分故事世界中的 chronological order 与读者看到
 
 作者提供四张侧栏截图，作为本轮视觉参考。采用的具体特征是：图 1 的紧凑树目录与底部固定控制，图 2 的固定主入口与分组内容，图 3 的低强调选中态与一致图标对齐，图 4 的作用域导航与克制的分组。截图含不同缩放和裁切，不能直接把截图像素当作 CSS 尺寸；不把参考产品的账号、项目、对话和功能目录复制进 Suiming。
 
-本轮已完成[侧栏修订视觉稿](design/2026-09-08-workbench-concepts/02-story-lens-jieting-v3-sidebar.png)，[实际生成 prompt](design/2026-09-08-workbench-concepts/02-story-lens-jieting-v3-sidebar.prompt.md)同时保留。内置 Image Gen 接收了失街亭 v2 与作者的四张原始截图；新稿经过视觉检查，目录、图节点和依据面选中对象一致，军法追责连线仍从失守节点引出。此稿是静态探索，不表示侧栏交互或 shadcn/ui 已实现。
+本轮已完成[侧栏修订视觉稿](../design/2026-09-08-workbench-concepts/02-story-lens-jieting-v3-sidebar.png)，[实际生成 prompt](../design/2026-09-08-workbench-concepts/02-story-lens-jieting-v3-sidebar.prompt.md)同时保留。内置 Image Gen 接收了失街亭 v2 与作者的四张原始截图；新稿经过视觉检查，目录、图节点和依据面选中对象一致，军法追责连线仍从失守节点引出。此稿是静态探索，不表示侧栏交互或 shadcn/ui 已实现。
 
 ### 当前作品内的侧栏
 
@@ -351,9 +351,9 @@ Aeon Timeline 明确区分故事世界中的 chronological order 与读者看到
 
 作者确认统一采用一套导航：导航轨选工作类型，上下文栏选对象，主工作面处理内容。设置也遵循同一结构，不引入整栏下钻后返回一级菜单的第二套导航。第 13 节单栏原型及讨论中混用两套导航的建议不再作为实现目标。
 
-完整模块映射、尺寸起点、窄窗口、选择与恢复规则已更新至[作者工作台设计](web-product-design.md)第 3 节，以该文为交互真源。本轮继续使用《三国演义》失街亭样例设计视觉稿，不改变样例的小说来源、派生事件、人物判断和证据边界。
+完整模块映射、尺寸起点、窄窗口、选择与恢复规则已更新至[作者工作台设计](../web-product-design.md)第 3 节，以该文为交互真源。本轮继续使用《三国演义》失街亭样例设计视觉稿，不改变样例的小说来源、派生事件、人物判断和证据边界。
 
-已生成[统一导航视觉稿](design/2026-09-08-workbench-concepts/02-story-lens-jieting-v4-rail.png)，并保留[生成与几何校正 prompt](design/2026-09-08-workbench-concepts/02-story-lens-jieting-v4-rail.prompt.md)。内置 Image Gen 的结果已表达独立导航轨、上下文目录和主面联动，军法追责分支与选中对象一致；但几何校正后图标轨与图标间距仍偏宽，尚未精确满足规范的 48px＋216px。该图可作为信息架构与内容关系参考，不能直接当作尺寸验收通过的像素稿。实现时按主规范确定 CSS 几何，需在真实窗口中复核密度，不能照搬图中偏宽的比例。
+已生成[统一导航视觉稿](../design/2026-09-08-workbench-concepts/02-story-lens-jieting-v4-rail.png)，并保留[生成与几何校正 prompt](../design/2026-09-08-workbench-concepts/02-story-lens-jieting-v4-rail.prompt.md)。内置 Image Gen 的结果已表达独立导航轨、上下文目录和主面联动，军法追责分支与选中对象一致；但几何校正后图标轨与图标间距仍偏宽，尚未精确满足规范的 48px＋216px。该图可作为信息架构与内容关系参考，不能直接当作尺寸验收通过的像素稿。实现时按主规范确定 CSS 几何，需在真实窗口中复核密度，不能照搬图中偏宽的比例。
 
 ### 本轮设计验收
 
@@ -367,7 +367,7 @@ Aeon Timeline 明确区分故事世界中的 chronological order 与读者看到
 
 ### 最新侧栏版式参考
 
-作者随后再次提供[窄轨与树目录截图](design/2026-09-08-workbench-concepts/references/sidebar-tree-user.png)。这张原图已原样保存，作为侧栏空间结构与密度的直接参照；不再用生成稿中偏宽的导航轨推导实际尺寸。
+作者随后再次提供[窄轨与树目录截图](../design/2026-09-08-workbench-concepts/references/sidebar-tree-user.png)。这张原图已原样保存，作为侧栏空间结构与密度的直接参照；不再用生成稿中偏宽的导航轨推导实际尺寸。
 
 - 原生窗口按钮与少量工具集中在左侧顶部的紧凑区域，下面开始窄导航轨与上下文目录。
 - 模块名称与目录操作合成紧凑工具行；搜索按需展开，使目录尽早开始。取消生成稿顶部多行项目身份与搜索堆叠。

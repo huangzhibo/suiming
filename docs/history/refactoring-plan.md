@@ -2,7 +2,7 @@
 
 日期：2026-09-07。代码基线：main / `262ee4d`。
 
-**状态：历史方案，不是现行规范。**2026-09-07 设计，2026-09-08 落地了自有 Harness、自主 Agent、AG-UI 事件与首个桌面闭环。2026-09-13 的 Session 模型推翻了其中的执行部分：第 2 节表中 Agent、Task / Attempt、agent graph 三行，3.2 的 Run worktree 与合并，第 5 节全部（Run / Task / Attempt、`completed` 的交付判定、预算），7.2 的 ID 表，以及第 9 节「ADR-0010 仍是 Proposed」（它已于 2026-09-12 Accepted）；TUI 已删除，第 6 节的 pi-ai 现为 0.99.2。3.2「自动保存成功才能显示已保存」已被[作者工作台设计](web-product-design.md)改为手动保存；3.4 拟定的性能门槛（常用操作 p95 小于 200 ms）已移到作者工作台设计第 7 节。现行形状见 [Harness 设计](harness-design.md)与[系统架构](architecture.md)，桌面方向沿用 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md)。
+**状态：历史方案，不是现行规范。**2026-09-07 设计，2026-09-08 落地了自有 Harness、自主 Agent、AG-UI 事件与首个桌面闭环。2026-09-13 的 Session 模型推翻了其中的执行部分：第 2 节表中 Agent、Task / Attempt、agent graph 三行，3.2 的 Run worktree 与合并，第 5 节全部（Run / Task / Attempt、`completed` 的交付判定、预算），7.2 的 ID 表，以及第 9 节「ADR-0010 仍是 Proposed」（它已于 2026-09-12 Accepted）；TUI 已删除，第 6 节的 pi-ai 现为 0.99.2。3.2「自动保存成功才能显示已保存」已被[作者工作台设计](../web-product-design.md)改为手动保存；3.4 拟定的性能门槛（常用操作 p95 小于 200 ms）已移到作者工作台设计第 7 节。现行形状见 [Harness 设计](../harness-design.md)与[系统架构](../architecture.md)，桌面方向沿用 [ADR-0011](../adr/0011-desktop-product-and-autonomous-runtime.md)。
 
 本文收敛此前关于 AG-UI、TanStack AI、Run / Task / Attempt、agent graph、Capability、Codex App Server 与 pi 的讨论，并依据当前代码确定改造边界。[AG-UI 评估](ag-ui-assessment.md)、Agent 自主性评估（已删除，原文见基线提交 `7d50f37`）与 [Graph Engineering 研究](graph-engineering-assessment.md)保留取证过程；本文保留实现缺口与迁移依据；目标规范以需求、架构和技术栈为准，实施顺序以路线图为准。
 
@@ -148,7 +148,7 @@ Agent 可以提前规划任务、执行中细化或替代尚未执行的工作�
 
 真正独立的并行工作以后按证据引入，届时必须给出只读快照或写入隔离与合并规则。当前不为尚不存在的并行分支建立调度平台。
 
-Attempt 冻结实际 provider、model、参数、prompt 与工具策略版本，可包含多个模型请求和动作。暂停、进程重启、网络重试沿用原 Attempt；显式换绑定或重试失败工作才新建，并保留同一 Task 已确认的动作身份和消息引用。换模型必须先核对在途效果，在安全边界接续，不能跳过未知请求。改变目标或输入契约另建 Task。Run / Task / Attempt 的状态分工与 ModelCall / Action 记录以[Harness 设计](harness-design.md)为准。
+Attempt 冻结实际 provider、model、参数、prompt 与工具策略版本，可包含多个模型请求和动作。暂停、进程重启、网络重试沿用原 Attempt；显式换绑定或重试失败工作才新建，并保留同一 Task 已确认的动作身份和消息引用。换模型必须先核对在途效果，在安全边界接续，不能跳过未知请求。改变目标或输入契约另建 Task。Run / Task / Attempt 的状态分工与 ModelCall / Action 记录以[Harness 设计](../harness-design.md)为准。
 
 ### 5.2 状态表达真实结果
 
@@ -184,7 +184,7 @@ Agent、Worker、Review、重试和失败调用共用 Run 预算；中断后返�
 
 ## 6. 自有 Harness 与模型凭据
 
-执行方向已确定：参考 pi-agent-core 逻辑自行实现，不依赖其 Agent / AgentHarness，不 fork / vendor 或按字段改名搬入其内核，不保留替代执行后端的比较与预留。现有 RunEngine 演进为 SuimingHarness；详细状态、动作恢复、交接、目录和验收见[Harness 设计](harness-design.md)。
+执行方向已确定：参考 pi-agent-core 逻辑自行实现，不依赖其 Agent / AgentHarness，不 fork / vendor 或按字段改名搬入其内核，不保留替代执行后端的比较与预留。现有 RunEngine 演进为 SuimingHarness；详细状态、动作恢复、交接、目录和验收见[Harness 设计](../harness-design.md)。
 
 当前项目保留 pi-ai `0.84.4`，pi-agent-core、Agent 与 pi 文件工具依赖已经删除；自有 loop 和受限文件工具在 `runtime/src/harness`。已核对的 pi `0.85.1` / commit `7d8ab31` 具有真实持久 Harness，不能用旧版本的占位实现作为选择依据。pi 源码只作参考；本次没有 fork / vendor 内核，相关 AgentTool、文件工具与 NodeExecutionEnv 引用已完整替换。
 
@@ -233,7 +233,7 @@ AG-UI 标准 schema 复用上游，Suiming 扩展使用自己的 TypeBox 边界�
 
 桌面端与创作内核是一条产品主线。视觉和交互设计从第一阶段开始，生产工作台随正确的执行与事件边界接入；不再将桌面视觉冻结到整个长篇质量验证门之后。真实正文、作者修订与盲选持续进行，不等待 UI 完成。
 
-S0–S5 的唯一详细任务清单与状态见[路线图第 4 节](roadmap.md)。S0 规范与六类界面状态已有实现与截图检查；S1 的 H1–H3 完成自有状态、循环与交接，S2 的 H4 完成持续 Agent，S3 / S4 接统一交互并交付桌面闭环，S5 深化长篇、可视化与发行。2026-09-08 已落地 H1–H4 主路径、AG-UI / TanStack / IPC 和首个桌面闭环，并以 DeepSeek V4 Flash 完成一次有预算上限的真实委托。详细验收与剩余缺口见[当前状态](current-status.md)。
+S0–S5 的唯一详细任务清单与状态见[路线图第 4 节](../roadmap.md)。S0 规范与六类界面状态已有实现与截图检查；S1 的 H1–H3 完成自有状态、循环与交接，S2 的 H4 完成持续 Agent，S3 / S4 接统一交互并交付桌面闭环，S5 深化长篇、可视化与发行。2026-09-08 已落地 H1–H4 主路径、AG-UI / TanStack / IPC 和首个桌面闭环，并以 DeepSeek V4 Flash 完成一次有预算上限的真实委托。详细验收与剩余缺口见[当前状态](../current-status.md)。
 
 第一条产品验收固定为：一次真实委托在桌面内完成修改、独立 Review、作者介入、比较与提交，中断或退出重开后继续原委托，并能显式更换模型。设计选择没有证明质量优于 Codex，真实作品与盲选持续提供证据。
 
@@ -266,7 +266,7 @@ Graph Engineering 的增量收益另与具备相同能力和可靠交接的自�
 
 以下工程不作为本次重构前置：通用 graph / workflow engine、智能模型 Router、多 agent 蜂巢、自动 verifier 平台、向量数据库、CRDT、全功能 MCP、Cloud identity / 计费、Cloud Web 或 Codex App Server 第二后端。
 
-[ADR-0010：git 作为 Canon 存储引擎](adr/0010-git-as-canon-storage-engine.md)仍是独立 Proposed 决策，本轮不默认为已接受。自主运行和桌面端继续基于现有 ProjectRevision / store port；未来底层存储选择不能改变作品权限、evidence 与提交恢复的验收条件。
+[ADR-0010：git 作为 Canon 存储引擎](../adr/0010-git-as-canon-storage-engine.md)仍是独立 Proposed 决策，本轮不默认为已接受。自主运行和桌面端继续基于现有 ProjectRevision / store port；未来底层存储选择不能改变作品权限、evidence 与提交恢复的验收条件。
 
 ## 10. 对现行规范的修订清单
 

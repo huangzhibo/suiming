@@ -1,6 +1,6 @@
 # 内容组织、页面菜单与分屏验收
 
-2026-09-09。落实[已确认方案](../../workbench-view-and-menu-proposal.md)，替换此前的专用“并排对照”和文件“源码 / 预览”分段。本轮采用现有 shadcn/ui 控件与 `react-resizable-panels`，没有新增运行状态或作品真源。
+2026-09-09。落实[已确认方案](../../history/workbench-view-and-menu-proposal.md)，替换此前的专用“并排对照”和文件“源码 / 预览”分段。本轮采用现有 shadcn/ui 控件与 `react-resizable-panels`，没有新增运行状态或作品真源。
 
 ## 实际行为
 

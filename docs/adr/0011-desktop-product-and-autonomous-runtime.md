@@ -10,7 +10,7 @@
 
 Codex 能提供结构化交接、子线程、会话恢复与自定义桌面客户端接口；原 host Skill 要求父模型转录子 Agent JSON，是本项目 adapter 的接法，不能作为 Codex 能力不足的证据。选择 pi 的依据是当前实际需要的多 provider 原生协议覆盖、模型调用前的 Context 控制，以及创作执行与作品事务的直接接入。它不证明自建方案写得更好、恢复更可靠或总维护成本更低。
 
-研究依据见 [AG-UI 评估](../ag-ui-assessment.md)、Agent 自主性评估（已删除，原文见基线提交 `7d50f37`）、[Graph Engineering 研究](../graph-engineering-assessment.md)；原方案及迁移分析见[重构方案](../refactoring-plan.md)。
+研究依据见 [AG-UI 评估](../history/ag-ui-assessment.md)、Agent 自主性评估（已删除，原文见基线提交 `7d50f37`）、[Graph Engineering 研究](../history/graph-engineering-assessment.md)；原方案及迁移分析见[重构方案](../history/refactoring-plan.md)。
 
 ## 决定
 

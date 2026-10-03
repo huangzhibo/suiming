@@ -2,15 +2,15 @@
 
 日期：2026-09-12。诊断基线：main / `52b21fb`。
 
-**状态：历史方案，不是现行规范。**作者 2026-09-12 决定做一次全局重构而不是继续局部打补丁，范围包含概念层重审，重构期间暂停长篇质量工作。第 4 节的七步当天做完，其中第 4 步的「命令目录合一、传输适配自动生成」后来定为刻意不做，只保留共用 schema 与投影（见[系统架构](architecture.md)）；第 5 节要的基线已于 2026-09-16 跑完（[第一次真实对话](validation/2026-09-16-first-real-session/README.md)）。2026-09-13 的 Session 模型又推翻了本文多处「保留」：3.1 表中的 Conversation / Run / Attempt 与 DesignCommit / lineage / ContextSnapshot，3.3 的 worktree，3.4 的 `RunBudget`，第 4 节第 6 步说 harness 调用 `mergeOpenStoryFiles`、`apps/worker` 是活代码，3.7「不撤的东西」里的 Run / Task / Attempt 与 `finish`，第 6 节「不重命名 Run / Task / Attempt」；2.1 待裁的「Agent 能不能删文件」已定为能。现行形状见 [Harness 设计](harness-design.md)第 2、16 节与[系统架构](architecture.md)。
+**状态：历史方案，不是现行规范。**作者 2026-09-12 决定做一次全局重构而不是继续局部打补丁，范围包含概念层重审，重构期间暂停长篇质量工作。第 4 节的七步当天做完，其中第 4 步的「命令目录合一、传输适配自动生成」后来定为刻意不做，只保留共用 schema 与投影（见[系统架构](../architecture.md)）；第 5 节要的基线已于 2026-09-16 跑完（[第一次真实对话](../validation/2026-09-16-first-real-session/README.md)）。2026-09-13 的 Session 模型又推翻了本文多处「保留」：3.1 表中的 Conversation / Run / Attempt 与 DesignCommit / lineage / ContextSnapshot，3.3 的 worktree，3.4 的 `RunBudget`，第 4 节第 6 步说 harness 调用 `mergeOpenStoryFiles`、`apps/worker` 是活代码，3.7「不撤的东西」里的 Run / Task / Attempt 与 `finish`，第 6 节「不重命名 Run / Task / Attempt」；2.1 待裁的「Agent 能不能删文件」已定为能。现行形状见 [Harness 设计](../harness-design.md)第 2、16 节与[系统架构](../architecture.md)。
 
-本文同时是诊断、目标形状与执行记录：查证推翻原判断时就地更正并写明为什么。这样的更正发生了不止四次，成了本轮最有用的产出之一——2.1 的委派 / 提问等待形态、2.2 的 `cancelled` 四处、3.5 决定 5 的 `artifactVersionId`（先后判错两次）、3.6 的 Agent 写字路径、第 3 步的度量结论、第 6 步切片 4 取消的两件，以及第 7 步查出的五条不实声称。git 的决定已写回 [ADR-0010](adr/0010-git-as-canon-storage-engine.md)；规范更新落在[系统架构](architecture.md)与 [Harness 设计](harness-design.md)。
+本文同时是诊断、目标形状与执行记录：查证推翻原判断时就地更正并写明为什么。这样的更正发生了不止四次，成了本轮最有用的产出之一——2.1 的委派 / 提问等待形态、2.2 的 `cancelled` 四处、3.5 决定 5 的 `artifactVersionId`（先后判错两次）、3.6 的 Agent 写字路径、第 3 步的度量结论、第 6 步切片 4 取消的两件，以及第 7 步查出的五条不实声称。git 的决定已写回 [ADR-0010](../adr/0010-git-as-canon-storage-engine.md)；规范更新落在[系统架构](../architecture.md)与 [Harness 设计](../harness-design.md)。
 
 上一版全局方案是[桌面工作台与自主 Agent 重构方案](refactoring-plan.md)（2026-09-07），它的目标已经实现；本文不推翻它的产品方向，只处理它落地之后暴露的分叉与重复。
 
 ## 0. 组织原则：意图是作品的一部分，不是运行参数
 
-产品的北极星是 A-SOTA——「从**作品意图**到可发布成稿无需逐步人工接受」（[需求与目标](vision-and-requirements.md)）。但今天意图在实现里散在三个层次，耐久性各不相同：
+产品的北极星是 A-SOTA——「从**作品意图**到可发布成稿无需逐步人工接受」（[需求与目标](../vision-and-requirements.md)）。但今天意图在实现里散在三个层次，耐久性各不相同：
 
 | 层次 | 今天落在哪 | 耐久性 | 下次委托还在吗 |
 | --- | --- | --- | --- |
@@ -49,7 +49,7 @@
 
 | 分叉 | 规范 | 代码 | 状态 |
 | --- | --- | --- | --- |
-| checkpoint 阶段 | [harness-design.md](harness-design.md) 第 4 节六个阶段，含 `waiting_children` / `waiting_input`；第 6 节写「把父 checkpoint 置为 waiting_children」 | `LoopCheckpoint.phase` 只有 `ready` / `model_pending` / `tools` / `settled` | 已改规范 |
+| checkpoint 阶段 | [harness-design.md](../harness-design.md) 第 4 节六个阶段，含 `waiting_children` / `waiting_input`；第 6 节写「把父 checkpoint 置为 waiting_children」 | `LoopCheckpoint.phase` 只有 `ready` / `model_pending` / `tools` / `settled` | 已改规范 |
 | 委派的等待形态 | 第 6 节写「父等待时不保留必须恢复的 JavaScript 栈」 | `executeChild` 是同步 `await`，父的 JS 栈确实保留着；恢复靠的是以父动作 id 作 `key` 的持久查找，不是栈 | 已改规范 |
 | 提问的等待形态 | 列为 checkpoint 阶段 `waiting_input` | 是错误码 `run_waiting_input`：checkpoint 留在 `tools`，`ask_author` 动作留在 `effect_pending`，恢复时按工具名豁免「效果未知」判定 | 已改规范 |
 | 恢复阶段词汇 | —— | `AttemptRecoveryPhase` 六个值只写入过 `prepared` 与 `loop`，其余四个从未使用 | 已收窄为两值 |
@@ -111,7 +111,7 @@
 
 ### 2.4 与 git 的结构性重复
 
-ProjectRevision 层实现了快照、线性历史、diff、rollback、每 Run 一个 worktree、三方合并与 push / pull。净删除量约一两千行且交错（[ADR-0010](adr/0010-git-as-canon-storage-engine.md) 原估的「五六千行」按文件计，其中大部分是留下来的领域逻辑）。作者 2026-09-12 决定强制转 git、删除自定义版本层，理由是当下大模型偏向 coding 训练，除 Story Language 与 artifact 外不必制造概念差异。
+ProjectRevision 层实现了快照、线性历史、diff、rollback、每 Run 一个 worktree、三方合并与 push / pull。净删除量约一两千行且交错（[ADR-0010](../adr/0010-git-as-canon-storage-engine.md) 原估的「五六千行」按文件计，其中大部分是留下来的领域逻辑）。作者 2026-09-12 决定强制转 git、删除自定义版本层，理由是当下大模型偏向 coding 训练，除 Story Language 与 artifact 外不必制造概念差异。
 
 ## 3. 目标形状
 
@@ -134,7 +134,7 @@ ProjectRevision 层实现了快照、线性历史、diff、rollback、每 Run �
 | 补充意图（steering / 追问） | **必须分类** | 纠错型留执行数据；补信息型由 Agent 提议写回 Intent 或 Design，作者确认后提交。这是 A-SOTA 的结构性改善，不靠模型变强 |
 | Frame 的 seeds | **接线** | Agent 两处都传 `seeds: []`，裁剪机制形同虚设；意图结构化之后 seeds 有了来源。`subjectsForSearchHits` 与 `preferredPaths` 是这条的两个未接线半边 |
 
-对外表达按[作者工作台设计](web-product-design.md)第 4.4 节：界面不出现 commit / branch / merge，也不画提交图。
+对外表达按[作者工作台设计](../web-product-design.md)第 4.4 节：界面不出现 commit / branch / merge，也不画提交图。
 
 ### 3.2 命令目录收敛为一套
 
@@ -340,7 +340,7 @@ Worker 是权限形状（task-local、无提交权、不递归委派），不是
 
 seeds 接线（`subjectsForSearchHits` / `preferredPaths`）要等结构化意图真的产生之后才有输入，排在指示与度量之后。
 4. **端口化与命令目录。**Runtime 依赖 port（**已完成**：`HarnessProjectPort`，15 个方法加两个属性，harness 对 `local/` 的 import 归零，守卫测试钉住这两条）；命令目录合一，CLI 接到同一条路径（**未做**）。Cloud adapter 跟随同一 port 与契约测试。
-5. **git spike（已完成，通过）。**在 eval-022 的作品本体副本（151 文件 / 776 KB）与放大到 69 / 300 / 1000 Beat 的合成规模上实测 isomorphic-git 1.42.2，结论写回 [ADR-0010](adr/0010-git-as-canon-storage-engine.md)，状态改为 Accepted。
+5. **git spike（已完成，通过）。**在 eval-022 的作品本体副本（151 文件 / 776 KB）与放大到 69 / 300 / 1000 Beat 的合成规模上实测 isomorphic-git 1.42.2，结论写回 [ADR-0010](../adr/0010-git-as-canon-storage-engine.md)，状态改为 Accepted。
 
    要点：**增量 commit 与两版本 diff 不随规模增长**——从 151 文件到 1145 文件都是 8–14 ms，而这正是创作路径上反复发生的两个操作。首次全量 `add` 线性增长（1000 Beat 时 3.1 秒），但那是一次性迁移。三方合并正确：同文件不同位置自动合并（22 ms），同一行冲突如实报 `MergeConflictError`（44 ms）。worktree 从 commit 全量物化 39 ms。
 
@@ -362,7 +362,7 @@ seeds 接线（`subjectsForSearchHits` / `preferredPaths`）要等结构化意�
 
    - **`sync/` 的文件级合并保留。**它不只服务 Cloud 同步：`suiming-harness.ts` 在 head 移动时用 `mergeOpenStoryFiles` 把 Agent 的候选并到新基线上——那正是散文场景，正是要文件级冲突。而 `.gitattributes` 只管 git 自己的合并驱动，harness 与 sync 都不走 git merge，两者治的不是同一条路径，替代关系不成立。
    - **Cloud 的 artifact 版本存储保留。**Cloud 没有 git 实现，也不在本轮解冻范围内；删掉等于让 Cloud 没有 Canon，而 `packages/cloud-postgres` 是 `apps/api` 与 `apps/worker` 的活代码。本地用 git、Cloud 用 PostgreSQL 是同一个 `CanonStore` 契约的两个实现，不违反不变量 3——它约束的是「每个 Project 只有一个权威」，不是「全局只有一种存储」。
-7. **规范定稿（已完成）。**[系统架构](architecture.md)与 [Harness 设计](harness-design.md)重写，AGENTS.md 的不变量与工程边界逐条对照代码核实。
+7. **规范定稿（已完成）。**[系统架构](../architecture.md)与 [Harness 设计](../harness-design.md)重写，AGENTS.md 的不变量与工程边界逐条对照代码核实。
 
    核实的方法是机械的：抽出文档里所有反引号标识符和所有「引号里的测试名」，去源码里对。129 个标识符全部存在；Harness 设计故障验收表（当时第 10 节，现第 14 节）引用的 40 个测试名全部命中真实测试。
 
@@ -376,7 +376,7 @@ seeds 接线（`subjectsForSearchHits` / `preferredPaths`）要等结构化意�
 
 ## 5. 验收
 
-- 每个阶段结束时：`npm run check` 与 `npm test` 全绿，桌面 E2E 与基线一致（当前基线 330 项 / 321 通过 / 9 skip；桌面 17 项 / 15 通过，2 个既有环境失败，原因见[当前状态](current-status.md)）。
+- 每个阶段结束时：`npm run check` 与 `npm test` 全绿，桌面 E2E 与基线一致（当前基线 330 项 / 321 通过 / 9 skip；桌面 17 项 / 15 通过，2 个既有环境失败，原因见[当前状态](../current-status.md)）。
 - 规范里每一条声称的架构属性，必须能指到验证它的测试或代码；指不到的要么实现，要么从规范删除。这是本轮的核心验收，不是附加项。
 - 迁移前备份并验证作品、revision、evidence、作者选择与修订。开发期旧执行数据可以一次性转写或封存只读。
 - 创作行为的对照基线**不存在，且是有意放弃的**（2026-09-12 作者决定）：当前版本有已知缺陷（Writer 契约未接线、预算为空），在其上取基线会把重构风险与修复收益混在一起，分不开。代价是重构后的第一次真实委托没有可比对象，只能作为新基线本身。机械回归仍由 `npm test` 与桌面 E2E 守住；文学质量的回归**本轮无法验证**，这一点不要在验收结论里含糊过去。
@@ -386,6 +386,6 @@ seeds 接线（`subjectsForSearchHits` / `preferredPaths`）要等结构化意�
 
 - 不新增 graph engine、workflow engine、向量数据库、CRDT。
 - 不解冻 Cloud executor、Cloud Web、生产 identity / 计费、多人协作、全功能 MCP。端口化让 Cloud **可以**接，不等于本轮接。
-- 不做 git 分支 / 历史图界面。「试另一个方向」的产品形态是故事层的另一稿，见[作者工作台设计](web-product-design.md)第 4.4 节。
-- 不引入 TanStack AI 的 `/ui` 组件工厂与 MCP Apps，理由与重开触发点见[技术栈](technology.md)。
-- 不重命名 Run / Task / Attempt。它们的英文标识符是通用技术术语；中文表达按[作者工作台设计](web-product-design.md)用白话，不造对应名词。
+- 不做 git 分支 / 历史图界面。「试另一个方向」的产品形态是故事层的另一稿，见[作者工作台设计](../web-product-design.md)第 4.4 节。
+- 不引入 TanStack AI 的 `/ui` 组件工厂与 MCP Apps，理由与重开触发点见[技术栈](../technology.md)。
+- 不重命名 Run / Task / Attempt。它们的英文标识符是通用技术术语；中文表达按[作者工作台设计](../web-product-design.md)用白话，不造对应名词。
