@@ -9,7 +9,8 @@
  *   { "beat": "情节标题", "volume": "卷名", "character": "人物名", "contract": "读者期待名" }
  *
  * 输出：axis.png（全书故事轴）、axis-state.png（选中一节并查看状态）、volume.png（进入一卷）、
- * character.png（人物页的关系图）、contract.png（读者期待的轨迹）；带 --video 时另出 tour.webp。
+ * contract.png（读者期待的轨迹）、character.png（人物页的关系图）、reading.png（那一节的正文与最近一次对话）；
+ * 带 --video 时另出 tour.webp。
  * 截图是 2 倍像素。动图不用 Playwright 自带的录像（码率低，中文发糊），而是录 Chromium 的逐帧画面，
  * 按时间戳重采样后用 img2webp 合成；需要本机有 ImageMagick（magick）与 libwebp（img2webp）。
  * 窗口里画的光标只存在于录制时注入的页面元素里，不是产品的一部分。
@@ -69,6 +70,7 @@ try {
 	// 录制用的光标：跟随 Playwright 的鼠标事件，按下时有一圈涟漪。
 	await page.evaluate(() => {
 		const cursor = document.createElement("div");
+		cursor.dataset.captureCursor = "";
 		cursor.innerHTML =
 			'<svg width="22" height="22" viewBox="0 0 24 24"><path d="M4 2l15 9.5-6.6 1.4 3.9 7.3-2.8 1.5-3.9-7.3L4 19z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 		Object.assign(cursor.style, {
@@ -142,9 +144,12 @@ try {
 		await sleep(70);
 		await page.mouse.up();
 	};
+	// 静态截图不带光标，动图里才有。
 	const shot = async (name) => {
 		await sleep(900);
+		await page.evaluate(() => document.querySelector("[data-capture-cursor]")?.setAttribute("hidden", ""));
 		await page.screenshot({ path: join(out, `${name}.png`) });
+		await page.evaluate(() => document.querySelector("[data-capture-cursor]")?.removeAttribute("hidden"));
 	};
 
 	if (values.video) {
@@ -175,6 +180,9 @@ try {
 	await sleep(900);
 	const change = page.getByRole("radio", { name: "本幕变化" }).or(page.getByRole("button", { name: "本幕变化" }));
 	if (await change.count()) await click(change.first());
+	// 右栏打开后轴变窄，按选中的那一节滚动过；适应窗口让全书重新放进来。
+	await click(page.getByRole("button", { name: "适应窗口" }));
+	await sleep(900);
 	await shot("axis-state");
 	await sleep(800);
 
@@ -201,6 +209,29 @@ try {
 	await sleep(1500);
 	await shot("character");
 	await sleep(600);
+
+	// 6. 回到故事轴双击打开那一节，读正文；右栏打开对话，显示这部作品最近一次对话。
+	await click(page.getByRole("button", { name: "后退" }));
+	await sleep(900);
+	const beat = page.getByRole("button", { name: new RegExp(`^${plan.beat} · `) }).first();
+	await moveTo(beat);
+	await page.mouse.dblclick(pointer.x, pointer.y);
+	await sleep(1200);
+	const text = page.getByRole("radio", { name: "正文" }).or(page.getByRole("button", { name: "正文", exact: true }));
+	if (await text.count()) await click(text.first());
+	const conversation = page.getByRole("button", { name: "对话", exact: true });
+	if (await conversation.count()) await click(conversation.first());
+	else await click(page.getByRole("button", { name: "展开右栏" }));
+	await sleep(1500);
+	// 对话栏自动滚到底；往回滚到提问，让问与答的开头都在画面里。
+	await moveTo(page.getByRole("textbox").last(), { x: 160, y: -420 });
+	for (let index = 0; index < 10; index += 1) {
+		await page.mouse.wheel(0, -400);
+		await sleep(60);
+	}
+	await sleep(1500);
+	await shot("reading");
+	await sleep(1200);
 
 	if (recording) await recording.send("Page.stopScreencast");
 } finally {
