@@ -1,6 +1,6 @@
 # 从 suiming-story 迁移
 
-一次性迁移已经完成，本文只留两件仍然有用的事：迁移钉住的是旧仓哪个版本，以及旧仓今后和本仓是什么关系。产品目标与实施顺序以 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md)、[ADR-0012](adr/0012-own-suiming-harness.md)和[路线图](roadmap.md)为准；迁移过程中的命令表、目录对照与步骤已经过时，在 git 历史里。
+一次性迁移已经完成，本文只留两件仍然有用的事：迁移钉住的是旧仓哪个版本，以及旧仓今后和本仓是什么关系。产品目标与实施顺序以 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md)、[ADR-0012](adr/0012-own-suiming-harness.md)和[路线图](roadmap.md)为准；迁移过程中的命令表、目录对照与步骤已经过时，不再保留。
 
 ## 1. 钉住的来源版本
 
@@ -19,9 +19,10 @@ subject: docs: define repository-native scope
 
 ## 2. 不作为上游依赖的边界
 
-- 2026-09-06 作者决定搁置旧仓，全局 `suim` 指向本仓；旧仓也不再是默认质量基线，只在具体实验有信息价值时作为候选参照。未来是否发行 Community 版是独立的产品决策。
+旧仓的定位（一次性迁移来源、可选的历史参照、可能的 Community 发行，不是上游依赖或质量基线）见 AGENTS.md 不变量 1。2026-09-06 作者决定搁置旧仓：全局 `suim` 指向本仓，旧仓只在具体实验有信息价值时作为候选参照。落到操作上：
+
 - 本仓不依赖旧仓的任何 release，不通过子模块、Git subtree 或定时同步消费旧仓；修复若两边都适用，各自实现、各自验证，不建隐藏的共享源码。
-- `suim` 沿用旧名字，但实现与 command contract 都是重写的，不承诺旧参数或输出兼容，也不调用旧 CLI。两个 CLI 只能有一个在 PATH 上（见 [README](../README.md) 的安装说明）。
-- 不实现 legacy importer：Runtime 只认当前格式，不读旧 `.suim/`、`suiming.yaml` 或旧 schema。旧格式的作品要用就一次性改写成当前格式，其余旧运行数据丢弃。`~/stories/eval-007`–`eval-021` 都是旧格式，打开时会被拒绝并点名文件与字段。
+- `suim` 沿用旧名字，但实现与 command contract 都是重写的，不承诺旧参数或输出兼容，也不调用旧 CLI；两个 CLI 只能有一个在 PATH 上。
+- Runtime 只认当前格式，不读旧 `.suim/`、`suiming.yaml` 或旧 schema，也不做 legacy importer；旧格式的作品打开时被拒绝并点名文件与字段，要用就一次性改写成当前格式。
 - Story Language 的终局演进发生在本仓；Community 版若要发行，由产品决策选一个明确版本回迁，不反向约束本仓。
 - 同一部作品不由旧仓和本仓双向写入：每次实验选一个权威，另一边只作固定快照。

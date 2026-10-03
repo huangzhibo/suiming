@@ -15,7 +15,7 @@ import {
 } from "./review.js";
 
 /**
- * `review/<id>.md`：一份审稿就是一个普通作品文件（[evidence 派生设计](../../../docs/derived-evidence-design.md) 3.1）。
+ * `review/<id>.md`：一份审稿就是一个普通作品文件（[Story Language artifacts](../../../story-language/artifacts.md)）。
  * frontmatter 记它审的是哪一层、哪个范围、审的时候主体文件长什么样（`subjects`）与结论；正文是给作者看的摘要。
  * 「这份审稿对当前稿还算不算数」不存文件，由 `reviewCurrency` 拿 `subjects` 与当前候选比出来。
  */

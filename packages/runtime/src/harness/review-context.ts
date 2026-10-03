@@ -19,7 +19,7 @@ export type ReviewerHost = "engine" | "host";
 
 export type ReviewScope = { kind: "book" } | { kind: "selection"; storyBeatIds: readonly string[] };
 
-/** 审稿文件 frontmatter 里的 scope（[evidence 派生设计](../../../../docs/derived-evidence-design.md) 3.1）。 */
+/** 审稿文件 frontmatter 里的 scope（[Story Language artifacts](../../../../story-language/artifacts.md)）。 */
 export type ReviewSubject =
 	| { kind: "book" }
 	| { kind: "beats"; storyBeatIds: string[] }

@@ -7,7 +7,7 @@ import { parseMarkdownDocument } from "./markdown.js";
 
 /**
  * `source/<id>/notes/<n>.md`：Source Reader 读过某段原文后留下的 handoff，是普通作品文件
- * （[evidence 派生设计](../../../docs/derived-evidence-design.md) 3.1）。frontmatter 记它覆盖的码点区间与
+ * （[Story Language source](../../../story-language/source.md)「笔记与覆盖率」）。frontmatter 记它覆盖的码点区间与
  * 当时 `material.txt` 的内容 sha；「读过哪些范围、还缺哪些」由 `sourceCoverage` 按 notes 的 span 派生。
  */
 export const SOURCE_NOTE_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,126}$";

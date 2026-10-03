@@ -17,7 +17,7 @@ import { storyPackageCodec } from "./story-package-codec.js";
 import type { ArtifactCandidate, ProjectRevision } from "./types.js";
 
 /**
- * 从版本历史派生的状态（[evidence 派生设计](../../../../docs/derived-evidence-design.md) 3.2）。
+ * 从版本历史派生的状态（[派生状态设计](../../../../docs/derived-evidence-design.md) 3.2）。
  * 这些函数只读 Canon 历史与当前候选，不落盘；Local（git）与 Cloud（PostgreSQL）实现同一个读取面。
  */
 export interface RevisionHistoryReader {
