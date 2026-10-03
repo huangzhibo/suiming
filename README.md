@@ -9,12 +9,15 @@
 <!-- 这一段只在阶段变化时改。 -->
 > **当前状态：开发预览。**桌面工作台与自主 Agent 已经贯通，但证据最高只到「真实调用」：还没有一部完整的长篇在它上面写完，也没有安装包，目前只在 macOS 上验证过。完成度与已知缺陷见[当前状态](docs/current-status.md)，接下来做什么见[路线图](docs/roadmap.md)第 6 节。
 
+<p align="center"><img src="docs/media/tour.webp" alt="全书故事轴：读者期待、因果依赖与人物轨迹；选中华容道那一节查看状态，进入赤壁一卷，打开关羽的人物页，最后读这一节的正文和 Agent 的回答" width="100%"></p>
+<p align="center"><sub>示例作品是《三国演义》第一回到第五十回：设计由 Suiming 的 Agent 从原著忠实抽取，正文是原著原文。就是仓库里的 <a href="examples/README.md">examples/sanguo</a>，不配模型也能打开。</sub></p>
+
 ## 它解决什么
 
 让 AI 在长篇尺度上持续理解同一部作品：人物、时间、关键物品、谁知道什么、长期埋下的期待，写到后面也不走样；同时作者随时能读、改、比较、回退自己的作品，不被锁进某个服务。
 
 - **作品就是一个普通目录。**大纲、人物、世界设定、正文、审稿都是 Markdown 文件；作品目录本身是 git 仓库，历史随它走。人、Agent、外部 coding agent 改的是同一份文件。
-- **只有过了 Checker 的修改才算数。**Checker 只管确定性的东西：格式、引用、顺序、硬状态（谁持有什么、谁已死去、哪个秘密何时揭开）、长期期待是否按期回应。文学好坏交给模型与独立审稿，不交给规则。
+- **提交要过 Checker。**Checker 只管确定性的东西：格式、引用、顺序、硬状态（谁持有什么、谁已死去、哪个秘密何时揭开），这些不对就提交不了；长期期待到期没回应、秘密没埋下就揭开这类设计问题，检查标出来但不拦阶段提交。文学好坏交给模型与独立审稿，不交给规则。
 - **Agent 自主推进，作者随时插手。**一次对话里 Agent 可以直接改、委派写作或审稿的子任务、阶段性提交多个版本；作者可以打断、补充意图、直接编辑，长期成立的要求会写回作品的 `intent/`，而不是只留在聊天记录里。
 
 ```text
@@ -27,6 +30,20 @@ Suiming Agent：在作品目录上读、改、自检，按需委派写作与独�
 作品的一个版本（同一个对话可以接着改）
 ```
 
+## 看一眼
+
+**选中一节，看那一刻的世界。**故事轴上点一节，只留下与它有关的因果弧；右栏按进入前、本幕变化、结束后列出谁拿着什么、谁知道什么、哪条期待在这里兑现，每一条都能点回出处。
+
+<img src="docs/media/axis-state.webp" alt="选中华容道关羽念恩放曹：远处的因果弧汇向这一节，右栏列出关羽余恩报曹在此兑现、华容军令状在此推进" width="100%">
+
+**人物牵着哪些情节。**人物页末尾是关系图：依赖他的情节、和他有关的读者期待，想看下一层再点一下。
+
+<img src="docs/media/character.webp" alt="关羽的人物页：84 节情节与 3 条读者期待依赖他" width="100%">
+
+**原文旁边就是 Agent。**问它「关羽在华容道放走曹操，前面埋了哪些线」，它按故事顺序列出 11 节，从土山约三事到葫芦口两遇伏兵；长期有效的要求会写回作品，不只留在对话里。
+
+<img src="docs/media/reading.webp" alt="左边是华容道这一节的原文，右边是 Agent 按故事顺序列出的伏笔" width="100%">
+
 ## 快速开始
 
 需要 Node.js 24 以上与 git。桌面端目前只在 macOS 上验证过，其他平台未验证。
@@ -38,7 +55,13 @@ npm install
 npm run dev:desktop
 ```
 
-打开一个已有作品，或选一个空目录新建。阅读与编辑不需要模型；要和 Agent 对话，在导航轨底部的「设置」里配置：「提供商」里填 API key 或登录，「模型配置」里给各个角色选模型。目前是开发构建，安装包、签名与自动升级还没做。
+打开一个已有作品，或选一个空目录新建。想先看看一部长篇在里面是什么样，打开示例作品：打开作品时会在目录里建 git 仓库，所以先复制到仓库外，再点「打开作品」选复制出来的目录。
+
+```bash
+cp -R examples/sanguo ~/Documents/sanguo
+```
+
+阅读与编辑不需要模型；要和 Agent 对话，在导航轨底部的「设置」里配置：「提供商」里填 API key 或登录，「模型配置」里给各个角色选模型。目前是开发构建，安装包、签名与自动升级还没做。
 
 ### 命令行 `suim`
 
@@ -83,7 +106,7 @@ my-book/
   source/                  导入的原作材料与忠实抽取（改编时用）
 ```
 
-字段的含义与写法见 [Story Language](story-language/README.md)；最小的完整例子是测试样例里的苦肉计与火烧赤壁（[`packages/runtime/test/sample-work.ts`](packages/runtime/test/sample-work.ts)）。
+字段的含义与写法见 [Story Language](story-language/README.md)；最小的完整例子是测试样例里的苦肉计与火烧赤壁（[`packages/runtime/test/sample-work.ts`](packages/runtime/test/sample-work.ts)）；完整规模的例子是 [`examples/sanguo`](examples/README.md)，《三国演义》前五十回，9 卷 231 节。
 
 ## 模型配置
 
@@ -162,6 +185,8 @@ strategies/      故事创作宪法
 ## English
 
 Suiming is a desktop-first AI workbench for writing long-form fiction. A dedicated agent reads and edits your manuscript directory, delegates drafting and independent review to sub-agents, and commits in stages. A work is a plain directory of Markdown files (outline, characters, world, prose, reviews) that is also a git repository; only changes that pass a deterministic Checker — schema, references, ordering, hard state such as who holds what or which secret is revealed when, and deadlines of long-running reader expectations — become a version of the work. Literary quality is left to models and independent review, not to rules. The same runtime is available from the `suim` CLI and from Codex, Claude Code and Grok.
+
+The animation above shows the bundled example, the first 50 chapters of *Romance of the Three Kingdoms*: the agent extracted the design (9 volumes, 231 scenes, 15 reader expectations, 403 causal dependencies) and the prose is the original text. Copy `examples/sanguo` out of the repository and open it in the desktop app; no model is needed to browse it.
 
 **Status: development preview.** It has been exercised with real models on real material but no complete novel has been written with it yet, there is no installer, and only macOS has been verified.
 
