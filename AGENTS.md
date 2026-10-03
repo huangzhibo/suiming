@@ -93,7 +93,7 @@ npm run regression:harness -- --only check-issues --trials 1   # 真实模型回
 
 - workspace 包的 exports 指向 dist。测试和 CLI 里 `@suiming/*` 的跨包 import 走 dist，改了 packages/* 之后先 `npm run check`（其中 `tsc -b` 会重新 emit）或 `npm run build` 再 `npm test`，否则测的是旧代码。包内测试用 `../src` 相对路径，不受影响。
 - 跑被 skip 的集成测试：按 .env.example 设 `SUIMING_TEST_POSTGRES_URL`、`SUIMING_TEST_S3_*`、`SUIMING_TEST_DURABLE_PROCESS=1`，需要一次性的 PostgreSQL 与 MinIO。
-- 真实模型调用的配置、`regression:harness` 的跑法与节奏见 [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)「真实模型调用与回归」。**回归跑的过程中不要 `npm run build` / `check` / `test:desktop`，也不要提交**：每个任务起新的 `suim` 进程读当时的 dist，脚本记下 commit 与 dist 指纹，变了就停。
+- 真实模型调用的配置、`regression:harness` 的跑法与节奏见 [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)「真实模型调用与回归」。**回归跑的过程中不要 `npm run build` / `check` / `test:desktop`**：每个任务起新的 `suim` 进程读当时的 dist，脚本每跑完一项核对 dist 指纹，变了就停；只提交不构建不影响它。
 
 ## 检查脚本的隐含约束
 
