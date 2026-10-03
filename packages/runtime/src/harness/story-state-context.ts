@@ -101,19 +101,34 @@ export function compileStoryStateContext(candidate: ArtifactCandidate, task: Sto
 		for (const key of new Set([...left.keys(), ...right.keys()]))
 			if (left.get(key)?.value !== right.get(key)?.value) sourceByKey.set(key, beat.path);
 	}
+	/**
+	 * 有人拿着的物品，位置是原子规则隐含清空的「无」：单列一行只是噪声，故事轴上每件被持有的物品都多一行。
+	 * 从某个地方被拿走（位置 X → 无）仍然列出，那是有信息的清空。
+	 */
+	const heldElsewhere = (state: ReadonlyMap<string, StateAssignment>, assignment: StateAssignment | undefined) =>
+		assignment?.property === "location" &&
+		assignment.value === "none" &&
+		[...state.values()].some(
+			(other) =>
+				other.subject === assignment.subject &&
+				other.scope === assignment.scope &&
+				other.property === "holder" &&
+				other.value !== "none",
+		);
 	const lines: string[] = [];
 	if (task.phase === "changes") {
 		for (const key of new Set([...before.keys(), ...after.keys()])) {
 			const left = before.get(key);
 			const right = after.get(key);
 			if (left?.value === right?.value || (!matches(left) && !matches(right))) continue;
+			if ((left === undefined || left.value === "none") && heldElsewhere(after, right)) continue;
 			lines.push(
 				`- ${label((right ?? left) as StateAssignment)}：${valueText(left)} → ${valueText(right)}（依据：${sourceLink(target.path)}）`,
 			);
 		}
 	} else {
 		for (const [key, assignment] of current) {
-			if (!matches(assignment)) continue;
+			if (!matches(assignment) || heldElsewhere(current, assignment)) continue;
 			const source = sourceByKey.get(key);
 			lines.push(
 				`- ${label(assignment)}：${valueText(assignment)}（依据：${source ? sourceLink(source) : "开场声明"}）`,
