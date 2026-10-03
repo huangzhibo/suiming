@@ -348,7 +348,8 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		assert.deepEqual((beat.frontmatter.refs as { character: string[] }).character, ["黄盖"]);
 		assert.ok((shown.files.find((file) => file.path === "outline/story/index.yaml")?.codePoints ?? 0) > 0);
 
-		// 写好正文提交：时效 current 且记下写成的版本；再改一个 Design 文件提交，正文就 design-changed。
+		// 写好正文提交：时效 current 且记下写成的版本；再改第二节的设计提交，第二节的正文就 design-changed，
+		// 第一节不引用第二节，它的正文仍是 current（2026-10-04 之前闭包取整卷，两篇一起变黄）。
 		await mkdir(join(root, "text"), { recursive: true });
 		await writeFile(join(root, "text/beat-0001.md"), "黄盖走入赤壁，在木匣中找到火船。\n");
 		await writeFile(join(root, "text/beat-0002.md"), "约定那夜，二十艘火船一齐点火，直冲曹营。\n");
@@ -367,7 +368,7 @@ test("目录投影透传 frontmatter 与卷顺序，正文时效与审稿从历�
 		assert.deepEqual(
 			changed.storyText.map((item) => [item.state, item.changed]),
 			[
-				["design-changed", ["outline/story/vol-0001/beat-0002.md"]],
+				["current", []],
 				["design-changed", ["outline/story/vol-0001/beat-0002.md"]],
 			],
 		);
