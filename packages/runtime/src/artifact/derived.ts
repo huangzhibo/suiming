@@ -58,12 +58,8 @@ export async function writtenAtMap(reader: RevisionHistoryReader, head: string):
  * Design 绑不上、或这个 Beat 已经不在 Design 里时退回整个 Design。
  */
 export function designClosurePaths(candidate: ArtifactCandidate, storyBeatId: string): string[] {
-	let design: BoundDesign;
-	try {
-		design = inspectStoryDesignCandidate(candidate).design;
-	} catch {
-		return designPaths(candidate).sort();
-	}
+	const design = boundDesignOf(candidate);
+	if (design === undefined) return designPaths(candidate).sort();
 	const beat = design.story.beats.find((item) => item.id === storyBeatId);
 	if (beat === undefined) return designPaths(candidate).sort();
 	const refs = new Set([...beat.refs, ...beat.stateRefs]);
@@ -80,6 +76,24 @@ export function designClosurePaths(candidate: ArtifactCandidate, storyBeatId: st
 		if (isTargetArtifactIdentity(artifact.identity) && artifact.identity.kind === "story-index")
 			paths.add(artifact.path);
 	return [...paths].sort();
+}
+
+/**
+ * 一份候选只解析一次 Design：时效与审稿主体要对每个 Beat 取闭包，逐个解析时 231 篇正文的作品（《三国演义》前五十回）
+ * 光 `suim status` 就要 44 秒——每篇正文把九百多个设计文件解析两遍。候选在派生计算里不被修改，按对象缓存即可。
+ */
+const boundDesigns = new WeakMap<ArtifactCandidate, BoundDesign | null>();
+function boundDesignOf(candidate: ArtifactCandidate): BoundDesign | undefined {
+	let design = boundDesigns.get(candidate);
+	if (design === undefined) {
+		try {
+			design = inspectStoryDesignCandidate(candidate).design;
+		} catch {
+			design = null;
+		}
+		boundDesigns.set(candidate, design);
+	}
+	return design ?? undefined;
 }
 
 function intentCovers(intent: CreativeIntent, beat: StoryBeat, ordinals: ReadonlyMap<string, number>): boolean {
