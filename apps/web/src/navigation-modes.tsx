@@ -21,6 +21,12 @@ const modes = [
 	{ id: "search", name: "搜索", description: "搜索作品内容 · ⌘/Ctrl K", Icon: Search },
 ] as const satisfies { id: SideMode; name: string; description: string; Icon: typeof Folder }[];
 
+/** 帮助里列举左栏导航时用这一句，免得改了名字帮助还是旧说法（「材料」曾长期写成「依据」）。 */
+export const navigationModeNames = `${modes
+	.slice(0, -1)
+	.map((mode) => mode.name)
+	.join("、")}与${modes[modes.length - 1]?.name}`;
+
 export function NavigationModes({ value, onChange }: { value: SideMode; onChange(mode: SideMode): void }) {
 	const current = modes.find((mode) => mode.id === value) ?? modes[0];
 	const availableRef = useRef<HTMLDivElement>(null);

@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { navigationModeNames } from "./navigation-modes.js";
 
 /** 图例条目：与故事轴、左栏上的图元同一套形状与颜色。 */
 export function Legend({
@@ -76,9 +77,8 @@ export function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange
 					<Section title="分栏与导航">
 						<p className="text-xs leading-[1.8] text-ink-3">
 							拖动左右栏与正文之间的分隔线调宽，双击恢复默认。也可用 Tab 聚焦分隔线，左右方向键微调，Home / End
-							调到最小 / 最大，Enter
-							恢复默认。只有图标放不下时，才通过当前导航菜单切换大纲、文件、身份、依据与搜索；⌘/Ctrl K
-							可直接搜索。
+							调到最小 / 最大，Enter 恢复默认。只有图标放不下时，才通过当前导航菜单切换{navigationModeNames}
+							；⌘/Ctrl K 可直接搜索。
 						</p>
 					</Section>
 					<Section title="内容与分屏">
@@ -92,8 +92,9 @@ export function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange
 					</Section>
 					<Section title="文件与标签页">
 						<p className="text-xs leading-[1.8] text-ink-3">
-							首次打开作品默认选中大纲。左栏的大纲、文件、身份、依据与搜索只切换导航。普通打开复用页面；固定或未保存的页面会保留。⌘/Ctrl
-							点击或中键在后台新开，加 Shift 切到新页；右键也可新开。标签页右键可固定、复制和关闭。
+							首次打开作品默认选中大纲。左栏的{navigationModeNames}
+							只切换导航。普通打开复用页面；固定或未保存的页面会保留。⌘/Ctrl 点击或中键在后台新开，加 Shift
+							切到新页；右键也可新开。标签页右键可固定、复制和关闭。
 						</p>
 						<p className="mt-2 text-xs leading-[1.8] text-ink-3">
 							⌘/Ctrl T 打开空白选择页，⌘/Ctrl W
