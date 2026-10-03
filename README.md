@@ -6,7 +6,8 @@
 
 *An AI workbench for long-form fiction. See [English](#english) below.*
 
-> **当前状态：开发预览。**桌面工作台与自主 Agent 已经贯通，但证据最高只到「真实调用」：还没有一部完整的长篇在它上面写完，也没有安装包，目前只在 macOS 上验证过。完成度与已知缺陷见[当前状态](docs/current-status.md)，实施顺序见[路线图](docs/roadmap.md)第 6 节；这一段只在阶段变化时改。
+<!-- 这一段只在阶段变化时改。 -->
+> **当前状态：开发预览。**桌面工作台与自主 Agent 已经贯通，但证据最高只到「真实调用」：还没有一部完整的长篇在它上面写完，也没有安装包，目前只在 macOS 上验证过。完成度与已知缺陷见[当前状态](docs/current-status.md)，接下来做什么见[路线图](docs/roadmap.md)第 6 节。
 
 ## 它解决什么
 
@@ -86,7 +87,7 @@ my-book/
 
 ## 模型配置
 
-模型调用基于 [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai)，可以用它支持的各家服务商。不同角色可以用不同模型：`main`（对话的根 Agent）、`writer`、`reviewer`、`source-reader`、`source-extractor`、`judge`（盲读评委，最好与 writer 不同）；除 `main` 外都可以省略，省略时用 `main`。
+模型调用基于 [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai)，可以用它支持的各家提供商。不同角色可以用不同模型，比如 `main`（对话的根 Agent）、`writer`、`reviewer`、`judge`（盲读评委，最好与 writer 用不同模型）；除 `main` 外都可以省略，省略时用 `main`。
 
 配置在 `~/.suiming/config.toml`，桌面「设置」改的也是这份文件：
 
@@ -98,9 +99,9 @@ provider = "deepseek"
 model = "deepseek-flash"
 ```
 
-完整形状见[技术栈](docs/technology.md)「本地配置与凭据」。凭据存在 `~/.suiming/auth.json`，经桌面设置或服务商自己的登录流程写入；开发时也可以用 [`.env.example`](.env.example) 里的 `SUIMING_*` 变量覆盖。
+全部角色与完整形状见[技术栈](docs/technology.md)「本地配置与凭据」。凭据存在 `~/.suiming/auth.json`，经桌面设置或提供商自己的登录流程写入；开发时也可以用 [`.env.example`](.env.example) 里的 `SUIMING_*` 变量覆盖。
 
-部分服务商支持用订阅账号登录。各家对第三方应用使用订阅登录的条款不同，以服务商的条款为准。产品只使用你自己的系统代理与环境变量里的代理设置，不内置任何代理。
+部分提供商支持用订阅账号登录。各家对第三方应用使用订阅登录的条款不同，以提供商的条款为准。产品只使用你自己的系统代理与环境变量里的代理设置，不内置任何代理。
 
 ## 参与开发
 
@@ -108,7 +109,7 @@ model = "deepseek-flash"
 
 ```sh
 npm run check          # 文档链接、生成文件对账、biome、类型检查
-npm test               # 单元与集成测试；需要真实 PostgreSQL / S3 的 5 个用例默认跳过
+npm test               # 单元与集成测试；需要真实数据库、对象存储或双进程的用例默认跳过
 npm run test:desktop   # 构建桌面端并跑真实 Electron E2E
 npm run format         # biome 自动格式化
 ```
