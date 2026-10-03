@@ -30,15 +30,8 @@ import {
 	stripFrontmatter,
 	versionPage,
 } from "./model.js";
-import {
-	ActionButton,
-	reviewCurrencyLabel,
-	reviewLayerLabel,
-	Tag,
-	toneText,
-	verdictLabel,
-	verdictTone,
-} from "./ui-bits.js";
+import { verdictLabel, verdictTone } from "./review-verdict.js";
+import { ActionButton, reviewCurrencyLabel, reviewLayerLabel, Tag, toneText } from "./ui-bits.js";
 import type { OpenPage, PageState } from "./view-state.js";
 
 const CodeEditor = lazy(() => import("./code-editor.js"));

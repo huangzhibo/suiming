@@ -228,16 +228,6 @@ export const toneText = (tone: "green" | "amber" | "purple" | "red" | "gray" | u
 				: tone === "red"
 					? "text-red-ink"
 					: "text-success";
-export const verdictLabel = (verdict: string) =>
-	({ pass: "通过", revise: "需修订", block: "有阻断问题", insufficient_context: "依据不足" })[verdict] ?? verdict;
 /** 审稿的层与时效：所有地方用同一种说法（原来「待复核」「依据已变化」「关联内容已有更新」「stale」各说各的）。 */
 export const reviewLayerLabel = (layer: string) => ({ design: "设计", text: "正文", source: "原作" })[layer] ?? layer;
 export const reviewCurrencyLabel = (current: boolean) => (current ? "对应当前稿" : "稿子已改，需重新核对");
-export const verdictTone = (verdict: string) =>
-	verdict === "pass"
-		? "green"
-		: verdict === "revise" || verdict === "insufficient_context"
-			? "amber"
-			: verdict === "block"
-				? "red"
-				: "gray";

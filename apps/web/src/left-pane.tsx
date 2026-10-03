@@ -13,7 +13,8 @@ import {
 	shortId,
 	versionPage,
 } from "./model.js";
-import { Hint, PanelToolbar, reviewCurrencyLabel, reviewLayerLabel, ToolButton, verdictLabel } from "./ui-bits.js";
+import { verdictLabel } from "./review-verdict.js";
+import { Hint, PanelToolbar, reviewCurrencyLabel, reviewLayerLabel, ToolButton } from "./ui-bits.js";
 import type { ViewState } from "./view-state.js";
 
 export interface PaneProps {

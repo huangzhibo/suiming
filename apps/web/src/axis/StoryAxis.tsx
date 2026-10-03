@@ -3,7 +3,8 @@ import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type Book, issuePage, type ReviewReport } from "../model.js";
-import { Hint, verdictLabel } from "../ui-bits.js";
+import { verdictColor, verdictLabel } from "../review-verdict.js";
+import { Hint } from "../ui-bits.js";
 import {
 	type AxisModel,
 	axisModel,
@@ -116,9 +117,6 @@ const press = (handler: () => void) => ({
 		if (event.key === "Enter") handler();
 	},
 });
-
-const verdictColor = (verdict: string) =>
-	verdict === "pass" ? "var(--success)" : verdict === "reject" ? "var(--destructive)" : "var(--amber)";
 
 /**
  * 故事轴：横轴 = index.yaml 的 Beat 顺序，按卷分段；纵向是叠在同一坐标上的泳道。

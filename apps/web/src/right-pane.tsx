@@ -16,7 +16,8 @@ import {
 	reviewsFor,
 	shortId,
 } from "./model.js";
-import { Hint, PanelToolbar, reviewCurrencyLabel, ToolButton, verdictLabel } from "./ui-bits.js";
+import { verdictLabel } from "./review-verdict.js";
+import { Hint, PanelToolbar, reviewCurrencyLabel, ToolButton } from "./ui-bits.js";
 
 const Tools = ({ children }: { children: React.ReactNode }) => (
 	<PanelToolbar className="justify-center">{children}</PanelToolbar>
