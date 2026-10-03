@@ -82,6 +82,25 @@ test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及�
 	});
 });
 
+// C 题库第 13 题：插在中间的 Beat（eval-022 的 beat-0068 夹在 beat-0001 与 beat-0002 之间）才是续写的真实前文。
+// 原有断言里 index 顺序恰好等于 id 数字顺序，区分不出「按 index」与「按 id」。
+test("Write Context 的前一节按 index 顺序取，不按 id 数字", async () => {
+	await withProject(async (project, checkoutPath) => {
+		await writeFile(
+			join(checkoutPath, "outline/story/vol-0001/beat-0068.md"),
+			"---\nrefs:\n  character: [黄盖]\n---\n黄盖受刑之后，阚泽带着降书过江，在曹操面前替他把诈降说圆。\n",
+		);
+		await writeFile(
+			join(checkoutPath, "outline/story/index.yaml"),
+			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001, beat-0068, beat-0002]\n",
+		);
+		await project.commitCheckout();
+
+		assert.equal((await compileHostContext(project, "write:beat-0002")).write?.previousStoryBeatId, "beat-0068");
+		assert.equal((await compileHostContext(project, "write:beat-0068")).write?.previousStoryBeatId, "beat-0001");
+	});
+});
+
 test("context compile 给 host 的输入按路径列出作品文件；review record 写成 review/<id>.md，正文一变它就不再 current", async () => {
 	await withProject(async (project, checkoutPath) => {
 		await mkdir(join(checkoutPath, "text"), { recursive: true });

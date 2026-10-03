@@ -1,6 +1,6 @@
 # C 题库：确定性长程题
 
-ADR-0008 决定 9 要求从真实长篇 Run 暴露的失败里抽取不少于 20 道确定性长程题作为 C-SOTA 的最低证据，进入回归。这里登记每道题的来源、它对应的确定性边界（硬状态、secret 知情、Contract 生命周期、refs 依赖、Checker），以及现状。题目只收"Checker 能判对错"的形式；纯语义问题（旁白复述、格言短句、AI 味）留给 Reviewer，不进题库。
+ADR-0008 决定 9 与它的验证门要求从真实长篇 Run 暴露的失败里抽取不少于 20 道确定性长程题作为 C-SOTA 的最低证据，进入回归。这里登记每道题的来源、它对应的确定性边界（硬状态、secret 知情、Contract 生命周期、refs 依赖、Checker），以及现状。题目只收"Checker 能判对错"的形式；纯语义问题（旁白复述、格言短句、AI 味）留给 Reviewer，不进题库。
 
 **状态：活登记表。**当前 17 道，最近一次补题是 2026-09-06；eval-022 暂停推进之后还没有新题，差额继续从当前测试台的真实运行里补。
 
@@ -27,7 +27,7 @@ ADR-0008 决定 9 要求从真实长篇 Run 暴露的失败里抽取不少于 20
 | 10 | 关羽以"长生"入册后，县簿上没有"关羽"；直到旧案被翻出，官府文书里只能出现长生 | 三组正文都写了长生入册 | `secret:关羽亡命` 的 `world.revealed` 只在 beat-0069 之后为 true | 回归（与 2 同一声明：world scope 只在 beat-0069 揭示） |
 | 11 | 刘备为关羽具保后，"刘备失官"的代价在 beat-0069 必须发生，不能在更早的 Beat 被提前兑现 | 新仓 Codex 把代价写进 beat-0069 与 beat-0007 | Contract advance 顺序：三人同到太平 的 advance 出现在 beat-0069、beat-0007，顺序由 Story index 决定 | 回归（Contract advance 顺序有测试） |
 | 12 | 张角焚掉总册后，各地的救济路线只在"愿意承担的人"手里；beat-0008 以后的黄巾余部不能凭总册互认 | eval-022 beat-0005 | 同 9 | 回归（同 9） |
-| 13 | beat-0068 插在 beat-0001 与 beat-0002 之间：正文续写的"真实前文"是 beat-0068 而不是 beat-0001 | Write Context 的 previous 选择 | `previousStoryBeatId` 按 Story index 顺序，不按 id 数字；有测试 | 回归（write-context 测试） |
+| 13 | beat-0068 插在 beat-0001 与 beat-0002 之间：正文续写的"真实前文"是 beat-0068 而不是 beat-0001 | Write Context 的 previous 选择 | `previousStoryBeatId` 按 Story index 顺序，不按 id 数字 | 回归（`host-context.test.ts`「Write Context 的前一节按 index 顺序取」，2026-10-04 补） |
 | 14 | 一个 Beat 的 `changes` 只能声明自然语言里已经成立的结果：beat-0004 若写 `关羽.location: 涿郡` 而正文让他当夜离开，Reviewer 有硬状态可引 | 设计规则 | 硬状态与自然语言一致性由 Reviewer 判，Checker 守时间线 | 回归（状态时间线测试） |
 | 15 | 张角在 beat-0005 的死亡时刻：Design 写"雨夜里病死"，正文写雨停后的白天 | R1 Suiming Reviewer note | Beat 内时刻不在硬状态里；只有 `dead: true` 与展示顺序是确定性的 | 待机制（与 8 同类：不加年代字段） |
 | 16 | 刘备代韩跛应役后，这笔义务必须有了结（销号、转入本队或仍须应征） | R1 Suiming Reviewer minor；Claude Code 重放的"韩家双重覆盖"同源 | 义务不是资源；可退化为 Resource `代役券.holder` 或 Contract；是否加"义务"类硬状态待定 | 待机制 |
