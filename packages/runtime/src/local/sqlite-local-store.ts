@@ -222,7 +222,9 @@ export class SqliteLocalStore {
 		for (const item of delta.changed) {
 			if (item.type !== "session") continue;
 			const record = item.record as SessionRecord;
-			if (record.status !== "running") continue;
+			// 只拦有活着的进程来驱动的 turn：放弃 paused 的核对是瞬间开一个 turn 再结束的簿记（lease 的 hostname 留空），
+			// 不碰 checkout，另一个 session 在跑时也照样能做。
+			if (record.status !== "running" || record.lease === undefined || !leaseHolderAlive(record.lease)) continue;
 			const rows = this.#database
 				.prepare("SELECT data_json FROM sessions WHERE project_id = ? AND status = 'running' AND id <> ?")
 				.all(record.projectId, record.id) as { data_json: string }[];

@@ -31,6 +31,7 @@ export function abandonPausedSession(project: LocalProjectService, sessionId: st
 	execution.startTurn({
 		commandId: `${session.id}:interrupt:${session.version}:start`,
 		sessionId: session.id,
+		// hostname 留空：这不是有进程驱动的 turn，「同一作品只有一个 running」的检查不算它。
 		lease: { pid: process.pid, hostname: "", acquiredAt: new Date().toISOString() },
 		turnId: `${session.id}:interrupt:${session.version}`,
 		fromPaused: true,
