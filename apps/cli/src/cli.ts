@@ -781,7 +781,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 	context
 		.command("compile")
 		.description(
-			"为一次任务编译按需裁剪的 Context（write:<beat-id>、design、design:character:<id>[:at:<beat-id>]、design:family:<id>、design:volume:<id>、source:read:<source-id>[:<start>:<end>]、review:design、review:text[:<beat-id>,...]、review:source:<source-id>）；输入按路径引用作品文件",
+			"为一次任务编译按需裁剪的 Context（write:<beat-id>、design、design:state:<beat-id>:before|changes|after[:character|resource|contract:<id>]、design:character:<id>[:at:<beat-id>]、design:family:<id>、design:volume:<id>、source:read:<source-id>[:<start>:<end>]、review:design、review:text[:<beat-id>,...]、review:source:<source-id>）；输入按路径引用作品文件",
 		)
 		.argument("<task>")
 		.option("--output <path>", "同时把输入文本写到这个文件")

@@ -131,7 +131,7 @@ export function SpinePane({ book, reviews, view, page, patch, open }: PaneProps)
 													)
 													.map((report) => ({
 														key: `review:${report.id}`,
-														title: `审稿${verdictLabel(report.verdict)} · ${report.current ? "对应当前版本" : "关联内容已有更新"}`,
+														title: `审稿${verdictLabel(report.verdict)} · ${reviewCurrencyLabel(report.current)}`,
 														color: REVIEW_MARK,
 														shape: "tri" as const,
 													}))

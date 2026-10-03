@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type Book, issuePage, type ReviewReport } from "../model.js";
 import { verdictColor, verdictLabel } from "../review-verdict.js";
-import { Hint } from "../ui-bits.js";
+import { Hint, reviewCurrencyLabel } from "../ui-bits.js";
 import {
 	type AxisModel,
 	axisModel,
@@ -712,11 +712,11 @@ export function StoryAxis({
 										const color = verdictColor(latest.verdict);
 										return [
 											<Hint
-												content={`${verdictLabel(latest.verdict)} · ${latest.current ? "对应当前版本" : "关联内容已有更新"} · ${latest.findings} 条审稿意见${reports.length > 1 ? `\n共 ${reports.length} 份报告` : ""}`}
+												content={`${verdictLabel(latest.verdict)} · ${reviewCurrencyLabel(latest.current)} · ${latest.findings} 条审稿意见${reports.length > 1 ? `\n共 ${reports.length} 份报告` : ""}`}
 												key={`${row.key}:${beat.id}`}
 											>
 												<g
-													aria-label={`${verdictLabel(latest.verdict)} · ${latest.current ? "对应当前版本" : "关联内容已有更新"} · ${latest.findings} 条审稿意见${reports.length > 1 ? `\n共 ${reports.length} 份报告` : ""}`}
+													aria-label={`${verdictLabel(latest.verdict)} · ${reviewCurrencyLabel(latest.current)} · ${latest.findings} 条审稿意见${reports.length > 1 ? `\n共 ${reports.length} 份报告` : ""}`}
 													{...press(() => open(issuePage(latest.reportId)))}
 												>
 													<polygon
@@ -746,11 +746,11 @@ export function StoryAxis({
 											const color = verdictColor(span.verdict);
 											return (
 												<Hint
-													content={`${span.layer === "text" ? "正文审稿" : span.layer === "design" ? "设计审稿" : span.layer} · ${verdictLabel(span.verdict)} · ${span.current ? "对应当前版本" : "关联内容已有更新"} · ${span.findings} 条审稿意见\n覆盖 ${beatTitle(span.start)} → ${beatTitle(span.end)}`}
+													content={`${span.layer === "text" ? "正文审稿" : span.layer === "design" ? "设计审稿" : span.layer} · ${verdictLabel(span.verdict)} · ${reviewCurrencyLabel(span.current)} · ${span.findings} 条审稿意见\n覆盖 ${beatTitle(span.start)} → ${beatTitle(span.end)}`}
 													key={span.reportId}
 												>
 													<line
-														aria-label={`${span.layer === "text" ? "正文审稿" : span.layer === "design" ? "设计审稿" : span.layer} · ${verdictLabel(span.verdict)} · ${span.current ? "对应当前版本" : "关联内容已有更新"} · ${span.findings} 条审稿意见\n覆盖 ${beatTitle(span.start)} → ${beatTitle(span.end)}`}
+														aria-label={`${span.layer === "text" ? "正文审稿" : span.layer === "design" ? "设计审稿" : span.layer} · ${verdictLabel(span.verdict)} · ${reviewCurrencyLabel(span.current)} · ${span.findings} 条审稿意见\n覆盖 ${beatTitle(span.start)} → ${beatTitle(span.end)}`}
 														x1={clampX(span.start)}
 														y1={y}
 														x2={clampX(span.end)}
