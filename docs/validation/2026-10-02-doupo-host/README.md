@@ -2,11 +2,11 @@
 
 用 host 模式（Claude Code 按作品仓里安装的 suiming Skill 工作，确定性部分走 `suim`）把《斗破苍穹》前 120 章**忠实**抽取为 Source，原样提升为 Target Design，再从第 120 章之后续写两个 Beat。目的有三：测 host 路径本身、测续写、在桌面上看原作的结构。以后要用桌面里的 Suiming Agent 做同样的事来对比，对比协议见文末。
 
-**作品内容不进产品仓**：作品文件都在作品目录里，这里只记数字、行为与结论。作品在 `~/stories/doupo-host-2026-10-02`。
+**作品内容不进产品仓**：作品文件都在作品目录里，这里只记数字、行为与结论。作品是 `doupo-host-2026-10-02`。
 
 ## 现场
 
-- Source：`~/stories/eval-011-input/斗破苍穹-0001-0120.txt`，307,785 码点，SHA-256 `1735ab9c…`——与 [2026-10-01 桌面那次真实运行](../2026-10-01-doupo-real-run/README.md)的 Source 是同一份，三次运行（桌面改编、这次 host 忠实抽取、以后桌面忠实抽取）输入一致。
+- Source：`eval-011-input/斗破苍穹-0001-0120.txt`，307,785 码点，SHA-256 `1735ab9c…`——与 [2026-10-01 桌面那次真实运行](../2026-10-01-doupo-real-run/README.md)的 Source 是同一份，三次运行（桌面改编、这次 host 忠实抽取、以后桌面忠实抽取）输入一致。
 - host：这一次的 Claude Code 会话（Opus 5.5）就是 Skill 说的 Agent；Reader、Writer、Reviewer 等角色是按 Skill 隔离的子 agent（不继承主会话、只拿编译好的 Context 文件）。Skill 由 `suim init --agent claude-code` 装进作品仓，与产品仓 `integrations/shared/suiming/SKILL.md` 逐字相同。
 - 意图与 2026-10-01 那次相反：那次是「以原作为底本重新设计」（废除穿越、改三年之约位置等十条改法）；这次是「前 120 章不改设定，续写延续原作设定」。
 

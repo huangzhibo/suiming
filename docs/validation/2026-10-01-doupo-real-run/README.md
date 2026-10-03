@@ -6,8 +6,8 @@
 
 ## 现场
 
-- 作品：`~/stories/doupo-2026-10-01`，当前格式新建。r1 是 `suim init --intent-file`（意图取旧仓 eval-021 的初始意图 `~/stories/eval-021.intent.md`，不取它跑完后的 `intent/book.md`——那里已经混进旧 Agent 的设计决定）；r2 加正文风格意图与原创风格参照（同取自 eval-021）；r3 是 `suim source ingest`。
-- Source：`~/stories/eval-011-input/斗破苍穹-0001-0120.txt`，307,785 码点，SHA-256 `1735ab9c…`，与 eval-021 记录的同一份。逐章拆开的全书在 `~/ai/04.web_novel/斗破苍穹`（519 / 1623 章，1–140 章齐全）。
+- 作品：`doupo-2026-10-01`，当前格式新建。r1 是 `suim init --intent-file`（意图取旧仓 eval-021 的初始意图 `eval-021.intent.md`，不取它跑完后的 `intent/book.md`——那里已经混进旧 Agent 的设计决定）；r2 加正文风格意图与原创风格参照（同取自 eval-021）；r3 是 `suim source ingest`。
+- Source：`eval-011-input/斗破苍穹-0001-0120.txt`，307,785 码点，SHA-256 `1735ab9c…`，与 eval-021 记录的同一份。逐章拆开的全书在作者本机（519 / 1623 章，1–140 章齐全）。
 - 模型：`.env` 写的是 `deepseek-v4-flash`，**实际跑的几乎肯定是 V4.1 Flash**：DeepSeek 官方公告 V4 Flash 已下线，旧名字暂时路由到 V4.1；每次响应的 `responseModel` 都是 `deepseek-flash`（不过 2026-09-16 基线的响应也是这个名字，它可能只是系列名，区分不了版本）。`source-reader` / `source-extractor` 没单配，回落到 main。
 - **花费的口径**：下文的花费是 pi-ai 0.84.4 目录按 V4 Flash 单价（输入 $0.14、输出 $0.28、缓存读 $0.0028 / 百万 token）算的账面数。token 量是确定的：前五轮 434 次调用，输入（未命中缓存）204 万、输出 113 万（其中思考 83 万）、缓存命中 2974 万。按[官方价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing)（V4.1 Flash，元 / 百万 token：命中 0.02 / 未命中 1 / 输出 4，忙时翻倍；忙时只在北京时间工作日 9–12、14–18 点，节假日按闲时）——10 月 1–2 日是国庆假期，全按闲时——实际约 **7.17 元（约 $1.01）**，账面 $0.69 偏低约 1.5 倍；同样的量放在忙时是 14.35 元。
 - 驱动：`suim session send`，同一个 session 连续对话。作者的话由负责人代说（测试作品的故事内容不等作者，2026-10-01 定），代说的依据是意图文件。

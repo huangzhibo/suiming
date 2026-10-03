@@ -4,10 +4,10 @@
 
 ## 做法
 
-- 作品 `~/stories/doupo-holdout-2026-10-02`：Target Design 取自 [host 版忠实抽取](../2026-10-02-doupo-host/README.md)，beat-0001–0024 的正文直接放原作对应章节（转换规则同 host 记录），去掉 `source/`，免得 Agent 读到答案。
+- 作品 `doupo-holdout-2026-10-02`：Target Design 取自 [host 版忠实抽取](../2026-10-02-doupo-host/README.md)，beat-0001–0024 的正文直接放原作对应章节（转换规则同 host 记录），去掉 `source/`，免得 Agent 读到答案。
 - 作者消息：「按设计写 beat-0025、beat-0026、beat-0027 的正文，接着前面的原作往下写，语气、节奏和人物说话方式与前文一致。写完检查并提交。」
 - 模型：DeepSeek V4.1 Flash（`deepseek-flash`，思考 high）。一个 turn，24 次调用，估算 $0.17。
-- 参照答案：原作里与这三节对应的章节，放在作品外的 `~/stories/doupo-holdout-2026-10-02.reference/original/`。
+- 参照答案：原作里与这三节对应的章节，放在作品外的 `doupo-holdout-2026-10-02.reference/original/`。
 - 两类信号，都不需要人读全文：
   - [`compare.py`](compare.py) 的确定性指标；
   - 盲读评委 `suim rank <beat> --candidate agent.md original.md --rounds 2`，评委是 `deepseek-v4-pro`，与写的模型不同，两轮交换顺序。

@@ -42,7 +42,7 @@ B 步已修：`run show` 不带 usage（B1）；profile options 写错键名被�
 
 ## 2026-09-05 P：host-native 对照验收（Codex 新旧仓、Claude Code 重放）
 
-路线图 P 验收二的第一次实测。作品是 `~/stories/eval-022`（史诗三国，69 Beat、9 卷，已有 4 篇正文）的三份 scratch 拷贝，格式直接兼容，新 CLI `init` 与 `check` 一次通过。任务相同：作者补充关羽河东旧案 → 跨文件 Design 修订并冻结 → 按顺序写 beat-0004、beat-0005 正文 → 独立 text Review 与最小修订 → 提交。Codex 两组都是 `codex exec` headless、主 agent `gpt-6-astra xhigh`、子 agent 与旧仓相同的 `gpt-5.6-sol`（Writer medium / Reviewer high）；旧仓组用旧 CLI 0.1.0 与旧四个 Skill，新仓组用共享 Skill 加 `integrations/codex/agents/`。Claude Code 组由本会话按同一 Skill 亲自做 Agent，只写了 beat-0004 一篇，Writer / Reviewer 是隔离子 agent，因与其它工作交错，用时不可比。运行现场（trace、分析脚本、三个 checkout）在会话 scratchpad，不进仓。
+路线图 P 验收二的第一次实测。作品是 `eval-022`（史诗三国，69 Beat、9 卷，已有 4 篇正文）的三份 scratch 拷贝，格式直接兼容，新 CLI `init` 与 `check` 一次通过。任务相同：作者补充关羽河东旧案 → 跨文件 Design 修订并冻结 → 按顺序写 beat-0004、beat-0005 正文 → 独立 text Review 与最小修订 → 提交。Codex 两组都是 `codex exec` headless、主 agent `gpt-6-astra xhigh`、子 agent 与旧仓相同的 `gpt-5.6-sol`（Writer medium / Reviewer high）；旧仓组用旧 CLI 0.1.0 与旧四个 Skill，新仓组用共享 Skill 加 `integrations/codex/agents/`。Claude Code 组由本会话按同一 Skill 亲自做 Agent，只写了 beat-0004 一篇，Writer / Reviewer 是隔离子 agent，因与其它工作交错，用时不可比。运行现场（trace、分析脚本、三个 checkout）在会话 scratchpad，不进仓。
 
 | 指标 | Codex + 旧仓 | Codex + 新仓 Skill | Claude Code + 新仓 Skill（一篇） |
 | --- | --- | --- | --- |
@@ -66,9 +66,9 @@ B 步已修：`run show` 不带 usage（B1）；profile options 写错键名被�
 
 验收过程中修掉的 host 缺口：并行 `suim` 撞 project lock、CLI 无 SIGINT、host 版 Writer / Reviewer 契约引用引擎工具名、Skill 的 freeze / commit 顺序、`check` 不说明 storyTextPassed 为 false 的原因。
 
-同日晚补测"作者环境里从零开一部作品"：以上验收全靠 scratchpad 的 shim 与手工复制，作者按 README 根本开不了新作品（没有安装步骤、全局 `suim` 是旧仓的 npm link、`init` 拒绝空目录、Checker 与 StoryText 校验拒绝零 Beat、Skill 与 agent 文件要手工 cp）。补上 `npm link`、`suim init --intent-file --agent`、`suim host install` 后，在作者的真实登录 shell 里用 `suim init ~/stories/suiming-new-001 --intent-file ~/stories/eval-022.intent.md --agent codex` 开工，`codex exec` 默认模型、无任何 PATH 技巧，任务限定为 world/core 加第一卷前 3 Beat 并提交：31 条命令，`suim` 调用 open / status ×3 / diff / check ×5 / commit / history 全部走新 CLI；`check` 前四次被 Checker 挡回（不支持的状态字段、secret 知情作用域、重复亲缘声明、终态字段初始化为 false），第五次通过；提交为第 2 个 ProjectRevision，21 个 artifact（3 Beat、7 人物、3 地点、3 资源、core、2 份 reference），最终 clean；约 137 万 input token（126 万命中缓存）、1.6 万 output。暴露一个新缺口：Story Language 字段规则只在 `packages/story` 的 schema 与 `story-language-guide.ts` 里，Skill 让 host "以 `check` 诊断为准"，Codex 于是顺着 npm link 读开发仓源码找规则，8 条命令花在这上面；正式安装没有源码可读。需要把 schema 生成的格式指南作为 `suim` 命令暴露给 host，登记在已知缺陷。
+同日晚补测"作者环境里从零开一部作品"：以上验收全靠 scratchpad 的 shim 与手工复制，作者按 README 根本开不了新作品（没有安装步骤、全局 `suim` 是旧仓的 npm link、`init` 拒绝空目录、Checker 与 StoryText 校验拒绝零 Beat、Skill 与 agent 文件要手工 cp）。补上 `npm link`、`suim init --intent-file --agent`、`suim host install` 后，在作者的真实登录 shell 里用 `suim init suiming-new-001 --intent-file eval-022.intent.md --agent codex` 开工，`codex exec` 默认模型、无任何 PATH 技巧，任务限定为 world/core 加第一卷前 3 Beat 并提交：31 条命令，`suim` 调用 open / status ×3 / diff / check ×5 / commit / history 全部走新 CLI；`check` 前四次被 Checker 挡回（不支持的状态字段、secret 知情作用域、重复亲缘声明、终态字段初始化为 false），第五次通过；提交为第 2 个 ProjectRevision，21 个 artifact（3 Beat、7 人物、3 地点、3 资源、core、2 份 reference），最终 clean；约 137 万 input token（126 万命中缓存）、1.6 万 output。暴露一个新缺口：Story Language 字段规则只在 `packages/story` 的 schema 与 `story-language-guide.ts` 里，Skill 让 host "以 `check` 诊断为准"，Codex 于是顺着 npm link 读开发仓源码找规则，8 条命令花在这上面；正式安装没有源码可读。需要把 schema 生成的格式指南作为 `suim` 命令暴露给 host，登记在已知缺陷。
 
-2026-09-06 补齐差项后在同一作品仓（`~/stories/suiming-new-001`，同时装 codex 与 grok 两个 host）做 Grok Build 真实 session（`grok --prompt-file … --permission-mode bypassPermissions --no-subagents`，模型 grok-4.6-build，默认设置）：任务是读 `design:character:张角` 视图后给第一卷续写 beat-0004 并提交。11 轮模型调用、7 条 shell 命令、0.098 美元；`suim` 调用 open / status / design guide / context compile / design impact / check / commit / history 全部成功，Grok 自己先调 `design guide` 与 Skill 目录下的 story-language 文档再写文件，`check` 一次通过（前一天 Codex 没有指南时是五次），提交为第 3 个 ProjectRevision（新增 beat-0004、人物郝岑、地点槐里东口），最终 clean。至此三个 host 都有真实 session 记录。
+2026-09-06 补齐差项后在同一作品仓（`suiming-new-001`，同时装 codex 与 grok 两个 host）做 Grok Build 真实 session（`grok --prompt-file … --permission-mode bypassPermissions --no-subagents`，模型 grok-4.6-build，默认设置）：任务是读 `design:character:张角` 视图后给第一卷续写 beat-0004 并提交。11 轮模型调用、7 条 shell 命令、0.098 美元；`suim` 调用 open / status / design guide / context compile / design impact / check / commit / history 全部成功，Grok 自己先调 `design guide` 与 Skill 目录下的 story-language 文档再写文件，`check` 一次通过（前一天 Codex 没有指南时是五次），提交为第 3 个 ProjectRevision（新增 beat-0004、人物郝岑、地点槐里东口），最终 clean。至此三个 host 都有真实 session 记录。
 
 ## 2026-09-06 按作者意见重写：Writer 在提交前耗尽预算
 
@@ -83,7 +83,7 @@ B 步已修：`run show` 不带 usage（B1）；profile options 写错键名被�
 | beat-0005，V4 Flash | 8,886（14,088） | 12 | 9.6 万 / 6.7 万 | $0.039 |
 | beat-0005，V4 Pro | 9,082（14,088） | 7 | 7.2 万 / 6.2 万 | $0.086 |
 
-两次 beat-0005 的首跑分别死于 `model_call_failed terminated` 与 `Request timed out.`（DeepSeek 瞬时故障，API 本身可达），`run retry` 都从 brief 之后续上。reasoning 占 output 的六到八成，是 DeepSeek 开 thinking 的代价。四版都在 `~/stories/blind-read-2-2026-09-06/` 等作者第二轮盲读（与第一轮原稿混排）。评委（deepseek-v4-pro 两轮）预筛：beat-0005 三版平均名次都是 2，pro 与原稿在两轮里互换头尾，分不出高下；beat-0004 三版 flash > pro > orig，原稿垫底，但评委仍在 flash 版里点名关羽内心自述是替人物作证式的旁白。契约修改的效果要等作者第二轮盲读定，评委只能说重写没有更差。
+两次 beat-0005 的首跑分别死于 `model_call_failed terminated` 与 `Request timed out.`（DeepSeek 瞬时故障，API 本身可达），`run retry` 都从 brief 之后续上。reasoning 占 output 的六到八成，是 DeepSeek 开 thinking 的代价。四版都在 `blind-read-2-2026-09-06/` 等作者第二轮盲读（与第一轮原稿混排）。评委（deepseek-v4-pro 两轮）预筛：beat-0005 三版平均名次都是 2，pro 与原稿在两轮里互换头尾，分不出高下；beat-0004 三版 flash > pro > orig，原稿垫底，但评委仍在 flash 版里点名关羽内心自述是替人物作证式的旁白。契约修改的效果要等作者第二轮盲读定，评委只能说重写没有更差。
 
 ## 2026-09-06 作者选择记录 #1：盲读 beat-0004 四版与 beat-0005
 

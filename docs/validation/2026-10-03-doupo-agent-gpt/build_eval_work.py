@@ -9,7 +9,8 @@
   起点；起点在章首就从章标记切，落在章内就从给出的那句话切。表的顺序必须与 index 里的 Beat 顺序逐个对上。
 - 清洗规则同 2026-10-02 host 记录：剔作者按语、推书行、网站水印与重复的第 72 章，断在句中的换行接回，其余一字不动；
   章标题写成「## 第N章 标题」，与正文风格意图给续写定的格式一致。对照评分前要去掉标题（会泄露身份），compare.py 已经这么做。
-- 评测作品去掉 `source/` 与 Source 审稿，免得 Agent 读到答案。参照章节从作者本地的按章原文取，同一套清洗。
+- 评测作品去掉 `source/` 与 Source 审稿，免得 Agent 读到答案。参照章节从作者本地的按章原文取，同一套清洗；
+  原文目录不进仓库，用环境变量 `DOUPO_CHAPTERS` 指向按章拆分的「正文」目录（文件名形如 `第0121章_标题.txt`）。
 - `--holdout-from N`（留出评测）：起始章 ≥ N 的节不放正文，这一节的原作原文写进参照目录的 `<beat>.md`。Agent 按同一份
   抽自原作的 Design 写这几节，与原作逐节对照才公平；Agent 自己定情节的续写与原作比，评委拿着 Agent 的 Design 打分，
   原作会因「不兑现本节 Design」被扣分（2026-10-03 前 12 章续写 6 轮全判 Agent 胜，就是这个偏差）。
@@ -17,12 +18,12 @@
 只写评测作品与参照目录，不改抽取作品。评测作品写完后要在里面执行一次 `suim init`。
 """
 
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-ORIGINAL_CHAPTERS = Path.home() / "ai/04.web_novel/斗破苍穹/正文"
 DUPLICATE_CHAPTERS = {72}  # 第 72 章是第 71 章的整章重复（2026-10-03 逐字核对）
 
 HEADER = re.compile(r"^===== 第(\d{4})章[^\n]*=====$", re.M)
@@ -103,9 +104,12 @@ def beat_order(out: Path) -> list[tuple[str, str]]:
 
 
 def reference(chapters: range, target: Path) -> None:
+    if "DOUPO_CHAPTERS" not in os.environ:
+        raise SystemExit("设 DOUPO_CHAPTERS 指向按章拆分的原文目录")
+    original_chapters = Path(os.environ["DOUPO_CHAPTERS"])
     target.mkdir(parents=True, exist_ok=True)
     for number in chapters:
-        found = sorted(ORIGINAL_CHAPTERS.glob(f"第{number:04d}章*.txt"))
+        found = sorted(original_chapters.glob(f"第{number:04d}章*.txt"))
         if not found:
             raise SystemExit(f"本地原文缺第 {number} 章")
         (target / f"chapter-{number:04d}.md").write_text(clean(found[0].read_text(encoding="utf8")), encoding="utf8")

@@ -4,7 +4,7 @@
 
 ## 做法
 
-- 作品：`~/stories/doupo-agent-gpt-2026-10-03`，与前两份同一份 Source（sha `1735ab9c…`，307,785 码点），意图文件同 10-02。
+- 作品：`doupo-agent-gpt-2026-10-03`，与前两份同一份 Source（sha `1735ab9c…`，307,785 码点），意图文件同 10-02。
 - 模型：`openai/gpt-6.1-sol`，思考 high，ChatGPT 订阅；所有子任务同一模型。
 - 作者消息与 10-02 那次逐字相同：读原作写笔记 → 抽取 → 独立审稿 source 层并按意见修 → 原样提升为 Target → 检查并提交，回复里列每节对应原作章节。
 - 用 `suim --json session send --events` 从 CLI 跑，事件流存在会话 scratchpad，不入库。

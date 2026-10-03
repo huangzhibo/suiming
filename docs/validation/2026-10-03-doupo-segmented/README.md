@@ -4,7 +4,7 @@
 
 ## 做法
 
-- 作品：`~/stories/doupo-agent-gpt-2026-10-03c`（另存 `.template`），Source 与上午那次同一份（sha `1735ab9c…`，307,785 码点），意图文件相同。构建是 `dc7f320`（现成分段、抽取中间态的 `impact` 已修；谜团 Contract 的提醒、`move` 还没有）。
+- 作品：`doupo-agent-gpt-2026-10-03c`（另存 `.template`），Source 与上午那次同一份（sha `1735ab9c…`，307,785 码点），意图文件相同。构建是 `dc7f320`（现成分段、抽取中间态的 `impact` 已修；谜团 Contract 的提醒、`move` 还没有）。
 - 模型：`openai/gpt-6.1-sol`，思考 high，ChatGPT 订阅；窗口 272k，分段上限 54,400 码点。
 - 作者消息不规定流程：「source/doupo-0001-0120 是《斗破苍穹》前 120 章。请把它忠实抽取成 Source Design，独立审稿 source 层并按意见修，再原样提升为本作的 Target Design（outline/、world/），不改设定……做完在回复里列出每个 Target Beat 对应原作第几章到第几章；如果分界落在章内，给出下一节开头的那一句。」
 

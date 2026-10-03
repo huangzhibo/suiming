@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| 作品 | `~/stories/eval-022-suiming` 的副本 `~/stories/eval-022-baseline-2026-09-16`（121 文件 / 69 Beat / 6 篇正文，原作品未被触碰） |
+| 作品 | `eval-022-suiming` 的副本 `eval-022-baseline-2026-09-16`（121 文件 / 69 Beat / 6 篇正文，原作品未被触碰） |
 | 模型 | 全角色 deepseek-v4-flash，`reasoningEffort: high`（Writer low） |
 | 任务 | 写 `beat-0069`《无功者》的正文——index 顺序里紧接已写完的 beat-0005，是下一篇该写的 |
 | 命令 | `suim session send --events`，两个 turn |
@@ -102,7 +102,7 @@ Agent 提出、本记录不代答。**2026-10-01 已裁定**：测试作品的�
 
 **作品内容不进产品仓**（与既往验收记录一致，那些也只引标识和短句）。完整材料在作品副本里：
 
-- `~/stories/eval-022-baseline-2026-09-16/.validation/session-events*.ndjson`：两个 turn 的完整 SessionEvent 流。
-- `~/stories/eval-022-baseline-2026-09-16/text/beat-0069.md`：产出的正文。
-- `~/stories/eval-022-baseline-2026-09-16/review/text-20260915-173703-47ef.md`：审稿文件——它本来就是作品文件，在版本里。
-- canon 三个版本：创世 → r2（正文）→ r3（审稿 + 修订）。原作品 `~/stories/eval-022-suiming` 未被触碰。
+- `eval-022-baseline-2026-09-16/.validation/session-events*.ndjson`：两个 turn 的完整 SessionEvent 流。
+- `eval-022-baseline-2026-09-16/text/beat-0069.md`：产出的正文。
+- `eval-022-baseline-2026-09-16/review/text-20260915-173703-47ef.md`：审稿文件——它本来就是作品文件，在版本里。
+- canon 三个版本：创世 → r2（正文）→ r3（审稿 + 修订）。原作品 `eval-022-suiming` 未被触碰。

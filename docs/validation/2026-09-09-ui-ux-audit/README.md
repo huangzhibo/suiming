@@ -8,7 +8,7 @@
 
 自行运行 `npm run build:desktop`，通过 Playwright Electron 启动最新桌面产物并操作真实 renderer / IPC。使用 `eval-022-suiming` 的完整临时副本：9 卷、69 Beat、6 份正文、2 份 ReviewReport，当前 r8。默认窗口 1460×940，另查应用允许的最小窗口 960×640，均为 CSS 像素。
 
-原作品 `~/stories/eval-022-suiming` 未改动。临时正文编辑只存在于 renderer，已撤销；Checker 返回 0 个候选文件变更。没有发起 Agent 委托、修改模型配置、调用付费模型、提交或恢复作品版本。本轮只新增审查记录与截图，没有实现以下建议。
+原作品 `eval-022-suiming` 未改动。临时正文编辑只存在于 renderer，已撤销；Checker 返回 0 个候选文件变更。没有发起 Agent 委托、修改模型配置、调用付费模型、提交或恢复作品版本。本轮只新增审查记录与截图，没有实现以下建议。
 
 ## 优先处理的问题
 
