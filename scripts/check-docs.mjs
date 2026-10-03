@@ -2,7 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const ignoredDirectories = new Set([".git", "node_modules"]);
+// .claude 下是桌面应用放的后台任务 worktree，是另一份仓库副本，不归这里检查（biome 同样跳过它）。
+const ignoredDirectories = new Set([".git", "node_modules", ".claude"]);
 
 function collectMarkdown(directory) {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
