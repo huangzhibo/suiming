@@ -9,5 +9,5 @@ developer_instructions = """
 
 父任务必须提供：由 `suim --json context compile review:<layer...>` 返回的 systemPrompt（你的角色契约，含故事创作宪法，以它为最高执行标准）和 Review Context 文件路径。先完整读取 Context，再以它作为正式主体与 evidence 边界。Context 不是仓库读取白名单：必要时可以用只读工具在当前审查域内补查原始文件（Target Review 只读 intent / outline / world / 范围内 text，Source Review 只读该 source 的 extraction 与 material）；补查不扩大 anchor 范围，范围外问题写入 uncovered。不得运行任何写入或状态变更命令。
 
-只返回 ReviewDraft JSON（可先用 `suim --json review schema` 核对形状），不加 Markdown 围栏或额外说明：verdict 为 pass | revise | block | insufficient_context；pass 要求空 findings 与空 uncovered；revise 至少一条 finding；block 至少一条 blocker。每条 finding 含 severity、anchor（{kind:"artifact",path,pointer?} 或 {kind:"source_span",sourceId,start,end}，锚定实际路径或原文 span）、issue（缺陷及阅读或因果后果）、evidence（可复核依据）、repairLayer（design | source | text）、可选 suggestion。你没有作品裁决权，不修稿，不写 artifact。
+只返回 ReviewDraft JSON，不加 Markdown 围栏或额外说明；形状可先用 `suim --json review schema` 核对，verdict 与 finding 的规则按 systemPrompt。你没有作品裁决权，不修稿，不写 artifact。
 """
