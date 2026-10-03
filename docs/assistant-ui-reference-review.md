@@ -1,6 +1,6 @@
 # assistant-ui 对话功能源码参考
 
-2026-09-10。研究本地 `~/github/assistant-ui`，版本为 `0bea0fc504a169ccb699c4c9efd2d7a29651c186`（2026-09-09），其中 `@assistant-ui/react` 为 `0.15.18`。依据实现及相关测试用例阅读，不代表已运行其示例、测试或验收音频服务。本文件保留源码研究与设计依据；下列非音频交互已按 Suiming 自有边界实现，未引入 assistant-ui 依赖。
+状态：2026-09-10 的源码研究笔记，不再维护。研究对象是 [assistant-ui](https://github.com/assistant-ui/assistant-ui) 的 `0bea0fc504a169ccb699c4c9efd2d7a29651c186` 提交（2026-09-09，`@assistant-ui/react` 0.15.18），只读了实现和测试，没有运行示例、测试或音频服务。其中的非音频交互已按 Suiming 自己的边界实现、没有引入依赖（[验收](validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](web-product-design.md) 4.1；语音未排期，待做边界见 [Agent 输入能力方案](agent-input-capabilities.md)。文中的 `run.launch` / `run.steer` / `run.steering` 与「委托」是当时的名字，现在分别对应 `session.send`、`session.inbox` 与「对话」。
 
 ## 结论与复用边界
 
@@ -13,18 +13,6 @@ assistant-ui 有三层可供参考：
 - `packages/core`：composer、消息树、队列、adapter 和运行时。适合研究状态转换与异常处理，不宜整体移植为 Suiming 的另一套执行状态。
 
 它提供 external-store 和 AG-UI adapter，技术上能够对接已有后端。完整接入仍需映射消息、会话、取消、续跑与队列语义；当前 Suiming 已有同类客户端边界，单为增加输入功能不值得再增加一层运行时映射。
-
-## 实施状态（2026-09-10）
-
-已实现安全发送、多引用和文本附件、`＋` / `@` 共用作品搜索、消息复制 / 引用 / 导出、对话与动作排序、折叠执行组、阅读位置恢复及持久补充要求状态。保持现有 React、shadcn/ui、TanStack client、typed IPC；未复制 assistant-ui runtime、队列或消息树，也未新增依赖。
-
-- 输入更新由根工作区的 [useComposerWorkspace](../apps/web/src/use-composer-workspace.ts) 接收，文档窗格关闭不影响会话回包；引用迁移只在恢复入口执行，具体见[工作台收敛记录](workbench-consolidation.md)。
-- [composer-state](../apps/web/src/composer-state.ts) 保存一次未确认提交及独立后续草稿；命令发送前持久化内容和 ID。回包不确定时显式确认，续跑失败重试仅重发续跑；按附件 ID 与读取 ID 处理迟到结果。
-- [AgentComposer](../apps/web/src/agent-composer.tsx) 负责现有控件组合和输入动作。作品引用冻结路径、版本、SHA-256、内容与草稿标识；本地 UTF-8 文本实际进入文字命令，支持选择、拖放、粘贴文件、预览、移除和重试，引用总量上限 256 KB。
-- [ConversationViewport](../apps/web/src/conversation-viewport.tsx) 区分主动滚动和尺寸变化，按委托保留位置；[Transcript](../apps/web/src/agent-transcript.tsx) 根据持久事件顺序组织消息与动作，连接失败按游标只读重连。
-- `run.steering` 是从现有 steering 与消息事件派生的查询。等待项和「已送入执行上下文」明确区分；后者不代表落实、提交，也不保证仅由 Agent 接收。
-
-音频服务尚未选定和验证，因此未增加空麦克风按钮。图片、PDF、OCR、通用多模态、历史消息重写和执行分支没有伪装成已支持功能。当前附件只作为会话输入，不自动写入作品。验收见[原生对话交互](validation/2026-09-10-agent-composer/README.md)。
 
 ## 源码研究与设计依据
 
@@ -87,23 +75,6 @@ assistant-ui 默认 Thread 模板在生成时以取消按钮替代发送；其 q
 
 - `elements/composer.tsx` 的简化 `useMentionMatches` / `applyMention` 使用 `\w`，只匹配末尾的 ASCII 单词，不能直接用于中文人物或作品标题。运行时另有 trigger popover 机制，不应将这个示例的限制泛化为整个库。
 - 同文件 `ComposerVoice` 的波形来自 `Math.sin` 演示函数；它不是实际麦克风音量。听写核心在片段间补空格的策略也需要按中文标点重新处理。
-
-## 建议的界面组织与实施顺序
-
-保留现有白底、中性灰反馈、约 104px 默认输入框，以及既定图标和点击区域规范。输入器保持在侧栏底部，支持随内容增高；不照搬示例的主题色、尺寸与空会话居中跳转。
-
-- 顶部：委托切换、新建、展开及更多菜单。低频操作收进菜单，避免堆成一排按钮。
-- 对话区：作者要求、Agent 回复、折叠执行组；可展开计划。需要作者处理的问题就近给出操作。
-- 输入区：多引用/附件条、文本、底部「＋／语音／发送」。运行中发送表示补充要求，暂停独立可达。
-- 更多菜单：导出对话、查看完整执行记录、取消委托等与当前委托有关的操作。避免加入没有实际行为支持的菜单项。
-
-原实施顺序如下，前两步已落实，第三步仍需音频服务与设备验收：
-
-1. 交互可靠性：发送快照及幂等回执、滚动跟随、加载状态、复制和引用、IME 与键盘操作。
-2. 输入与信息组织：多引用、「＋」及附件真实通路、活动分组、持久补充要求状态。`@` 复用作品选择器。
-3. 音频：验证服务后接入听写；实时语音按已明确的通话与执行边界实现。
-
-重点验收：发送期间继续输入、失败后输入新草稿、切换委托时上传/转写完成、移除后附件迟到、命令已接收但回包失败、上滑期间持续输出、图片加载及窗口缩放、中文输入法确认候选词。优先参考上游测试覆盖的场景，使用 Suiming 自己的命令和真实状态验证。
 
 ## 源码索引
 

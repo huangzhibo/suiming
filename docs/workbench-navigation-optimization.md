@@ -1,10 +1,6 @@
 # 工作台导航与文档交互优化方案
 
-> 内容视图、菜单与分屏部分已由[后续方案](workbench-view-and-menu-proposal.md)取代，下文保留本轮导航决策的形成记录。
-
-日期：2026-09-09。状态：已实施并通过本轮验证。本方案保留讨论结论、交互边界与验收要求；实际结果见[验收记录](validation/2026-09-09-navigation/README.md)。
-
-长期交互规范见[作者工作台设计](web-product-design.md)，实际完成度见[当前状态](current-status.md)。本轮依据包括[工具栏实测](validation/2026-09-09-toolbar-review/README.md)、作者提供的 Obsidian 截图，以及随后对文件浏览、导航独立性和 tab 行为的讨论。
+状态：2026-09-09 的方案，已实施（[验收记录](validation/2026-09-09-navigation/README.md)），不再维护；内容视图、菜单与分屏部分已被[视图与分屏方案](workbench-view-and-menu-proposal.md)取代。现行规则见[作者工作台设计](web-product-design.md) 3.2–3.3。本轮依据是[工具栏实测](validation/2026-09-09-toolbar-review/README.md)、作者提供的 Obsidian 截图，以及随后对文件浏览、导航独立性和 tab 行为的讨论。
 
 ## 1. 优化目标与最终结论
 

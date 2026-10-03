@@ -336,6 +336,7 @@
 .agent-composer [data-slot="input-group-control"] {
 	min-height: 42px;
 	max-height: min(266px, calc(34vh - 14px));
+	/* 上方留白用 margin 而不是 padding：padding 在滚动区域里，长输入一滚就跟着文字移走，文字贴到顶边。 */
 	margin-top: 14px;
 	padding: 0 16px;
 	font-size: 15px;
