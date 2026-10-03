@@ -46,7 +46,7 @@ const ReadSchema = Type.Object(
 );
 /**
  * 写完顺手检查（SoL-Pi Action Fusion 的无 shell 版）：Writer 写一节要 write 三四次、每次后面再来一次
- * check（DeepSeek 一次只吐两三千字，见 CLAUDE.md），合进写入就省掉那一个模型来回。
+ * check（DeepSeek 一次只吐两三千字，见 packages/runtime/AGENTS.md），合进写入就省掉那一个模型来回。
  */
 const CheckAfterWrite = Type.Optional(
 	Type.Boolean({ description: "true 时写完立刻对整个候选跑一次确定性检查（同 check 工具），结论接在结果后面" }),

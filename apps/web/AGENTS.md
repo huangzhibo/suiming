@@ -1,0 +1,28 @@
+# apps/web：作者工作台（renderer）
+
+改这个目录之前先读完本文。产品规则见[作者工作台设计](../../docs/web-product-design.md)与[可视化设计](../../docs/visualization-design.md)；这里只放看代码推不出来、踩过才知道的约定。全仓通用的命令、提交与测试纪律见根目录的 [AGENTS.md](../../AGENTS.md)。
+
+## 设计系统 lint
+
+- 根目录 `npm run check` 里的 check:design-system 就是本目录的 ESLint（`eslint.config.mjs`），只跑 `@shadcn/lint` 的设计系统规则。**两个 linter 分工固定**：通用 lint 与格式全归 biome，ESLint 只管 Tailwind / shadcn 的设计系统面，规则面不重叠。不要往 `apps/web/eslint.config.mjs` 里加 `@typescript-eslint` 或 `react` 的 preset——那才会变成第二套通用 linter。目前只开了 `no-raw-colors`（2026-09-16），其余规则开不开由作者定，可用规则见 <https://github.com/shadcn-ui/lint/blob/main/docs/rules.md>。组件与主题由插件自己从 `apps/web/components.json` 发现，所以没有 `settings.shadcn`。 `eslint.config.mjs` 不在 biome 的范围内，biome 不管它的格式，手写时照 tab / 120 列来。
+
+## 踩坑得来的决定
+
+- `apps/web` 用 shadcn/ui + Tailwind v4（2026-09-08 作者决定，替代手写 CSS）。CLI 生成的组件把 `cn` 写成 `from "cn"` 并装了同名 npm 包，要改回 `@/lib/utils`；生成文件是双引号两空格，提交前跑 `npm run format`。
+- `exactOptionalPropertyTypes` 下 radix 可选 prop 需要 `?? false` 之类兜底。tsconfig 不能再写 `baseUrl`（TS 6 报废弃错误），`paths` 直接相对 tsconfig。
+- `-webkit-app-region` 的 `drag` / `no-drag` 必须用 `@utility` 声明，`@layer components` 里的自定义类不能被 `@apply`。
+- 根字号必须保持 16px（正文字号在 body 上单独设 13px）：Tailwind / shadcn 的 `size-8`、`w-12` 都是 rem，改了根字号所有标称尺寸都会缩水，2026-09-08 曾因此把「32px 按钮」实际渲染成 26px 而不自知。
+- 按钮里的 lucide 图标用 `className` 的 `size-*`（如 `size-[17px]`）指定尺寸，不要用 `size={…}` 属性：shadcn 的 Button / Toggle 基类带 `[&_svg:not([class*='size-'])]:size-4`，属性给的尺寸会被这条 CSS 压成 16px（2026-09-08 同一天踩了两次）。
+- **会叠在别的层上的浮层组件（`popover`、`select`、`dropdown-menu`、`context-menu`）刻意去掉了退出动画**，只留打开动画：Radix 只让层栈最上面那层响应 Esc，而浮层在退出动画里仍挂在层栈顶，于是在设置框里连按两下 Esc（先关浮层、再关设置）时第二下被正在关闭的浮层吃掉，设置框关不掉（2026-09-30 查清，回归在 `model-picker.test.ts`）。重新 `shadcn add` 这几个组件会把 `data-[state=closed]:animate-out` 一组类带回来，要再删掉；顶层 Dialog 下面没有别的层，保留它的退出动画。
+- `@layer components` 里的行样式**带死高度**：`.tree-row` 与 `.beat-row` 都是 `h-7`（28px），只给单行用。拿它们渲染两行内容（标题 + 路径）时高度压不住，相邻行会直接叠上——`empty-page.tsx` 的「最近访问」就这么坏了很久，三套测试全绿，是作者截图发现的。复用这两个类渲染多行时要加 `h-auto`（utilities 层压得过 `@layer components` 的 `@apply`），交互样式照旧复用。这类缺陷只能靠**几何断言**守住：E2E 里量包围盒（行高、相邻行是否重叠），按 role / 文本选元素永远发现不了。
+- **全仓改名必须带上 `*.css`。**类名不过类型检查，E2E 按 role / 文本选元素也照样通过，所以 TSX 里的 `className` 改了而 `style.css` 没改时，`npm run check`、`npm test`、`npm run test:desktop` **全绿**，样式却整块失效。2026-09-13 把 `.director-composer` 改成 `agent-composer` 时漏了 CSS，输入框的 20px 圆角、边框、阴影和 `padding: 12px 16px 16px` 一起没了，看上去就是「贴着面板边」——是作者发现的，不是测试。改名脚本的文件表要列全（`*.css` / `*.json` / `*.html` 都算），改完 grep 一遍旧名确认归零。历史验收记录（如 `docs/validation/**/measurements.json` 里的 span 名）是当时的事实，不跟着改。
+- Renderer 的反向链接、身份计数、谱与邻域图都从 `workspace.show` 透传的 frontmatter 派生（`apps/web/src/model.ts` 的 `deriveLinks`，键名决定目标种类），没有复制 Story Language 字段表；新增 frontmatter 引用键时在 `KEY_KINDS` 补一行即可。
+- 逐段建议稿与 A / B 决策卡还没做，**但不是做不了**（以前写成「没有 Runtime 通道」，被读成了「不能做」），零件清单见[作者工作台设计](../../docs/web-product-design.md) 4.4 节「A / B 决策卡」。要做就从 Runtime 做通，**不要在 renderer 里用客户端状态伪造**。
+- Markdown 渲染只有 `apps/web/src/markdown.tsx` 一处（Streamdown 2.x）：static 模式给阅读态与设计文档，streaming 模式只给正在流入的最后一条 Agent 消息。Streamdown 的元素自带 Tailwind utility 类，必须在 style.css 用 `@source "../../../node_modules/streamdown/dist/*.js"` 让 Tailwind 扫到（monorepo 提升到根 node_modules），否则列表 / 代码块 / 表格无样式；同时 p / h1–h3 / strong / em / a 用 `components` 换成裸元素，否则它的 utility 会压过我们 `@layer components` 里的字号行距。段号 `data-index` 在 `useLayoutEffect` 里按渲染出的 `<p>` 顺序打，不能用解析器位置：Streamdown 按块缓存，块内 position 不是全文位置。链接渲染成 span，renderer 打不开外部窗口。代码高亮 / mermaid / 数学是可选插件包（`@streamdown/code` 等），刻意没装。
+- TanStack AI 客户端在本仓只做消息装配：`useChat` 的 `isLoading` **恒为 false**，它只在 `connection.joinRun` 与 `send()` 路径置位，而 `apps/web/src/bridge.ts` 的只读 attach 两者都没有（`send` 直接 throw）。流式状态一律取 `sessionGenerating`（由 RUN_STARTED / RUN_FINISHED / RUN_ERROR 派生）。2026-09-12 之前 `streaming` 一直传的是 `isLoading`，Streamdown 的流式开关从未生效。
+- 两份 `@ag-ui/core` 并存：`@suiming/sdk` 用 0.0.59，`@tanstack/ai` 内嵌 0.1.1-canary.beta.0。我们实际发的 9 种事件类型在两版里一致，`bridge.ts` 里 yield 的类型转换靠这个成立；升级任一侧都要重新核对。`metadata.tanstack` 是上游保留命名空间，我们的扩展一律走 `metadata.suiming`。
+- `validateProductEvent` 的白名单只约束 `suiming.*` 扩展面：CUSTOM 只放行 `suiming.session`，ACTIVITY_SNAPSHOT 的检查以 `activityType.startsWith("suiming.")` 为前提。标准 AG-UI 事件（含 `TOOL_CALL_*`）只过上游 `EventSchemas.parse`，不会被拦——别把这道闸当成「不会混进第二套协议」的防线。
+- 编辑器是 CodeMirror 6（`apps/web/src/code-editor.tsx`），Monaco 已删：源码即真源，只做语法着色不隐藏标记。比较用 `@codemirror/merge` 的 MergeView：给了 onChange 时右侧可编辑并带 `revertControls: "a-to-b"`，这就是"逐块采纳 / 放弃改动"，不要另做 accept / reject 通道；版本页两侧只读。@codemirror/* 各包对 `@codemirror/state` 的要求会漂，出现 `commands/node_modules/@codemirror/state` 这种嵌套副本时 tsc 报 SelectionRange 类型不兼容、运行期整个编辑器崩成 "Something went wrong"，用 `npm ls @codemirror/state` 查并把 state 升到被要求的版本。E2E 选择器是 `.cm-editor .cm-content` 与 `.cm-mergeView`。
+- finding 的段落锚点是 renderer 派生的（`apps/web/src/anchors.ts`）：取 evidence 里引号内的原文，在 remark 解析出的 paragraph 节点里找，段号 = paragraph 节点的文档顺序，与 Streamdown 渲染出的 `<p>` 顺序一致。Review schema 的 anchor 仍只到文件，不要为了段号去改 Reviewer 契约或 Story Language。审稿页的 finding 卡片不能整体做成 `<button>`：里面还有按钮，外层的可访问名称会包含内层文字，Playwright 的 `getByRole("button", { name: /在正文中打开/ })` 会点到外层（2026-09-09 踩过）。
+- 故事轴（`apps/web/src/axis/`）：`layout.ts` 是纯函数，坐标一律是 index.yaml 的 ordinal，不是 id 数字（eval-022 第一卷顺序是 1 68 2 3 4 5 69 6 7）。审稿只锚一个 Beat 的画三角、覆盖多个 Beat 的画区间线，否则一份全书设计审稿会在每一列出现。列头是点击设时点、双击打开：dblclick 前必先触发两次 click，反过来放会先跳页。SVG 图元当按钮用统一走 `press()`，但 biome 看不见 spread 里的 role，列头 rect 要显式写 `role="button"` 并加 useSemanticElements 豁免；拖动处理放在 `setPointerCapture` 的把手上而不是 svg 上，否则 noStaticElementInteractions 报错。
+- macOS 文件系统不分大小写：`axis/neighborhood.ts`（数据）与 `axis/Neighborhood.tsx`（组件）同时存在时 tsc 报 "differs only in casing"，组件文件叫 `NeighborhoodView.tsx`。根 `check:types` 会类型检查 apps/web/test，测试文件不能 import `.tsx`（没开 jsx），纯数据要拆成 `.ts` 再测。

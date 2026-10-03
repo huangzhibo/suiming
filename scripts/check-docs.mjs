@@ -28,6 +28,16 @@ for (const file of collectMarkdown(root)) {
 	}
 }
 
+// Codex 默认只读 AGENTS.md 的前 32 KiB（project_doc_max_bytes），多出的部分静默截掉；
+// 只在某个目录用得上的约定放进那个目录的 AGENTS.md。
+const codexProjectDocMaxBytes = 32 * 1024;
+const rootAgentsBytes = statSync(join(root, "AGENTS.md")).size;
+if (rootAgentsBytes > codexProjectDocMaxBytes) {
+	errors.push(
+		`AGENTS.md: ${rootAgentsBytes} bytes, Codex reads only the first ${codexProjectDocMaxBytes}; move directory-specific notes into that directory's AGENTS.md`,
+	);
+}
+
 if (errors.length > 0) {
 	console.error(errors.join("\n"));
 	process.exitCode = 1;

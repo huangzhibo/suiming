@@ -105,7 +105,7 @@ model = "deepseek-flash"
 
 ## 参与开发
 
-规范真源是 [AGENTS.md](AGENTS.md)：产品目标、核心不变量与工程边界都在那里，人和 coding agent 共用；[CLAUDE.md](CLAUDE.md) 补充命令、检查脚本的隐含约束和踩过的坑。动手之前先读这两份。
+规范真源是 [AGENTS.md](AGENTS.md)：产品目标、核心不变量、工程边界与开发约定（命令、检查脚本、提交与测试纪律）都在那里，人和 coding agent 共用；只在某个目录用得上的约定写在那个目录的 AGENTS.md。动手之前先读。Codex、Grok 直接读 AGENTS.md，Claude Code 从 2.1.277 起也直接读，本仓没有 CLAUDE.md。
 
 ```sh
 npm run check          # 文档链接、生成文件对账、biome、类型检查

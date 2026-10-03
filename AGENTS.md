@@ -14,7 +14,7 @@
 - 当前完成度与已知缺陷：[当前状态](docs/current-status.md)
 - 实施顺序与验收：[实施路线图](docs/roadmap.md)；接下来做什么只在它的第 6 节维护
 - 发生过什么：[变更记录](docs/changelog.md)
-- 命令、检查脚本的隐含约束、提交规则与踩坑记录：[CLAUDE.md](CLAUDE.md)（不只写给 Claude Code，人和其他 coding agent 改代码前也要读）
+- 开发约定（常用命令、检查脚本、提交规则、测试纪律）：本文后半；只在某个目录用得上的坑写在那个目录的 AGENTS.md，见文末「各目录的约定」
 - 旧仓边界：[迁移方案](docs/migration-from-suiming-story.md)
 - ADR 是历史决策，不是当前规范；已完成或被取代的方案与评估在 [docs/history](docs/history/README.md)，保留形成过程，也不是现行规范。撤掉「委托」概念的理由见[需求与目标](docs/vision-and-requirements.md) 5.1 节「作者意图与对话」。
 - 开源前的提交历史不在本仓：2026-10-03 开源时，之前的 409 个提交压成了一个基线提交（`chore: 开源基线（MIT）`）；本仓的另一个起点是 2023-09-28 建仓时的 8 个提交，由合并提交接入。文档里 2026-10-03 及之前的 7 位提交号、「看当时的提交信息」都指那段历史，本仓查不到；该保留的设计理由已经写在上面这些文档里。维护者本机在本仓旁边留有完整归档（裸仓 `../suiming-history-2026-10-03.git`），在那里用 `git log -L` 或 `git blame <提交> -- <文件>` 追到逐行的旧理由；其他环境没有这份归档。
@@ -43,7 +43,7 @@ Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真
 - `packages/runtime` 是 deployment-neutral 的共享 Runtime，收纳 artifact、harness、原子 Capability、可选方法、events、model 与 application service；Local / Cloud 只替换存储、owner 领取与传输 adapter，桌面、CLI 和 Cloud 不另建平行 runtime。
 - `packages/cloud-postgres` 是 Kysely / `pg` Cloud persistence adapter，依赖 Runtime port；数据库 driver、migration runner 与 PostgreSQL transaction 实现不得反向进入 `packages/runtime`。
 - `packages/cloud-s3` 是 AWS SDK v3 / S3-compatible `CloudObjectStore` adapter；只拥有对象 client、内容完整性与物理 key prefix，不拥有 ArtifactVersion、Project 权限或对象生命周期规则。
-- Model Gateway 直接使用 `@earendil-works/pi-ai`，复用其 provider、消息、工具声明和流类型；显式 profile 选择模型，每个 turn 冻结实际 provider、model、参数、prompt 与工具声明（`taskLoopBinding`），换绑只在没有未决副作用的 turn 边界发生。参考 pi-agent-core 逻辑自行实现 Harness，不依赖、fork、vendor 或按字段改名移植其内核，不再评估其他执行路径；pi-agent-core、其文件工具和 NodeExecutionEnv 依赖已移除。pi-ai 的版本以 `packages/runtime/package.json` 为准，升级时的坑见 CLAUDE.md。
+- Model Gateway 直接使用 `@earendil-works/pi-ai`，复用其 provider、消息、工具声明和流类型；显式 profile 选择模型，每个 turn 冻结实际 provider、model、参数、prompt 与工具声明（`taskLoopBinding`），换绑只在没有未决副作用的 turn 边界发生。参考 pi-agent-core 逻辑自行实现 Harness，不依赖、fork、vendor 或按字段改名移植其内核，不再评估其他执行路径；pi-agent-core、其文件工具和 NodeExecutionEnv 依赖已移除。pi-ai 的版本以 `packages/runtime/package.json` 为准，升级时的坑见 [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)「模型与凭据」。
 - `SuimingHarness` 是唯一执行实现；根 Agent 与子任务共用一份自有 loop（`runTaskLoop`）、动作恢复与 execution store，不增加 pi Session / Lane / Operation 同义层。Session 是根 Agent（idle / running / paused 三态，一份连续的消息列表），turn 是作者一条消息到模型停下，Task 是子智能体；暂停、进程重启和网络重试都续同一份消息列表。Agent 使用受限的 checkout 文件工具（整个 checkout 可写，`.git` / `.suiming` 与 host 接入目录除外；不加载 host 的 Skill 与入口文件），子任务按角色缩小写范围；作者、host agent 与 Agent 共用一份候选与一条提交路径（`commitCheckout` + receipt），没有 per-session worktree，也没有提交时的三方合并；作者消息经持久 inbox 进入消息列表。不得新增 per-capability run service、coordinator 或 executor。
 - **turn 结束不等于作者的目标达成**，系统不做这个判断——达成与否由作者看作品定。没有交付协议：模型一次响应里没有工具调用，turn 就结束回 idle；未提交的候选留在 checkout 等下一轮，Agent 在回复里说明哪些改了还没提交。**没有预算**，理由与代价见 [Harness 设计](docs/harness-design.md)第 10 节。只有三种情况 Session 停在 paused 等作者：模型请求结果未知、动作停在半途无法核对、半途换了模型或工具面；其余都回 idle 加一句原因。外部模型请求可能结果未知，不承诺 exactly-once。
 - `packages/sdk` 持有命令目录。**目前是三份而不是一份**（`SUIM_CLI_COMMANDS` / `LOCAL_COMMANDS` / `DOMAIN_API_ROUTES`），传输适配也不是生成的；已经合一的是它们共用的部分：领域对象 schema 只在 `domain-schema.ts` 定义一次，Session 摘要 / 作品状态 / Checker 结果 / revision 摘要各只有一份投影，同名命令只允许一份 payload。全量改名与自动生成刻意不做，理由见[系统架构](docs/architecture.md)——不要把这条读成「已经是一份」。只有一个 agent loop（`runTaskLoop`）、一个合并函数（`mergeOpenStoryFiles`）、一个搜索函数（`searchStoryCandidate`）、一个 Review 能力实现（`harness/review-task.ts`）；审稿是 `review/<id>.md`、材料笔记是 `source/<id>/notes/<n>.md`，两者都是普通 artifact，时效与覆盖率按需从历史派生（`artifact/derived.ts`）。
@@ -70,3 +70,70 @@ Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真
 本阶段是[路线图](docs/roadmap.md)的 S5：真实长篇质量、Harness 余下切片（C / E / F）、认证与发行。具体队列只在路线图第 6 节维护，完成度与已知缺陷见[当前状态](docs/current-status.md)。
 
 Cloud Web、远程 Agent 产品、生产 identity / 计费、多人协作、Reader、短剧、全功能 MCP 与通用 graph engine 不进入本轮；已有 Cloud adapter 随共享契约修正，不借此扩张 Cloud。Story Language 在验证门前不承诺兼容；真实作品、revision 与作者记录迁移前备份，不随开发执行数据一起丢弃。
+
+## 开工前
+
+- 动手前对照 [Harness 设计](docs/harness-design.md)第 16 节的拆除清单，避免重建已被推翻的层；TUI 也已删除，不要重建。ADR 是历史：ADR-0009「收敛」节里的 Worker claim、DesignCommit、MaterialEvidence、三方合并做 rebase、保留 TUI 都已被推翻，不要拿它当规范对照。
+
+## 常用命令
+
+```sh
+npm run check        # docs 链接、生成文件对账、story 隔离、biome、tsc（含测试源码）、设计系统 lint、integrations 对账
+npm test             # node --test 全部包；需要真实 PostgreSQL / S3 / 双进程的用例默认 skip
+node --import tsx --test packages/runtime/test/agent.test.ts   # 单个测试文件
+npm run build        # tsc -b --force
+npm run format       # biome 自动修
+npm link -w @suiming/cli   # 全局 suim 指向本仓；旧仓同名，只能有一个在 PATH 上
+npm run dev:api      # Cloud 开发进程（只剩 Canon 与同步），读 .env
+node --import tsx apps/cli/src/bin.ts --json status    # 从源码跑 suim
+npm run test:desktop   # 构建 renderer + 真实 Electron E2E；只改测试时可直接 node --import tsx --test apps/desktop/test/desktop.test.ts
+cd apps/web && npx shadcn@latest add <component>   # 生成 shadcn/ui 组件到 src/components/ui，之后跑 npm run format
+npm run regression:harness -- --only check-issues --trials 1   # 真实模型回归，节奏见下
+```
+
+- workspace 包的 exports 指向 dist。测试和 CLI 里 `@suiming/*` 的跨包 import 走 dist，改了 packages/* 之后先 `npm run check`（其中 `tsc -b` 会重新 emit）或 `npm run build` 再 `npm test`，否则测的是旧代码。包内测试用 `../src` 相对路径，不受影响。
+- 跑被 skip 的集成测试：按 .env.example 设 `SUIMING_TEST_POSTGRES_URL`、`SUIMING_TEST_S3_*`、`SUIMING_TEST_DURABLE_PROCESS=1`，需要一次性的 PostgreSQL 与 MinIO。
+- 真实模型调用的配置、`regression:harness` 的跑法与节奏见 [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)「真实模型调用与回归」。**回归跑的过程中不要 `npm run build` / `check` / `test:desktop`，也不要提交**：每个任务起新的 `suim` 进程读当时的 dist，脚本记下 commit 与 dist 指纹，变了就停。
+
+## 检查脚本的隐含约束
+
+`npm run check` 的任一道闸失败都让整条链失败。脚本的报错会说该做什么，下面是看报错看不出来的：
+
+- check-docs：全仓所有 .md 的相对链接必须指向存在的文件；根目录这份 AGENTS.md 不能超过 32 KiB——Codex 默认只读这么多（`project_doc_max_bytes`），多出的部分静默截掉。只在某个目录用得上的约定放进那个目录的 AGENTS.md。
+- 三份生成文件不要手改，改了真源跑对应的 `npm run generate:*`：`strategies/story-constitution.md` → `packages/story/src/constitution.ts`；`story-language/*.md` → `packages/story/src/story-language-docs.ts`；integrations/shared/suiming/SKILL.md 与 integrations/codex/agents/*.toml → `apps/cli/src/host-files.ts`。Agent 经 `story_guide` 的 `topic` 读 Story Language，`suim init --agent` 与 `suim update --agent` 把 Skill 和同一份 Story Language 写进作品仓——2026-10-02 之前只有 CLI 的 host-files 嵌了一份，Agent 只看得到字段形状，抽斗破时 Beat 写成速记、人物档写成编年、一个秘密都没声明。生成脚本读 story-language 下所有 .md，那里不能放别的 Markdown（包括 AGENTS.md）。
+- check-story-isolation：packages/story/src 禁止 import node:fs / sqlite / child_process / net / http、fastify、pg、kysely、commander、pi-ai。
+- check-host-integrations：要核对的命令片段由脚本从 `SUIM_CLI_COMMANDS` 生成（`cloud.*` 除外），增删 `suim` 子命令时只需让 SKILL.md 写出对应的 `suim --json <命令>`，不用改脚本；三个 host README 也要含安装路径与 smoke check。
+- check:design-system 是 `apps/web` 的 ESLint，与 biome 的分工见 [apps/web/AGENTS.md](apps/web/AGENTS.md)。
+- biome 只覆盖 apps/*/{src,test}、packages/*/{src,test}、scripts/*.mjs；tab 缩进，行宽 120。tsconfig 开了 exactOptionalPropertyTypes、noUncheckedIndexedAccess、verbatimModuleSyntax：NodeNext 相对 import 写 `.js` 后缀，类型用 `import type`，可选属性不能显式赋 undefined。
+
+## 提交与完成规则
+
+- 一个提交只做一个任务或明确子任务；机械重命名、行为变更、文档决策分开提交。
+- 每个任务先补验收测试，再更新当前状态；未经真实模型验证的能力留在「机制」等级，不写成已完成。验收与风险相称：恢复与事务用故障注入，界面用真实交互，文档修改查链接与规范一致性。
+- 完成一步后各更新一处，三份各管一样：docs/current-status.md 管能力、已知缺陷与测试数；docs/roadmap.md 第 6 节管队列；docs/changelog.md 管发生了什么。AGENTS.md「当前阶段」与 README 顶部「当前状态」引用块只写阶段级摘要并链接，只在阶段变化时改——以前要求同步四处，四份副本照样漂移了。
+- 提交信息用 `type(scope): 中文摘要`，Harness 切片字母或 ADR 编号放在结尾括号，如 `（C）`、`（ADR-0013）`。正文写为什么；删除测试时写明它守的是什么、为什么不再需要。
+- 设计原型不进生产 `apps/web`，直到视觉方向被选定；生产代码不复制 mock domain model。
+- 不提交 .env、API key、Langfuse key、Local SQLite、trace payload、真实用户数据或未脱敏作品。
+- 仓库是公开的：文档不写作者所在地区、代理出口与本机路径；作品副本放在哪个目录这类维护者本机信息不进仓库。
+
+## 测试纪律
+
+- 测试 helper 是 test/ 目录下的普通文件，按相对路径引用：story 层 fixture 在 packages/story/test/fixture.ts，唯一的样例作品在 packages/runtime/test/sample-work.ts（2 个 StoryBeat）。曾做过独立 `@suiming/testing` 包和 `@suiming/runtime/testing` 子路径导出，都因为是第二套机制或污染产品导出面被删，不要再建。
+- 被删模块的测试随模块删除，不留空壳。不加只测 in-memory 假对象、或断言临时空洞（如「Worker 零 executor」）的测试；冻结面只保留能发现真问题的测试。
+- 真实 provider 暴露的每种 malformed output 都要有等价回归，由 Checker 或 tool contract 拒绝，不靠改 prompt 兜底。
+- 默认 skip 的集成测试不会告诉你它坏了：改 Cloud schema 后的真跑办法见 [packages/cloud-postgres/AGENTS.md](packages/cloud-postgres/AGENTS.md)。桌面 E2E 的纪律见 [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md)。
+- YAML 把 64 位纯数字的 sha 解析成数字，`material_sha256: 000…0` 会被 schema 拒绝；测试里造假 sha 用 `"f".repeat(64)`。
+
+## 错误信息与退出码
+
+- CLI 的 exit code 从错误类别派生，不是手抄表：`errorCategory()`（`packages/sdk/src/error-category.ts`，正则规则加少量 overrides）定类别，`EXIT_BY_CATEGORY` 映射到退出码。新增 Runtime 错误码通常不需要动 CLI；只有当它落进错误的类别时才加一条 override。
+- **错误信息的语言按「是不是 bug」分，不按包分**（2026-09-30 作者定）。作者正常操作就会撞到、原因在作者输入或环境的信息写中文；不变量被破坏的程序错误保持英文——作者不需要懂，看得懂英文的人也多。新增错误时按这两问判：作者正常操作会不会撞到？原因在不在作者输入或环境？都是就写中文。保持英文的是执行状态机、存储与 journal 损坏、内部契约校验、Cloud 运维、release 完整性校验、NFC 规范化与 API 参数校验，以及第三方原文（TypeBox 的 schema 错误、pi-ai）；commander 的内置错误由 `localizeCommanderError` 按模板翻，没命中的原样露出英文。**错误码永远不译**——`code` 是机器契约，`message` 是给人看的那半。改在源头而不是显示层按 code 映射：诊断带参数，`suim` 的 JSON 信封与 host agent 也要看到同一句话；这些诊断同时是模型的 `ToolRejection` 反馈，与中文的 Agent prompt / Skill 一致。排版：中文人名前不留空格（`提到了${character.name}`、`找不到人物：${id}`，人物 id 就是中文名），id、路径、字段名这类拉丁变量前后留空格。有 7 条测试断言诊断原文，改文案时一起改，断言里的标识符不能少。
+
+## 各目录的约定
+
+只在某个目录用得上的约定写在该目录的 AGENTS.md。Claude Code 读到那个目录里的文件时自动加载；Codex 只自动读工作目录到仓库根这一路上的 AGENTS.md，改别的目录前要自己读。
+
+- [apps/web/AGENTS.md](apps/web/AGENTS.md)：界面与设计系统 lint
+- [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md)：主进程与 IPC、桌面 E2E
+- [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)：真实模型调用与回归、模型与凭据、Harness 与执行、Canon 与存储
+- [packages/cloud-postgres/AGENTS.md](packages/cloud-postgres/AGENTS.md)：Cloud schema 与默认 skip 的集成测试

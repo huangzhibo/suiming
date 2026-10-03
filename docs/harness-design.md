@@ -148,7 +148,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 - `copy` 把一个文件或整个目录原样复制到新路径，内容不经过模型，每个目标文件照 `write` 先准备 journal 再落盘。没有它时，斗破抽取的「原样提升」要模型把 176 个文件逐个重打一遍，约 35 分钟。
 - `move` 与 `mv` 同义，挪完原处不留，目标已有不同内容时拒绝。换卷就是改 index 加 `move` 文件；没有它时，120 章整合给 153 节分卷只能逐个 `copy` 再 `delete`。
-- `write` / `edit` 带可选的 `check: true`：改完立刻对候选跑 Checker，一次观察返回两者，省一个模型来回（SoL-Pi Action Fusion 的无 shell 版）。Writer 的交付句是「全文完成的那次 write 带 check」。结果也给写入后的字数，因为 Writer 曾把 6,745 码点报成「约一万字」。DeepSeek 写一万字要 write 四五次、每次后跟一个 check（实测见 CLAUDE.md），所以不在工具层禁止多次 write。
+- `write` / `edit` 带可选的 `check: true`：改完立刻对候选跑 Checker，一次观察返回两者，省一个模型来回（SoL-Pi Action Fusion 的无 shell 版）。Writer 的交付句是「全文完成的那次 write 带 check」。结果也给写入后的字数，因为 Writer 曾把 6,745 码点报成「约一万字」。DeepSeek 写一万字要 write 四五次、每次后跟一个 check（实测见 [packages/runtime/AGENTS.md](../packages/runtime/AGENTS.md)），所以不在工具层禁止多次 write。
 
 **scope 去掉。**Design / Write / Review / Source 不是带权限预设的入口，只是桌面与 CLI 发出的消息模板（桌面「写这个 Beat」发的是「完成并提交 beat-0004 的正文」这句话）。曾经的 `run.design` / `run.write` / `run.review` / `run.source.*` 是「权限预设 + 交付检查」：前者在长会话第二轮就不成立——作者顺口一句「顺便改下大纲」；后者是在判「作者目标是否达成」。哪些路径是合法作品文件由 codec 与 Checker 在 `commit` 时判，工具层不设第二道。
 

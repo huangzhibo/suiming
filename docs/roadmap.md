@@ -104,7 +104,7 @@ Cloud Web 复用桌面已完成的 React 工作台与同一事件契约，不再
    - 「作者否决」这一维仍没有记录，暂由评测中作者的抽查补。
    - 不再推进：以原作为底本重新设计的那一版（停在 beat-0001）与 eval-022。C 题库照旧。
 2. **长篇运行与界面性能**：用标注的规模 fixture 测量 checkpoint、Context、列表与 diff；用真实作品验证阅读和写作负担，不把合成数据记作质量证据。斗破作品上的桌面查询 2026-10-02 已压下来（`workspace.show` 约 11 ms，比较页先给文件清单、选中再读两侧）。还没做的是随长篇增长的几处：版本下拉平铺全部 revision、执行对象没有回收、命令回执从不清理（见当前状态的已知缺陷）。执行状态簿记的测量脚本在 [Harness 审查](validation/2026-10-01-harness-review/README.md)。
-3. **Harness 余下切片** C / E / F（[Harness 设计](harness-design.md)第 13 节）。C 里只剩折叠与边界压缩，各项彼此独立，可以分开提交。排序依据：DeepSeek 的 1M 窗口上不急，斗破前五轮请求约 30 万 token、占窗口三成，保护从未触发，缓存命中 99.9%（[记录](validation/2026-10-01-doupo-real-run/README.md)）；默认的 GPT-6.1 Sol 窗口只有 272k，2026-10-03 斗破 120 章抽取的 Source 审稿每次请求平均约 18.5 万 token、占 68%，离 80% 的清理线不远，是最先撞线的角色，阈值在下一次长运行里验。E（调研）与 F（`run_command`）这次用不上，排后。改 prompt、工具描述或 loop 之后跑相关的真实模型回归（[记录](validation/2026-10-01-harness-regression/README.md)，节奏见 [CLAUDE.md](../CLAUDE.md)）。
+3. **Harness 余下切片** C / E / F（[Harness 设计](harness-design.md)第 13 节）。C 里只剩折叠与边界压缩，各项彼此独立，可以分开提交。排序依据：DeepSeek 的 1M 窗口上不急，斗破前五轮请求约 30 万 token、占窗口三成，保护从未触发，缓存命中 99.9%（[记录](validation/2026-10-01-doupo-real-run/README.md)）；默认的 GPT-6.1 Sol 窗口只有 272k，2026-10-03 斗破 120 章抽取的 Source 审稿每次请求平均约 18.5 万 token、占 68%，离 80% 的清理线不远，是最先撞线的角色，阈值在下一次长运行里验。E（调研）与 F（`run_command`）这次用不上，排后。改 prompt、工具描述或 loop 之后跑相关的真实模型回归（[记录](validation/2026-10-01-harness-regression/README.md)，节奏见 [packages/runtime/AGENTS.md](../packages/runtime/AGENTS.md)「真实模型调用与回归」）。
 4. **完整作者交互**：深化 Library、精细引用、人物时点 / 因果 / Contract；保持同一 Runtime 和既有 Canon。精细引用先做了正文选段的就地修改（2026-10-03，选段栏写要求、回车直接发出，走输入框同一条发送路径）。修改记录不另建存储：作者原话与选段在会话消息里，Agent 的改动在动作日志里，最后留下什么在 git 历史里；需要拿来改进方法时从这三处派生导出，等就地修改有了真实使用再做。
 5. **可视化**：故事轴、邻域图、承诺 / 人物轨迹已落地并在 eval-022 上做过脚本化验收（[记录](validation/2026-09-09-visualization.md)）；下一步是作者本人在自己的作品上操作并记录解释负担，再决定语义解释层。
 6. **认证与发行**：`openai`（ChatGPT 订阅）的登录、调用与 token 刷新已在真实账号上发生，余下失效恢复与桌面、CLI 同时刷新的验收；再验证 macOS 安装、升级、备份和恢复；未验证平台不标为支持。
@@ -112,4 +112,4 @@ Cloud Web 复用桌面已完成的 React 工作台与同一事件契约，不再
 
 ## 7. 提交与完成规则
 
-见 [CLAUDE.md](../CLAUDE.md)「提交与完成规则」；新增领域实体、持久协议或基础设施前的终局论证见 [AGENTS.md](../AGENTS.md)「工程边界」。
+见 [AGENTS.md](../AGENTS.md)「提交与完成规则」；新增领域实体、持久协议或基础设施前的终局论证见 [AGENTS.md](../AGENTS.md)「工程边界」。

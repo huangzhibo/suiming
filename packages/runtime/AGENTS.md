@@ -1,0 +1,48 @@
+# packages/runtime：共享 Runtime
+
+改这个目录之前先读完本文。执行模型的规范见 [Harness 设计](../../docs/harness-design.md)，存储与版本见[系统架构](../../docs/architecture.md)；这里只放看代码推不出来、踩过才知道的约定，设计文档已经写全的只留「不要做什么」、守它的测试与链接。全仓通用的命令、提交与测试纪律见根目录的 [AGENTS.md](../../AGENTS.md)。
+
+## 真实模型调用与回归
+
+- 真实模型调用：`~/.suiming/config.toml` 是作者的配置，.env 里的 `SUIMING_*_MODEL_*` 覆盖它（桌面开发启动、CLI、回归都读 .env）。2026-10-02 起作者默认用 `openai/gpt-6.1-sol`（ChatGPT 订阅，思考 high），.env 只留评委覆盖（DeepSeek，不让 GPT 给自己的稿子打分）；在那之前的回归记录与留出评测都是 DeepSeek 跑的，换模型后第一轮是新基线。订阅额度与作者自己的 Codex 共用，全套回归、长抽取别无谓地跑。.env 已 gitignore。
+- `regression:harness` 在样例作品的副本上从外面驱动 `suim session send`，只用确定性信号判分（turn 结束对账、版本、Checker、审稿引文锚定），报通过率不报红绿。**跑的过程中不要 `npm run build` / `check` / `test:desktop`，也不要提交**：每个任务起新的 `suim` 进程读当时的 dist，2026-10-01 第一次跑就因为中途 `tsc -b` 混进了两种构建，结果作废；脚本现在记下 commit 与 dist 指纹，变了就停。**节奏（2026-10-02 作者嫌拖慢开发后定）**：不先跑基线，上一次记录的结果就是基线；改 prompt、工具描述或 loop 之后只用 `--only` 跑相关任务、`--trials 1`，放后台，不需要构建的活照常做；全套 `--trials 3` 只在节点上跑——真实长篇运行之前、发版之前、改 loop 或上下文管理之后。全套一轮在 DeepSeek 上 10–15 分钟，在 GPT-6.1 Sol（思考 high）上一个多小时（2026-10-03 实测），期间不能构建；放后台时把超时设到两小时，默认一小时会在最后几项被停掉。
+
+## 模型与凭据
+
+- **模型调用要遵守系统代理，Node 的 `fetch` 默认不读那些环境变量。**`NODE_USE_ENV_PROXY=1` 只在 bootstrap 生效，进程内 `process.env` 设它无效。所以进程入口（`apps/cli/src/bin.ts`、Electron 主进程）各调一次 `useEnvironmentProxy()`（`model/proxy.ts`，装 undici 的 `EnvHttpProxyAgent` 作全局 dispatcher，没配代理时什么都不做）。**不要装进库或 gateway**——`setGlobalDispatcher` 是进程级副作用，测试反复导入时不该改全局网络行为。配了 `HTTPS_PROXY` 但没装 dispatcher 时请求根本不走代理，界面只看到一句 `fetch failed`，完全看不出代理没被用上（2026-09-13 实测）。
+- **环境变量之外还有 macOS 系统代理**：从 Finder / 程序坞启动的桌面拿不到 shell 的变量，Node 也不读系统代理，于是直连。桌面主进程在 ready 之后第一步用 `session.defaultSession.resolveProxy` 问 Chromium 解析出的系统代理，`proxyFromPacResult` 取第一个 HTTP(S) 代理交给 `useEnvironmentProxy(system)`，环境变量优先；SOCKS 不接（undici 不支持）。实测从 Finder 无变量启动时请求走上了系统代理。`openai-codex` 2026-09-13 登录时被 403 拒绝就是因为直连：当时记成「这个 provider 用不了、不要再试」是误判，同一台机器上读系统代理的客户端一直能用（2026-10-02 查清）。登录或调用的网络失败，先查请求有没有走上作者的代理。产品只遵守作者自己的代理设置，不内置任何代理。
+- **pi-ai 升级会改模型目录，配置里的模型 id 可能就此失效**（2026-10-02 从 0.84.4 升到 0.99.2）。DeepSeek 官方的 V4.1 Flash 在目录里叫 `deepseek-flash`，`deepseek-v4-flash` 从官方 provider 的目录里消失。产品显示的花费只是估算，**别拿它对账**，计价口径与旧 id 期间的记账偏差见[当前状态](../../docs/current-status.md)「花费是估算」那条。作者 `config.toml`、`.env` 与桌面 E2E 的配置里写着旧 id 的，升级后都是「找不到模型」，桌面「设置页」E2E 就因此等不到「还没有可用凭据」超时。这不加迁移层：目录本来会变，产品给出明确提示让作者重选即可；升级时 grep 一遍配置与测试里的模型 id。同一次升级还有两处形状变化：provider 与 faux 拿到的是折好的 transcript（系统提示与工具声明在开头那条 `system` 消息里，没有 `context.systemPrompt`），工具结果的 `details` 必须是 JSON 值；`openai` provider 多了 ChatGPT 订阅 OAuth，与 `openai-codex` 同源。
+- 模型凭据只走 pi-ai 的 `Models.login`（[系统架构](../../docs/architecture.md)第 10 节），`LocalModelSettings` 把 prompt / notify 摊成可轮询的登录会话（`models.login.*`），窗口只转述。曾有一个直接写 key 的 `models.connect`，因为是第二套机制且绕过 provider 自己的多步 login（Cloudflare 要 account id）而删掉，不要再加。
+- **凭据文件的 `modify` 持跨进程锁跑完整次 OAuth 刷新**（`json-file-credential-store.ts`）：pi-ai 约定刷新在 `modify` 里、全局只刷一次，OpenAI 的 refresh token 用过即作废，锁外刷新会让桌面与 CLI 各刷一次、后到的一方失败、作者被迫重登。不要为了「别占着锁等网络」把远端请求挪出锁——登录时浏览器里的等待本来就不在 `modify` 里。Codex 自己只在进程内单飞、刷新前重读磁盘，跨进程撞上时靠「refresh token was already used」报错与重读兜底，不是更好的参照。实测到哪一步见[当前状态](../../docs/current-status.md)「发行与认证」。
+- pi-ai 自己不开浏览器：`auth_url` / `device_code` 的链接由主进程 `shell.openExternal` 打开（`LocalModelSettings({ openUrl })`），renderer 打不开外部窗口。`openai` / `openai-codex` 的 OAuth 回调固定监听本机 1455 端口，与 Codex CLI 共用，被占时退回手动粘贴回调地址。
+- `SUIMING_AUTH_PATH` 与 `SUIMING_CONFIG_PATH` 对称，桌面 E2E 用它们把设置指到临时目录，并要从 launch env 里剔掉开发 shell 的 `*_API_KEY`（开发 shell 导出了某个 provider 的 key 时，「缺少凭据」永远不出现）。
+- `session.send` 的启动预检用的是 `#controller()` 那一次初始化的 gateway，不要再调一次 `models()` 工厂，幂等测试数着初始化次数。
+- 模型输出的 wire schema 保持平面 `Type.Object`，不用顶层 object union：qwen3.8-max 会把 union 下的数组序列化成字符串。字面量枚举可以用 union；verdict 与 findings 这类跨字段约束放在 parser 里查，不放在 schema 里。
+
+## Harness 与执行
+
+- 不要凭直觉给写作定按次的小上限：DeepSeek V4 Flash 每次只吐两三千字，一万多字的正文要 write 四五次、每次后跟一个 check（2026-09-06 按作者意见重写 beat-0004 时，当时 Writer 的 8 次上限在 submit 前耗尽，$0.037 白花）。契约里已写明可以多次 write 覆盖、check 只跑一次；也不要在工具层禁止多次 write。创作路径本来就没有预算，见 [Harness 设计](../../docs/harness-design.md)第 10 节。
+- 会话开场与非 writer 子任务的初始 Context 是 `packages/runtime/src/artifact/design-frame.ts` 的 Frame（ADR-0008 决定 3，种子为空；设计视图与 rank 按 Beat 播种）：Design 超过 `DESIGN_FRAME_FULL_RENDER_CODE_POINTS`（2.4 万码点，占位值，真实长篇上实测调）才裁剪，否则全量。委派的 writer 拿的是 Write Context，不是 Frame。全书 Design Review 与 host 的 `context compile design` 仍是完整 Design，不要为了省 token 再去裁它。全书 Intent 与 world/core 作 seed 不扩散；非 Beat seed 涉及的 Beat 受 `DESIGN_FRAME_EXTRA_BEAT_CODE_POINTS` 预算，也是占位值。以后若要拿检索命中作 seeds，先滤掉常用词：长目标里的常用词会命中全书，eval-022 实测未过滤时 Frame 比全量还大（当时的过滤函数 `subjectsForSearchHits` 随固定配方失去调用点，代码随后删除）。
+- 上下文清理只改请求投影，不改 `state.messages` 与 checkpoint，阈值与步骤见 [Harness 设计](../../docs/harness-design.md)第 7 节「窗口保护」。不要把它改成直接删消息；改之前会话会卡死在同一次溢出上，`context-window.test.ts` 四条守着。
+- 没有 per-session worktree，理由与三个后果见 [Harness 设计](../../docs/harness-design.md)第 2 节，host 接入目录对模型不可见见第 6 节。改这一带时：不要为了「干净」给 `commit` 的 `ignored` 加白名单；新加 host 时 `ConfinedExecutionEnv` 的 `HOST_ADAPTER_ROOTS` 要跟上，`cli.test.ts` 核对；要并行就给 session 配可选工作目录，接口位置是 `HarnessSession.checkoutPath`。
+- `HarnessSession.base` 是**已提交基线**（turn 开始时 head 的快照，阶段提交后推进），`session.scan()` 才是 checkout 里的当前候选。turn 开场的「权威作品状态」用 scan（`uncommittedChanges` 要真实），Design Frame 用 base（不能让未提交的候选冒充已提交作品）——这两处过去都读 worktree 基线，`uncommittedChanges` 因此恒为 0。
+- running 的 Session 持有进程 lease，`LocalProjectService.open` 只收敛持有者已死的 Session（[Harness 设计](../../docs/harness-design.md)第 3 节）。测试里用 `execution.startTurn` 给一个 `hostname: "elsewhere"` 的 lease 模拟崩溃遗留；不要为了「同进程重开」再加时间过期或心跳。
+- 作者消息走持久 inbox（[Harness 设计](../../docs/harness-design.md)第 3 节）。重发的 `session.send` 只拿回原回执，不再开一个什么都不做的 turn；命令的幂等指纹包含 `model`，同一 commandId 换模型是 `command_conflict`。
+- 提交型工具的失败一律回到模型手里：Checker 拒绝是 `ToolRejection`，不是 turn 崩溃；只有持久化故障与三种 paused 原因往上抛。**Story 诊断由 loop 统一转**（2026-10-02）：任何工具里冒出的 `SuimError`（含 `StoryParseError`）在 `runTaskLoop` 收工具异常时经 `rejectionForToolError` 变成拒绝，工具不必自己记得转——之前 `read_source` / `source_coverage` 漏了，斗破抽取时 Design 里一处作用域写错就掀掉了 35 分钟的根 turn（子任务崩了，`childOutcome` 又不认这个码）。`ArtifactError` 刻意不在 loop 里一刀切：里面有 `session_owner_lost`、`local_project_closed` 这类执行状态故障，交给模型就成了在别人的 session 上接着跑，哪些能放行由工具自己判断（`requireDomain`）。读原文、查覆盖率只认原文与笔记，不连带校验整个 Source，抽取写到一半也能读。
+- `dirty_checkout` 只剩要求干净 checkout 的几条路：managed ChangeSet（`suim release publish`、`source ingest`）与 `rollback`；Agent 的 `commit` 就是 `commitCheckout`，脏 checkout 正是它要提交的东西。Cloud 的 link / pull 另有自己的 `cloud_sync_dirty_checkout`。
+- checkpoint 里停在 error / aborted / length 的模型响应在下一次续跑时撤回重发，不能把后面的每个 turn 都钉死在同一个错误上（2026-09-13 踩过）。
+- 子任务的结果只能经持久化的 `TaskOutcome.result` 交回父 Agent，不能读工具闭包：续跑复用已完成的 Task 时没有闭包，只有结果对象。新增的 Task 输出要能从 `result()` 的 JSON 读回。
+- Reviewer 子任务的读范围（`compileReviewContext` 的 `readable`）必须放行 `review/`：`submit_review` 经 `env.writeFile` 落盘，写也要过读权限，source 层曾因此报 `permission_denied` 且被 `ToolRejection` 吞成「未交付」，循环到 faux 响应耗尽。改 readable 时连同 `review/` 一起想。
+- **执行命令只写自己的写集合**（2026-10-01）。`InMemoryExecutionState` 的 `commit` 收的是 `ExecutionStateDelta`：这条命令碰过的实体（取自回滚用的 `#undo`，每处修改都先 `#remember`）、删掉的 session 与它自己的回执，`SqliteLocalStore.applyExecutionDelta` 只核对并写这几行。原来每条命令整份 `exportSnapshot()`、整份重读两遍，faux 零延迟实测 100 轮后单轮簿记 0.63 秒、73% CPU 在这里。**不要回到整份快照**——整份写入 `saveExecutionState` 与 `InMemoryExecutionState` 自己的订阅 / `persist` 于 2026-10-02 删掉（只剩测试在用，「两个进程同时写」那条回归走的竟是它而不是产品路径）；测试造状态就给 `InMemoryExecutionState` 传 `commit: (delta) => store.applyExecutionDelta(delta)`，变更通知只有 `LocalProjectService.subscribeExecutionState` 一处；只读查询（`workspace.show` 每 100ms、session 列表、CLI）用 `loadExecutionEntities()`，不读回执。`agent.test.ts` 数着一个 turn 里整份导出与整份重读的次数，与工具轮数无关是它的闸。checkpoint 归档按 JSON 记住小节点的引用、事件流按 id 查索引，也是同一次量出来的；单轮耗时用 `docs/validation/2026-10-01-harness-review/bench.mts` 量。
+
+## Canon、目录与存储
+
+- **`LocalProjectService` 的 head 不是真源，canon ref 才是**（2026-10-01）。桌面、CLI 与 host 的 `suim commit` 是不同进程里的不同实例，作品锁只锁 open 与 commit，谁都会推进 `refs/suiming/canon`。原先注释假设「本服务是 canon ref 的唯一写入者」只缓存不重读，斗破运行时 CLI 提交到 r7、开着的桌面停在 r4，已提交的文件标成「候选未提交」，桌面里提交会因基线过期被拒、直到重开。现在需要准确 head 的异步操作都先 `refreshHead()`（服务内部、桌面每条作品命令、harness 每个 turn 开场与 `readProjectStatus`）；同步的 `project()` 只返回最后读到的值。不要为了省一次小文件读取把缓存改回去。
+- `ProjectRevision` 只有 `{id, parentId}`，理由与实测见[系统架构](../../docs/architecture.md) 4.2。**不要往版本身份上加字段**——加一个就是加一次全树读取；`git-canon-real-work.test.ts` 断言 `Object.keys` 恰好是这两个。`history()` 仍按 head 缓存（与 `historyReader()` 同一份），因为它是每秒十次的查询。
+- artifact 的 identity 与 path 都是扫描得到的事实，换卷是改 `index.yaml` 加 `mv` 文件两步，理由见[系统架构](../../docs/architecture.md) 4.1。手写 ChangeSet 的 create / replace 要自己填 `path`，`applyChangeOperations` 用 `identityForPath`（不看 index，所以不是自证）比对，拼错报 `path_identity_mismatch`。三个错误码（`noncanonical_story_path` / `path_projection_mismatch` / `story_beat_not_indexed`）与 `storyBeatVolumeById` 已删，不要重建。
+- 按 identity 存 artifact 的 store 必须自己存路径：`InMemoryArtifactStore` 存在内部记录里，Cloud PostgreSQL 是 `revision_artifacts.path`（migration 006）。git 不用，tree 天然带路径。
+- 审稿时效比 `subjects` 内容摘要，不比版本，理由见 [派生状态设计](../../docs/derived-evidence-design.md)。写审稿和判时效共用 `reviewSubjectPaths`，改主体范围时改一处；不要为了这个把 ContextSnapshot 加回来——摘要是审稿文件自己的字段，不是第二套记录。
+- `source/<id>/notes/*.md` 不算 extraction：`inspectSource` 只把 story-index 等 extraction 种类当抽取，笔记单独按形状校验；否则只写了笔记的 Source 会报 `source_story_index_missing`。渲染给 Reviewer 的 extraction（`renderSourceExtraction`）也排除笔记，笔记在输入前半段按顺序单独渲染。
+- 目录投影解码文本时要包含 `application/yaml` / json：`outline/story/index.yaml` 的 mediaType 不是 `text/*`，漏掉就会解析不到卷顺序（谱页显示 0 卷）。
+- 目录扫描把根目录下非保留名的条目整个记为 `repository-auxiliary`（`scripts` 而不是 `scripts/count.py`），commit 结果里的 `ignored` 因此是目录名。
+- TypeBox 1.x 对 `Type.Union(values.map(Type.Literal))`（数组而不是元组）推出的静态类型是 `never`，`review.ts` / `review-file.ts` 的 `literals()` 用 `Type.Unsafe<T>` 包一层保住联合类型；不要照着写新的裸 `Type.Union(array)`。
