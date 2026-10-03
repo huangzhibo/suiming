@@ -4,15 +4,16 @@
 // 模型输出不确定，所以这是报通过率的脚本，不是红绿测试；不写 trace、不碰真实作品。
 // `suim --json` 的 ok 只表示命令跑完，Checker 过没过看 data.passed。
 //
-//   npm run regression:harness -- [--trials 3] [--only discuss,review] [--concurrency 3] [--out result.json]
+//   npm run regression:harness -- [--trials 3] [--only discuss,review] [--concurrency 6] [--out result.json]
 //
 // 跑的过程中不要重建 dist：每个任务起一个新的 suim 进程，读的是当时的 dist。脚本开头记下 commit 与
 // dist 指纹，每跑完一个任务核对一次，变了就停——不同构建混在一份结果里比不出任何东西。
 //
-// 各次运行互不相干（各自一份样例副本、各自的 suim 进程），默认同时跑 3 个。串行时全套 3 次在 GPT-6.1 Sol
-// （思考 high）上要一个多小时，大头是三个写正文的任务；同一个订阅上 Agent 自己的分段抽取一次就并行 6 个请求。
-// 被限流时那一次会以模型调用失败记为未通过，看失败信息能和真正的退化分开。并行时单次耗时会变长，
-// 不能和串行跑的记录逐项比较。
+// 各次运行互不相干（各自一份样例副本、各自的 suim 进程），默认同时跑 6 个。串行时全套 3 次在 GPT-6.1 Sol
+// （思考 high）上要一个多小时，四分之三花在三个写正文的任务上（单次 4–6 分钟），整轮的下限就是最慢的那一次。
+// 同一个订阅上 Agent 自己的分段抽取一次就并行 6 个请求。被限流时那一次会以模型调用失败记为未通过，
+// 看失败信息能和真正的退化分开。并行时单次耗时会变长，不能和串行跑的记录逐项比较。
+// 没有按预估耗时排「长的先跑」：并行 6 个时只省两分钟，却要维护一组会随模型漂移的数字。
 import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -280,7 +281,7 @@ const option = (name) => {
 const trials = Number(option("trials") ?? 1);
 const only = option("only")?.split(",");
 const tasks = TASKS.filter((task) => only === undefined || only.includes(task.id));
-const concurrency = Math.max(1, Number(option("concurrency") ?? 3));
+const concurrency = Math.max(1, Number(option("concurrency") ?? 6));
 const build = {
 	commit: execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim(),
 	dirty: execFileSync("git", ["status", "--porcelain", "--", "packages", "apps"], { encoding: "utf8" }).trim() !== "",
