@@ -69,6 +69,12 @@ interface CloudHarness {
 
 const encoder = new TextEncoder();
 
+// 测试不读开发者本机的 ~/.suiming：没传 gateway 的命令走默认解析时，只会看到这两个不存在的文件。
+// 2026-10-03 在干净的 HOME 里模拟 CI 时查出，「另一个 CLI 往进行中的 session 补一句」靠本机配置才通过。
+const NO_USER_CONFIG = join(tmpdir(), `suiming-cli-test-no-config-${process.pid}`);
+process.env.SUIMING_CONFIG_PATH = join(NO_USER_CONFIG, "config.toml");
+process.env.SUIMING_AUTH_PATH = join(NO_USER_CONFIG, "auth.json");
+
 function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 	const root = `source/${sourceId}`;
 	const text = (path: string, value: string, mediaType = "text/markdown; charset=utf-8"): OpenPackageFile => ({
@@ -168,7 +174,7 @@ function designRunGateway(
 			}),
 		),
 		fauxAssistantMessage(fauxToolCall("commit", { summary: "保存设计与审查" })),
-		fauxAssistantMessage("让公开诈降当场可见"),
+		fauxAssistantMessage("让诈降的代价当场可见"),
 	]);
 	const models = createModels();
 	models.setProvider(provider.provider);
@@ -484,7 +490,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 			[["原作", "extracted"]],
 		);
 
-		const ran = await jsonCommand(checkoutPath, ["session", "send", "让公开诈降当场可见"], designRunGateway());
+		const ran = await jsonCommand(checkoutPath, ["session", "send", "让诈降的代价当场可见"], designRunGateway());
 		assert.equal(ran.exitCode, 0, JSON.stringify(ran.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, ran.value.data));
 		const sessionId = (ran.value.data as { session: { id: string } }).session.id;
@@ -779,7 +785,7 @@ test("suim 退出时统一由 shutdown 导出并关闭观测实例，成功与�
 		const ok = harness(checkoutPath, designRunGateway());
 		ok.io.telemetry = telemetry;
 		assert.equal(
-			await runSuimCli(["--json", "session", "send", "让公开诈降当场可见"], ok.io),
+			await runSuimCli(["--json", "session", "send", "让诈降的代价当场可见"], ok.io),
 			SUIM_CLI_EXIT.success,
 			ok.stdout.join(""),
 		);
@@ -916,7 +922,7 @@ test("作者未提交的修改与 Agent 的改动是同一份候选：一次 com
 			fauxAssistantMessage(
 				fauxToolCall("write", {
 					path: "intent/计谋的代价.md",
-					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开诈降当场可见。\n",
+					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角诈降的代价当场可见。\n",
 				}),
 			),
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "完善设计" })),
@@ -965,28 +971,26 @@ test("另一个 CLI 用 session send --session 往进行中的 session 补一句
 				// 模型第一轮只说话；同时"另一个进程"通过 CLI 往 inbox 里补一句。
 				const listed = await jsonCommand(checkoutPath, ["session", "list"]);
 				const sessionId = (listed.value.data as { sessions: { id: string }[] }).sessions[0]?.id as string;
-				const injected = await jsonCommand(checkoutPath, [
-					"session",
-					"send",
-					"--session",
-					sessionId,
-					"把代价写成主角失去行医资格。",
-				]);
+				const injected = await jsonCommand(
+					checkoutPath,
+					["session", "send", "--session", sessionId, "把代价写成黄盖落下终身的伤。"],
+					gateway,
+				);
 				injectResponse = injected.value;
 				return fauxAssistantMessage("我先看看现状。");
 			},
 			(context: Context) => {
 				const last = context.messages.at(-1);
 				injectedContextSeen =
-					last?.role === "user" && typeof last.content === "string" && last.content.includes("失去行医资格");
+					last?.role === "user" && typeof last.content === "string" && last.content.includes("落下终身的伤");
 				return fauxAssistantMessage(
 					fauxToolCall("write", {
 						path: "intent/计谋的代价.md",
-						content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开诈降是当场失去行医资格。\n",
+						content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n黄盖诈降的代价是落下终身的伤。\n",
 					}),
 				);
 			},
-			fauxAssistantMessage(fauxToolCall("commit", { summary: "代价具体化为失去行医资格" })),
+			fauxAssistantMessage(fauxToolCall("commit", { summary: "代价具体化为落下终身的伤" })),
 			fauxAssistantMessage("代价具体且当场可见。"),
 		]);
 		const models = createModels();
@@ -997,7 +1001,7 @@ test("另一个 CLI 用 session send --session 往进行中的 session 补一句
 				reviewer: { provider: providerId, model: "reviewer-model" },
 			},
 		});
-		const ran = await jsonCommand(checkoutPath, ["session", "send", "让公开诈降当场可见"], gateway);
+		const ran = await jsonCommand(checkoutPath, ["session", "send", "让诈降的代价当场可见"], gateway);
 		assert.equal(ran.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(ran.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, ran.value.data));
 		const data = ran.value.data as { session: { id: string; turn: number }; reply: string };
@@ -1019,7 +1023,7 @@ test("另一个 CLI 用 session send --session 往进行中的 session 补一句
 				record.event.type === "TEXT_MESSAGE_CONTENT" && record.event.metadata?.suiming?.inboxSequence === 2,
 		);
 		assert.equal(injectedEvents.length, 1);
-		assert.ok(JSON.stringify(injectedEvents[0]).includes("失去行医资格"));
+		assert.ok(JSON.stringify(injectedEvents[0]).includes("落下终身的伤"));
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 	}
@@ -1046,10 +1050,10 @@ test("suim session send 收到 SIGINT：run_interrupted、exit 7、session 回 i
 			fauxAssistantMessage(
 				fauxToolCall("write", {
 					path: "intent/计谋的代价.md",
-					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角公开诈降当场可见。\n",
+					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角诈降的代价当场可见。\n",
 				}),
 			),
-			fauxAssistantMessage(fauxToolCall("commit", { summary: "让公开诈降当场可见" })),
+			fauxAssistantMessage(fauxToolCall("commit", { summary: "让诈降的代价当场可见" })),
 			fauxAssistantMessage("代价当场可见。"),
 		]);
 		const models = createModels();
@@ -1061,7 +1065,7 @@ test("suim session send 收到 SIGINT：run_interrupted、exit 7、session 回 i
 			},
 		});
 		cli.io.resolveModelGateway = async () => gateway;
-		const exitCode = await runSuimCli(["--json", "session", "send", "让公开诈降当场可见"], cli.io);
+		const exitCode = await runSuimCli(["--json", "session", "send", "让诈降的代价当场可见"], cli.io);
 		const value = response(cli.stdout);
 		assert.equal(interrupted, true);
 		assert.equal(value.ok, false, JSON.stringify(value));
