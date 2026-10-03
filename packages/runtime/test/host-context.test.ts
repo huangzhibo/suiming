@@ -113,6 +113,11 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 		assert.ok(review.systemPrompt.includes("ReviewDraft JSON"));
 		assert.ok(review.systemPrompt.includes("repairLayer 只能为 design 或 text"), "判断规则原样保留");
 		assert.ok(review.systemPrompt.includes("severity 按读者体验定"), "severity 规则进入 host 版 Reviewer 契约");
+		// 没有这句，Reviewer 会拿写作方法的默认取舍把样章里作品自己的写法判成缺陷（10-03 斗破评委就这样扣原作的分）
+		assert.ok(
+			review.systemPrompt.includes("不拿上面的标准把作品自己的写法判成缺陷"),
+			"作品依据优先进入 Reviewer 契约",
+		);
 		assert.deepEqual(review.review, { layer: "text", storyBeatIds: ["beat-0001"] });
 		assert.ok(review.text.includes("# 当前 Design") && review.text.includes('"text/beat-0001.md"'));
 
