@@ -186,3 +186,16 @@ write-text #1 这一轮没碰任何接入文件，也委派了一次 Writer（13
 | write-text | ✔ | 11 | 334 s | $0.138 |
 
 4 / 4，估算 $0.22。write-text 这次没改 Design、回复里也没有再点名设定矛盾，委派了 writer 与独立审稿（上一轮三次是 11 / 24 / 14 次调用，#2 为了矛盾改了 Design 又审一次）。write-back 写进了人物文件，design-edit 加了巡江船盘问并保留火船烧尽的结果。其余四项（delegate-writer、review、check-issues、delegate-writer-issues）没重跑，下一次全套一起看。
+
+## 文档收敛之后（2026-10-04）
+
+2026-10-03 的文档收敛改了模型会读到的三样东西：Story Language 去重并改写示例（Agent 经 `story_guide` 读），故事创作宪法删掉悬空的一句与重复的「Checker 管不了文学判断」（版本号随之变化，进 Agent、Writer、Reviewer 的提示），design guide 的示例去掉斗破残留。构建 `327df9d`，dist `7e76d8bb391149ff`，相关四项各 1 次：
+
+| 任务 | 通过 | 耗时 | 花费（估算） |
+| --- | --- | --- | --- |
+| write-back | ✔ | 37 s | $0.025 |
+| design-edit | ✔ | 50 s | $0.032 |
+| write-text | ✔ | 382 s | $0.164 |
+| review | ✔ | 116 s | $0.044 |
+
+4 / 4，估算 $0.27。Skill 与 Codex agent 文件的改动走 host，这套回归覆盖不到；抽取子任务嵌入的六篇 Story Language 也不在回归里，留给下一次斗破抽取验证。
