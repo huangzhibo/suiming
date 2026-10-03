@@ -181,6 +181,83 @@ test("story index 只按这个 Beat 的那一段算进闭包：末尾加卷不�
 	);
 });
 
+test("正文的 Design 闭包只取 Writer 读到的那部分：同卷别的 Beat、没碰到的 Contract 与 Intent 改了不算，它引用的与它碰到的改了才算", async () => {
+	const history = new FakeHistory();
+	const index = markdown(
+		"outline/story/index.yaml",
+		"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001, beat-0002, beat-0003]\n",
+	);
+	const beat3 = (body: string) =>
+		markdown(
+			"outline/story/vol-0001/beat-0003.md",
+			`---\nrefs:\n  character: [曹操]\ncontracts:\n  open: [华容道]\n---\n${body}\n`,
+		);
+	const contract = (body: string) =>
+		markdown("outline/contracts/华容道.md", `---\nsubjects:\n  character: [曹操]\n---\n${body}\n`);
+	const intent = (body: string) =>
+		markdown("intent/败走.md", `---\ntarget: { from_beat_id: beat-0003, to_beat_id: beat-0003 }\n---\n${body}\n`);
+	const files = [
+		...sampleWorkFiles().filter((file) => file.path !== "outline/story/index.yaml"),
+		index,
+		beat3("曹操烧了船，从华容小道逃走。"),
+		contract("曹操欠下的这条命，要等关羽来还。"),
+		intent("败走要写出曹操的狼狈，也写出他不肯认输。"),
+		markdown("world/characters/曹操.md", "---\nname: 曹操\n---\n统率北军南下的丞相。\n"),
+		markdown("text/beat-0001.md", "黄盖当众挨了军杖。\n\n他一声没吭。"),
+	];
+	const r1 = history.commit(files);
+	const closure = designClosurePaths(history.candidate(r1), "beat-0001");
+	for (const path of [
+		"outline/story/vol-0001/beat-0001.md",
+		"world/characters/黄盖.md",
+		"world/places/赤壁.md",
+		"world/resources/火船.md",
+		"outline/contracts/诈降.md",
+		"intent/计谋的代价.md",
+		"outline/story/index.yaml",
+	])
+		assert.ok(closure.includes(path), `闭包应包含 ${path}`);
+	for (const path of [
+		"outline/story/vol-0001/beat-0002.md",
+		"outline/story/vol-0001/beat-0003.md",
+		"outline/contracts/华容道.md",
+		"intent/败走.md",
+		"world/characters/曹操.md",
+	])
+		assert.ok(!closure.includes(path), `闭包不应包含 ${path}`);
+
+	// r2：同卷的第三节、它开的 Contract、只覆盖它的 Intent、它引用的人物全改了，第一节的正文不受影响。
+	const r2 = history.commit(
+		files
+			.filter((file) => !["outline/story/vol-0001/beat-0003.md", "outline/contracts/华容道.md"].includes(file.path))
+			.filter((file) => !["intent/败走.md", "world/characters/曹操.md"].includes(file.path))
+			.concat(
+				beat3("曹操在乌林大败，带着残兵从华容小道逃走。"),
+				contract("曹操在华容道上欠下关羽一条命。"),
+				intent("败走写他的狼狈。"),
+				markdown("world/characters/曹操.md", "---\nname: 曹操\n---\n挟天子以令诸侯的丞相。\n"),
+			),
+	);
+	assert.deepEqual(await textCurrency(history, r2, history.candidate(r2), "beat-0001"), {
+		storyBeatId: "beat-0001",
+		state: "current",
+		writtenAt: r1,
+		changed: [],
+	});
+
+	// r3：第一节引用的地点与它开的 Contract 改了，才算 Design 变了。
+	const r3 = history.commit(
+		replace(
+			replace(history.candidateFiles(r2), "world/places/赤壁.md", "长江南岸的赤壁，孙刘联军隔江扎营。\n"),
+			"outline/contracts/诈降.md",
+			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: beat-0002\n---\n黄盖的投降是假的。\n",
+		),
+	);
+	const changed = await textCurrency(history, r3, history.candidate(r3), "beat-0001");
+	assert.equal(changed.state, "design-changed");
+	assert.deepEqual(changed.changed, ["outline/contracts/诈降.md", "world/places/赤壁.md"]);
+});
+
 test("审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间", async () => {
 	const history = new FakeHistory();
 	const design = sampleWorkFiles();
