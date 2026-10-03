@@ -11,7 +11,7 @@
 - **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
 - **证据**：最高到「真实调用」——2026-09-16 重构后第一次完整真实对话（[基线](validation/2026-09-16-first-real-session/README.md)），以及 2026-10 起斗破前 120 章的忠实抽取与留出评测。没有任何能力达到「真实长篇」。
 
-验证（2026-10-04）：`npm run check` 通过；`npm test` 390 项，385 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，2026-10-03 换成 GPT-6.1 Sol 后的新基线是 23 / 23，之后样例改成赤壁、文档收敛各跑了相关四项，都是 4 / 4（[记录](validation/2026-10-01-harness-regression/README.md)）；delegate-writer、check-issues、delegate-writer-issues 三项从样例换掉之后还没重跑。各次运行的起伏见[变更记录](changelog.md)。
+验证（2026-10-04）：`npm run check` 通过；`npm test` 390 项，385 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
 
 ## 能力与证据
 
