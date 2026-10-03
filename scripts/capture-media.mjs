@@ -214,6 +214,11 @@ try {
 	await click(page.getByRole("button", { name: "后退" }));
 	await sleep(900);
 	const beat = page.getByRole("button", { name: new RegExp(`^${plan.beat} · `) }).first();
+	// 那一节不在刚才进入的卷里时，先点面包屑回到全书。
+	if ((await beat.count()) === 0) {
+		await click(page.locator('[aria-label="文档工具"]').getByRole("button", { name: "故事轴", exact: true }));
+		await sleep(900);
+	}
 	await moveTo(beat);
 	await page.mouse.dblclick(pointer.x, pointer.y);
 	await sleep(1200);
