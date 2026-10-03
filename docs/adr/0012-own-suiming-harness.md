@@ -1,6 +1,6 @@
 # ADR-0012：参考 pi 逻辑，自行实现 Suiming Harness
 
-- 状态：Accepted（执行方向已确定，设计规格已同步，代码迁移未开始）
+- 状态：Accepted，2026-09-08 已实现。仍有效：参考 pi 逻辑自建唯一的 SuimingHarness、只依赖 pi-ai、不再评估其他执行后端、不建通用 Agent 平台。已被取代：第二段的 Run / Task / Attempt 与「同 Attempt 恢复」由 2026-09-13 的 Session / Task 模型取代（[Harness 设计](../harness-design.md)第 2 节），预算随之删除（第 10 节）
 - 日期：2026-09-07
 - 决策者：作者与项目负责人
 

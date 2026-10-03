@@ -2,6 +2,8 @@
 
 ADR-0008 决定 9 要求从真实长篇 Run 暴露的失败里抽取不少于 20 道确定性长程题作为 C-SOTA 的最低证据，进入回归。这里登记每道题的来源、它对应的确定性边界（硬状态、secret 知情、Contract 生命周期、refs 依赖、Checker），以及现状。题目只收"Checker 能判对错"的形式；纯语义问题（旁白复述、格言短句、AI 味）留给 Reviewer，不进题库。
 
+**状态：活登记表。**当前 17 道，最近一次补题是 2026-09-06；eval-022 暂停推进之后还没有新题，差额继续从当前测试台的真实运行里补。
+
 状态含义：**回归**——已有确定性测试；**待声明**——eval-022 的 Design 还没写相应硬状态或 secret，写上之后现有 Checker 就能抓；**待机制**——Story Language 或 Checker 还没有这类边界，需要先决定要不要加。
 
 ## 来源
@@ -31,10 +33,10 @@ ADR-0008 决定 9 要求从真实长篇 Run 暴露的失败里抽取不少于 20
 | 16 | 刘备代韩跛应役后，这笔义务必须有了结（销号、转入本队或仍须应征） | R1 Suiming Reviewer minor；Claude Code 重放的"韩家双重覆盖"同源 | 义务不是资源；可退化为 Resource `代役券.holder` 或 Contract；是否加"义务"类硬状态待定 | 待机制 |
 | 17 | beat-0005 撤离时阿弟与杜蘅的批次、位置前后必须一致 | R1 Suiming Reviewer minor；新仓 Codex 的"严石目击距离"同源 | `阿弟.location` / `杜蘅.location` 的 `changes` 只能声明退出位置；场面内的批次由 Reviewer 对照 | 回归（与 6 同一 Beat 声明 `杜蘅.location: 广宗北门外`） |
 
-当前 17 道，其中回归 13、待声明 0、待机制 4（2026-09-06 把 7 道"待声明"落进 `~/stories/eval-022-suiming` 的 Design 并冻结：secret 关羽亡命、Resource 张飞的钱串与太平道总册、Place 涿县县寺与广宗北门外）。四个不同 Reviewer 在同一两篇正文上重合的类别（簿记 / 义务了结、位置连续、旁白复述 Design、Beat 内时刻）是优先级最高的一组。距离 20 道的差额由 R 的真实 Run 补：每次 Reviewer 的 major finding 若能改写成硬状态或 secret 声明，就登记一道。
+当前 17 道，其中回归 13、待声明 0、待机制 4（2026-09-06 把 7 道"待声明"落进 eval-022 的 Design：secret 关羽亡命、Resource 张飞的钱串与太平道总册、Place 涿县县寺与广宗北门外）。四个不同 Reviewer 在同一两篇正文上重合的类别（簿记 / 义务了结、位置连续、旁白复述 Design、Beat 内时刻）是优先级最高的一组。距离 20 道的差额由 R 的真实 Run 补：每次 Reviewer 的 major finding 若能改写成硬状态或 secret 声明，就登记一道。
 
 ## 怎么把"待声明"变成回归
 
-1. 在 eval-022 的 Design 里补相应 `refs.secret`、`changes`、Resource 文件（这是作者层修改，走 `design impact` → 改文件 → `check` → `commit` → `design freeze`）。
+1. 在作品的 Design 里补相应 `refs.secret`、`changes`、Resource 文件（这是作者层修改，走 `design impact` → 改文件 → `check` → `commit`）。
 2. 用同一声明在 `packages/story/test` 里写一个最小反例（例如更晚的 Beat 让已死者行动、未声明即揭示 secret），确认 Checker 阻塞。
 3. 题目状态改为回归，并在这里记下测试文件名。

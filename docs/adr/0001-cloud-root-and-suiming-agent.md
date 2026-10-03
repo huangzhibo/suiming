@@ -1,6 +1,6 @@
 # ADR-0001：Cloud 根产品与专属 Suiming Agent
 
-- 状态：Amended；实施顺序由 [ADR-0005](0005-quality-before-product-runtime.md) 和 [ADR-0006](0006-real-work-before-formal-eval.md) 补充，产品形态由 [ADR-0007](0007-local-tui-and-explicit-cloud-sync.md) 扩展为专属本地 TUI、host coding-agent integrations 与 Cloud Web；Cloud Web 的实施时机由 [ADR-0008](0008-creative-loop-before-product-surface.md) 推迟到创作闭环验证之后
+- 状态：Amended。仍有效：新 `suiming` 仓是产品与代码根（1 的前半）、版本化 Story Artifact 与开放作品包（2）、单一 Agent 拥有作品决策且 Worker task-local（3）、模块化单体（4）、`suiming-story` 只作一次性迁移来源（5 的前半）。已被取代：「Cloud 是默认产品形态」先由 [ADR-0007](0007-local-tui-and-explicit-cloud-sync.md) 扩展为本地入口，再由 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md) 改为桌面是核心产品、Cloud 是可选扩展；6 的实施顺序由 [ADR-0005](0005-quality-before-product-runtime.md) 与 [ADR-0006](0006-real-work-before-formal-eval.md) 调整，旧仓不再充当 paired eval 基线；3 中的「有限动态 Task DAG」随 2026-09-13 删除计划实体不再成立
 - 日期：2026-09-01
 - 决策者：项目负责人
 

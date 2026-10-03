@@ -2,7 +2,7 @@
 
 日期：2026-09-12。诊断基线：main / `52b21fb`。
 
-**状态：七步全部完成。**作者 2026-09-12 决定做一次全局重构而不是继续局部打补丁，范围包含概念层重审，重构期间暂停长篇质量工作。第 4 节的七步——收敛现状、角色定义归位、意图沉淀、端口化与命令目录、git spike、Canon 存储迁移、规范定稿——都已落地。**下一步回到质量**：跑重构后的第一次完整真实委托并完整保存过程，作为此后一切对照的基线（见第 5 节）。
+**状态：历史方案，不是现行规范。**作者 2026-09-12 决定做一次全局重构而不是继续局部打补丁，范围包含概念层重审，重构期间暂停长篇质量工作。第 4 节的七步当天做完，其中第 4 步的「命令目录合一、传输适配自动生成」后来定为刻意不做，只保留共用 schema 与投影（见[系统架构](architecture.md)）；第 5 节要的基线已于 2026-09-16 跑完（[第一次真实对话](validation/2026-09-16-first-real-session/README.md)）。2026-09-13 的 Session 模型又推翻了本文多处「保留」：3.1 表中的 Conversation / Run / Attempt 与 DesignCommit / lineage / ContextSnapshot，3.3 的 worktree，3.4 的 `RunBudget`，第 4 节第 6 步说 harness 调用 `mergeOpenStoryFiles`、`apps/worker` 是活代码，3.7「不撤的东西」里的 Run / Task / Attempt 与 `finish`，第 6 节「不重命名 Run / Task / Attempt」；2.1 待裁的「Agent 能不能删文件」已定为能。现行形状见 [Harness 设计](harness-design.md)第 2、16 节与[系统架构](architecture.md)。
 
 本文同时是诊断、目标形状与执行记录：查证推翻原判断时就地更正并写明为什么。这样的更正发生了不止四次，成了本轮最有用的产出之一——2.1 的委派 / 提问等待形态、2.2 的 `cancelled` 四处、3.5 决定 5 的 `artifactVersionId`（先后判错两次）、3.6 的 Agent 写字路径、第 3 步的度量结论、第 6 步切片 4 取消的两件，以及第 7 步查出的五条不实声称。git 的决定已写回 [ADR-0010](adr/0010-git-as-canon-storage-engine.md)；规范更新落在[系统架构](architecture.md)与 [Harness 设计](harness-design.md)。
 

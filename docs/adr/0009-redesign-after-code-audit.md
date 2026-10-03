@@ -1,12 +1,8 @@
 # ADR-0009：代码审计后的重新设计
 
-> 最新执行决策见 [ADR-0012](0012-own-suiming-harness.md)：参考 pi 逻辑自行实现 SuimingHarness，继续依赖 pi-ai；本文有关 pi-agent-core 内循环的条款保留为历史。
-
-- 状态：Amended by [ADR-0011](0011-desktop-product-and-autonomous-runtime.md)
+- 状态：Amended。仍有效：并发与崩溃窗口修复（3）、删除内存 Workspace（4）、Checker 累积诊断与长程确定性检查（5、7、8）、唯一执行实现（9 的原则）、Write Context（13）、不做 shard / merge（14 的原则）、exit code 从错误类别派生（17）、Model Gateway 与配置收敛（20、21）、一个 Review 实现、一个合并函数、一个搜索函数（30–32）。已被取代：内循环用 pi-agent-core（10）由 [ADR-0012](0012-own-suiming-harness.md) 撤回；RunEvent 取代 AG-UI（16）由 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md) 改回 AG-UI；固定配方（9、12–14 的配方形态）由 ADR-0011 改为可选方法；本地 Canon 改为 git（1 的版本存储，[ADR-0010](0010-git-as-canon-storage-engine.md)）；Run / Task / Attempt（15）、worktree（11）、TUI（18）、成本上限（22 的后半）、一个 Worker loop（27）随 2026-09-13 的 Session 模型与删除 Cloud 执行去掉；evidence 逐条存储、范围冻结、DesignCommit、MaterialEvidence（2、6、28、29）随 evidence 改为 Canon 历史派生删除；「一份命令目录、三个生成的传输适配」（26）只做到共用 schema 与投影，生成刻意不做（见[系统架构](../architecture.md)）
 - 日期：2026-09-04
 - 决策者：项目负责人
-
-> 2026-09-07：本文保留当时决策。桌面核心产品、持续 Agent、原子 Capability、事件与凭据边界的后续修订见 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md)；当前规范以需求、架构和技术栈为准。
 
 ## 背景
 

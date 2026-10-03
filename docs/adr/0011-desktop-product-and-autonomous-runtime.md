@@ -1,10 +1,8 @@
 # ADR-0011：桌面核心产品与自主创作 Runtime
 
-- 状态：Amended by [ADR-0012](0012-own-suiming-harness.md)（桌面与产品决策保持，执行底座已修订）
+- 状态：Amended，已实现。仍有效：桌面是核心产品（1）、Capability 是原子领域动作且 recipe 只是可选方法（3）、父子委派与结果依赖分开且已完成历史不重写（5 的后半）、AG-UI 标准事件加类型化 Suiming 扩展（6）、模型与入口开放（7）、不接第二执行后端（8 的前半）。已被取代：2 的 pi-agent-core 内循环与 8 的替代后端评估由 [ADR-0012](0012-own-suiming-harness.md) 修订；4「一份 Run 持续完成完整委托」、5 的计划实体与累计预算由 2026-09-13 的 Session 模型取代（[Harness 设计](../harness-design.md)第 2、10 节；撤掉「委托」概念的理由见[需求与目标](../vision-and-requirements.md) 5.1）
 - 日期：2026-09-07
 - 决策者：作者与项目负责人
-
-> 后续修订：执行方向已由 ADR-0012 确定为参考 pi 逻辑、自行实现 SuimingHarness；不再依赖 pi-agent-core 内核或评估其他执行后端。下文保留当时决策，当前规格见[Harness 设计](../harness-design.md)。
 
 ## 背景
 
@@ -12,7 +10,7 @@
 
 Codex 能提供结构化交接、子线程、会话恢复与自定义桌面客户端接口；原 host Skill 要求父模型转录子 Agent JSON，是本项目 adapter 的接法，不能作为 Codex 能力不足的证据。选择 pi 的依据是当前实际需要的多 provider 原生协议覆盖、模型调用前的 Context 控制，以及创作执行与作品事务的直接接入。它不证明自建方案写得更好、恢复更可靠或总维护成本更低。
 
-研究依据见 [AG-UI 评估](../ag-ui-assessment.md)、[Agent 自主性评估](../agent-autonomy-assessment.md)、[Graph Engineering 研究](../graph-engineering-assessment.md)；原方案及迁移分析见[重构方案](../refactoring-plan.md)。
+研究依据见 [AG-UI 评估](../ag-ui-assessment.md)、Agent 自主性评估（已删除，原文见基线提交 `7d50f37`）、[Graph Engineering 研究](../graph-engineering-assessment.md)；原方案及迁移分析见[重构方案](../refactoring-plan.md)。
 
 ## 决定
 

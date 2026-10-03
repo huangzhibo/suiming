@@ -1,6 +1,6 @@
 # ADR-0006：真实创作先于正式评测，模型按任务显式路由
 
-- 状态：Accepted
+- 状态：Accepted，部分过时。仍有效：真实创作先于正式评测（1、5）、按任务显式选模型且 profile 不进 Story Language、不做自动 Router（2、3 的原则）、旧仓不是基线（6）、Langfuse 可关闭（7 的后半）。已过时：2 的两个 profile 现为 main / writer / reviewer / source-reader / source-extractor / judge；4 的 Attempt 冻结改为按 turn 冻结，换模型只在 turn 边界发生（[Harness 设计](../harness-design.md)第 2、10 节）；7 的 PostgreSQL durable Run 随 2026-09-13 删除 Cloud 执行失效
 - 日期：2026-09-02
 - 决策者：项目负责人
 

@@ -1,12 +1,10 @@
 # Graph Engineering 对 Suiming 的适配研究
 
-> 执行选型已收敛：参考 pi 逻辑自行实现 SuimingHarness，见 [ADR-0012](adr/0012-own-suiming-harness.md)与[Harness 设计](harness-design.md)。本文保留此前取证，关于 pi 内循环、Attempt 重启或替代后端的建议不再作为当前规范。
->
-> 2026-09-12 时效更正：文中的 `RunEngine` 标识符在当前代码中已不存在（`grep -rn "RunEngine" packages/runtime/src` 命中 0），其职责由 `packages/runtime/src/harness/suiming-harness.ts` 的 `SuimingHarness` 承担。引用第 1 节表末行结论时应改述为「保留单一 SuimingHarness 与现有执行存储」。
+**状态：历史研究（2026-09-07，2026-09-12 补第 1.1 节），不是现行规范。**结论已用于 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md) 与 AGENTS.md 不变量 5、8；关于 pi 内循环与替代后端的建议由 [ADR-0012](adr/0012-own-suiming-harness.md) 取代。文中的 `RunEngine` 现为 `SuimingHarness`；Run / Attempt、worktree、ContextSnapshot、Cloud 执行存储，以及第 1 节表中「执行中调整任务结构」一行与第 1.1 节说「已经在做」的 `plan` / `execute_task`，都已于 2026-09-13 删除。现行执行模型见 [Harness 设计](harness-design.md)第 2 节。
 
 日期：2026-09-07。代码基线：main / `262ee4d`，连同本轮[重构方案](refactoring-plan.md)。
 
-状态：研究结论已用于 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md) 与当前规范；本文保留取证和适配分析，未实现新的 graph 调度、修改执行 schema 或运行真实模型对照。本文讨论以任务、Agent 协作和运行状态为共同组织对象的 Graph Engineering；不把它等同于预设流程、LangGraph、知识图谱或界面上的节点图。
+本文讨论以任务、Agent 协作和运行状态为共同组织对象的 Graph Engineering；不把它等同于预设流程、LangGraph、知识图谱或界面上的节点图。
 
 ## 1. 结论与采用范围
 
@@ -109,7 +107,7 @@ graph 可以帮助定位、分派和跟踪这些问题，不能自动判断什�
 | 一个 RunEngine、一个 worktree | 统一 owner、工具与提交边界 | 当前单活动 Task、固定初始基线和 recipe 重入不足以直接支持可改计划 |
 | Cloud ready claim 与 dependency 表 | 已有依赖筛选和持久 adapter | 当前 Cloud Worker 没有 Agent executor，不代表端到端 graph 已运行 |
 
-代码依据：[execution state](../packages/runtime/src/execution/in-memory-execution-state.ts)、[RunEngine](../packages/runtime/src/harness/suiming-harness.ts)、[ContextSnapshot](../packages/runtime/src/artifact/derived.ts)、[Story impact](../packages/runtime/src/artifact/story-impact.ts)、[正文 lineage](../packages/runtime/src/artifact/derived.ts)、[Review store](../packages/runtime/src/artifact/derived.ts)、Cloud execution store（2026-09-13 随 Cloud 执行 adapter 一起删除，Cloud 只剩 [Project store](../packages/runtime/src/cloud/cloud-project-store.ts)）。
+代码依据：execution state（`packages/runtime/src/execution/in-memory-execution-state.ts`）、RunEngine（`packages/runtime/src/harness/suiming-harness.ts`）、ContextSnapshot（`packages/runtime/src/artifact/derived.ts`）、Story impact（`packages/runtime/src/artifact/story-impact.ts`）、正文 lineage（`packages/runtime/src/artifact/derived.ts`）、Review store（`packages/runtime/src/artifact/derived.ts`）、Cloud execution store（2026-09-13 随 Cloud 执行 adapter 一起删除，Cloud 只剩 Project store（`packages/runtime/src/cloud/cloud-project-store.ts`））。
 
 两个具体限制会直接影响实现：
 
@@ -160,11 +158,11 @@ Runtime 检查引用、环、权限、在途工作处置与未满足的交付条
 
 ### 6.1 当前有一段由模型搬运的数据链路
 
-Codex Reviewer adapter 要求只返回 ReviewDraft JSON，共享 Skill 再要求主 Agent 将最终回复原样写到 `.suim-host/drafts/<task>.json`，调用 `review record`。这让主 Agent 同时负责判断与完整数据转录。[Reviewer 配置](../integrations/codex/agents/suim_reviewer.toml)、[host 方法论](../integrations/shared/suiming/SKILL.md)
+Codex Reviewer adapter 要求只返回 ReviewDraft JSON，共享 Skill 再要求主 Agent 将最终回复原样写到 `.suim-host/drafts/<task>.json`，调用 `review record`。这让主 Agent 同时负责判断与完整数据转录。Reviewer 配置（`integrations/codex/agents/suim_reviewer.toml`）、host 方法论（`integrations/shared/suiming/SKILL.md`）
 
 如果结果未完整进入父上下文、被概括或转录错误，后面的 schema 和 evidence 检查只能发现部分问题，不能找回没有收到的 finding。本文没有找到足以定位作者所指那次故障的完整 trace，不能将以上风险认定为那次事件的已证实根因。
 
-managed Reviewer 已通过 `submit_review` 调用提交结果；RunEngine 在结果对象写入后记录 checkpoint、完成 Attempt、持久保存执行状态，再返回 TaskOutcome。这里已有可靠交接所需的部分基础，但当前仍是固定 recipe 调用和重放，不能据此宣称动态父子接续已经完成。[Review 配方](../packages/runtime/src/harness/review-task.ts)、[RunEngine](../packages/runtime/src/harness/suiming-harness.ts)
+managed Reviewer 已通过 `submit_review` 调用提交结果；RunEngine 在结果对象写入后记录 checkpoint、完成 Attempt、持久保存执行状态，再返回 TaskOutcome。这里已有可靠交接所需的部分基础，但当前仍是固定 recipe 调用和重放，不能据此宣称动态父子接续已经完成。Review 配方（`packages/runtime/src/harness/review-task.ts`）、RunEngine（`packages/runtime/src/harness/suiming-harness.ts`）
 
 ### 6.2 把结果交付从模型回复中分离
 

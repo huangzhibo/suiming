@@ -1,6 +1,6 @@
 # ADR-0002：Capability-first 模块化单体
 
-- 状态：Amended by [ADR-0007](0007-local-tui-and-explicit-cloud-sync.md)；PostgreSQL 与原 app/package 形态仅适用于当时的 Cloud 设计
+- 状态：Amended。仍有效：capability-first（1）、Capability 不进 Story Language 也不建数据库本体（2）、模块化单体的原则（3）、执行 / 观测 / 质量三类数据各有真源（5 的后半）、独立 Domain API（6）。已被取代：3 的 app / package 清单由 [ADR-0007](0007-local-tui-and-explicit-cloud-sync.md) 改写；4 中 PostgreSQL 承载首期持久任务、5 中 Attempt 级 trace 随 2026-09-13 删除 Cloud 执行与 Attempt 失效，Cloud PostgreSQL 现在只保存 Canon 与同步元数据
 - 日期：2026-09-01
 - 决策者：项目负责人
 

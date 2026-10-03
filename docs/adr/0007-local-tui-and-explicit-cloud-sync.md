@@ -1,6 +1,6 @@
 # ADR-0007：本地产品入口与显式 Cloud 同步
 
-- 状态：Amended by [ADR-0008](0008-creative-loop-before-product-surface.md)；专属 TUI 收窄为开发者与自动化入口，作者面向的本地界面改为 Electron 桌面端，同进程 Runtime、统一目录、host integrations 与显式 Cloud 同步的决定继续有效
+- 状态：Amended。仍有效：host integrations 是一等本地入口（1、8）、Runtime 同进程且 deployment-neutral（3、4）、checkout 是 dirty candidate、`suim commit` 扫 diff 过 Checker（5 的后半）、唯一目录形态与 codec（6）、`suim` CLI 与 machine contract（7）、显式 Cloud 同步与包外 remote binding（9–11）。已被取代：专属 TUI（1、2 与 7 中的无子命令进 TUI）先由 [ADR-0008](0008-creative-loop-before-product-surface.md) 收窄、2026-09-13 删除，作者界面改为 Electron 桌面（ADR-0008、[ADR-0011](0011-desktop-product-and-autonomous-runtime.md)）；5 中 SQLite 保存作品版本改为 git 保存 Canon、SQLite 只存执行数据（[ADR-0010](0010-git-as-canon-storage-engine.md)）；3 中「AG-UI 只作远程协议」由 ADR-0011 改为所有界面共用 AG-UI 事件；7 中的 `run` 现为 `session send`
 - 日期：2026-09-02
 
 ## 背景

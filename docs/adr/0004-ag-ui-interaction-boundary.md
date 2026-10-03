@@ -1,6 +1,6 @@
 # ADR-0004：采用 AG-UI 作为 Agent 交互边界
 
-- 状态：Superseded by [ADR-0009](0009-redesign-after-code-audit.md)；Suiming RunEvent 成为所有界面的唯一事件契约，AG-UI 只在有第三方客户端时作为单向投影。先持久化再发送、单调序号、重放不重执行的做法保留
+- 状态：Superseded by [ADR-0009](0009-redesign-after-code-audit.md)，方向又由 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md) 恢复：现行做法是 AG-UI 标准事件加类型化 Suiming 扩展，threadId 是 sessionId、runId 是 turn id（见[技术栈](../technology.md)「AG-UI 与传输」）。仍有效：先持久化再发送、单调序号、重放不重执行（3、4 的原则）、Story Artifact 与完整 diff 不进 AG-UI（5）、服务端是会话与作品版本的权威（7）。已失效：Conversation / Run 的 ID 对应（2）、PostgreSQL RunEvent 与 SSE 续传（3、4 的 Cloud 实现，随 2026-09-13 删除 Cloud 执行）、`@ag-ui/client`（6，桌面用 TanStack AI client）
 - 日期：2026-09-02
 
 ## 背景

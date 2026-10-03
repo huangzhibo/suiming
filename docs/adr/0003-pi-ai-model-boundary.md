@@ -1,11 +1,7 @@
 # 0003：采用 pi-ai 作为模型调用边界
 
-> 最新执行决策见 [ADR-0012](0012-own-suiming-harness.md)：参考 pi 逻辑自行实现 SuimingHarness，继续依赖 pi-ai；本文有关 pi-agent-core 内循环的条款保留为历史。
-
-- 状态：Amended by [ADR-0009](0009-redesign-after-code-audit.md)；决定 2 中"不引入 `pi-agent-core`"被修订，内循环改由 pi-agent-core 提供，其余边界继续有效；2026-09-05 补充不采用的 pi 组件清单
+- 状态：Amended。仍有效：Model Gateway 直接使用 pi-ai（1，现为 0.99.2）、Suiming 拥有 loop、工具、Context、持久化与重试决策（3）、新能力先走 pi 的 provider-specific 参数（5）、补充节里「pi 作为基础设施的部分用到底，作为真源的部分一律不用」的判断标准。已被取代：2 的「不引入 pi-agent-core」曾被 [ADR-0009](0009-redesign-after-code-audit.md) 决定 10 推翻，[ADR-0012](0012-own-suiming-harness.md) 改为参考 pi 逻辑自建 Harness 后重新成立；4 的「每次 Attempt」改为按 turn 冻结绑定（[Harness 设计](../harness-design.md)第 2 节）；补充节列出的 pi-agent-core、pi-tui、steering queue、Attempt、ContextSnapshot 均已删除
 - 日期：2026-09-01
-
-> 2026-09-07：本文保留当时决策。桌面核心产品、持续 Agent、原子 Capability、事件与凭据边界的后续修订见 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md)；当前规范以需求、架构和技术栈为准。
 
 ## 背景
 

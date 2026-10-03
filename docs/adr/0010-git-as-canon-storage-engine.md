@@ -1,6 +1,6 @@
 # ADR-0010：git 作为 Canon 存储引擎
 
-- 状态：Accepted（2026-09-12：作者决定走这条路，spike 通过；提议的 bare repo 形状作废，实际形状见文末两节）
+- 状态：Accepted（2026-09-12：作者决定走这条路，spike 通过）。仍有效：作品目录是普通 git 仓，谁都可以 commit（那是候选），`refs/suiming/canon` 只由过 Checker 的提交推进，Checker 只在这一步跑（文末两节）。没有成为现实的：「提议的形状」中的 `.suiming/canon.git` bare repo、Cloud 改托管 git（Cloud 仍用 PostgreSQL 保存 Canon）、evidence 逐条存 SQLite（2026-09-13 改为从 Canon 历史派生，见 [派生状态设计](../derived-evidence-design.md)）与 Run worktree；文末「绑定 key 不换」的对象 StoryText lineage 已删除，`artifactVersionId` 现在只用于 Cloud 存储
 - 日期：2026-09-06
 - 决策者：项目负责人
 

@@ -1,10 +1,8 @@
 # ADR-0008：创作闭环先于产品表面
 
-- 状态：Amended by [ADR-0009](0009-redesign-after-code-audit.md)；当时顺序与验证门保留，随后由 ADR-0011 前移桌面工作，决定 7 的分层 Review 改为整体删除、决定 8 的编排收敛改为单一 RunEngine、路线图任务重编号
+- 状态：Amended。仍有效：冻结 Cloud 产品表面（1）、Writer 能力（2，现为 writer profile）、Frame 选择性 Context（3）、观测接线（5 的后半）、宪法进 prompt（6）、长程一致性不靠分层 Review 保证（7 的原则）、C 题库与 R 基线（9）、文档瘦身（13）、验证门里的真实长篇条件。已被取代：7 的 shard / merge 与 8 的编排收敛由 [ADR-0009](0009-redesign-after-code-audit.md) 改写；桌面条件启动、首版只读与旗舰重审（10、12）由 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md) 撤销；范围冻结（4）、Run 预算（5 的前半）、TUI（11）、每 Run 一个 worktree（14）随 2026-09-13 的 Session 模型与 evidence 派生删除
 - 日期：2026-09-04
 - 决策者：项目负责人
-
-> 2026-09-07：本文保留当时决策。桌面核心产品、持续 Agent、原子 Capability、事件与凭据边界的后续修订见 [ADR-0011](0011-desktop-product-and-autonomous-runtime.md)；当前规范以需求、架构和技术栈为准。
 
 ## 背景
 

@@ -1,12 +1,10 @@
 # AG-UI 采用评估
 
-> 执行选型已收敛：参考 pi 逻辑自行实现 SuimingHarness，见 [ADR-0012](adr/0012-own-suiming-harness.md)与[Harness 设计](harness-design.md)。本文保留此前取证，关于 pi 内循环、Attempt 重启或替代后端的建议不再作为当前规范。
+**状态：历史选型研究（2026-09-07），不是现行规范。**结论「以 AG-UI 标准事件加有 schema 的 Suiming 扩展取代自定义 RunEvent，不长期并存两套协议」已进入 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md) 决定 6 与[技术栈](technology.md)「AG-UI 与传输」，2026-09-08 落地；关于 pi 内循环的建议由 [ADR-0012](adr/0012-own-suiming-harness.md) 取代。文中描述的 RunEventSchema、RunEngine、worktree、TUI 与 Conversation 都已不在：`packages/sdk/src/run-event.ts` 现在定义的就是 AG-UI 事件，threadId 是 sessionId、runId 是 turn id，桌面只读 attach 不走 SSE。TanStack 默认连接适配器的探针结论只对将来的 Web / SSE 接入有参考价值。
 
 日期：2026-09-07。评估基线：main / 262ee4d。
 
-本文保留选型研究；结论已纳入 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md) 和目标规范，不代表已完成迁移。核对了仓库实现、官方规范和实际发布的 npm 包，并在仓库外执行了客户端兼容性探针。
-
-> 综合决策与实施顺序见[桌面工作台与自主 Agent 重构方案](refactoring-plan.md)。桌面端已确定为核心产品；本评估保留协议与客户端取证，新方案补齐桌面 IPC、作者工作台和持续委托的接入边界。
+核对了仓库实现、官方规范和实际发布的 npm 包，并在仓库外执行了客户端兼容性探针。
 
 ## 结论
 
@@ -30,7 +28,7 @@
 
 另核对 @tanstack/ai-react 当前发布版本为 0.24.0；没有启动 React 界面。实验使用它底下的真实 ChatClient。
 
-临时实验目录：/tmp/suiming-agui-eval.XKyEMb。保存 probe.test.ts、package.json、package-lock.json；运行命令为 node --test probe.test.ts。现状缺陷复现项依赖本机仓库绝对路径。实验目录不进入项目依赖或正式测试集，临时目录清理后需重新取得脚本。
+实验放在仓库外的临时目录（已清理），保存 probe.test.ts、package.json、package-lock.json；运行命令为 node --test probe.test.ts。现状缺陷复现项依赖本机仓库绝对路径。实验目录不进入项目依赖或正式测试集，临时目录清理后需重新取得脚本。
 
 结果：**10 项探针通过，0 失败**。其中包含对不支持行为和当前缺陷的确认；不能解释为所有产品验收已通过。
 
@@ -53,15 +51,15 @@
 
 ## 当前代码意味着什么
 
-[RunEventSchema](../packages/sdk/src/run-event.ts) 定义 12 种事件，但还不是完整的交互消息流：
+RunEventSchema（`packages/sdk/src/run-event.ts`）定义 12 种事件，但还不是完整的交互消息流：
 
 1. text.delta 没有消息级 ID、消息开始和结束边界，且不持久化。
 2. tool.called 在工具结束后才发出，保存摘要，没有对外工具调用开始及参数流。
 3. 文档提到的 revision.created、run.blocked、run.awaiting_input 并未单独出现在当前 schema 中。revision 可由完成结果引用表达；不能把文档中的事件清单当成已有实现。
 
-[pi loop 接入](../packages/runtime/src/harness/loop.ts) 已能观察 message 与 tool execution 事件，可以在现有接入点补消息边界，无须修改 pi 源码。无论选哪套协议，这部分产品交互信息都要补。
+pi loop 接入（`packages/runtime/src/harness/loop.ts`）已能观察 message 与 tool execution 事件，可以在现有接入点补消息边界，无须修改 pi 源码。无论选哪套协议，这部分产品交互信息都要补。
 
-[RunEngine 恢复](../packages/runtime/src/harness/suiming-harness.ts) 读取 Run / Task / Attempt 状态、任务结果和 worktree，不靠重放 UI 事件恢复执行。因此，改事件格式不要求把持久状态机改成 AG-UI 模型。
+RunEngine 恢复（`packages/runtime/src/harness/suiming-harness.ts`）读取 Run / Task / Attempt 状态、任务结果和 worktree，不靠重放 UI 事件恢复执行。因此，改事件格式不要求把持久状态机改成 AG-UI 模型。
 
 源码和测试中有 27 个 TypeScript 文件引用 RunEvent 相关类型。迁移跨 SDK、engine、store、CLI、TUI、API 和测试，不能按“改几个事件名字”估计。本次没有给出未经实测的工期或节省行数。
 
@@ -141,6 +139,6 @@ write / edit 参数可能含整篇正文或 Design 文件。不能因为标准�
 
 ## 独立发现：持久化失败后仍发布
 
-[RunEventStream.emit](../packages/runtime/src/harness/events.ts) 对所有订阅者异常一律吞掉，而 [RunEngine](../packages/runtime/src/harness/suiming-harness.ts) 把 appendRunEvents 注册成第一个订阅者。
+RunEventStream.emit（`packages/runtime/src/harness/events.ts`）对所有订阅者异常一律吞掉，而 RunEngine（`packages/runtime/src/harness/suiming-harness.ts`）把 appendRunEvents 注册成第一个订阅者。
 
 探针复现了存储订阅者抛错后，界面订阅者仍收到事件。这与“持久事件先保存再发送”要求不符。它是现有实现缺陷，不能用来支持或否决 AG-UI；修复应把持久化成功作为发布前置条件，并单独处理可丢失增量。本次评估未修改该行为。
