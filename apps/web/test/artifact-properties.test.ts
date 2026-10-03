@@ -52,9 +52,9 @@ test("秘密披露严格区分世界、读者和指定人物，名字中的点�
 	const rows = properties(
 		file("story-beat", "beat-0001", {
 			changes: {
-				world: { "secret:药老.身份.revealed": true },
-				reader: { "secret:药老.身份.revealed": false },
-				character: { "萧.炎": { "secret:药老.身份.revealed": true } },
+				world: { "secret:单福.身份.revealed": true },
+				reader: { "secret:单福.身份.revealed": false },
+				character: { "刘.备": { "secret:单福.身份.revealed": true } },
 			},
 		}),
 	);
@@ -62,40 +62,40 @@ test("秘密披露严格区分世界、读者和指定人物，名字中的点�
 	assert.equal(rows[0]?.label, "本节变化");
 	assert.deepEqual(
 		rows[0]?.values.map((value) => value.text),
-		["秘密「药老.身份」在故事世界中已公开", "读者尚未知晓秘密「药老.身份」", "萧.炎已获知秘密「药老.身份」"],
+		["秘密「单福.身份」在故事世界中已公开", "读者尚未知晓秘密「单福.身份」", "刘.备已获知秘密「单福.身份」"],
 	);
 });
 
 test("revealed 只属于 Secret：裸 id 与 secret: 前缀写法显示相同", () => {
 	const rows = properties(
 		file("story-beat", "beat-0001", {
-			changes: { reader: { "药老身份.revealed": true }, character: { 萧炎: { "药老身份.revealed": true } } },
+			changes: { reader: { "单福身份.revealed": true }, character: { 刘备: { "单福身份.revealed": true } } },
 		}),
 	);
 	assert.deepEqual(
 		rows.map((row) => [row.label, row.values.map((value) => value.text)]),
-		[["本节变化", ["读者已获知秘密「药老身份」", "萧炎已获知秘密「药老身份」"]]],
+		[["本节变化", ["读者已获知秘密「单福身份」", "刘备已获知秘密「单福身份」"]]],
 	);
 });
 
 test("开场状态与本节变化分开，不补出缺省状态或把持有当成所有权", () => {
-	const initial = properties(file("resource", "残图", { initial: { holder: "海波东", sealed: false } }));
+	const initial = properties(file("resource", "青釭剑", { initial: { holder: "夏侯恩", sealed: false } }));
 	assert.equal(initial[0]?.label, "开场状态");
 	assert.deepEqual(
 		initial[0]?.values.map((value) => value.text),
-		["残图：由海波东持有", "残图：未封印"],
+		["青釭剑：由夏侯恩持有", "青釭剑：未封印"],
 	);
 	const changed = properties(
 		file("story-beat", "beat-0001", {
-			changes: { world: { "resource:残图.holder": "character:萧炎", "韩枫.dead": true } },
+			changes: { world: { "resource:青釭剑.holder": "character:赵云", "夏侯恩.dead": true } },
 		}),
 	);
 	assert.equal(changed[0]?.label, "本节变化");
 	assert.deepEqual(
 		changed[0]?.values.map((value) => value.text),
-		["残图：由萧炎持有", "韩枫：已死亡"],
+		["青釭剑：由赵云持有", "夏侯恩：已死亡"],
 	);
-	assert.deepEqual(properties(file("character", "韩枫")), []);
+	assert.deepEqual(properties(file("character", "夏侯恩")), []);
 });
 
 test("无法解释的字段或状态类型保留原值，包括空值、false 和空集合", () => {

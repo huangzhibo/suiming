@@ -466,7 +466,7 @@ const ImpactSchema = Type.Object(
 		subject: Type.String({
 			minLength: 1,
 			description:
-				"<kind>:<id>，kind 是 beat、character、place、resource、world、contract、intent 之一，如 character:萧炎",
+				"<kind>:<id>，kind 是 beat、character、place、resource、world、contract、intent 之一，如 character:诸葛亮",
 		}),
 		sourceId: Type.Optional(Type.String({ minLength: 1, description: "查这份 Source 的抽取；缺省查 Target" })),
 	},

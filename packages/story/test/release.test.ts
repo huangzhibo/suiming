@@ -5,7 +5,7 @@ import { deriveRelease, parseReleaseManifest, parseYaml, renderReleaseManifest, 
 const revision = "a".repeat(40);
 const storyTextReview = "text-20260913-120000-ab12";
 const storyText = [
-	{ storyBeatId: "beat-0001", text: "萧炎抬起头。\n\n大厅安静下来。" },
+	{ storyBeatId: "beat-0001", text: "诸葛亮抬起头。\n\n帐中安静下来。" },
 	{ storyBeatId: "beat-0002", text: "他没有退。🔥众人终于听见了回答。" },
 ];
 

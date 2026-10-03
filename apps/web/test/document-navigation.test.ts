@@ -119,6 +119,6 @@ test("显示名依次取 frontmatter 的 title、name、正文一级标题，都
 	const named = new Book({ files: [], volumes: [] } as unknown as WorkspaceData);
 	assert.equal(named.title(entry("c1", { title: "标题", heading: "正文标题" })), "标题");
 	assert.equal(named.title(entry("c2", { frontmatter: { name: "白墨" }, heading: "白墨（同窗）" })), "白墨");
-	assert.equal(named.title(entry("contract-yunlan-yingyue", { heading: "云岚宗的备战与声誉" })), "云岚宗的备战与声誉");
+	assert.equal(named.title(entry("contract-chibi", { heading: "赤壁之战的胜负" })), "赤壁之战的胜负");
 	assert.equal(named.title(entry("c4", {})), "c4");
 });

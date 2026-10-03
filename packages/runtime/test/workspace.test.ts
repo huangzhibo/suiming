@@ -518,7 +518,7 @@ test("目录投影带正文的第一个一级标题：没有 title / name 的文
 		const workspace = new LocalWorkspace(project, async () => {
 			throw new Error("查询不应初始化模型");
 		});
-		await writeFile(join(root, "world/overview.md"), "# 世界总纲\n\n斗气大陆的规则。\n");
+		await writeFile(join(root, "world/overview.md"), "# 世界总纲\n\n汉末天下的规则。\n");
 		const contractPath = join(root, "outline/contracts/诈降.md");
 		await writeFile(
 			contractPath,
