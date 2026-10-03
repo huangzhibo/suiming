@@ -79,6 +79,19 @@ test("故事轴按 index 顺序编号，卷分段随之；正文状态来自 lin
 	);
 });
 
+// 设计稿与图例都说「候选未提交的正文画琥珀空心」，原来只要有正文、设计没变就画成绿色实心，未提交的修改只在悬停里看得到。
+test("正文有未提交的修改时是 candidate，不当成已提交", () => {
+	const dirty = {
+		...data,
+		storyText: [{ storyBeatId: "beat-0001", state: "uncommitted", changed: [] }, ...data.storyText.slice(1)],
+		files: data.files.map((entry) => (entry.path === "text/beat-0001.md" ? { ...entry, dirty: true } : entry)),
+	} as WorkspaceData;
+	assert.deepEqual(
+		axisModel(new Book(dirty), []).beats.map((beat) => beat.text),
+		["candidate", "none", "incompatible", "none", "none"],
+	);
+});
+
 test("承诺生命周期按 ordinal 计算：deadline、resolve 之后的 advance、没有锚点的承诺不画", () => {
 	const model = axisModel(new Book(data), []);
 	assert.deepEqual(

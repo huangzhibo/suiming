@@ -12,7 +12,8 @@ export interface AxisBeat {
 	title: string;
 	path: string;
 	/** committed = 已提交正文且与 Design 一致；incompatible = 有正文但 Design 已变化；none = 仅设计。 */
-	text: "committed" | "incompatible" | "none";
+	/** candidate：有正文但带未提交的修改（含从没提交过的）；设计已变时仍是 incompatible。 */
+	text: "committed" | "candidate" | "incompatible" | "none";
 	textPath: string | undefined;
 	dirty: boolean;
 }
@@ -126,7 +127,13 @@ export function axisModel(book: Book, reviews: ReviewReport[]): AxisModel {
 			volumeId: book.volumeOf(id)?.id ?? "",
 			title: book.beatTitle(id),
 			path: beat?.path ?? "",
-			text: text ? (currency?.state === "design-changed" ? "incompatible" : "committed") : "none",
+			text: text
+				? currency?.state === "design-changed"
+					? "incompatible"
+					: text.dirty
+						? "candidate"
+						: "committed"
+				: "none",
 			textPath: text?.path,
 			dirty: !!(beat?.dirty || text?.dirty),
 		};
