@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-and-test:
+    # 目前只在 macOS 上开发和验证过；Linux / Windows 上能否全部通过还没试，验证之前不在 CI 里声明支持。
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      # 桌面 E2E 需要真实 Electron 与图形会话，不在 CI 跑；npm test 不含它，省掉 Electron 二进制下载。
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # check 里的 tsc -b 会 emit dist；测试与 CLI 的跨包 import 走 dist，所以必须先 check 再 test。
+      - run: npm run check
+      # 需要真实 PostgreSQL / S3 / 双进程的 5 个用例没有对应环境变量时自动跳过；
+      # 另有一条读维护者本机作品（~/stories/eval-022-suiming）的用例，找不到时也跳过。
+      - run: npm test
