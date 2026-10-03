@@ -102,7 +102,7 @@ test("无法解释的字段或状态类型保留原值，包括空值、false �
 	const rows = properties(
 		file("story-beat", "beat-0001", {
 			custom: { empty: "", nil: null, enabled: false, count: 0, list: [], object: {} },
-			changes: { world: { "secret:秘密.revealed": "maybe", "韩枫.unknown": true }, reader: { "韩枫.dead": true } },
+			changes: { world: { "secret:秘密.revealed": "maybe", "黄盖.unknown": true }, reader: { "黄盖.dead": true } },
 		}),
 	);
 	assert.deepEqual(
@@ -115,8 +115,8 @@ test("无法解释的字段或状态类型保留原值，包括空值、false �
 			["custom.list", "[]"],
 			["custom.object", "{}"],
 			["changes.world.secret:秘密.revealed", "maybe"],
-			["changes.world.韩枫.unknown", "true"],
-			["changes.reader.韩枫.dead", "true"],
+			["changes.world.黄盖.unknown", "true"],
+			["changes.reader.黄盖.dead", "true"],
 		],
 	);
 });
