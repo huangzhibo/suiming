@@ -23,7 +23,8 @@
 			"scripts/**/*.mjs",
 			"!packages/story/src/constitution.ts",
 			"!packages/story/src/story-language-docs.ts",
-			"!apps/cli/src/host-files.ts"
+			"!apps/cli/src/host-files.ts",
+			"!!.claude"
 		]
 	}
 }
