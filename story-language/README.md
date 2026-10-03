@@ -60,7 +60,7 @@ Target Design 使用 `intent/**`、`outline/**` 与 `world/**`。Source 在 `sou
 
 ## 本地 id
 
-identity、Intent 与 StoryContract 的本地 id 在中文作品里用简洁稳定的中文——作者在文件与界面上看到的就是它（Contract 没有名字字段，故事轴的期待泳道直接显示 id）。ASCII id 也合法。id 要能作单个文件名：不含空白和 `<>:"/\|?*`，不以 `.` 开头或结尾，使用 Unicode NFC。
+identity、Intent 与 StoryContract 的本地 id 在中文作品里用简洁稳定的中文——作者在文件与界面上看到的就是它（Contract 没有名字字段：故事轴的期待泳道显示正文里第一个 `#` 标题，没有标题就显示 id）。ASCII id 也合法。id 要能作单个文件名：不含空白和 `<>:"/\|?*`，不以 `.` 开头或结尾，使用 Unicode NFC。
 
 `refs`、`subjects` 的分组键（`character / place / resource / secret / world / beat`）、`kind`、状态属性和 schema 枚举保持英文。字段已经限定 kind 时只写本地 id；只有单个值可能属于多种 kind 的机器接口才写 `kind:id`。Volume / StoryBeat 使用 `vol-* / beat-*` 结构 id。
 

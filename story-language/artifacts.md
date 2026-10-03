@@ -8,7 +8,7 @@
 
 它们虽然不是 Canon，仍是作品目录里可移植的 Reference，和 `reference/style/**` 一样随目录、作品包与 Cloud checkout 完整保存，不因当前 Agent 没有读取就被丢掉。
 
-`reference/style/<id>.md` 只保存被 Intent 经 `style_refs` 选择的表达证据。它可以保存足以说明人物说话口吻、叙述距离或场景写法的原创对照例，或作者明确采用的 StoryText 短片段；片段中的故事内容不具有 Canon 权威，也不约束其它 Beat。不复制整章，也不保存 approved 状态。
+`reference/style/<id>.md` 只保存被 Intent 经 `style_refs` 选择的表达证据。它的 id 必须是 `style_` 开头的 ASCII（如 `style_opening`），是本地 id 用中文的例外。它可以保存足以说明人物说话口吻、叙述距离或场景写法的原创对照例，或作者明确采用的 StoryText 短片段；片段中的故事内容不具有 Canon 权威，也不约束其它 Beat。不复制整章，也不保存 approved 状态。
 
 ## StoryText
 

@@ -123,7 +123,7 @@ Design / Write / Source / Review 不是带权限预设的入口，只是桌面�
 
 ### 6.2 候选与工具
 
-Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径（4.3）。Agent 与子任务只拥有限制在 checkout 根内的工具，清单与每个工具的重放策略见 [Harness 设计](harness-design.md)第 6 节。`.git`、`.suiming` 与 host 接入目录（`.agents` / `.claude` / `.codex` / `.grok`）由 `ConfinedExecutionEnv` 挡在读写之外，其余整个 checkout 可写，是不是作品文件由 codec 与 Checker 在 `commit` 判。**没有 shell，也没有 `rg`**——`search` 背后是纯函数 `searchStoryCandidate`，不调用任何外部二进制（`confined-env.test.ts`「受限环境：路径逃逸、symlink 与只读策略都被拒绝，没有 shell」）。**子任务拿不到 `commit`，也不能再委派**，它的交付出口只有 `submit_task`。可修复的工具 / 领域错误作为反馈；持久化失败或 owner 失效立即停止推进，`stopReason === "length"` 单独处理。
+Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径（4.3）。Agent 与子任务只拥有限制在 checkout 根内的工具，清单与每个工具的重放策略见 [Harness 设计](harness-design.md)第 6 节。`.git`、`.suiming` 与 host 接入目录（`.agents` / `.claude` / `.codex` / `.grok`）由 `ConfinedExecutionEnv` 挡在读写之外，其余整个 checkout 可写，是不是作品文件由 codec 与 Checker 在 `commit` 判。**没有 shell，也没有 `rg`**——`search` 背后是纯函数 `searchStoryCandidate`，不调用任何外部二进制（`confined-env.test.ts`「受限环境：路径逃逸、symlink 与只读策略都被拒绝，没有 shell」）。**子任务拿不到 `commit`，也不能再委派**，它的交付出口只有 `submit_task`（Reviewer 是 `submit_review`）。可修复的工具 / 领域错误作为反馈；持久化失败或 owner 失效立即停止推进，`stopReason === "length"` 单独处理。
 
 候选不是 Canon。Agent 的阶段提交走与作者的「提交」按钮、host 的 `suim commit` 完全相同的 `commitCheckout`，只多一个 commandId 回执，用于崩溃后按回执认领已完成的提交。成功后 session 基线推到新版本，同一 turn 可以继续工作；一次提交不会自动结束这一轮。提交与恢复以 receipt 和 checkout journal 核对实际效果，不能因工具回复缺失重复 edit 或 commit。
 

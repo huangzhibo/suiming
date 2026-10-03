@@ -11,7 +11,7 @@
 - **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
 - **证据**：最高到「真实调用」——2026-09-16 重构后第一次完整真实对话（[基线](validation/2026-09-16-first-real-session/README.md)），以及 2026-10 起斗破前 120 章的忠实抽取与留出评测。没有任何能力达到「真实长篇」。
 
-验证（2026-10-04）：`npm run check` 通过；`npm test` 390 项，385 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
+验证（2026-10-04）：`npm run check` 通过；`npm test` 390 项，385 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
 
 ## 能力与证据
 
@@ -46,6 +46,9 @@
 - **作者体验**：v7 工作台已在 2 Beat 样例上验收。Library 有最近作品列表与打开 / 新建，打开任意 Open Story Directory 会就地初始化；旧仓格式不迁移，初始化失败时文件夹保持原样。上下文栏与右栏可以拖拽调宽（[调宽验收](validation/2026-09-09-pane-resize/README.md)）。邻域图只画 frontmatter 声明的引用，看二跳就再点一次，不推断隐含关系。finding 的 Runtime 锚点仍只到文件，段落定位是窗口用审稿引文在 mdast 上对出来的，Reviewer 没引原文时退回到只锚文件。同一个文件被编辑器 buffer 与外部改动（作者、host agent、Agent）同时修改时只做 CAS 比较，入口是「比较外部修改」，不自动解决，也不覆盖任何一方。
 - **A / B 决策卡**（针对一段给两个改法让作者选）还没做，但不是做不了：零件都在，缺的只是 `validateProductEvent` 的 CUSTOM 白名单里的一个事件名，以及一次「作者读到一段不满意」的真实场景来定给几个改法、怎么呈现。它也是「作者否决」这类证据最干净的采集口。零件清单见[作者工作台设计](web-product-design.md) 4.4 节「A / B 决策卡」。
 - **发行与认证**：当前是开发构建，没有签名安装包或升级机制。设置页的登录向导接通了 pi-ai 全部 provider 的 API key / OAuth 流程（浏览器回调、设备码、手动粘贴授权码都能转述）。到「真实调用」的：API key（另经桌面 E2E）；`openai` 的 Sign in with ChatGPT——2026-10-02 登录并真实调用，10-03 凭据文件在一次真实刷新中被重写，当天 CLI 连跑多个一到两小时的运行没有一次因凭据失败。只到机制的：refresh token 作废后的失效恢复、桌面与 CLI 同时刷新，以及 `openai-codex`、Anthropic 等其余 provider 的 OAuth。订阅额度与作者自己的 Codex 共用，界面上的花费是按 API 价的估算，不是扣费。
+- **正文时效报得太宽**：判断一篇正文是否 design-changed 用的 Design 闭包（`artifact/derived.ts` 的 `designClosurePaths`）取的是 Design Frame，Frame 按 Beat 播种时会载入整卷的 Beat 与全部 Intent；而 Writer 实际拿到的是 Write Context，只有这个 Beat、它 refs 的设定、碰到的 Contract 与适用的 Intent。结果是同卷任何一个 Beat 改了，整卷的正文都会被标成 design-changed，长篇里这个信号会被淹没。设计意图见[派生状态设计](derived-evidence-design.md)第 2 节，2026-10-04 核对文档时发现，未修。
+- **写冲突的处理与设计相反，未复现**：[Harness 设计](harness-design.md)第 10 节写 `file_write_conflict` 作为工具错误交给模型、turn 继续；代码在执行阶段专门把它重新抛出（`harness/loop.ts` 收工具异常处），turn 结束回 idle、记一句失败原因。若冲突出在落盘那一步，动作已记成待确认，下一个 turn 恢复时会再撞同一个冲突，会话可能一直卡住，直到文件被还原。窗口很窄（准备写入到落盘之间作者改了同一个文件），2026-10-04 核对文档时从代码读出，还没有复现。
+- **「同一作品同时只有一个 running session」只在进程内成立**：`LocalSessionController` 只看本进程的活动 session，桌面与 CLI 两个进程各开一个 session 同时跑时不拦，两边会在同一份 checkout 上互相覆盖（去掉 worktree 之后的后果之一，见 [Harness 设计](harness-design.md)第 2 节）。
 - **命令与 Cloud**：本地 typed IPC 命令有 SDK 目录与双向校验，但命令目录仍是三份，三个传输的适配都是手写的，理由见[系统架构](architecture.md)。Cloud 只剩 Canon 与同步，Cloud Harness host 与同等原子事件验收保持冻结；`CanonStore` 契约测试目前只有 git 一个实现在跑，Cloud 走的是自己的 store 接口与自己的测试。
 - **模型预检范围**：启动只预检实际对话模型——`session.send` 在建 session 前 bind 一次 `main` profile，未配置的专用角色不挡住讨论（有意收窄）。代价是 Agent 委派到凭据或模型有问题的 writer / reviewer / source-extractor 时，失败发生在 turn 中途、token 已经花掉，而不是创建前。按实际会用到的 profile 预检需要先知道 Agent 会不会委派，未实现。
 - **无人值守没有方向闸**：创作路径没有预算，兜底只有 `run_no_progress` 与作者打断，**停不住「持续产出但方向错了」的 turn**，只能靠作者发现（完整说明见 [Harness 设计](harness-design.md)第 10 节）。带交付工具的子任务另有 `unsubmittedStops >= 3` 的收口，那不是方向闸。真正的结构性改善是让作者补充的意图能沉淀回作品，见 [AGENTS.md](../AGENTS.md) 不变量 5。

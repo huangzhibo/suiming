@@ -21,7 +21,7 @@
 Canon 是带历史的版本库：每个 revision 是一整棵树，祖先链是历史（本地是 git；Cloud 还没接上同一套契约，见第 3.2 节末）。于是：
 
 - (a) = **X 最后一次变化所在的 revision**（`writtenAt(path)`），那个 revision 下的树就是当时的 Design。不需要另存一份 hash 表——树本身就是 hash 表。
-- (b) = 两个 revision 之间**相关路径**的 diff。「相关」不是整个 Design（那样任何改动都让全书正文变黄，等于没有信号），而是 X 的 **Design 闭包**：`design-frame.ts` 给 Writer 的那一套——这个 Beat 自己、它 refs 的人物 / 地点 / 资源 / World 文档、全部 Contract、适用的 Intent、`world/core` 与 story index。这正是 Writer 写那份正文时拿到的 Context，也是「Design 变了会不会影响这份正文」的边界。story index 只按这个 Beat 的那一段算：所在卷的 id 与标题、故事顺序里的前一个与后一个 Beat；整份 `index.yaml` 变了而这一段没变，不算变化。不这样的话，斗破 host 运行在全书末尾加一卷续写，原作 27 篇正文全成了 design-changed，连载式写法每加一节都会这样。
+- (b) = 两个 revision 之间**相关路径**的 diff。「相关」不是整个 Design（那样任何改动都让全书正文变黄，等于没有信号），而是 X 的 **Design 闭包**：Writer 写那份正文时拿到的 Design——这个 Beat 自己、它 refs 的人物 / 地点 / 资源 / World 文档、它碰到的 Contract、适用的 Intent、`world/core` 与 story index。这就是「Design 变了会不会影响这份正文」的边界。**现在的实现比这宽**：`designClosurePaths` 拿 Beat 作种子取 Design Frame，Frame 会载入整卷的 Beat 与全部 Intent，而委派的 Writer 拿的是 Write Context，所以同卷别的 Beat 一改，这篇正文也会被标成 design-changed（见[当前状态](current-status.md)已知缺陷）。story index 只按这个 Beat 的那一段算：所在卷的 id 与标题、故事顺序里的前一个与后一个 Beat；整份 `index.yaml` 变了而这一段没变，不算变化。不这样的话，斗破 host 运行在全书末尾加一卷续写，原作 27 篇正文全成了 design-changed，连载式写法每加一节都会这样。
 - (c) = 一组路径加上它们当时的样子。Reviewer 审的是哪些文件、当时内容的摘要，记在审稿文件自己的 frontmatter 里（`subjects`；为什么记摘要而不是 revision，见第 5 节）。
 
 所以 DesignCommit、lineage、ContextSnapshot 三种记录整个消失；审稿与 Source 笔记从「Runtime 生成的 evidence」降为**普通作品文件**；时效、覆盖率、可发布性全部是**按需计算的投影**，不落盘。
@@ -49,17 +49,17 @@ Checker 对它们只查形状：`review/**` 与 `source/<id>/notes/**` 的 front
 | `sourceCoverage(candidate, sourceId)` | 取 `material_sha256` 等于当前 `material.txt` sha 的笔记，span 并集 | `{ sourceId, materialCodePoints, materialSha256, covered, gaps }` |
 | `releaseReadiness(reader, head, candidate)` | 每个 StoryBeat 都有正文；每份正文 `current`；存在一份 `scope: book` 的 text 层审稿且 `current` | `{ publishable, blockers, texts, review? }`；verdict 不参与，原样带出 |
 
-凡是提交过的正文都有 `writtenAt`；候选里未提交的正文标 `uncommitted`。
+凡是提交过的正文都有 `writtenAt`；head 里还没有、只在候选里的正文标 `uncommitted`（已提交过的正文在候选里再改，仍按已提交的那一版算）。
 
-计算量：`writtenAt` 走一遍祖先链、逐 commit 做树 diff，一次算出全部路径的最后变化点，按 head 缓存（`workspace.show` 已经按 head 缓存 Design 投影，同一个位置）。git 的树 diff 是 O(变化文件数)，几百个 commit 几十个正文文件毫秒级。
+计算量：`writtenAt` 走一遍祖先链，逐 commit 取整棵树的 blob id（`fileDigests`，只走 tree 不读内容）再与上一个 commit 比，一次算出全部路径的最后变化点；每个 commit 是 O(文件数)，不是只看变化子树的树 diff。摘要按 revision 缓存（`LocalProjectService.historyReader()`），桌面的正文时效投影按 head 缓存（`LocalWorkspace` 的 `#textProjectionFor`，`workspace.show` 每 100ms 一次也只算一遍）。
 
-谁在用：Agent 查覆盖率用 `source_coverage` 工具，CLI 是 `suim source list` 的 `coverage`，桌面与 Reviewer 读同一份；`suim review show` 是读文件加 `reviewCurrency`；`suim release status` / `publish` 用 `releaseReadiness`，`publish` 仍生成 `release/**`。桌面每个 Beat 显示「写于哪个版本 · Design 未变 / Design 已变：N 个文件」，点开列出 `changed`；审稿页与故事轴的审稿泳道读 `review/**` 加 `reviewCurrency`，finding 的段落锚点由 `anchors.ts` 从引文派生。
+谁在用：Agent 查覆盖率用 `source_coverage` 工具，CLI 是 `suim source list` 的 `coverage`，Source 审稿与合并任务的输入（`renderSourceNotes`）读同一份，桌面还没有覆盖率视图；`suim review show` 是读文件加 `reviewCurrency`；`suim release status` / `publish` 用 `releaseReadiness`，`publish` 仍生成 `release/**`。桌面每个 Beat 显示「写于哪个版本 · 设计未变 / 设计已变：N 个文件」，只给个数，`changed` 的清单还没在界面上列出；审稿页与故事轴的审稿泳道读 `review/**` 加 `reviewCurrency`，finding 的段落锚点由 `anchors.ts` 从引文派生。
 
 可移植与 Cloud：Open Story Directory 是 git 仓，`git clone` / `git bundle` 带走历史，派生状态在任何一处算出来都一样。Open Story Package 是快照，没有历史：导入即一次提交，所有正文的 `writtenAt` 就是导入 revision，全部 `current`。这是如实的——快照里本来就没有更早的信息；原先整包搬 evidence，局部改动就全丢，反而更脆。`RevisionHistoryReader` 目前只有 git 实现，Cloud PostgreSQL 还没接上 `CanonStore` 契约，也不算这些派生状态（AGENTS.md 不变量 3）；接上之后用两个 snapshot 的 hash 表相减就能跑同一份代码。
 
 ## 4. 拆掉的代码
 
-约 2900 行：五个 evidence store、可移植层的 evidence 部分、harness 里的 `#captureContext` / `sessionEvidence` / 临时 session / `record_source` / `source_notes` / `commit` 的 freeze 分支、CLI 的 `design freeze` / `source freeze` / `context show`，以及 Checker 的 `design_not_frozen`、`story_text_lineage_conflict`、`review_design_commit_mismatch`、`design_commit_*`、`material_coverage_*`、`material_evidence_mismatch`、`review_report_mismatch`。新增的派生函数、两种 identity 与 `submit_review` 落盘约 370 行，净减约 2600 行。这些名字都不要重建。
+约 2900 行：五个 evidence store、可移植层的 evidence 部分、harness 里的 `#captureContext` / `sessionEvidence` / 临时 session / `record_source` / `source_notes` / `commit` 的 freeze 分支、CLI 的 `design freeze` / `source freeze` / `context show`，以及 Checker 的 `design_not_frozen`、`story_text_lineage_conflict`、`review_design_commit_mismatch`、`design_commit_*`、`material_coverage_*`、`material_evidence_mismatch`、`review_report_mismatch`。新增的派生函数、两种 identity 与 `submit_review` 落盘约 370 行，净减约 2600 行。这些名字都不要重建。现在的 `material_coverage_incomplete` 不是旧的 Checker 码：它是 Runtime 在合并抽取与 Source 审稿前，从派生的覆盖率得出的 ArtifactError（`harness/material.ts`），与本文的设计一致。
 
 ## 5. 代价与放弃
 
@@ -80,9 +80,9 @@ Checker 对它们只查形状：`review/**` 与 `source/<id>/notes/**` 的 front
 | --- | --- | --- |
 | 正文提交后改了它闭包里的一个人物文件 | 该 Beat `design-changed`，`changed` 列出该文件；闭包外的 Beat 仍 `current` | `derived.test.ts`「正文时效从历史派生…」、`local-project-service.test.ts`「host 提交 StoryText 后正文时效从 git 历史派生…」（样例作品两个 Beat 的闭包都是整套 Design，闭包外的情形由 `derived.test.ts` 的 r4 一步覆盖） |
 | 改了闭包外的文件 | 全部正文仍 `current` | `derived.test.ts` Release 一节：加审稿与 Release 文件不改变正文时效 |
-| 正文改了但未提交 | 该 Beat `uncommitted` | `derived.test.ts`「候选里有正文、head 里没有」 |
+| 正文写了、还从没提交过（head 里没有） | 该 Beat `uncommitted` | `derived.test.ts`「候选里有正文、head 里没有」 |
 | 审稿之后主体文件改了（哪怕和审稿落在同一次提交），或出现了审稿时不存在的主体文件 | `stale`，`changed` 列出这些路径 | `derived.test.ts`「审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间」 |
 | `submit_review` / `review record` 引文不在被审文件里、锚到不存在的路径 | 拒绝（`review_quote_not_found` / `review_anchor_not_found`），文件不落盘；Source 审稿的引文也可以出自原作 | `host-context.test.ts`「context compile 给 host 的输入…」、`cli.test.ts` host 领域命令 |
 | Source notes 的 `material_sha256` 与当前原文不符 | 不计入覆盖率 | `host-context.test.ts`「host 自己读材料…」 |
 | 快照包导入 | 全部正文 `current`，`writtenAt` = 导入 revision | `derived.test.ts` r2：一次提交带上全部正文即全部 `current`；没有单独的导入测试 |
-| Release publish 条件 | 正文完整、全部 `current`、有 `current` 的全书审稿，都由派生给出；有 `design-changed` 正文时拒绝并列出 | `derived.test.ts`「Release 从完整且 current 的正文派生…」、`local-project-regressions.test.ts`、`cli.test.ts` 主流程 |
+| Release publish 条件 | 正文完整、全部 `current`，由派生给出；全书审稿不是必需，但 `--review` 指定的那份必须是 `current` 的全书正文审稿；有 `design-changed` 正文时拒绝并列出 | `derived.test.ts`「Release 从完整且 current 的正文派生…」、`local-project-regressions.test.ts`、`cli.test.ts` 主流程 |

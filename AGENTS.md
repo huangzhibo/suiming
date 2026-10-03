@@ -17,7 +17,7 @@
 - 开发约定（常用命令、检查脚本、提交规则、测试纪律）：本文后半；只在某个目录用得上的坑写在那个目录的 AGENTS.md，见文末「各目录的约定」
 - 旧仓边界：[迁移方案](docs/migration-from-suiming-story.md)
 - ADR 是历史决策，不是当前规范；已完成或被取代的方案与评估在 [docs/history](docs/history/README.md)，保留形成过程，也不是现行规范。撤掉「委托」概念的理由见[需求与目标](docs/vision-and-requirements.md) 5.1 节「作者意图与对话」。
-- 开源前的提交历史不在本仓：2026-10-03 开源时，之前的 409 个提交压成了一个基线提交（`chore: 开源基线（MIT）`）；本仓的另一个起点是 2023-09-28 建仓时的 8 个提交，由合并提交接入。文档里 2026-10-03 及之前的 7 位提交号、「看当时的提交信息」都指那段历史，本仓查不到；该保留的设计理由已经写在上面这些文档里。维护者本机在本仓旁边留有完整归档（裸仓 `../suiming-history-2026-10-03.git`），在那里用 `git log -L` 或 `git blame <提交> -- <文件>` 追到逐行的旧理由；其他环境没有这份归档。
+- 开源前的提交历史不在本仓：2026-10-03 开源时，之前的 409 个提交压成了一个基线提交（`chore: 开源基线（MIT）`）；本仓的另一个起点是 2023-09-28 建仓时的 8 个提交，由合并提交接入。开源基线之前的 7 位提交号（文档里 2026-10-03 及更早的条目大多是）、「看当时的提交信息」都指那段历史，本仓查不到；该保留的设计理由已经写在上面这些文档里。维护者本机在本仓旁边留有完整归档（裸仓 `../suiming-history-2026-10-03.git`），在那里用 `git log -L` 或 `git blame <提交> -- <文件>` 追到逐行的旧理由；其他环境没有这份归档。
 
 Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真源；不要在架构文档、Prompt、API 或 UI 中复制字段表。以下约束定义目标架构，当前代码与差距以当前状态为准。
 
@@ -27,7 +27,7 @@ Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真
 2. **Capability first。** 先定义 Agent 为完成创作目标需要具备的能力，再设计 Domain Service、API、工具和界面。不得从页面、REST endpoint、模型 provider 或 Workflow 反推领域边界。
 3. 每个本地或 Cloud Project 只以已提交的版本化 Story Artifact 为作品权威。数据库、对象存储、Open Story Directory、编辑器、Context、索引和会话不得形成第二套 Canon；本地目录是可由人类和 host agent 直接修改的 checkout，文件修改只是 dirty candidate，Runtime 经 Checker 后从 diff 内部构造 ChangeSet，才推进本地 ProjectRevision。本地作品目录是普通 git 仓库，任何人都可以 commit——那是候选；权威只有受保护的 `refs/suiming/canon`，它只由过 Checker 的提交推进。「每个 Project 一个权威」不等于「全局一种存储」：本地用 git、Cloud 用 PostgreSQL 是同一套语义的两个实现；给 Cloud 换存储时，先让它通过 `CanonStore` 契约测试再迁。
 4. Open Story Directory 是本地创建、repository-native project 和 Cloud checkout 共用的唯一标准目录表示；Open Story Package 是同一逻辑路径空间的可移植快照。两者必须可读、可验证、可导入和可继续创作。交换格式不携带部署内部的 project、revision、attempt、run 或 artifact version identity。Local 与 Cloud 的关联保存在包外，通过显式 checkout / import / link / push / pull 同步，不做后台双写。
-5. **作者意图是组织核心，不是「委托」。**耐久的中心是 `intent/**`——它是 Canon，过 Checker，有版本；作者在对话里说的话只要对以后仍然成立，就必须有路径提议写回它。Session / Task 是**机械边界**（lease、checkpoint、按 turn 的模型绑定），作者只看到「一个持续的对话」，产品不围绕它们建概念。一个 Session 就是一个根 Agent 与一份连续的消息列表，在作者的 checkout 上直接工作并拥有作品决策权，可阶段提交多个 ProjectRevision；Run / Attempt / Conversation 已于 2026-09-13 删除，不要重建。Capability 是设计词汇不是运行时构造，落地形态是 Agent / Worker 的工具集；recipe 只剩可选的写作方法（`STORY_TEXT_METHOD`）与可修改的计划模板，固定创作配方已删除，不要重建。Agent 可以直接执行或委派，允许预规划与动态调整，普通工具调用不自动成为 Task。父子委派与结果依赖分开，已完成历史不重写；不新增 graph engine 或状态库。
+5. **作者意图是组织核心，不是「委托」。**耐久的中心是 `intent/**`——它是 Canon，过 Checker，有版本；作者在对话里说的话只要对以后仍然成立，就必须有路径提议写回它。Session / Task 是**机械边界**（lease、checkpoint、按 turn 的模型绑定），作者只看到「一个持续的对话」，产品不围绕它们建概念。一个 Session 就是一个根 Agent 与一份连续的消息列表，在作者的 checkout 上直接工作并拥有作品决策权，可阶段提交多个 ProjectRevision；Run / Attempt / Conversation 已于 2026-09-13 删除，不要重建。Capability 是设计词汇不是运行时构造，落地形态是 Agent / Worker 的工具集；recipe 只剩可选的写作方法（`STORY_TEXT_METHOD`）与可修改的计划模板，固定创作配方已删除，不要重建。Agent 可以直接执行或委派，计划写在消息里、随时调整，不是实体（没有 plan / 任务依赖），普通工具调用不自动成为 Task；已完成历史不重写；不新增 graph engine 或状态库。
 6. Worker 是 task-local agent loop，无持久人物记忆、不自由互传消息、不直接提交 Canon。结果先经校验持久保存，再以引用交还父调用，不让主模型转录完整 JSON 或正文。每次提交由 Agent 收敛为一个 ChangeSet；同一候选同一时刻一个写入 owner，独立并行须有输入与输出隔离及实际收益。
 7. 模型负责搜索、生成和语义判断；Checker 只验证 schema、引用、顺序、硬状态和版本等确定性边界。Review 帮助发现问题，但不拥有作品权限。
 8. Story Artifact 保存长期记忆。按表达意图检索是正式的 `read` 能力，搜索结果只是回到原始 artifact 的入口；Session、Task、事件、消息、trace、索引与摘要都是运行或派生数据，长期结论须写回作品。正文与审稿的时效由 Canon 历史派生，不另存 evidence；实际读取、硬依赖与可能的故事影响不能混为一谈。
@@ -79,7 +79,7 @@ Cloud Web、远程 Agent 产品、生产 identity / 计费、多人协作、Read
 
 ```sh
 npm run check        # docs 链接、生成文件对账、story 隔离、biome、tsc（含测试源码）、设计系统 lint、integrations 对账
-npm test             # node --test 全部包；需要真实 PostgreSQL / S3 / 双进程的用例默认 skip
+npm test             # node --test 全部包；需要真实 PostgreSQL / S3 / 双进程的 5 条默认 skip，没有本机 eval-022 作品时再 skip 1 条
 node --import tsx --test packages/runtime/test/agent.test.ts   # 单个测试文件
 npm run build        # tsc -b --force
 npm run format       # biome 自动修
@@ -92,7 +92,7 @@ npm run regression:harness -- --only check-issues --trials 1   # 真实模型回
 ```
 
 - workspace 包的 exports 指向 dist。测试和 CLI 里 `@suiming/*` 的跨包 import 走 dist，改了 packages/* 之后先 `npm run check`（其中 `tsc -b` 会重新 emit）或 `npm run build` 再 `npm test`，否则测的是旧代码。包内测试用 `../src` 相对路径，不受影响。
-- 跑被 skip 的集成测试：按 .env.example 设 `SUIMING_TEST_POSTGRES_URL`、`SUIMING_TEST_S3_*`、`SUIMING_TEST_DURABLE_PROCESS=1`，需要一次性的 PostgreSQL 与 MinIO。
+- 跑被 skip 的集成测试：按 .env.example 设 `SUIMING_TEST_POSTGRES_URL`、`SUIMING_TEST_S3_*`、`SUIMING_TEST_DURABLE_DEPLOYMENT=1`、`SUIMING_TEST_DURABLE_PROCESS=1`，需要一次性的 PostgreSQL 与 MinIO。
 - 真实模型调用的配置、`regression:harness` 的跑法与节奏见 [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)「真实模型调用与回归」。**回归跑的过程中不要 `npm run build` / `check` / `test:desktop`**：每个任务起新的 `suim` 进程读当时的 dist，脚本每跑完一项核对 dist 指纹，变了就停；只提交不构建不影响它。
 
 ## 检查脚本的隐含约束
@@ -118,7 +118,7 @@ npm run regression:harness -- --only check-issues --trials 1   # 真实模型回
 
 ## 测试纪律
 
-- 测试 helper 是 test/ 目录下的普通文件，按相对路径引用：story 层 fixture 在 packages/story/test/fixture.ts，唯一的样例作品在 packages/runtime/test/sample-work.ts（2 个 StoryBeat）。曾做过独立 `@suiming/testing` 包和 `@suiming/runtime/testing` 子路径导出，都因为是第二套机制或污染产品导出面被删，不要再建。
+- 测试 helper 是 test/ 目录下的普通文件，按相对路径引用：story 层 fixture 在 packages/story/test/fixture.ts，唯一的样例作品在 packages/runtime/test/sample-work.ts（2 个 StoryBeat）；packages/runtime/test/synthetic-work.ts 是给 Frame 规模测试合成的 3 卷 36 Beat Design，没有文学内容，不当样例用。曾做过独立 `@suiming/testing` 包和 `@suiming/runtime/testing` 子路径导出，都因为是第二套机制或污染产品导出面被删，不要再建。
 - 被删模块的测试随模块删除，不留空壳。不加只测 in-memory 假对象、或断言临时空洞（如「Worker 零 executor」）的测试；冻结面只保留能发现真问题的测试。
 - 真实 provider 暴露的每种 malformed output 都要有等价回归，由 Checker 或 tool contract 拒绝，不靠改 prompt 兜底。
 - 默认 skip 的集成测试不会告诉你它坏了：改 Cloud schema 后的真跑办法见 [packages/cloud-postgres/AGENTS.md](packages/cloud-postgres/AGENTS.md)。桌面 E2E 的纪律见 [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md)。
@@ -135,5 +135,5 @@ npm run regression:harness -- --only check-issues --trials 1   # 真实模型回
 
 - [apps/web/AGENTS.md](apps/web/AGENTS.md)：界面与设计系统 lint
 - [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md)：主进程与 IPC、桌面 E2E
-- [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)：真实模型调用与回归、模型与凭据、Harness 与执行、Canon 与存储
+- [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)：真实模型调用与回归、模型与凭据、Harness 与执行、Canon、目录与存储
 - [packages/cloud-postgres/AGENTS.md](packages/cloud-postgres/AGENTS.md)：Cloud schema 与默认 skip 的集成测试

@@ -106,8 +106,8 @@ Checker 按下表判断 Contract 是否到期未兑现：
 
 | 情况 | `deadline` 是 Beat id | `deadline` 是 `book_end` |
 | --- | --- | --- |
-| 普通 Target Design | 期限前必须 `resolve` | 全书结束前必须 `resolve` |
-| index 写了 `open_ended: true` 的 Target，或 Source | 期限前必须 `resolve` | 已 `open`、未 `resolve` 算进行中 |
+| 普通 Target Design | 期限那一节或之前必须 `resolve` | 全书结束前必须 `resolve` |
+| index 写了 `open_ended: true` 的 Target，或 Source | 期限那一节或之前必须 `resolve` | 已 `open`、未 `resolve` 算进行中 |
 
 任何情况下，从未 `open` 的 Contract 都是错误。Source 可能只登记原作的一部分，也可能抽取未完本作品，所以它的 `book_end` 指当前登记材料的边界，不宣称原作已经完结；Source 不得为通过 Checker 伪造 `resolve`。
 

@@ -15,7 +15,7 @@
 - 模型凭据只走 pi-ai 的 `Models.login`（[系统架构](../../docs/architecture.md)第 10 节），`LocalModelSettings` 把 prompt / notify 摊成可轮询的登录会话（`models.login.*`），窗口只转述。曾有一个直接写 key 的 `models.connect`，因为是第二套机制且绕过 provider 自己的多步 login（Cloudflare 要 account id）而删掉，不要再加。
 - **凭据文件的 `modify` 持跨进程锁跑完整次 OAuth 刷新**（`json-file-credential-store.ts`）：pi-ai 约定刷新在 `modify` 里、全局只刷一次，OpenAI 的 refresh token 用过即作废，锁外刷新会让桌面与 CLI 各刷一次、后到的一方失败、作者被迫重登。不要为了「别占着锁等网络」把远端请求挪出锁——登录时浏览器里的等待本来就不在 `modify` 里。Codex 自己只在进程内单飞、刷新前重读磁盘，跨进程撞上时靠「refresh token was already used」报错与重读兜底，不是更好的参照。实测到哪一步见[当前状态](../../docs/current-status.md)「发行与认证」。
 - pi-ai 自己不开浏览器：`auth_url` / `device_code` 的链接由主进程 `shell.openExternal` 打开（`LocalModelSettings({ openUrl })`），renderer 打不开外部窗口。`openai` / `openai-codex` 的 OAuth 回调固定监听本机 1455 端口，与 Codex CLI 共用，被占时退回手动粘贴回调地址。
-- `SUIMING_AUTH_PATH` 与 `SUIMING_CONFIG_PATH` 对称，桌面 E2E 用它们把设置指到临时目录，并要从 launch env 里剔掉开发 shell 的 `*_API_KEY`（开发 shell 导出了某个 provider 的 key 时，「缺少凭据」永远不出现）。
+- `SUIMING_AUTH_PATH` 与 `SUIMING_CONFIG_PATH` 对称，桌面 E2E 用它们把设置指到临时目录，并要从 launch env 里剔掉开发 shell 的 `*_API_KEY`（开发 shell 导出了某个 provider 的 key 时，「未配置凭据」「还没有可用凭据」这类提示永远不出现）。
 - `session.send` 的启动预检用的是 `#controller()` 那一次初始化的 gateway，不要再调一次 `models()` 工厂，幂等测试数着初始化次数。
 - 模型输出的 wire schema 保持平面 `Type.Object`，不用顶层 object union：qwen3.8-max 会把 union 下的数组序列化成字符串。字面量枚举可以用 union；verdict 与 findings 这类跨字段约束放在 parser 里查，不放在 schema 里。
 

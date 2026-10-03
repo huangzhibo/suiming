@@ -44,7 +44,7 @@
 
 - 桌面主进程直接持有 Runtime，renderer 经 typed IPC 接入，不 shell out 或解析 CLI，也不经 localhost HTTP。
 - Codex / Claude Code / Grok integrations 是正式产品入口，不是“碰巧能编辑文件”；adapter 只是薄的 instructions / Skills 与命令契约，见[系统架构](architecture.md)第 8 节。
-- host-native 模式复用 host 已配置的模型与凭据；只有在桌面里对话或显式执行 `suim session send` 才切换到 Suiming Agent 与 model profile。
+- host-native 模式复用 host 已配置的模型与凭据；在桌面里对话或显式执行 `suim session send` 才进入 Suiming Agent 并按 model profile 调模型；`suim rank` 的评委同样按 `judge` profile 调用。
 - 本地模式不要求 Cloud account。Cloud 连接与作品同步都是可选能力。
 - 自然语言是主要创作入口；作者不需要理解文件路径、hash、Task DAG、Context id 或模型路由才能完成作品。
 - 桌面端必须把作品工作台与自然 AI 对话合为一个连续体验：正文有良好的阅读与编辑体验，对话与作品同屏联动，activity 渐进披露，revision 结果可以直接回到权威 diff 和原始 Artifact；不能退化成后台 dashboard、只读文件查看器或作品页面旁的聊天挂件。后续 Web 复用这一产品能力。
@@ -57,7 +57,7 @@
 - **Story Artifact** 是按 Story Language identity 独立寻址的作品内容，也是作品长期记忆。
 - **Open Story Directory** 是标准可编辑目录表示；桌面、CLI、本地 integrations、Cloud checkout 和 repository-native project 使用同一种格式。
 - **Open Story Package** 是某个明确 ProjectRevision 的封闭、可验证快照，与目录使用相同逻辑路径。
-- **repository-native project** 是 Open Story Directory 加可选 Git、AGENTS.md、Skills 和说明文档，不是另一种 Story Language 或旧 Runtime 的同义词。
+- **repository-native project** 是 Open Story Directory（它本身就是 git 仓，见 4.3）加可选的 AGENTS.md、Skills 和说明文档，不是另一种 Story Language 或旧 Runtime 的同义词。
 
 Story Artifact 与 Story Language 是作品语义真源；机器 schema 必须从同一语义边界实现，不能在 API、Prompt 或 UI 中另建字段定义。数据库、对象存储、工作目录、编辑器、Session 消息列表、trace、索引、模型摘要和 UI state 都不能形成第二套 Canon。
 
@@ -94,7 +94,7 @@ Story Artifact 与 Story Language 是作品语义真源；机器 schema 必须�
 
 一个 Session 只有一个根 Agent，负责理解这一轮要解决什么、选择动作、在 checkout 上修改并阶段提交。它可以直接执行，也可以把独立任务委派给 Worker；没有固定创作顺序，计划写在消息里而不是实体，作者不需要操作 DAG。Worker 只处理 task-local 输入，不能直接提交 Canon，所有候选由 Agent 收敛。子任务结果交付成功不代表判断正确或适用于新稿，采用前仍要核对输入与正文 / 审稿时效。Session、Task 与 Worker 的准确语义见 [Harness 设计](harness-design.md)。
 
-turn 结束不表示作者的目标达成，达成与否由作者看作品定。未提交的候选留在 checkout，Agent 在回复里说明哪些改了还没提交，这一轮采用的长期结论写回作品或在回复里点名。只有结果未知时才停下等作者，其余失败说明原因，作者再发一条消息就能继续。没有预算，理由与代价见 [Harness 设计](harness-design.md)第 10 节。
+turn 结束不表示作者的目标达成，达成与否由作者看作品定。未提交的候选留在 checkout，Agent 在回复里说明哪些改了还没提交，这一轮采用的长期结论写回作品或在回复里点名。只有结果未知、或续跑时模型与工具面和 checkpoint 对不上时才停下等作者，其余失败说明原因，作者再发一条消息就能继续。没有预算，理由与代价见 [Harness 设计](harness-design.md)第 10 节。
 
 host-native coding agent 的私有会话不伪装成 Suiming Session。它直接形成文件候选并通过本地提交边界接纳，因此共享 Story 正确性与版本事务，但不伪造 Suiming 的 checkpoint、trace 或恢复能力。
 

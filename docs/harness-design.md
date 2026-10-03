@@ -36,7 +36,7 @@ Suiming 自建 harness 只有一个理由：做一个**对 Open Story Package �
 
 **为什么留 Task。**writer 子智能体一跑十几分钟，进程死了要从它自己的 checkpoint 接上，不能从零重跑；`read_result` 的回读也靠它。改版时 eval-022 的四个 Run 里 `delegate` / `plan` / `review` 一次都没用过（read 93、search 10、check 4、edit 2、commit 1），Task 当时是为长篇规模留的；后来斗破的 Source 抽取用上了它，分段读与分段抽取的并行委派见第 9 节。
 
-**`plan` / `execute_task` 删掉。**预规划、`dependsOn`、撤销未执行计划、task contract 对象——这一整套零使用，而它是 Task 记录里最重的部分（planned 状态、依赖校验、`cancelPlannedTasks`）。要计划就写在消息里，Claude Code 的 TodoWrite 也只是文本不是实体。Task 只剩两个来源：`delegate` 与 `review`。
+**`plan` / `execute_task` 删掉。**预规划、`dependsOn`、撤销未执行计划、task contract 对象——这一整套零使用，而它是 Task 记录里最重的部分（planned 状态、依赖校验、`cancelPlannedTasks`）。要计划就写在消息里，Claude Code 的 TodoWrite 也只是文本不是实体。Task 只剩两个来源：`delegate` 与 `review`（Eval 脚本的 `rank.round` 不在对话里，见第 11 节）。
 
 **消息列表是一份耐久的事实，但不是作品。**一个 Session 的消息列表持久而完整（checkpoint 片段加执行对象；`compact_context` 只改下一次输入，原始消息仍在），模型不需要「翻回历史」。所以对话事实上是一个长期事实存储，只是不过 Checker、没有版本、不进 Open Story Package，换一个 Session 或换 host agent 就看不见。危险不在「有两份」，而在两份耐久性不同、模型却看不出差别：只活在对话里的事实在当前 Session 里工作得完美，失效发生在别处、以后、对别人；Context 头部那句「非作品事实」只是标签，不是边界。所以作者说过的、以后仍然成立的话要写回 `intent/**` 或 Design（AGENTS.md 不变量 5），turn 结束的对账（第 3 节）让「没写回」至少看得见。
 
@@ -57,7 +57,7 @@ Session 只有三个状态：
 1. 拿 lease，按当前模型、systemPrompt、工具面重算 binding。工具面与宪法的升级在 turn 边界生效；中途恢复（有 `effect_pending` 的调用或动作）仍要求同一绑定。
 2. 在作者消息后附一行确定性状态：当前版本、自上个 turn 是否有人提交过、checkout 里未提交的文件数，在消息被取走的那一刻算（turn 中途 Agent 改过或提交过，附注跟着变）。不注入历史文本（以前按 32,000 码点注入之前所有 Run 的消息）：历史就在消息列表里，这样对 provider 的 prompt cache 也更友好。会话第一次跑时的开场（作品状态与 Design Frame）只写一次，标明是「会话开始时的快照」。
 
-Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两个 turn 之间改过、提交过什么，Agent 下一步 `read` 到的就是什么。**一个 Project 同时只有一个 `running` session**：前一个停下之前，另一个 session 的 `session.send` 直接被拒绝（`session_running`），同一个 session 再说一句则排进它的 inbox（`local-session-controller.test.ts`「一句话开一个 turn；同一作品同时只跑一个」）。
+Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两个 turn 之间改过、提交过什么，Agent 下一步 `read` 到的就是什么。**一个 Project 同时只有一个 `running` session**：前一个停下之前，同一进程里另一个 session 的 `session.send` 直接被拒绝（`session_running`；只按 `LocalSessionController` 本进程在跑的 session 判，桌面与 CLI 两个进程各跑一个 session 时不拦），同一个 session 再说一句则排进它的 inbox（`local-session-controller.test.ts`「一句话开一个 turn；同一作品同时只跑一个」）。
 
 **作者消息走持久 inbox**（`session_inbox`，第一条消息也走它）。只有根 loop 在 `ready` 阶段取走，取到第几条记在 `SessionRecord.inboxSequence` 上，不另存「已消费」标记；模型停下时 inbox 里已有新消息，就在同一个 turn 里接着跑，turn 结束后才来的消息由 `LocalSessionController` 开下一个 turn。`paused` 的 session 拒收消息（第 10 节）。`session.send` 按 commandId 幂等：重发只拿回原回执，不会再开一个什么都不做的 turn；幂等指纹包含 `model`，同一 commandId 换了模型是 `command_conflict`。
 
@@ -74,7 +74,7 @@ Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两�
 
 **`interrupt`** 是唯一的停止命令：中止当前模型调用（checkpoint 记 `interrupted`，下次续接时弹掉半截响应）和正在跑的子任务，消息列表原样，回 `idle`。取消不回滚已提交作品。
 
-**关闭**：作者删除 session。删的是 inbox、事件与 checkpoint，execution object 按引用计数留待回收；checkout 不动——它不属于任何 session，未提交的改动仍在 `project.diff` 里。
+**关闭**：作者删除 session。删的是 session 与它的子任务记录、inbox 与事件；checkpoint 与子任务结果是 execution object，不随之删除，执行库目前也不回收它们（`collectObjects` 只清对象目录里无行引用的字节，且没有调用点）；checkout 不动——它不属于任何 session，未提交的改动仍在 `project.diff` 里。
 
 **owner 与 lease**：每个 `running` / `paused` 的 session 有一个进程 owner（`SessionRecord.lease`：pid + hostname + 每次领取的 ownerId）。`LocalProjectService.open` 只收敛持有者已死的 session（同一台机器上 pid 已不在）：回 `idle` 并记一句 `process_restart`，还在跑的子任务标 `interrupted`；checkpoint 里有未决副作用的，下一个 turn 开始时才落进第 10 节的三种 `paused`。持有者死没死只看 pid 与 hostname，不加时间过期或心跳：另一个进程正在跑的 session 不是崩溃遗留，任何 `suim` 调用都不能把它打断。所有推进与提交核对 ownerId 与实体版本，陈旧 owner 的写入被拒绝。测试里模拟崩溃遗留，是用 `execution.startTurn` 给一个 `hostname: "elsewhere"` 的 lease。
 
@@ -87,7 +87,7 @@ Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两�
 | `ready` | 取走 inbox 新消息、投影 Context（第 7 节） | 登记准确请求进入 `model_pending` |
 | `model_pending` | 执行已登记的 ModelCall，或核对遗留请求 | 完整响应与动作批次原子确认后进入 `tools` |
 | `tools` | 按记录执行、核对或交还动作 | 全批结果按原始顺序入消息后回到 `ready`；委派停在这里 |
-| `settled` | turn 已结束或被打断 | inbox 新消息 → `ready`（这就是 turn 续接，现有 `finishTerminated` 路径） |
+| `settled` | turn 已结束（被打断的 turn 不进 settled，停在原阶段，续跑时从那里接上） | inbox 新消息 → `ready`（这就是 turn 续接：续跑时把 settled 的 checkpoint 改回 `ready`，`suiming-harness.ts` 的 `#drive`） |
 
 ModelCall 的状态是 `prepared → effect_pending → received | failed | unknown`，Action 是 `planned → effect_pending → result_ready → delivered`：
 
@@ -121,7 +121,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 没有一行会让 session 因「外部效果未知」暂停：现有与已设计的工具要么是读取，要么有自己的幂等核对，`run_command` 的未知交给模型而不是作者。将来出现真正的外部写（例如发布到第三方平台）再加暂停那一行，不预留。
 
-一次多文件修改的 journal 必须在任何文件替换前完整保存，恢复完成整批或报告冲突后才允许下一个写动作。作品提交与其领域 receipt 在同一个数据库事务确认；执行 Action 的确认允许晚于作品事务，退出后通过 receipt 补记，不重做提交。
+一次多文件修改的 journal 必须在任何文件替换前完整保存，恢复完成整批或报告冲突后才允许下一个写动作。作品提交与其领域 receipt 是同一个 git 提交（回执写在提交信息的 `Suiming-Command-Id` / `Suiming-Fingerprint` trailer 里），一起原子确认；执行 Action 的确认允许晚于作品提交，退出后通过 receipt 补记，不重做提交。
 
 **`commit` 工具就是 `commitCheckout` 加 commandId receipt。**作者的「提交」按钮、host agent 的 `suim commit`、Agent 的 `commit` 走同一条路：扫 checkout diff → ChangeSet → Checker → 推进 `refs/suiming/canon`。Agent 只多一个回执，崩溃后按回执认领已完成的提交。提交没有合并步骤；作者与 Agent 改同一文件时，冲突在动作发生的当下解决，见[系统架构](architecture.md) 4.3。
 
@@ -262,11 +262,11 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 | `writer` | 只写那个 Beat 的正文文件 | Writer 契约 + Write Context；交付前全文完成的那次 `write` 带 `check: true`，跑的是对整个候选的同一判定。没有读原文的工具（`read_source` / `search_source` / `source_coverage` / `story_guide`）：留出评测里原作就是参照答案，Skill 的 Writer 契约也不给它 Source |
 | `reviewer` | 只经 `submit_review` 写审稿 | 走 `review` 工具，不经 `delegate` |
 | `source-reader` | 自己的笔记 `source/<id>/notes/**` | 分段读原作。原先只读，只能把整份笔记塞进报告让父 Agent 抄 |
-| `source-extractor` | 不带范围：`source/<id>/outline/**` 与 `world/**`；带 `span` 与 `beatRange`：号段内的 Beat 与这段的笔记 `notes/<号段>.md` | 见下文「Source 抽取的分工」 |
+| `source-extractor` | 不带范围：`source/<id>/outline/**` 与 `source/<id>/world/**`；带 `span` 与 `beatRange`：号段内的 Beat 与这段的笔记 `notes/<号段>.md` | 见下文「Source 抽取的分工」 |
 | `main` | 与根相同 | 通用委派 |
 | `researcher` | `reference/**` | 随切片 E 才有，现在 `delegate` 不接受它 |
 
-子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`、`read_result`。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。
+子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`、`read_result`。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。
 
 没有预规划：`plan` / `execute_task` 已删（第 2 节）。根 Agent 要分几步做，写在自己的回复里；`delegate` 是同步调用，结果回来再决定下一个。例外是写入不重叠的委派，见下一段。
 
@@ -334,7 +334,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 | `session.delete`（IPC） | 第 3 节 |
 | `rank`（CLI） | Eval 协议，见下 |
 
-**AG-UI 映射天然对上**：`threadId` = sessionId，`runId` = turn id，`RUN_STARTED` / `RUN_FINISHED` / `RUN_ERROR` 每个 turn 一对；此外是消息、`ACTIVITY_SNAPSHOT`（`suiming.action` / `suiming.task` / `suiming.turn`）与 `CUSTOM`（只有 `suiming.session`）。白名单在 `sdk/src/run-event.ts` 的 `validateProductEvent`。事件先持久后发布，稳定 id 补发去重；短批增量先持久再发。桌面 `sessionGenerating` 由 `RUN_STARTED` / `RUN_FINISHED` 派生。
+**AG-UI 映射天然对上**：`threadId` = sessionId，`runId` = turn id，`RUN_STARTED` / `RUN_FINISHED` 每个 turn 一对（失败与 `paused` 也是 `RUN_FINISHED`，分别带 `result` 与 `outcome: interrupt`，不发 `RUN_ERROR`，`state-events.ts`）；此外是消息、`ACTIVITY_SNAPSHOT`（`suiming.action` / `suiming.task` / `suiming.turn`）与 `CUSTOM`（只有 `suiming.session`）。白名单在 `sdk/src/run-event.ts` 的 `validateProductEvent`。事件先持久后发布，稳定 id 补发去重；短批增量先持久再发。桌面 `sessionGenerating` 由 `RUN_STARTED` / `RUN_FINISHED` 派生。
 
 `rank` 不是对话：它是脚本驱动的 Eval 协议（同一 Beat 多版正文匿名打乱交给隔离评委）。它用 `session.kind = "rank"`——没有 inbox、没有根 loop，由脚本创建若干 `rank.round` Task 并把汇总存为 session 结果——零新存储；不搬出 harness。
 
@@ -347,7 +347,7 @@ Electron 主进程拥有 Runtime、数据库连接、凭据与 session owner。r
 | 表 | 内容 |
 | --- | --- |
 | `sessions(id, project_id, status, data_json)` | kind、model、usage、checkpointRef、lease、turn 序号、lastFailure、时间戳、version |
-| `tasks(id, session_id, status, data_json)` | kind、key、parent action id、input、model（冻结）、checkpointRef、usage、result / failure |
+| `tasks(id, session_id, status, data_json)` | kind、key、parent action id、model（冻结）、checkpointRef、usage、result / failure（初始 prompt 在它自己的 checkpoint 里，见第 5 节） |
 | `session_inbox(session_id, sequence, text, queued_at)` | 作者消息队列；第一条消息也在这里 |
 | `session_events(session_id, sequence, event_json)` | AG-UI 事件日志 |
 | `execution_command_receipts` / `execution_objects` / `projects` / `remote_bindings` | 命令回执、执行对象、「哪个目录是哪个 Project」的部署登记、remote binding |
@@ -426,7 +426,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 启动 / 恢复的初始化 I/O 失败 | 记录原因、释放 lease；checkout 不动 | `agent`「turn 开始时读取作品失败：回 idle 记一句并释放 lease，下一句直接重试」「续跑时读取权威状态失败也释放 lease，并保留 checkout 里的候选文件」 |
 | 收口等待本身卡住 | 有界返回，不把调用方挂死 | `local-session-controller`「waitForIdle 有界：请求收不了口时按时返回，不把调用方挂死」 |
 
-测试层次不变：状态转换单测、faux provider 故障注入、真实 SQLite 重开与进程退出、PostgreSQL adapter 契约、真实模型跨能力委托、Electron 生命周期、作者长篇盲评。上表全部是前四层；真实模型那一层目前只有样例作品与 eval-022 的局部闭环。
+测试层次不变：状态转换单测、faux provider 故障注入、真实 SQLite 重开与进程退出、PostgreSQL adapter 契约、真实模型跨能力委托、Electron 生命周期、作者长篇盲评。上表除 `desktop.test.ts` 那条属于 Electron 生命周期，其余都在前四层；真实模型那一层目前只有样例作品与 eval-022 的局部闭环。
 
 ## 15. 已决定与待定
 

@@ -58,7 +58,7 @@ suim check         # 跑 Checker
 suim history       # 版本历史；suim rollback <revision> 恢复成一个新版本
 ```
 
-不带子命令运行 `suim` 显示全部命令；加 `--json` 得到给程序用的稳定输出。
+不带子命令运行 `suim` 显示全部命令；命令的输出始终是带版本的 JSON 信封，给程序用也稳定，`--json` 只为兼容保留。
 
 ### 在 Codex / Claude Code / Grok 里写
 

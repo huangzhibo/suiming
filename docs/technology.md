@@ -121,7 +121,7 @@ Langfuse 的 Prompt、Dataset、Experiment 和 Score 不作为 Suiming 真源。
 - 每个 turn 冻结解析后的 provider、model、参数与工具声明（[Harness 设计](harness-design.md)第 4 节），每次模型调用从消息列表和受控工具结果构造临时 pi `Context`；只持久化恢复、计费和 Eval 所需的结果或引用，详细 trace 通过 OpenTelemetry 输出；pi Context 不是会话、任务或作品真源；
 - 工具与结果通过现有 schema、Checker 和 tool contract 校验，错误作为工具反馈供模型修正；不靠强制类型转换掩盖无效输出，也不固定只允许一次修复。恢复需要的原始消息、结果与 Context 引用先持久化；transport error 与语义错误分别处理，不能透明换模型或重复已确认副作用；
 - 高杠杆任务使用 provider-specific `stream` / `complete` 参数；`streamSimple` / `completeSimple` 只用于确认不需要原生差异的调用；
-- 不使用 pi 的自动跨 provider thinking 转换作为长期上下文交接。模型切换时由 Context Compiler 从原始 artifact 与运行证据重新构造输入；
+- 长期上下文不靠 pi 的跨 provider thinking 转换交接，耐久的结论写回作品（不变量 8）。换模型只发生在 turn 边界，Session 的消息列表照常接着用，其中的 thinking 块由 pi-ai 按目标 provider 转换（[Harness 设计](harness-design.md)第 4 节）；
 - 原始 provider payload、response id、usage、stop reason、thinking/tool 事件和错误进入可追溯 trace，但不进入 Story Canon。
 
 若某项新模型能力无法由 `pi-ai` 无损表达，依次尝试 provider-specific API 和 custom provider；仍有缺口时先用固定输入做官方 SDK 对照测试，确认存在质量或可重放差异后，再在 Model Gateway 内局部接入。只有形成两个需要长期互换的完整实现时，才按真实差异抽取调用接口。不得因假设未来替换而预先维护平行协议或官方 SDK adapter。不采用 Mastra、LangChain 或其他通用 Agent framework。
@@ -163,7 +163,7 @@ actor_id = "author-id"
 
 示例沿用本项目真实调用过的 provider / 模型（`deepseek-flash` 是 DeepSeek 官方 V4.1 Flash 在 pi-ai 目录里的 id；旧的 `deepseek-v4-flash` 已从官方 provider 目录消失，写它会报找不到模型），不表示已证明它的文学质量最优；模型 id 随 pi-ai 升级可能再变，以安装版本的目录为准。正式盲排实验按协议选择 `judge`，不在可复制配置中留下虚构模型名。实际可用参数以安装版本的 provider schema 为准。
 
-`[cloud]` 只保存非敏感 endpoint 与本地登录主体；`suim cloud` 的解析优先级为命令行 → `SUIMING_CLOUD_*` 环境覆盖 → 用户配置，已经建立的 remote binding 还会保存该 Project 实际使用的 endpoint。API key、OAuth token、Cloud access token 和其它秘密不写入 `config.toml`。Suiming 为 `pi-ai` 注入持久 `CredentialStore`：首期可以使用权限为 `0600` 的 `~/.suiming/auth.json`，macOS 后续可由同一 store port 改接 Keychain；Cloud 使用加密 secret store。本地开发期 Cloud SDK composition root 从 `SUIMING_CLOUD_ACCESS_TOKEN` 注入 Bearer token，正式登录态再接独立的系统 credential store。用户级模型认证按 provider id 保存，例如 `qwen-token-plan-cn` 与 `qwen-token-plan-individual` 是两个独立 credential scope。
+`[cloud]` 只保存非敏感 endpoint 与本地登录主体；`suim cloud` 的解析优先级为命令行 → `SUIMING_CLOUD_*` 环境覆盖 → 用户配置。endpoint 另有一层：已经建立的 remote binding 保存该 Project 实际使用的 endpoint，它只让位于命令行，优先于环境覆盖与用户配置。API key、OAuth token、Cloud access token 和其它秘密不写入 `config.toml`。Suiming 为 `pi-ai` 注入持久 `CredentialStore`：首期可以使用权限为 `0600` 的 `~/.suiming/auth.json`，macOS 后续可由同一 store port 改接 Keychain；Cloud 使用加密 secret store。本地开发期 Cloud SDK composition root 从 `SUIMING_CLOUD_ACCESS_TOKEN` 注入 Bearer token，正式登录态再接独立的系统 credential store。用户级模型认证按 provider id 保存，例如 `qwen-token-plan-cn` 与 `qwen-token-plan-individual` 是两个独立 credential scope。
 
 `[models].disabled_providers` 保存本机停用的 provider id，未列出的默认启用。它独立于凭据与 profile；模型目录隐藏停用项，Model Gateway 拒绝新绑定（包括显式模型选择），冻结绑定继续按 turn 的绑定快照恢复。桌面开关经唯一 SDK 命令 `models.provider.setEnabled` 写入同一 config.toml，不另建偏好数据库。
 
@@ -177,7 +177,7 @@ actor_id = "author-id"
 
 PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、媒体、导出包、备份，以及恢复、审计或 Eval 明确需要长期保存的大型 Context 与模型输出进入对象存储。普通 trace payload 服从观测后端的保留策略，不默认再复制一份。对象存储中的长期对象由数据库保存引用、权限、类型和生命周期。
 
-Local 与 Cloud 共享 ArtifactVersion 内容标识和 inline 判定。Cloud 对外置内容先以 SHA-256 key 幂等写对象存储，并核对返回的 hash、key 与 byte length，再在 PostgreSQL transaction 中写 ArtifactVersion 引用和推进 Project head；对象写失败时不开始数据库提交，数据库失败时只可能留下未引用对象，由后续 GC 回收。不得用“先推进 revision、再补传对象”的顺序制造可见但无法读取的 Canon。
+本地没有 ArtifactVersion（作品版本是 git blob），只有执行对象沿用同一套内容标识与 inline 判定（`artifact/version-storage.ts`）。Cloud 对外置内容先以 SHA-256 key 幂等写对象存储，并核对返回的 hash、key 与 byte length，再在 PostgreSQL transaction 中写 ArtifactVersion 引用和推进 Project head；对象写失败时不开始数据库提交，数据库失败时只可能留下未引用对象，由后续 GC 回收。不得用“先推进 revision、再补传对象”的顺序制造可见但无法读取的 Canon。
 
 独立 `@suiming/cloud-s3` 使用 AWS SDK v3 实现该 port。逻辑 key 固定为 `objects/sha256/<prefix>/<hash>`，部署 prefix 只作用于 bucket 内的物理路径；写入同时携带 SHA-256 checksum、hash 与 byte-length metadata，读取必须重新计算内容 hash 并交叉核对响应长度、metadata 与可用 checksum。S3 client 由 deployment composition 创建并显式关闭，AWS 默认 credential chain 与显式 S3-compatible endpoint 均留在 adapter 边界。真实 MinIO 测试已覆盖跨实例读取、重复 put、输入拷贝、损坏对象拒绝、not-found 与幂等删除。
 
@@ -218,7 +218,7 @@ Cloud 现在只有一个应用，承担 Canon 与显式同步：
 api ──→ PostgreSQL
  └───→ S3-compatible Object Storage
 
-api ──OpenTelemetry──→ optional Langfuse
+api ┄┄OpenTelemetry（尚未接线）┄┄→ optional Langfuse
 ```
 
 Cloud 开发环境使用 PostgreSQL 与 MinIO；API 从显式环境配置建立连接并有界关闭。当前静态 bearer token 只用于单 actor 开发，生产 identity 冻结。Cloud Web 与执行 host 冻结，解冻时从哪里接见[系统架构](architecture.md)第 9 节；共享契约变了，已有 adapter 随之修正，但不借此启动 Cloud Web 或远程 Agent 产品建设。

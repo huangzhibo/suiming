@@ -129,7 +129,7 @@ suim --json context compile review:source:<source-id> --output ...
 suim --json review record .suim-host/drafts/<task>.json --layer <design|source|text> [--source <id>] [--beat <id...>]
 ```
 
-工具按同一投影重建主体，校验 schema、范围与每条 finding 的引文逐字出自被审文件（Source 审稿锚在抽取文件上时也可以引原作；`review_quote_not_found` / `review_anchor_not_found` 都是要改 draft 的校验错误），然后写成 `review/<id>.md`：一个普通作品文件，`subjects` 记下每个主体文件此刻的内容摘要，verdict 如实保留。它此时只是 dirty candidate，随下一次 `suim --json commit` 进版本。要记录的 judgment 必须在修改其输入前 record；写作过程中的探索性意见不必记录。用 `suim --json review list` 看每份审稿是否仍 `current`（主体摘要与当前候选一致；变了的路径、以及审稿之后才成为主体的文件列在 `changed`），`suim --json review show <review-id>` 带完整 `draft`，逐条 finding 不必再开文件。
+工具按同一投影重建主体，校验 schema、范围与每条 finding 的引文逐字出自被审文件（Source 审稿锚在抽取文件上时也可以引原作；`review_quote_not_found` / `review_anchor_not_found` 都是要改 draft 的校验错误），然后写成 `review/<id>.md`：一个普通作品文件，`subjects` 记下每个主体文件此刻的内容摘要，verdict 如实保留。它此时只是 dirty candidate，随下一次 `suim --json commit` 进版本。要记录的 judgment 必须在修改其输入前 record；写作过程中的探索性意见不必记录。用 `suim --json review list` 看每份已提交的审稿是否仍 `current`（按已提交 head 比：主体摘要与 head 一致；变了的路径、以及审稿之后才成为主体的文件列在 `changed`；刚 record 还没提交的审稿与未提交的修改都不在这里，按 checkout 看哪些审稿已过时用 `suim --json status` 的 `stale.reviews`），`suim --json review show <review-id>` 带完整 `draft`，逐条 finding 不必再开文件。
 
 **消费 finding 与收敛。** 先核对 issue 与 evidence，把相关问题合并为共同根因，再修正对应真源与真正失真的直接依赖；不逐条打补丁，不建 accepted / fixed / waiver 工单。意见不成立可明确不同意；分歧暴露 Intent 含混时直接澄清 Intent。系统性 finding 成立时停止在途任务，回到设计或正文循环完成语义完整的修订，再从新快照编译 Context。流程以作品候选收敛，不以 verdict 收敛：同一 Context 不重复采样追求 `pass`；修订后已是新候选，旧报告只证明旧快照被挑战；要声称最终候选已审，必须对新快照取得 current 报告，也可如实保留 unreviewed。产品不规定 Review 轮数。
 
