@@ -2,12 +2,11 @@ import { createHash } from "node:crypto";
 import {
 	type BoundDesign,
 	CANDIDATE_REVISION,
-	type CreativeIntent,
+	intentCoversBeat,
 	parseReviewFile,
 	parseSourceNote,
 	parseYaml,
 	type ReviewFile,
-	type StoryBeat,
 	TARGET_DESIGN_KINDS,
 } from "@suiming/story";
 import { codePointCount } from "./code-points.js";
@@ -71,7 +70,7 @@ export function designClosurePaths(candidate: ArtifactCandidate, storyBeatId: st
 	for (const entry of design.resources) if (refs.has(`resource:${entry.id}`)) paths.add(entry.path);
 	for (const entry of design.world) if (entry.id === "core" || refs.has(`world:${entry.id}`)) paths.add(entry.path);
 	for (const entry of design.contracts) if (touched.has(entry.id)) paths.add(entry.path);
-	for (const intent of design.intents) if (intentCovers(intent, beat, ordinals)) paths.add(intent.path);
+	for (const intent of design.intents) if (intentCoversBeat(intent, beat, ordinals)) paths.add(intent.path);
 	for (const artifact of candidate.artifacts)
 		if (isTargetArtifactIdentity(artifact.identity) && artifact.identity.kind === "story-index")
 			paths.add(artifact.path);
@@ -94,13 +93,6 @@ function boundDesignOf(candidate: ArtifactCandidate): BoundDesign | undefined {
 		boundDesigns.set(candidate, design);
 	}
 	return design ?? undefined;
-}
-
-function intentCovers(intent: CreativeIntent, beat: StoryBeat, ordinals: ReadonlyMap<string, number>): boolean {
-	if (intent.target.kind === "book") return true;
-	const from = ordinals.get(intent.target.fromStoryBeatId);
-	const to = ordinals.get(intent.target.toStoryBeatId);
-	return from !== undefined && to !== undefined && beat.ordinal >= from && beat.ordinal <= to;
 }
 
 export interface TextCurrency {

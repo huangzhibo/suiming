@@ -217,5 +217,5 @@ export type {
 	StoryTextVerificationFailure,
 	StoryTextVerificationResult,
 } from "./story-text.js";
-export { verifyStoryText } from "./story-text.js";
+export { intentCoversBeat, verifyStoryText } from "./story-text.js";
 export { parseYaml } from "./yaml.js";

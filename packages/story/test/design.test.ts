@@ -3,6 +3,7 @@ import test from "node:test";
 import {
 	bindDesignDocuments,
 	checkDesign,
+	intentCoversBeat,
 	parseCharacterMarkdown,
 	parseCreativeIntent,
 	projectCharacterFamily,
@@ -160,6 +161,70 @@ test("Intent 的解释与必须原样保留的片段共存于一个 Markdown art
 	);
 	assert.equal(intent.appliesTo, "text");
 	assert.deepEqual(intent.exactFragments, ["哎呀，你们真是害苦了朕啊"]);
+});
+
+test("intentCoversBeat：全书 Intent 覆盖每一节，区间 Intent 只覆盖首尾之间（含两端）", () => {
+	const documents = twoBeatDesignDocuments();
+	documents.intents.push(
+		{ id: "全书", path: "intent/全书.md", markdown: "---\napplies_to: text\n---\n全书都适用。\n" },
+		{
+			id: "第二节",
+			path: "intent/第二节.md",
+			markdown:
+				"---\napplies_to: text\ntarget: { from_beat_id: beat-0002, to_beat_id: beat-0002 }\n---\n只管第二节。\n",
+		},
+	);
+	const design = bindDesignDocuments(documents);
+	const ordinals = new Map(design.story.beats.map((beat) => [beat.id, beat.ordinal]));
+	const covered = (intentId: string) =>
+		design.story.beats
+			.filter((beat) =>
+				intentCoversBeat(design.intents.find((intent) => intent.id === intentId) as never, beat, ordinals),
+			)
+			.map((beat) => beat.id);
+	assert.deepEqual(covered("全书"), ["beat-0001", "beat-0002"]);
+	assert.deepEqual(covered("第二节"), ["beat-0002"]);
+});
+
+test("单个 Beat 的正文检查：覆盖它的 exact Intent 在范围正文齐全时逐字核对，不齐时不报", () => {
+	const documents = twoBeatDesignDocuments();
+	documents.intents.push({
+		id: "保留原句",
+		path: "intent/保留原句.md",
+		markdown: "---\napplies_to: text\n---\n结尾必须保留确认过的短句。\n\n~~~exact\n此事到此为止\n~~~",
+	});
+	const design = bindDesignDocuments(documents);
+	// 全书范围的正文还不齐：只查这一节自己的文件，逐字要求等写齐了再核对。
+	const partial = verifyStoryText(
+		design.story,
+		design.intents,
+		[{ storyBeatId: "beat-0001", text: "黄盖读完火船。" }],
+		"beat-0001",
+	);
+	assert.equal(partial.passed, true);
+	const missing = verifyStoryText(
+		design.story,
+		design.intents,
+		[
+			{ storyBeatId: "beat-0001", text: "黄盖读完火船。" },
+			{ storyBeatId: "beat-0002", text: "他烧掉火船，转身离开。" },
+		],
+		"beat-0002",
+	);
+	assert.deepEqual(
+		missing.failures.map((failure) => [failure.storyBeatId, failure.code]),
+		[["beat-0002", "exact_intent_missing"]],
+	);
+	const complete = verifyStoryText(
+		design.story,
+		design.intents,
+		[
+			{ storyBeatId: "beat-0001", text: "黄盖读完火船。" },
+			{ storyBeatId: "beat-0002", text: "他烧掉火船：此事到此为止。" },
+		],
+		"beat-0002",
+	);
+	assert.equal(complete.passed, true);
 });
 
 test("StoryText 完整性与 exact Intent 由纯验证器检查", () => {

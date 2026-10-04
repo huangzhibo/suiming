@@ -1,6 +1,6 @@
 import {
 	type BoundDesign,
-	type CreativeIntent,
+	intentCoversBeat,
 	projectCharacterFamily,
 	type StoryBeat,
 	storyDependentClosure,
@@ -73,13 +73,6 @@ function refIds(beat: StoryBeat, kind: string): string[] {
 
 function beatsReferencing(design: BoundDesign, ref: string): StoryBeat[] {
 	return design.story.beats.filter((beat) => beat.refs.includes(ref) || beat.stateRefs.includes(ref));
-}
-
-function intentCoversBeat(intent: CreativeIntent, beat: StoryBeat, ordinals: ReadonlyMap<string, number>): boolean {
-	if (intent.target.kind === "book") return true;
-	const from = ordinals.get(intent.target.fromStoryBeatId);
-	const to = ordinals.get(intent.target.toStoryBeatId);
-	return from !== undefined && to !== undefined && beat.ordinal >= from && beat.ordinal <= to;
 }
 
 function rootBeats(design: BoundDesign, subject: StoryImpactSubject): { roots: StoryBeat[]; familyIds: string[] } {

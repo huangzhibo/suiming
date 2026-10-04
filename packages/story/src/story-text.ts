@@ -2,7 +2,7 @@ import { sha256Hex } from "./canonical.js";
 import { SuimError } from "./errors.js";
 import { normalizeExactText } from "./intent-exact.js";
 import type { CreativeIntent } from "./parse-book.js";
-import type { StoryOutline } from "./story-outline.js";
+import type { StoryBeat, StoryOutline } from "./story-outline.js";
 
 export interface StoryTextDocument {
 	storyBeatId: string;
@@ -28,27 +28,45 @@ export interface StoryTextVerificationResult {
 	failures: StoryTextVerificationFailure[];
 }
 
+/**
+ * 这条 Intent 管不管这一节：全书 Intent 管每一节，区间 Intent 管首尾之间（含两端）。写作依据选 Intent、正文时效取
+ * Design 闭包、`impact` 找受影响的节都用这一条，三处必须一致——写的时候读到的，才是改了会让正文过时的。
+ */
+export function intentCoversBeat(
+	intent: CreativeIntent,
+	beat: StoryBeat,
+	ordinals: ReadonlyMap<string, number>,
+): boolean {
+	if (intent.target.kind === "book") return true;
+	const from = ordinals.get(intent.target.fromStoryBeatId);
+	const to = ordinals.get(intent.target.toStoryBeatId);
+	return from !== undefined && to !== undefined && beat.ordinal >= from && beat.ordinal <= to;
+}
+
+/**
+ * exact Intent 的逐字核对：范围内的正文拼起来，每段逐字要求都要出现。`only` 给定时只核对覆盖那一节、且范围正文
+ * 已经齐全的 Intent（单节检查不该因为别的节还没写而报错），失败记在那一节上。
+ */
 function exactIntentFailures(
 	story: StoryOutline,
 	intents: readonly CreativeIntent[],
 	textByStoryBeatId: ReadonlyMap<string, string>,
+	only?: StoryBeat,
 ): StoryTextVerificationFailure[] {
-	const ordinal = new Map(story.beats.map((beat) => [beat.id, beat.ordinal]));
+	const ordinals = new Map(story.beats.map((beat) => [beat.id, beat.ordinal]));
 	const failures: StoryTextVerificationFailure[] = [];
 	for (const intent of intents) {
 		if (intent.exactFragments.length === 0) continue;
-		const from = intent.target.kind === "book" ? 0 : ordinal.get(intent.target.fromStoryBeatId);
-		const to = intent.target.kind === "book" ? story.beats.length - 1 : ordinal.get(intent.target.toStoryBeatId);
-		if (from === undefined || to === undefined || from > to) continue;
-		const targetText = story.beats
-			.filter((beat) => beat.ordinal >= from && beat.ordinal <= to)
-			.map((beat) => textByStoryBeatId.get(beat.id) ?? "")
-			.join("");
-		const normalizedTarget = normalizeExactText(targetText);
+		const range = story.beats.filter((beat) => intentCoversBeat(intent, beat, ordinals));
+		if (range.length === 0) continue;
+		if (only !== undefined) {
+			if (!range.includes(only) || !range.every((beat) => textByStoryBeatId.has(beat.id))) continue;
+		}
+		const normalizedTarget = normalizeExactText(range.map((beat) => textByStoryBeatId.get(beat.id) ?? "").join(""));
 		for (const [index, fragment] of intent.exactFragments.entries()) {
 			if (normalizedTarget.includes(normalizeExactText(fragment))) continue;
 			failures.push({
-				storyBeatId: intent.target.kind === "book" ? (story.beats[0]?.id ?? "*") : intent.target.fromStoryBeatId,
+				storyBeatId: only?.id ?? (range[0] as StoryBeat).id,
 				code: "exact_intent_missing",
 				message: `${intent.id} 的第 ${index + 1} 段逐字要求没有出现在目标正文范围里`,
 			});
@@ -96,6 +114,8 @@ export function verifyStoryText(
 		if (!failures.some((failure) => failure.code === "missing_text" || failure.code === "empty_text")) {
 			failures.push(...exactIntentFailures(story, intents, textByStoryBeatId));
 		}
+	} else if (failures.length === 0) {
+		failures.push(...exactIntentFailures(story, intents, textByStoryBeatId, selected[0]));
 	}
 	return {
 		passed: failures.length === 0,

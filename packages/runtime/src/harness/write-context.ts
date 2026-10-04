@@ -1,8 +1,7 @@
 import {
 	type BoundDesign,
 	buildStateTimeline,
-	type CreativeIntent,
-	normalizeExactText,
+	intentCoversBeat,
 	type StateAssignment,
 	type StoryBeat,
 	verifyStoryText,
@@ -77,13 +76,6 @@ export function renderState(state: ReadonlyMap<string, StateAssignment>): string
 	return lines.length === 0 ? "（无硬状态）" : lines.join("\n");
 }
 
-function intentCovers(intent: CreativeIntent, beat: StoryBeat, ordinals: ReadonlyMap<string, number>): boolean {
-	if (intent.target.kind === "book") return true;
-	const from = ordinals.get(intent.target.fromStoryBeatId);
-	const to = ordinals.get(intent.target.toStoryBeatId);
-	return from !== undefined && to !== undefined && beat.ordinal >= from && beat.ordinal <= to;
-}
-
 /**
  * 覆盖这些 Beat 的 Intent 用 style_refs 选中的风格证据，按 Intent 顺序去重。写一节正文的 Writer 与审这段
  * 正文的 Reviewer 共用，两边看到的表达证据是同一份；没被选中的 reference 不是作品事实，谁都不默认带上。
@@ -97,7 +89,8 @@ export function selectedStyleEvidence(
 	const beats = book.story.beats.filter((beat) => storyBeatIds.includes(beat.id));
 	const ids = new Set<string>();
 	for (const intent of book.intents)
-		if (beats.some((beat) => intentCovers(intent, beat, ordinals))) for (const id of intent.styleRefs) ids.add(id);
+		if (beats.some((beat) => intentCoversBeat(intent, beat, ordinals)))
+			for (const id of intent.styleRefs) ids.add(id);
 	return [...ids].flatMap((id) =>
 		candidate.artifacts.filter(
 			(item) =>
@@ -318,7 +311,7 @@ export function compileWriteContext(
 	sections.push(lookahead.join("\n").trimEnd());
 
 	// 5. intent_and_style
-	const intents = book.intents.filter((intent) => intentCovers(intent, target, ordinals));
+	const intents = book.intents.filter((intent) => intentCoversBeat(intent, target, ordinals));
 	const intentLines: string[] = ["## intent_and_style"];
 	for (const intent of intents) {
 		artifacts.push(targetArtifactIdentity("intent", intent.id));
@@ -440,26 +433,6 @@ export function checkStoryText(candidate: ArtifactCandidate, storyBeatId: string
 		return { passed: false, codePoints: 0, failures: [error instanceof Error ? error.message : String(error)] };
 	}
 	failures.push(...perBeat.failures.map((failure) => `${failure.code}: ${failure.message}`));
-	const target = book.story.beats.find((beat) => beat.id === storyBeatId);
-	const ordinals = new Map(book.story.beats.map((beat) => [beat.id, beat.ordinal]));
-	if (target !== undefined) {
-		for (const intent of book.intents) {
-			if (intent.exactFragments.length === 0 || !intentCovers(intent, target, ordinals)) continue;
-			const from = intent.target.kind === "book" ? 0 : (ordinals.get(intent.target.fromStoryBeatId) ?? 0);
-			const to =
-				intent.target.kind === "book"
-					? book.story.beats.length - 1
-					: (ordinals.get(intent.target.toStoryBeatId) ?? 0);
-			const range = book.story.beats.filter((beat) => beat.ordinal >= from && beat.ordinal <= to);
-			if (!range.every((beat) => texts.has(beat.id))) continue;
-			const joined = normalizeExactText(range.map((beat) => texts.get(beat.id) ?? "").join(""));
-			for (const [index, fragment] of intent.exactFragments.entries()) {
-				if (!joined.includes(normalizeExactText(fragment))) {
-					failures.push(`exact_intent_missing: ${intent.id} exact block ${index + 1} 未逐字出现在范围正文中`);
-				}
-			}
-		}
-	}
 	const codePoints = Array.from(texts.get(storyBeatId) ?? "").length;
 	return { passed: failures.length === 0, codePoints, failures };
 }
