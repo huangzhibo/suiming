@@ -345,9 +345,10 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		// 点 Beat 列只改变选择；双击打开它的页面。
 		await page.locator("[data-beat='beat-0002']").click();
 		await page.getByRole("button", { name: "查看此处状态", exact: true }).waitFor();
-		// 因果弧来自 refs.beat（beat-0002 依赖 beat-0001）；人物泳道来自 refs.character。
-		await page.locator("path[data-arc='0-1']").waitFor();
+		// 人物泳道来自 refs.character。样例唯一的 refs.beat 是 beat-0002 连紧挨着的 beat-0001：
+		// 相邻由列的先后表达，不画因果弧，泳道也就不出现。
 		await page.getByRole("button", { name: "黄盖", exact: true }).first().waitFor();
+		assert.equal(await page.locator("path[data-arc]").count(), 0);
 		// 刷选：在列头从 beat-0001 拖到 beat-0002 → 区间标出并能引用给 Agent；finding 密度开关给有 finding 的列上底色。
 		const a = await page.locator("[data-beat='beat-0001']").boundingBox();
 		const b = await page.locator("[data-beat='beat-0002']").boundingBox();

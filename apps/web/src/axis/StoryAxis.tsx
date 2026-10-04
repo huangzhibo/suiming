@@ -58,7 +58,13 @@ function rows(model: AxisModel, allCharacters: boolean, worlds: boolean, resourc
 	for (const lane of model.contracts)
 		push({ kind: "contract", key: lane.path, label: lane.title, h: LANE_H, y, lane });
 	if (model.arcs.length > 0)
-		push({ kind: "arcs", key: "arcs", label: `因果 · refs.beat ${model.arcs.length} 条`, h: ARC_H, y });
+		push({
+			kind: "arcs",
+			key: "arcs",
+			label: `因果 · refs.beat ${model.arcs.length + model.adjacentArcs} 条`,
+			h: ARC_H,
+			y,
+		});
 	const shown = allCharacters
 		? model.characters
 		: [...model.characters]
@@ -392,7 +398,9 @@ export function StoryAxis({
 								content={
 									row.kind === "contract"
 										? `${row.lane.path} · ${contractStatus(row.lane, model.beats.length - 1, beatTitle)}`
-										: undefined
+										: row.kind === "arcs" && model.adjacentArcs > 0
+											? `其中 ${model.adjacentArcs} 条只连紧挨着的上一节，不画：相邻由列的先后表达`
+											: undefined
 								}
 								key={row.key}
 							>

@@ -104,7 +104,10 @@ export interface AxisModel {
 	beats: AxisBeat[];
 	volumes: AxisVolume[];
 	contracts: ContractLane[];
+	/** 要画的因果弧：跨节的 refs.beat。 */
 	arcs: Arc[];
+	/** 只连紧挨着的上一节的 refs.beat 条数。不画：相邻由列的顺序表达，Story Language 也说上一节不用连。 */
+	adjacentArcs: number;
 	/** 按首次出现排序。 */
 	characters: CharacterLane[];
 	worlds: WorldLane[];
@@ -181,11 +184,14 @@ export function axisModel(book: Book, reviews: ReviewReport[]): AxisModel {
 		}
 	}
 	spans.sort((a, b) => a.start - b.start || a.end - b.end);
-	const arcs = book.links
+	const dependencies = book.links
 		.filter((link) => link.key === "refs.beat")
 		.map((link) => ({ from: ordinalOfPath(link.to), to: ordinalOfPath(link.from) }))
 		.filter((arc) => arc.from >= 0 && arc.to >= 0 && arc.from !== arc.to)
 		.sort((a, b) => a.from - b.from || a.to - b.to);
+	// 只连上一节的不画：示例三国 403 条里有 203 条，基线上一排小拱，说的只是列的先后。
+	const arcs = dependencies.filter((arc) => arc.to - arc.from !== 1);
+	const adjacentArcs = dependencies.length - arcs.length;
 	const presentOf = (path: string, key: string) =>
 		[
 			...new Set(
@@ -245,7 +251,19 @@ export function axisModel(book: Book, reviews: ReviewReport[]): AxisModel {
 				if (ordinal >= 0) findings.set(ordinal, (findings.get(ordinal) ?? 0) + 1);
 			}
 	}
-	return { beats, volumes, contracts, reviews: reviewMap, spans, arcs, characters, worlds, resources, findings };
+	return {
+		beats,
+		volumes,
+		contracts,
+		reviews: reviewMap,
+		spans,
+		arcs,
+		adjacentArcs,
+		characters,
+		worlds,
+		resources,
+		findings,
+	};
 }
 
 function resourceChanges(book: Book): Map<string, ResourceEvent[]> {
@@ -368,9 +386,12 @@ export function arcHeight(span: number, maxSpan: number, width: number, room: nu
 	return Math.min(Math.max(4, room * Math.sqrt(span / Math.max(maxSpan, span, 1))), Math.max(4, width));
 }
 
-/** 弧的描边透明度：几十条以内不变，再多按条数的平方根变淡，否则重叠处叠成一片紫。 */
+/**
+ * 弧的描边透明度：一百来条以内不变，再多按条数的平方根变淡，否则重叠处叠成一片紫。不能压得太淡：
+ * 第一版 449 条时只有 0.19，截图缩进 900 像素宽的宣传卡片后因果弧几乎看不见。
+ */
 export function arcOpacity(count: number): number {
-	return Math.min(0.55, Math.max(0.15, 4 / Math.sqrt(Math.max(count, 1))));
+	return Math.min(0.55, Math.max(0.2, 6 / Math.sqrt(Math.max(count, 1))));
 }
 
 /** 承诺在某个时点的状态文字，与上下文栏一致；给了 beatTitle 就点名 Beat，作者不认序号。 */

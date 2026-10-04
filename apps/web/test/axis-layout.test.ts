@@ -228,14 +228,15 @@ test("因果弧、人物泳道与世界文档都只读 frontmatter：refs.beat�
 		],
 	} as unknown as WorkspaceData;
 	const model = axisModel(new Book(rich), []);
+	// 3 → 4 只连紧挨着的上一节，不画成弧，只计数：相邻由列的先后表达。
 	assert.deepEqual(
 		model.arcs.map((arc) => [arc.from, arc.to]),
 		[
 			[0, 3],
 			[0, 4],
-			[3, 4],
 		],
 	);
+	assert.equal(model.adjacentArcs, 1);
 	assert.deepEqual(
 		model.characters.map((lane) => [lane.id, lane.present, lane.deadAt]),
 		[
@@ -480,10 +481,10 @@ test("因果弧的高随跨度一路增高，不在中途封顶；弧越多描�
 	// 短弧至少看得见，也不高过自己的宽（窄而高的弧像刺）。
 	assert.ok(arcHeight(1, 123, 10, 60) >= 4);
 	assert.equal(arcHeight(1, 2, 8, 60), 8);
-	// 几十条以内保持原来的浓度；上百条按条数变淡，最淡也看得见。
+	// 一百来条以内保持原来的浓度；再多按条数变淡，最淡也看得见（缩小的截图里也要认得出）。
 	assert.equal(arcOpacity(9), 0.55);
-	assert.equal(arcOpacity(50), 0.55);
-	assert.ok(arcOpacity(449) <= 0.2);
-	assert.equal(arcOpacity(100_000), 0.15);
+	assert.equal(arcOpacity(100), 0.55);
+	assert.ok(arcOpacity(449) <= 0.3);
+	assert.equal(arcOpacity(100_000), 0.2);
 	for (const count of [10, 60, 100, 200, 449, 1000]) assert.ok(arcOpacity(count * 2) <= arcOpacity(count));
 });
