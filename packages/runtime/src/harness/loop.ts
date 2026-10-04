@@ -60,7 +60,8 @@ export interface LoopCheckpoint {
 	binding: string;
 	sequence: number;
 	steeringSequence: number;
-	reduction?: { summary: string; throughMessage: number; actionId: string; modelCallId: string };
+	/** 最近一次压缩：摘要就在写它的那次回复的 compact_context 调用里；throughMessage 是那一批结果之后的下标。 */
+	reduction?: { throughMessage: number; actionId: string; modelCallId: string };
 	/** 消息下标小于它的工具结果在请求里换成占位；原消息不改。只往前推，前缀因此在两次清理之间稳定。 */
 	cleared?: number;
 	/** 最近一个边界之后第一条消息的下标；它之前的大读取结果在请求里折成头尾（见 FOLD_BYTES）。只往前推。 */
@@ -258,20 +259,20 @@ function projectToolResult(state: LoopCheckpoint, index: number, foldable: Reado
 	return message;
 }
 
-/** 发给模型的消息：摘要替换压缩点之前的非作者消息，工具结果按清理点与边界投影（projectToolResult）。 */
+/**
+ * 发给模型的消息：工具结果按清理点与边界投影（projectToolResult）；压缩过的话，写摘要的那次回复之前只留作者消息，
+ * 其余由那次回复里 compact_context 的 summary 代表。那次回复本身和它同一批的结果照常发：模型常把压缩和别的
+ * 工具放在同一次回复里，2026-10-05 之前压缩点划在整批之后，同一批里读到的东西被摘要一起盖掉，而摘要写在读之前。
+ */
 function projectMessages(state: LoopCheckpoint, foldable: ReadonlySet<string>): Message[] {
 	const project = (message: Message, index: number): Message =>
 		message.role === "toolResult" ? projectToolResult(state, index, foldable) : message;
 	if (!state.reduction) return state.messages.map(project);
-	const through = state.reduction.throughMessage;
+	let response = state.reduction.throughMessage - 1;
+	while (response > 0 && state.messages[response]?.role !== "assistant") response -= 1;
 	return [
-		...state.messages.slice(0, through).filter((message) => message.role === "user"),
-		{
-			role: "user" as const,
-			content: `执行摘要（非作品事实；来源 action ${state.reduction.actionId} / model call ${state.reduction.modelCallId}，原始记录仍可回读）：\n${state.reduction.summary}`,
-			timestamp: Date.now(),
-		},
-		...state.messages.slice(through).map((message, offset) => project(message, through + offset)),
+		...state.messages.slice(0, response).filter((message) => message.role === "user"),
+		...state.messages.slice(response).map((message, offset) => project(message, response + offset)),
 	];
 }
 
@@ -891,7 +892,6 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		const reduced = actions.findLast((action) => action.result?.contextSummary);
 		if (reduced?.result?.contextSummary)
 			state.reduction = {
-				summary: reduced.result.contextSummary,
 				throughMessage: state.messages.length,
 				actionId: reduced.id,
 				modelCallId: call.id,

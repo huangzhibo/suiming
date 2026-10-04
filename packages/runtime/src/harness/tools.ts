@@ -669,7 +669,12 @@ export function compactContextTool(): HarnessTool {
 		replay: "read",
 		async prepare(params: { summary: string }) {
 			return {
-				content: [{ type: "text", text: "摘要已确认；下一次模型请求使用摘要，原始执行记录保留。" }],
+				content: [
+					{
+						type: "text",
+						text: "执行摘要已记下：之后的请求里，这次回复之前的模型回复与工具结果只由这份 summary 代表（不是作品事实），作者的消息原样保留；原始执行记录仍在执行存储里。",
+					},
+				],
 				contextSummary: params.summary,
 			};
 		},

@@ -186,7 +186,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 - **`commit` 之后**：候选已进 Canon，提交前的读取都是死重，Frame 可以从新 head 重新生成；
 - **turn 结束后**（`idle`）：没人在等，摘要调用可以慢慢做，下一个 turn 开始时使用。
 
-中途的窗口保护见上。边界压缩复用现有 `reduction` 机制——摘要由模型生成，记录来源范围与摘要调用，替换 `throughMessage` 之前的非作者消息；原始消息、动作结果与未应用指令不删。压缩之后自动追加一次 `project_status` 与 Frame 重建，对应 SoL-Pi 在压缩后要求重建计划。SoL-Pi 的 cache 写读比经济模型不采用：对我们是过度设计，边界已经把「压缩掉正在用的东西」这个主要风险去掉了。
+中途的窗口保护见上。边界压缩复用现有 `reduction` 机制——摘要由模型在 `compact_context` 的参数里写，写它的那次回复之前的模型回复与工具结果在请求里只由它代表，作者消息原样保留；那次回复本身与同一批的结果照常发（模型常把压缩和别的工具放在一起，原来压缩点划在整批之后，同一批读到的东西被写在它之前的摘要盖掉）。原始消息、动作结果与未应用指令不删。压缩之后自动追加一次 `project_status` 与 Frame 重建，对应 SoL-Pi 在压缩后要求重建计划。SoL-Pi 的 cache 写读比经济模型不采用：对我们是过度设计，边界已经把「压缩掉正在用的东西」这个主要风险去掉了。
 
 ## 8. 调研
 
@@ -419,7 +419,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | **动作进行中文件被外部改了** | `file_write_conflict` 作为工具错误交给模型，turn 继续 | journal 侧：`confined-env`「文件 journal 恢复识别未应用、已应用和外部冲突，重复 edit 不会再替换一次」；loop 侧：`harness-recovery`「准备写入之后作者改了同一个文件…」「动作已落 journal 时进程退出、重启前作者改了同一个文件…」（2026-10-04 补；此前 loop 把这个错误重新抛出，turn 失败，续接时又撞同一个冲突） |
 | DB 写入失败、对象写入失败、IPC 发出失败 | 前两者不发布未保存结果或继续副作用；后者从持久游标重放 | `execution-state`「持久确认失败回滚命令，并禁止该实例继续推进」；`run-event-stream`「事件保存失败后不发布、不给后续事件放行」；`workspace`「状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先收口」 |
 | renderer reload / 重复 attach / 消息截断后重连 | 快照和游标一致，补齐已保存内容，模型调用与提交计数不增加 | `workspace`「状态与产品事件原子确认…」里的 `session.attach` 快照与 `afterSequence` 续读；`run-event-stream`「合批消息先保存，恢复用完整响应补齐尾部并按 id 去重」；`apps/desktop/test/desktop.test.ts`「Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、作者回应、正文与独立审稿贯通」 |
-| 模型主动压缩 | 只改变下一次输入，原消息、动作与作者指令保留 | `agent`「Context 压缩只改变下一次输入，原消息与动作在 checkpoint 里保留」 |
+| 模型主动压缩 | 只改变下一次输入，原消息、动作与作者指令保留；写摘要的那次回复里顺带调的工具，结果照常发 | `agent`「Context 压缩只改变下一次输入，原消息与动作在 checkpoint 里保留」；`context-window`「压缩和别的工具在同一次回复里：同一批读到的结果压缩后照常发，之前的才由摘要代表」 |
 | 请求接近窗口；provider 报上下文超限 | 清掉较早的工具结果，请求不超窗口，原消息不改；清不动时请模型压缩；provider 超限时清理重试一次，放不下报 `context_overflow` | `context-window` 五条：「请求接近窗口时清掉较早的工具结果」「provider 报上下文超限时清掉较早的工具结果重试一次」「清掉工具结果后仍然偏大：请求末尾请模型先 compact_context」「作者的开场消息本身就超过压缩线：压不动就不再要求压缩」「清完仍放不下：重试一次后如实报 context_overflow」 |
 | **commit 后 / turn 结束后的系统压缩** | 摘要经 ModelCall；失败保留旧 Context；压缩后 Frame 重建 | **没有测试**（切片 C） |
 | 边界之后的大读取结果 | 新一轮或产生新版本的提交之后，之前超过 10 KB 的读取结果在请求里只留头尾与重调方法；干活中途的插话、没有改动的提交不是边界；委派这类重调不得的结果不折；checkpoint 原消息不改 | `context-window`「上一轮停下之后作者再说一句：之前的大读取结果折成头尾，这一轮读的照常全文；干活中途的插话不折，原消息不改」「提交产生新版本是边界：…」；`agent`「提交产生新版本之后，之前读的大文件在请求里折成头尾；没产生新版本的提交不算边界」 |

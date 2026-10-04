@@ -439,3 +439,31 @@ test("提交产生新版本是边界：之前的大读取结果折成头尾；�
 	assert.equal(small, "小结果");
 	assert.equal(committed, "已提交 r2");
 });
+
+test("压缩和别的工具在同一次回复里：同一批读到的结果压缩后照常发，之前的才由摘要代表", async () => {
+	const { provider, model } = await fixture(1_000_000);
+	const seen: Transcript[] = [];
+	provider.setResponses([
+		fauxAssistantMessage(fauxToolCall("big", {})),
+		fauxAssistantMessage([fauxToolCall("compact_context", { summary: "读过第一段。" }), fauxToolCall("big", {})]),
+		async (context: Transcript) => {
+			seen.push(context);
+			return fauxAssistantMessage("接着说");
+		},
+	]);
+	const { compactContextTool } = await import("../src/harness/tools.js");
+	await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: "读两段",
+		tools: [bigTool(40), compactContextTool()],
+		budget: { maxTurns: 10 },
+	});
+	const texts = toolTexts(seen[0] as Transcript);
+	assert.ok(!texts.some((text) => text.startsWith("第1段")), "压缩之前的结果由摘要代表");
+	assert.ok(
+		texts.some((text) => text.startsWith("第2段")),
+		"同一批读到的第二段照常发",
+	);
+	assert.match(JSON.stringify(seen[0]?.messages), /读过第一段。/u, "摘要在写它的那次回复里");
+});
