@@ -4,6 +4,7 @@
 
 本文管「发生了什么」。现在成立什么、还缺什么看[当前状态](current-status.md)，接下来做什么看[路线图](roadmap.md)第 6 节。2026-10-03 从当前状态整节迁来时，条目照原样搬，只去掉了本机路径与地区表述，并把当时挂在当前状态里的验证起伏与 E2E 排查经过并进了对应日期。
 
+- **2026-10-04** 打开作品时 canon ref 不见了（`.git` 被删或换掉）不再就地建创世版本：原来 `LocalProjectService.open` 按当前 checkout 直接写 Canon，不过 Checker，执行库里的 session 也还指着已经不存在的版本——这段兜底是 09-12 Canon 从 SQLite 换到 git 时留的，那批旧库早已被 schema 版本拦在门外。现在报 `local_project_canon_missing`，提示挪走 `.suiming/local.sqlite` 重新 init，init 先过 Checker。项目审查时发现，补了故障注入测试。
 - **2026-10-04** 截图脚本两处：打开作品副本之后，副本目录叫 `work`，左栏底部的作品名就显示成「work」，README 动图开头那一秒带着它——副本改用分镜里的 `folder`（没写就沿用原目录名），动图重录；另加一张三栏全开的全局截图 `workbench.png`，前面几张都收起了侧栏、只看局部，宣传封面改用它。
 - **2026-10-04** 发布 v0.1.0（开发预览，[GitHub Release](https://github.com/huangzhibo/suiming/releases/tag/v0.1.0)）：各包版本从 0.0.0 提到 0.1.0，`suim --version` 随之输出 0.1.0。只有源码，没有安装包；发布前 `npm run check`、`npm test`（408 项，403 通过、5 skip）与桌面 E2E 19 / 19 都过。
 - **2026-10-04** README 去掉英文段（作者定：暂时不考虑英文用户），问题一节改为「AI 写长篇，难在长程一致性」并说清它指什么；Agent 列伏笔那句改正为 Agent 原话的首尾两节（小沛之战里关羽与张辽相惜，到乌林、葫芦口两遇伏兵），原来写的「从土山约三事」是第 3 节。

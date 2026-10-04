@@ -318,10 +318,12 @@ export class LocalProjectService {
 				head = await canon.headRevisionId(project.id);
 			} catch (error) {
 				if (!(error instanceof ArtifactError && error.code === "project_not_found")) throw error;
-				// 已登记但还没有 canon ref：Canon 从 SQLite 换到 git 之前建的作品，或 .git 被丢掉的副本。
-				// 两种都按当前 checkout 重建创世版本——切换之前的版本链不跟过来，这是作者 2026-09-12
-				// 「现在数据都是测试用的，可以切」时接受的代价。init 只在没有 canon ref 时写，不覆盖历史。
-				head = (await canon.init((await readOpenStoryDirectory(paths.checkoutPath)).files)).id;
+				// 已登记但没有 canon ref：.git 被删或换掉了。不能就地按 checkout 建创世版本——那会绕过 Checker，
+				// 执行库里的 session 也还指着已经不存在的版本。让作者挪走执行库重新 init，init 会先过 Checker。
+				throw new ArtifactError(
+					"local_project_canon_missing",
+					`作品目录里找不到 refs/suiming/canon（.git 可能被删除或替换过）：${paths.checkoutPath}。把 .suiming/local.sqlite 挪走后重新打开作品（或 suim init），当前目录过了检查会成为新的创世版本；原来的对话记录留在挪走的文件里。`,
+				);
 			}
 			const service = new LocalProjectService(paths, store, canon, project.id, head);
 			await service.#recoverCheckoutAfterManagedCommit();

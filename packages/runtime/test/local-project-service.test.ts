@@ -514,6 +514,37 @@ test("open 以 head 快照恢复 managed commit 崩溃窗口", async () => {
 	}
 });
 
+test("canon ref 丢了（例如 .git 被删）时 open 拒绝，不把没过 Checker 的 checkout 写成新的创世版本", async () => {
+	// 2026-10-04 审查发现：open 曾在这里按当前 checkout 直接建 Canon，绕过 Checker。
+	const fixture = await createServiceFixture();
+	try {
+		const service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
+		service.close();
+		await rm(join(fixture.checkoutPath, ".git"), { recursive: true, force: true });
+		const characterPath = join(fixture.checkoutPath, "world", "characters", "黄盖.md");
+		await writeFile(characterPath, "---\nname: 黄盖\nfamily:\n  parent: [不存在的人]\n---\n错误引用。\n");
+
+		await assert.rejects(
+			LocalProjectService.open(fixture.checkoutPath),
+			(error: unknown) =>
+				error instanceof ArtifactError &&
+				error.code === "local_project_canon_missing" &&
+				error.message.includes(".suiming/local.sqlite"),
+		);
+		await assert.rejects(readFile(join(fixture.checkoutPath, ".git", "HEAD")), { code: "ENOENT" });
+
+		// 照提示挪走执行库后走 init：非法 checkout 被 Checker 拒绝，改好了才建出新的创世版本。
+		await rename(join(fixture.checkoutPath, ".suiming", "local.sqlite"), join(fixture.root, "local.sqlite.bak"));
+		await assert.rejects(LocalProjectService.init({ checkoutPath: fixture.checkoutPath }));
+		await writeFile(characterPath, "---\nname: 黄盖\n---\n改好了。\n");
+		const reinitialized = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath });
+		assert.equal((await reinitialized.status()).state, "clean");
+		reinitialized.close();
+	} finally {
+		await cleanup(fixture);
+	}
+});
+
 test("Local runtime session 把审稿文件与作品变更原子提交；重开后审稿从版本快照读回并按历史判时效", async () => {
 	const fixture = await createServiceFixture();
 	let service: LocalProjectService | undefined;
