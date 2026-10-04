@@ -1,7 +1,6 @@
 import {
 	type BoundDesign,
 	CANDIDATE_REVISION,
-	intentCoversBeat,
 	parseReviewFile,
 	parseSourceNote,
 	parseYaml,
@@ -9,6 +8,7 @@ import {
 	sha256Buffer,
 	TARGET_DESIGN_KINDS,
 } from "@suiming/story";
+import { beatDesign } from "./beat-design.js";
 import { codePointCount } from "./code-points.js";
 import { ArtifactError } from "./errors.js";
 import { isSourceArtifactIdentity, isTargetArtifactIdentity } from "./identity.js";
@@ -48,9 +48,8 @@ export async function writtenAtMap(reader: RevisionHistoryReader, head: string):
 }
 
 /**
- * 一个 Beat 的 Design 闭包，即「Design 变了会不会影响这份正文」的边界：取 Writer 写它时读到的那部分 Design，
- * 与 Write Context 同一套选择——这个 Beat、它 refs 的人物 / 地点 / 资源 / World 文档、它 open / advance / resolve 的
- * Contract、覆盖它的 Intent，再加 world/core 与 story index（index 只按这个 Beat 的那一段比，见 `indexEntry`）。
+ * 一个 Beat 的 Design 闭包，即「Design 变了会不会影响这份正文」的边界：Writer 写它时读到的那部分 Design
+ * （`beatDesign`，Write Context 照同一份装入），再加 story index（只按这个 Beat 的那一段比，见 `indexEntry`）。
  * 同卷别的 Beat、没碰到的 Contract 与 Intent 不在里面：原先借用 Design Frame，Frame 载入整卷 Beat 与全部 Contract、
  * Intent，同卷任何一节一改，整卷正文都被标成 design-changed，长篇里信号就淹没了（2026-10-04 改）。
  * 别的 Beat 的 `changes` 会改变这节进入时的硬状态，这里按文件比、不算进来；人物已死仍被引用这类由 Checker 报。
@@ -61,16 +60,14 @@ export function designClosurePaths(candidate: ArtifactCandidate, storyBeatId: st
 	if (design === undefined) return designPaths(candidate).sort();
 	const beat = design.story.beats.find((item) => item.id === storyBeatId);
 	if (beat === undefined) return designPaths(candidate).sort();
-	const refs = new Set([...beat.refs, ...beat.stateRefs]);
-	const touched = new Set([...beat.contracts.open, ...beat.contracts.advance, ...beat.contracts.resolve]);
-	const ordinals = new Map(design.story.beats.map((item) => [item.id, item.ordinal]));
-	const paths = new Set<string>([beat.path]);
-	for (const entry of design.characters) if (refs.has(`character:${entry.id}`)) paths.add(entry.path);
-	for (const entry of design.places) if (refs.has(`place:${entry.id}`)) paths.add(entry.path);
-	for (const entry of design.resources) if (refs.has(`resource:${entry.id}`)) paths.add(entry.path);
-	for (const entry of design.world) if (entry.id === "core" || refs.has(`world:${entry.id}`)) paths.add(entry.path);
-	for (const entry of design.contracts) if (touched.has(entry.id)) paths.add(entry.path);
-	for (const intent of design.intents) if (intentCoversBeat(intent, beat, ordinals)) paths.add(intent.path);
+	const read = beatDesign(design, beat);
+	const paths = new Set<string>([
+		beat.path,
+		...read.identities.map((item) => item.entry.path),
+		...read.world.map((entry) => entry.path),
+		...read.contracts.map((item) => item.contract.path),
+		...read.intents.map((intent) => intent.path),
+	]);
 	for (const artifact of candidate.artifacts)
 		if (isTargetArtifactIdentity(artifact.identity) && artifact.identity.kind === "story-index")
 			paths.add(artifact.path);

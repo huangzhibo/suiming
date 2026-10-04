@@ -6,6 +6,7 @@ import {
 	type StoryBeat,
 	verifyStoryText,
 } from "@suiming/story";
+import { beatDesign } from "../artifact/beat-design.js";
 import { isTargetArtifactIdentity, targetArtifactIdentity } from "../artifact/identity.js";
 import { inspectStoryDesignCandidate } from "../artifact/story-design-validator.js";
 import type { ArtifactCandidate, ArtifactIdentity, CandidateArtifact } from "../artifact/types.js";
@@ -162,11 +163,6 @@ function selectPriorTexts(
 }
 
 /**
- * Write Context（ADR-0009 决定 13）：只装入当前 Beat 的自然语言 Design、它引用的世界基底、硬状态、
- * 本 Beat 实际触及的 Contract、适用 Intent 与 style evidence、按规则选出的真实前文与后文接缝。
- * 不装入其它 Beat 的细纲；其它未来信息由 Agent 的 brief 提供。
- */
-/**
  * 这一节的样章：覆盖它的 Intent 用 style_refs 选中的 reference/style/<id>.md。作者认定「这部书该这么写」的依据，
  * 前文质量参差或没有前文时，文风以它为准。读者口径的评委与写正文时的段长对照共用。
  */
@@ -213,6 +209,12 @@ export function precedingStoryText(candidate: ArtifactCandidate, storyBeatId: st
 	return parts.join("\n\n");
 }
 
+/**
+ * Write Context（ADR-0009 决定 13）：当前 Beat 的自然语言 Design、它要读的那部分 Design（`beatDesign`：world/core、
+ * 本节的人物地点物品——含只在硬状态变化里出现的——、触及的 Contract、适用的 Intent）、硬状态、style evidence、
+ * 按规则选出的真实前文与后文接缝。Design 部分与正文时效的闭包是同一份选择。不装入其它 Beat 的细纲；其它未来
+ * 信息由 Agent 的 brief 提供。
+ */
 export function compileWriteContext(
 	candidate: ArtifactCandidate,
 	storyBeatId: string,
@@ -227,7 +229,8 @@ export function compileWriteContext(
 			`StoryBeat not found in the current Design: ${storyBeatId}`,
 		);
 	}
-	const ordinals = new Map(beats.map((beat) => [beat.id, beat.ordinal]));
+	const read = beatDesign(book, target);
+	const volume = book.story.volumes.find((item) => item.id === target.volumeId);
 	const texts = textArtifacts(candidate);
 	const previous = beats.find((beat) => beat.ordinal === target.ordinal - 1);
 	const next = beats.find((beat) => beat.ordinal === target.ordinal + 1);
@@ -238,7 +241,7 @@ export function compileWriteContext(
 	sections.push(
 		[
 			"## target_story_design",
-			`${target.path}（顺序 ${target.ordinal + 1} / ${beats.length}，${target.volumeId}）`,
+			`${target.path}（顺序 ${target.ordinal + 1} / ${beats.length}，${target.volumeId}${volume?.title ? `「${volume.title}」` : ""}）`,
 			`refs: ${target.refs.join(", ") || "无"}`,
 			`contracts: open=[${target.contracts.open.join(", ")}] advance=[${target.contracts.advance.join(", ")}] resolve=[${target.contracts.resolve.join(", ")}]`,
 			"",
@@ -246,32 +249,28 @@ export function compileWriteContext(
 		].join("\n"),
 	);
 
-	// 2. world_in_force
+	// 2. world_in_force：world/core、本节的人物地点物品（含只在硬状态变化里出现的）、refs 里的 World 文档
 	const world: string[] = ["## world_in_force"];
-	const identity = (kind: "character" | "place" | "resource") => {
-		const entries = kind === "character" ? book.characters : kind === "place" ? book.places : book.resources;
-		for (const id of refIds(target, kind)) {
-			const entry = entries.find((item) => item.id === id);
-			if (entry === undefined) continue;
-			artifacts.push(targetArtifactIdentity(kind, entry.id));
-			const initial = Object.entries(entry.initial)
-				.map(([key, value]) => `${key}=${String(value)}`)
-				.join(", ");
-			world.push(
-				`### ${kind} ${entry.name}（${entry.path}${entry.aliases.length === 0 ? "" : `，别名 ${entry.aliases.join("、")}`}${initial ? `，初始 ${initial}` : ""}）`,
-				entry.body.trim() || "（无基底）",
-				"",
-			);
-		}
-	};
-	identity("character");
-	identity("place");
-	identity("resource");
-	for (const id of refIds(target, "world")) {
-		const entry = book.world.find((item) => item.id === id);
-		if (entry === undefined) continue;
+	for (const entry of read.world) {
 		artifacts.push(targetArtifactIdentity("world", entry.id));
-		world.push(`### world ${entry.id}（${entry.path}）`, entry.body.trim(), "");
+		world.push(
+			`### world ${entry.id}（${entry.path}${entry.id === "core" ? "，全书公理" : ""}）`,
+			entry.body.trim(),
+			"",
+		);
+	}
+	for (const { kind, entry, stateOnly } of read.identities) {
+		artifacts.push(targetArtifactIdentity(kind, entry.id));
+		const initial = Object.entries(entry.initial)
+			.map(([key, value]) => `${key}=${String(value)}`)
+			.join(", ");
+		const notes = [
+			entry.path,
+			...(entry.aliases.length === 0 ? [] : [`别名 ${entry.aliases.join("、")}`]),
+			...(initial ? [`初始 ${initial}`] : []),
+			...(stateOnly ? ["只出现在本节的硬状态变化里"] : []),
+		];
+		world.push(`### ${kind} ${entry.name}（${notes.join("，")}）`, entry.body.trim() || "（无基底）", "");
 	}
 	if (world.length === 1) world.push("（本 Beat 未引用世界基底）");
 	sections.push(world.join("\n").trimEnd());
@@ -290,28 +289,16 @@ export function compileWriteContext(
 
 	// 4. authorial_lookahead：本 Beat 实际触及的 Contract
 	const lookahead: string[] = ["## authorial_lookahead"];
-	for (const [phase, ids] of [
-		["open", target.contracts.open],
-		["advance", target.contracts.advance],
-		["resolve", target.contracts.resolve],
-	] as const) {
-		for (const id of ids) {
-			const contract = book.contracts.find((item) => item.id === id);
-			if (contract === undefined) continue;
-			artifacts.push(targetArtifactIdentity("story-contract", contract.id));
-			const deadline = contract.deadline.kind === "book_end" ? "book_end" : contract.deadline.storyBeatId;
-			lookahead.push(
-				`### ${phase} ${contract.id}（${contract.path}，deadline ${deadline}）`,
-				contract.body.trim(),
-				"",
-			);
-		}
+	for (const { phase, contract } of read.contracts) {
+		artifacts.push(targetArtifactIdentity("story-contract", contract.id));
+		const deadline = contract.deadline.kind === "book_end" ? "book_end" : contract.deadline.storyBeatId;
+		lookahead.push(`### ${phase} ${contract.id}（${contract.path}，deadline ${deadline}）`, contract.body.trim(), "");
 	}
 	if (lookahead.length === 1) lookahead.push("（本 Beat 不建立、推进或兑现 Contract）");
 	sections.push(lookahead.join("\n").trimEnd());
 
 	// 5. intent_and_style
-	const intents = book.intents.filter((intent) => intentCoversBeat(intent, target, ordinals));
+	const intents = read.intents;
 	const intentLines: string[] = ["## intent_and_style"];
 	for (const intent of intents) {
 		artifacts.push(targetArtifactIdentity("intent", intent.id));
