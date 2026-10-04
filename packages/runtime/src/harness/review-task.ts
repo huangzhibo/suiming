@@ -86,7 +86,7 @@ const SUBMIT_DESCRIPTIONS: Readonly<Record<ReviewLayer, string>> = {
 };
 
 /**
- * 一个 Review 配方，layer 是参数（ADR-0009 决定 30）：Reviewer 只读作品，看到该层的完整输入与确定性诊断，
+ * 唯一的 Review 实现，layer 是参数（ADR-0009 决定 30）：Reviewer 只读作品，看到该层的完整输入与确定性诊断，
  * 用同一个 submit_review 交付 ReviewDraft。交付时校验 schema、范围与逐字引文，然后把审稿写成
  * `review/<id>.md`——一个普通作品文件，随下一次 commit 进版本；「它对当前稿还算不算数」由版本历史派生。
  */

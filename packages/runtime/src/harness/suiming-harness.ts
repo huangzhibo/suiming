@@ -113,7 +113,7 @@ export interface TaskOutcome {
 	taskId: string;
 	resultObjectId: string;
 	loop: TaskLoopOutcome;
-	/** spec.result() 提交的值；续跑复用已完成的 Task 时从执行对象读回，配方只能依赖它，不能依赖工具闭包。 */
+	/** spec.result() 提交的值；续跑复用已完成的 Task 时从执行对象读回，调用方只能依赖它，不能依赖工具闭包。 */
 	result: unknown;
 }
 

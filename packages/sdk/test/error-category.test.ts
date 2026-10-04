@@ -8,7 +8,7 @@ const root = resolve(import.meta.dirname, "../../..");
 const SOURCE_ROOTS = ["packages", "apps"].map((directory) => join(root, directory));
 /** 只在 internal 才合理的错误码：损坏、完整性、测试桩与"不应发生"。 */
 const INTERNAL_ALLOWLIST =
-	/_corrupt$|_integrity_error$|_store_error$|^(local_project_closed|unknown|boom|test_checker_rejected|internal_error|run_candidate_corrupt|invalid_cli_response)$/u;
+	/_corrupt$|_integrity_error$|_store_error$|^(local_project_closed|unknown|boom|test_checker_rejected|internal_error|invalid_cli_response)$/u;
 
 function* sourceFiles(directory: string): Generator<string> {
 	for (const entry of readdirSync(directory)) {

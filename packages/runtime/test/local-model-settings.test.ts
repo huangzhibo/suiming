@@ -78,7 +78,7 @@ test("桌面模型设置：profile 状态按 provider 凭据探测报告，API k
 		);
 		assert.equal(await readFile(configPath, "utf8"), source);
 
-		// 开关独立于环境/本地凭据；拒绝新绑定，但冻结的 Attempt 仍可恢复。
+		// 开关独立于环境/本地凭据；拒绝新绑定，但已冻结在 turn 里的绑定仍可恢复。
 		const models = builtinModels({
 			credentials,
 			authContext: authContext({ DEEPSEEK_API_KEY: "env-key-never-returned" }),

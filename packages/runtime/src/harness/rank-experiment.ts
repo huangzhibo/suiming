@@ -13,7 +13,7 @@ import { submitTool } from "./tools.js";
 import { compileWriteContext, precedingStoryText, styleEvidenceFor } from "./write-context.js";
 
 /**
- * 盲读评委配方（路线图 R 节，2026-09-06 作者提出）：同一个 StoryBeat 的多版正文匿名打乱后交给隔离的评委，
+ * 盲读评委（路线图 R 节，2026-09-06 作者提出）：同一个 StoryBeat 的多版正文匿名打乱后交给隔离的评委，
  * 按作者盲读记录里的口径排序。它只做预筛与回归，不是作品裁决，也不是 Reward：
  * - 评委用 `judge` profile，应与 Writer 不同的模型；结果记下是否与 Writer 同模型；
  * - 同一批候选跑多个顺序（默认两个：一正一反）取平均名次，压位置偏差；
