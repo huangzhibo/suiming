@@ -1,7 +1,6 @@
-import { createHash } from "node:crypto";
 import { posix } from "node:path";
 import { type Static, type TSchema, Type } from "@earendil-works/pi-ai";
-import { buildStateTimeline, formatDiagnostic } from "@suiming/story";
+import { buildStateTimeline, formatDiagnostic, sha256Hex } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
 import {
 	checkFindings,
@@ -271,7 +270,7 @@ export function fileTools(
 				throw new ToolRejection("edit_not_unique", "oldText 必须在文件中恰好出现一次");
 			const mutation = await env.prepareWrite(params.path, original.replace(params.oldText, params.newText));
 			// 在读和准备之间有外部修改时不能把新文件当成刚才读到的输入。
-			if (mutation.before !== createHash("sha256").update(original).digest("hex"))
+			if (mutation.before !== sha256Hex(original))
 				throw new ToolRejection("file_write_conflict", conflictMessage(params.path));
 			return mutation;
 		},

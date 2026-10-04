@@ -116,6 +116,8 @@ export type {
 	ProjectRevision,
 	RevisionArtifact,
 } from "./artifact/types.js";
+/** Cloud 的 ArtifactVersion id 由 mediaType 与内容 hash 派生；PostgreSQL store 读回时用同一个公式核对。 */
+export { artifactVersionId } from "./artifact/version-storage.js";
 export type {
 	CloudProjectRevisionDiff,
 	CloudProjectView,

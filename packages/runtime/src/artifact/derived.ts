@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
 	type BoundDesign,
 	CANDIDATE_REVISION,
@@ -7,6 +6,7 @@ import {
 	parseSourceNote,
 	parseYaml,
 	type ReviewFile,
+	sha256Buffer,
 	TARGET_DESIGN_KINDS,
 } from "@suiming/story";
 import { codePointCount } from "./code-points.js";
@@ -295,7 +295,7 @@ export function subjectDigests(candidate: ArtifactCandidate, paths: readonly str
 	const digests = new Map<string, string>();
 	for (const path of paths) {
 		const bytes = byPath.get(path);
-		if (bytes !== undefined) digests.set(path, `sha256:${createHash("sha256").update(bytes).digest("hex")}`);
+		if (bytes !== undefined) digests.set(path, `sha256:${sha256Buffer(bytes)}`);
 	}
 	return digests;
 }
@@ -354,7 +354,7 @@ export interface SourceCoverage {
 /** notes 的 span 并集：只算 `material_sha256` 等于当前材料 sha 的笔记，材料换了旧笔记自然作废。 */
 export function sourceCoverage(candidate: ArtifactCandidate, sourceId: string): SourceCoverage {
 	const material = sourceMaterialFromCandidate(candidate, sourceId);
-	const materialSha = sha256Hex(material.artifact.bytes);
+	const materialSha = sha256Buffer(material.artifact.bytes);
 	const points = codePointCount(material.text);
 	const notes = candidate.artifacts
 		.filter(
@@ -395,10 +395,6 @@ export function sourceCoverage(candidate: ArtifactCandidate, sourceId: string): 
 			span: [entry.note.span.start, entry.note.span.end],
 		})),
 	};
-}
-
-function sha256Hex(bytes: Uint8Array): string {
-	return createHash("sha256").update(bytes).digest("hex");
 }
 
 export interface ReleaseReadiness {

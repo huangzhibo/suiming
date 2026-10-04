@@ -1,6 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { sha256Buffer } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
 import type { OpenPackageFile } from "../artifact/open-package.js";
 import { classifyOpenStoryDirectoryFile } from "../artifact/open-story-directory.js";
@@ -17,10 +18,6 @@ interface CheckoutWriteJournal {
 	transactionId: string;
 	targetRevisionId: string;
 	operations: CheckoutWriteOperation[];
-}
-
-function sha256(bytes: Uint8Array): string {
-	return createHash("sha256").update(bytes).digest("hex");
 }
 
 function filesByPath(files: readonly OpenPackageFile[]): Map<string, OpenPackageFile> {
@@ -72,7 +69,7 @@ async function fileHash(path: string): Promise<string | null> {
 		if (info.isSymbolicLink() || !info.isFile()) {
 			throw new ArtifactError("checkout_write_conflict", `Checkout target is not a regular file: ${path}`);
 		}
-		return sha256(await readFile(path));
+		return sha256Buffer(await readFile(path));
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
 		throw error;
@@ -131,8 +128,8 @@ export class LocalCheckoutSynchronizer {
 		const operations: CheckoutWriteOperation[] = paths.flatMap((path) => {
 			const beforeFile = before.get(path);
 			const afterFile = after.get(path);
-			const beforeSha256 = beforeFile === undefined ? null : sha256(beforeFile.bytes);
-			const afterSha256 = afterFile === undefined ? null : sha256(afterFile.bytes);
+			const beforeSha256 = beforeFile === undefined ? null : sha256Buffer(beforeFile.bytes);
+			const afterSha256 = afterFile === undefined ? null : sha256Buffer(afterFile.bytes);
 			return beforeSha256 === afterSha256 ? [] : [{ path, beforeSha256, afterSha256 }];
 		});
 		if (operations.length === 0) return;

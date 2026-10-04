@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
 	type ArtifactVersion,
+	artifactVersionId,
 	type CloudObjectStore,
 	CloudStoreError,
 	cloudObjectKey,
@@ -21,10 +22,6 @@ export interface PostgresArtifactVersionRow {
 
 export function postgresContentHash(bytes: Uint8Array): string {
 	return createHash("sha256").update(bytes).digest("hex");
-}
-
-function expectedArtifactVersionId(mediaType: string, hash: string): string {
-	return `av_${createHash("sha256").update(mediaType).update("\0").update(hash).digest("hex")}`;
 }
 
 function byteLength(value: PostgresArtifactVersionRow["byte_length"]): number | undefined {
@@ -89,7 +86,7 @@ export class PostgresArtifactVersionStorage {
 	}
 
 	async materialize(row: PostgresArtifactVersionRow): Promise<ArtifactVersion> {
-		const expectedId = expectedArtifactVersionId(row.media_type, row.content_hash);
+		const expectedId = artifactVersionId(row.media_type, row.content_hash);
 		if (row.id !== expectedId || !/^[a-f0-9]{64}$/u.test(row.content_hash)) {
 			throw this.#integrityError(`ArtifactVersion metadata changed: ${row.id}`);
 		}

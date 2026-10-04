@@ -1,6 +1,6 @@
 import { compareCodeUnits, TARGET_DESIGN_KINDS } from "@suiming/story";
 import { ArtifactError } from "./errors.js";
-import { isTargetArtifactIdentity } from "./identity.js";
+import { artifactIdentityKey, isTargetArtifactIdentity } from "./identity.js";
 import { inspectStoryDesignCandidate } from "./story-design-validator.js";
 import { type StoryImpactSubject, storyImpact } from "./story-impact.js";
 import type { ArtifactCandidate, ArtifactIdentity, CandidateArtifact } from "./types.js";
@@ -80,10 +80,6 @@ export interface DesignFrame {
 	seeds: StoryImpactSubject[];
 }
 
-function identityKey(identity: ArtifactIdentity): string {
-	return JSON.stringify(identity);
-}
-
 /**
  * Frame(Design, seeds)：Agent 会话开场、委派与 Design 视图的初始 Context（ADR-0008 决定 3）。
  * 始终载入 Intent、Story index、全部 Contract 与 world/core；按 seeds 的 `design impact` 闭包载入直接涉及的 Beat、
@@ -121,14 +117,14 @@ export function designFrame(candidate: ArtifactCandidate, options: DesignFrameOp
 	const excluded = options.excludeStoryBeatIds ?? new Set<string>();
 	const loaded = new Set<string>();
 	const load = (kind: string, localId: string) =>
-		loaded.add(identityKey({ namespace: { kind: "target" }, kind, localId }));
+		loaded.add(artifactIdentityKey({ namespace: { kind: "target" }, kind, localId }));
 
 	for (const artifact of all) {
 		if (!isTargetArtifactIdentity(artifact.identity)) continue;
 		const { kind, localId } = artifact.identity;
 		if (kind === "intent" || kind === "story-index" || kind === "story-contract")
-			loaded.add(identityKey(artifact.identity));
-		if (kind === "world" && localId === "core") loaded.add(identityKey(artifact.identity));
+			loaded.add(artifactIdentityKey(artifact.identity));
+		if (kind === "world" && localId === "core") loaded.add(artifactIdentityKey(artifact.identity));
 	}
 	// Beat seed 直接涉及的 Beat：所在卷整卷载入，前后文因果在同一卷里最密。
 	// 其它 seed（人物、地点、Contract……）涉及的 Beat 可能横跨全书，只按故事顺序载入到预算为止。
@@ -162,14 +158,14 @@ export function designFrame(candidate: ArtifactCandidate, options: DesignFrameOp
 	const codePointsOf = new Map(
 		all.map((artifact) => {
 			try {
-				return [identityKey(artifact.identity), Array.from(decoder.decode(artifact.bytes)).length] as const;
+				return [artifactIdentityKey(artifact.identity), Array.from(decoder.decode(artifact.bytes)).length] as const;
 			} catch {
-				return [identityKey(artifact.identity), 0] as const;
+				return [artifactIdentityKey(artifact.identity), 0] as const;
 			}
 		}),
 	);
 	for (const beat of design.story.beats) {
-		const key = identityKey({ namespace: { kind: "target" }, kind: "story-beat", localId: beat.id });
+		const key = artifactIdentityKey({ namespace: { kind: "target" }, kind: "story-beat", localId: beat.id });
 		if (excluded.has(beat.id) || !extraBeats.has(beat.id) || loaded.has(key)) continue;
 		const size = codePointsOf.get(key) ?? 0;
 		if (size > extraBudget) continue;
@@ -177,8 +173,8 @@ export function designFrame(candidate: ArtifactCandidate, options: DesignFrameOp
 		extraBudget -= size;
 	}
 
-	const loadedArtifacts = all.filter((artifact) => loaded.has(identityKey(artifact.identity)));
-	const skipped = all.filter((artifact) => !loaded.has(identityKey(artifact.identity)));
+	const loadedArtifacts = all.filter((artifact) => loaded.has(artifactIdentityKey(artifact.identity)));
+	const skipped = all.filter((artifact) => !loaded.has(artifactIdentityKey(artifact.identity)));
 	const titleOf = new Map(design.story.beats.map((beat) => [beat.id, beat]));
 	const index = skipped
 		.map((artifact) => {
@@ -211,6 +207,8 @@ export function designFrame(candidate: ArtifactCandidate, options: DesignFrameOp
 
 /** Frame 载入的 artifact 清单（`context compile` 返回给 host）；只保留仍存在于当前候选里的（模型可能删了文件）。 */
 export function frameSelections(frame: DesignFrame, candidate: ArtifactCandidate): { identity: ArtifactIdentity }[] {
-	const present = new Set(candidate.artifacts.map((artifact) => identityKey(artifact.identity)));
-	return frame.artifacts.filter((identity) => present.has(identityKey(identity))).map((identity) => ({ identity }));
+	const present = new Set(candidate.artifacts.map((artifact) => artifactIdentityKey(artifact.identity)));
+	return frame.artifacts
+		.filter((identity) => present.has(artifactIdentityKey(identity)))
+		.map((identity) => ({ identity }));
 }

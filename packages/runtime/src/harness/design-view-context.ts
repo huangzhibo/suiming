@@ -7,6 +7,7 @@ import {
 } from "@suiming/story";
 import { DESIGN_FRAME_FULL_RENDER_CODE_POINTS, designFrame, frameSelections } from "../artifact/design-frame.js";
 import { ArtifactError } from "../artifact/errors.js";
+import { artifactIdentityKey } from "../artifact/identity.js";
 import { inspectStoryDesignCandidate } from "../artifact/story-design-validator.js";
 import type { StoryImpactSubject } from "../artifact/story-impact.js";
 import { storyPackageCodec } from "../artifact/story-package-codec.js";
@@ -44,16 +45,14 @@ type ContextSelection = { identity: ArtifactIdentity; range?: { start: number; e
 
 const decoder = new TextDecoder();
 
-function identityKey(identity: ArtifactIdentity): string {
-	return JSON.stringify(identity);
-}
-
 function characterIdentity(id: string): ArtifactIdentity {
 	return { namespace: { kind: "target" }, kind: "character", localId: id };
 }
 
 function renderArtifact(candidate: ArtifactCandidate, identity: ArtifactIdentity): string | undefined {
-	const artifact = candidate.artifacts.find((item) => identityKey(item.identity) === identityKey(identity));
+	const artifact = candidate.artifacts.find(
+		(item) => artifactIdentityKey(item.identity) === artifactIdentityKey(identity),
+	);
 	if (artifact === undefined) return undefined;
 	const path = storyPackageCodec.pathForIdentity(identity, candidate);
 	return `--- BEGIN ARTIFACT "${path}" ---\n${decoder.decode(artifact.bytes).trimEnd()}\n--- END ARTIFACT "${path}" ---`;
@@ -64,7 +63,7 @@ function mergeSelections(...groups: readonly (readonly ContextSelection[])[]): C
 	const merged: ContextSelection[] = [];
 	for (const group of groups) {
 		for (const selection of group) {
-			const key = identityKey(selection.identity);
+			const key = artifactIdentityKey(selection.identity);
 			if (seen.has(key)) continue;
 			seen.add(key);
 			merged.push(selection);

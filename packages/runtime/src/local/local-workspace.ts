@@ -14,6 +14,7 @@ import {
 	parseMarkdownDocument,
 	parseStoryIndexYaml,
 	parseYaml,
+	sha256Hex,
 	TARGET_DESIGN_KINDS,
 } from "@suiming/story";
 import { Value } from "typebox/value";
@@ -46,7 +47,6 @@ import { committedReviews } from "./review-summary.js";
 /** 作者点「停止」后最多等这么久确认收口；超时如实回当前状态，不硬取消也不挂死界面。 */
 const CANCEL_SETTLE_TIMEOUT_MS = 5_000;
 
-const hash = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 /** git 的 blob id：与 historyReader().fileDigests 同一口径，比对 checkout 与已提交版本不用把版本整份读出来。 */
 const blobId = (bytes: Uint8Array) => createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
 const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -579,7 +579,7 @@ export class LocalWorkspace implements LocalCommandClient {
 		return value;
 	}
 	#once<T>(id: string, input: unknown, body: () => Promise<T>): Promise<T> {
-		const fingerprint = hash(canonicalJson(input));
+		const fingerprint = sha256Hex(canonicalJson(input));
 		const previous = this.#pending.get(id);
 		if (previous) {
 			if (previous.fingerprint !== fingerprint)

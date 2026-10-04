@@ -1,7 +1,8 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { constants, type Dirent } from "node:fs";
 import { mkdir, open, readdir, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { sha256Buffer } from "@suiming/story";
 import { confinedPath } from "../files/confined-path.js";
 import { ToolRejection } from "./tool.js";
 
@@ -33,10 +34,6 @@ export interface FileMutation {
 	after: string | null;
 	/** 写入字节的 base64（不是原文），先随动作 journal 保存；删除为 null。 */
 	content: string | null;
-}
-
-function hash(bytes: Uint8Array): string {
-	return createHash("sha256").update(bytes).digest("hex");
 }
 
 function missing(error: unknown): boolean {
@@ -173,8 +170,8 @@ export class ConfinedExecutionEnv {
 		const bytes = content === null ? null : typeof content === "string" ? Buffer.from(content, "utf8") : content;
 		return {
 			path: logical,
-			before: before === null ? null : hash(before),
-			after: bytes === null ? null : hash(bytes),
+			before: before === null ? null : sha256Buffer(before),
+			after: bytes === null ? null : sha256Buffer(bytes),
 			content: bytes === null ? null : Buffer.from(bytes).toString("base64"),
 		};
 	}
@@ -184,9 +181,10 @@ export class ConfinedExecutionEnv {
 		signal?.throwIfAborted();
 		const { absolute } = await this.#confine(mutation.path, true);
 		const bytes = mutation.content === null ? null : Buffer.from(mutation.content, "base64");
-		if ((bytes === null ? null : hash(bytes)) !== mutation.after) throw new Error("File journal content is corrupt");
+		if ((bytes === null ? null : sha256Buffer(bytes)) !== mutation.after)
+			throw new Error("File journal content is corrupt");
 		const current = await this.#readExisting(absolute);
-		const currentHash = current === null ? null : hash(current);
+		const currentHash = current === null ? null : sha256Buffer(current);
 		if (currentHash === mutation.after) return;
 		if (currentHash !== mutation.before)
 			throw new ToolRejection("file_write_conflict", conflictMessage(mutation.path));
@@ -207,7 +205,7 @@ export class ConfinedExecutionEnv {
 				signal?.throwIfAborted();
 				await this.#confine(mutation.path, true);
 				const latest = await this.#readExisting(absolute);
-				if ((latest === null ? null : hash(latest)) !== mutation.before)
+				if ((latest === null ? null : sha256Buffer(latest)) !== mutation.before)
 					throw new ToolRejection("file_write_conflict", conflictMessage(mutation.path));
 				await rename(temporary, absolute);
 			} finally {

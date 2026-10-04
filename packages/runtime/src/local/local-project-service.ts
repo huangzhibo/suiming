@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { lstat, realpath, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ProjectCommitCommand } from "../artifact/canon-store.js";
@@ -52,6 +52,7 @@ import { scaffoldOpenStoryDirectory } from "./starter-project.js";
 /** 并行 `suim` 调用重叠在 open / commit 临界区时的最长等待；超过就是真的有人长期持锁。 */
 const PROJECT_LOCK_WAIT_MS = 5_000;
 
+import { sha256Buffer } from "@suiming/story";
 import { GitCanonStore } from "../artifact/git-canon-store.js";
 import type { LocalExecutionObject, LocalRemoteBinding } from "./sqlite-local-store.js";
 import { type LocalProjectRecord, SqliteLocalStore, type SqliteLocalStoreOptions } from "./sqlite-local-store.js";
@@ -146,7 +147,7 @@ function copyBytes(bytes: Uint8Array): Uint8Array {
 }
 
 function sha256(bytes: Uint8Array): string {
-	return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+	return `sha256:${sha256Buffer(bytes)}`;
 }
 
 async function pathsFor(checkoutPath: string): Promise<LocalProjectPaths> {

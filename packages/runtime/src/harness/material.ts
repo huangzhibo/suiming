@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { Type } from "@earendil-works/pi-ai";
+import { sha256Buffer } from "@suiming/story";
 import { codePointCount, sliceCodePoints } from "../artifact/code-points.js";
 import { sourceCoverage } from "../artifact/derived.js";
 import { ArtifactError } from "../artifact/errors.js";
@@ -33,7 +33,7 @@ export function sourceMaterialText(candidate: ArtifactCandidate, sourceId: strin
 		identity: view.artifact.identity,
 		text: view.text,
 		codePoints: codePointCount(view.text),
-		sha256: createHash("sha256").update(view.artifact.bytes).digest("hex"),
+		sha256: sha256Buffer(view.artifact.bytes),
 	};
 }
 

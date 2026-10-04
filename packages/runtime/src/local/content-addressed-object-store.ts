@@ -1,6 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { sha256Buffer } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
 
 const HASH_PATTERN = /^[a-f0-9]{64}$/u;
@@ -8,10 +9,6 @@ const HASH_PATTERN = /^[a-f0-9]{64}$/u;
 export interface ObjectCollectionResult {
 	kept: string[];
 	removed: string[];
-}
-
-function hashBytes(bytes: Uint8Array): string {
-	return createHash("sha256").update(bytes).digest("hex");
 }
 
 function requireHash(hash: string): string {
@@ -34,11 +31,11 @@ export class ContentAddressedObjectStore {
 	}
 
 	async put(bytes: Uint8Array): Promise<string> {
-		const hash = hashBytes(bytes);
+		const hash = sha256Buffer(bytes);
 		const path = this.pathFor(hash);
 		try {
 			const existing = await readFile(path);
-			if (hashBytes(existing) !== hash) {
+			if (sha256Buffer(existing) !== hash) {
 				throw new ArtifactError("object_corrupt", `Object content does not match its path: ${hash}`);
 			}
 			return hash;
@@ -70,7 +67,7 @@ export class ContentAddressedObjectStore {
 			}
 			throw error;
 		}
-		if (hashBytes(bytes) !== valid) throw new ArtifactError("object_corrupt", `Object hash mismatch: ${valid}`);
+		if (sha256Buffer(bytes) !== valid) throw new ArtifactError("object_corrupt", `Object hash mismatch: ${valid}`);
 		return bytes;
 	}
 

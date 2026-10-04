@@ -1,8 +1,7 @@
-import { createHash } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { LocalCommandOutput } from "@suiming/sdk";
-import { parseMarkdownDocument, parseYaml } from "@suiming/story";
+import { parseMarkdownDocument, parseYaml, sha256Buffer } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
 import { validateOpenPackagePath } from "../artifact/open-package.js";
 import { classifyOpenStoryDirectoryFile } from "../artifact/open-story-directory.js";
@@ -11,7 +10,6 @@ import { ToolRejection } from "../harness/tool.js";
 import { LocalProjectLock } from "./project-lock.js";
 
 type Entry = LocalCommandOutput<"workspace.files">["entries"][number];
-const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const textExtension =
 	/\.(?:md|markdown|txt|ya?ml|json|jsonl|toml|csv|tsv|xml|html|css|js|ts|tsx|jsx|svg|ini|cfg|log|sh)$/iu;
 function visible(path: string): boolean {
@@ -132,7 +130,7 @@ function fileView(
 	return {
 		path,
 		content: textual ? content : "",
-		sha256: hash(bytes),
+		sha256: sha256Buffer(bytes),
 		size: bytes.length,
 		textual,
 		writable: writable && textual,
