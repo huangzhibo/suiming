@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { normalizeReviewQuote, reviewQuoteFragments } from "@suiming/sdk";
 import {
 	parseReviewDraft,
 	type ReviewDraft,
@@ -57,28 +58,18 @@ function textOf(candidate: ArtifactCandidate, path: string): string | undefined 
 	}
 }
 
-/** 比较前去掉空白与引号，模型转述时最常改的就是这两样；标点保留，否则短引文会误命中。与 `apps/web/src/anchors.ts` 同一规则。 */
-function normalize(text: string): string {
-	return text.replace(/\s+/gu, "").replace(/[「」“”"『』‘’']/gu, "");
-}
-
-const QUOTE = /[「“"『]([^」”"』]{2,})[」”"』]/gu;
-
 /**
  * 引文必须逐字出自被审文件（[Harness 设计](../../../../docs/harness-design.md)第 6 节）：审稿页把 finding 锚回段落靠的
- * 就是这段引文，Reviewer 转述一句就锚不上。规则与渲染端的 `quotedFragments` 一致：evidence 里有引号就要求每段引文都在原文里；
+ * 就是这段引文，Reviewer 转述一句就锚不上。片段怎么取与审稿页共用 `reviewQuoteFragments`：有引号就要求每段引文都在原文里；
  * 没有引号时至少一个 8 字以上的句子要在原文里；连这样的句子都没有就要求整段 evidence 在原文里。
  */
 function quoteMissing(evidence: string, content: string): boolean {
-	const text = normalize(content);
-	const quoted = [...evidence.matchAll(QUOTE)].map((match) => normalize(match[1] ?? ""));
-	if (quoted.length > 0) return quoted.some((fragment) => !text.includes(fragment));
-	const sentences = evidence
-		.split(/[。！？；\n]/u)
-		.map((sentence) => normalize(sentence))
-		.filter((sentence) => sentence.length >= 8);
-	if (sentences.length > 0) return !sentences.some((sentence) => text.includes(sentence));
-	return !text.includes(normalize(evidence));
+	const text = normalizeReviewQuote(content);
+	const { quoted, fragments } = reviewQuoteFragments(evidence);
+	const normalized = fragments.map(normalizeReviewQuote);
+	if (quoted) return normalized.some((fragment) => !text.includes(fragment));
+	if (normalized.length > 0) return !normalized.some((fragment) => text.includes(fragment));
+	return !text.includes(normalizeReviewQuote(evidence));
 }
 
 function requireQuote(candidate: ArtifactCandidate, draft: ReviewDraft, scope: ReviewScope): void {
