@@ -4,8 +4,6 @@
 
 开源的 AI 长篇小说工作台。它把整部小说写成一套能检查的结构（Story Language），用一条故事轴把整本书铺开，让 Agent 在这套结构上持续推进；你随时阅读、修改、插手。
 
-*An AI workbench for long-form fiction. See [English](#english) below.*
-
 <!-- 这一段只在阶段变化时改。 -->
 > **当前状态：开发预览。**桌面工作台与自主 Agent 已经贯通，但证据最高只到「真实调用」：还没有一部完整的长篇在它上面写完，也没有安装包，目前只在 macOS 上验证过。完成度与已知缺陷见[当前状态](docs/current-status.md)，接下来做什么见[路线图](docs/roadmap.md)第 6 节。
 
@@ -64,7 +62,7 @@ contracts:
 
 Agent 在你的作品目录上直接读、改、自检，可以把写正文、审稿交给子任务，阶段性提交多个版本；你可以随时打断、补充要求、直接编辑。说过的长期要求会写回 `intent/`，不只留在聊天记录里。
 
-**原文旁边就是 Agent。**问它「关羽在华容道放走曹操，前面埋了哪些线」，它按故事顺序列出 11 节，从土山约三事到葫芦口两遇伏兵。
+**原文旁边就是 Agent。**问它「关羽在华容道放走曹操，前面埋了哪些线」，它按故事顺序列出 11 节，从小沛之战里关羽与张辽相惜，到乌林、葫芦口两遇伏兵。
 
 <img src="docs/media/reading.webp" alt="左边是华容道这一节的原文，右边是 Agent 按故事顺序列出的伏笔" width="100%">
 
@@ -226,15 +224,3 @@ strategies/      故事创作宪法
 ## 许可证
 
 [MIT](LICENSE)。Story Language 与测试里的故事示例取自《三国演义》，属于公有领域。
-
-## English
-
-Suiming is a desktop-first AI workbench for writing long-form fiction. A dedicated agent reads and edits your manuscript directory, delegates drafting and independent review to sub-agents, and commits in stages. A work is written in Story Language, an open format: every scene has a causal design in natural language, with frontmatter that registers the characters, places, secrets, reader expectations and state changes it involves. It is a plain directory of Markdown files (outline, characters, world, prose, reviews) that is also a git repository; only changes that pass a deterministic Checker — schema, references, ordering, hard state such as who holds what or which secret is revealed when — become a version of the work; design issues such as an overdue reader expectation are reported but do not block staged commits. Literary quality is left to models and independent review, not to rules. The agent loop is Suiming's own: sub-agents cannot commit, an interrupted turn resumes where it stopped, and repeating the same action with the same result or reaching a per-turn usage cap stops a runaway turn. The same runtime is available from the `suim` CLI and from Codex, Claude Code and Grok.
-
-The animation above shows the bundled example, the first 50 chapters of *Romance of the Three Kingdoms*: the agent extracted the design (9 volumes, 231 scenes, 15 reader expectations, 403 causal dependencies) and the prose is the original text. Copy `examples/sanguo` out of the repository and open it in the desktop app; no model is needed to browse it.
-
-**Status: development preview.** It has been exercised with real models on real material but no complete novel has been written with it yet, there is no installer, and only macOS has been verified.
-
-**Try it** (Node.js 24+, git): `npm install && npm run dev:desktop` for the desktop app, or `npm install && npm run build && npm link -w @suiming/cli` for the CLI, then `suim init <dir> --intent-file intent.md`. Configure models in the desktop settings or in `~/.suiming/config.toml`; any provider supported by [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) works.
-
-The interface, the agent's prompts, documentation and code comments are all in Chinese, and it has only been exercised on Chinese fiction. [AGENTS.md](AGENTS.md) is the source of truth for the product's invariants and engineering rules. Licensed under [MIT](LICENSE).
