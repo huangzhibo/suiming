@@ -27,6 +27,9 @@ test("恢复入口由错误码决定，原因文案不改变恢复策略；pause
 	assert.equal(stuck?.unknownModelCall, false);
 	assert.equal(stuck?.paused, false);
 	assert.equal(stuck?.title, "需要调整方向");
+	// 两种打转都报 run_no_progress：同一动作同一结果连续三次（成功的也算）、连续五次回复的动作全被拒绝。
+	assert.match(stuck?.hint ?? "", /同一个结果/u);
+	assert.match(stuck?.hint ?? "", /被拒绝/u);
 	const checkpoint = sessionProblem({
 		...session,
 		lastFailure: { code: "turn_usage_checkpoint", message: "这一轮的用量折合 612 万 token", retryable: false },
