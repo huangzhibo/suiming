@@ -36,7 +36,10 @@ export interface StoryImpact {
 	subject: StoryImpactSubject;
 	/** 直接涉及主体的 Beat，按故事顺序。 */
 	storyBeatIds: string[];
-	/** 经 refs.beat 依赖上面这些 Beat 的下游 Beat（不含它们本身），按故事顺序。 */
+	/**
+	 * 经 refs.beat 依赖上面这些 Beat 的下游 Beat（不含它们本身），按故事顺序。对紧挨着的上一节的依赖只算一跳、
+	 * 不往后传；主体是 Beat 时，紧接着的下一节总在其中。
+	 */
 	dependentStoryBeatIds: string[];
 	characterIds: string[];
 	placeIds: string[];
@@ -146,6 +149,12 @@ export function storyImpact(candidate: ArtifactCandidate, subject: StoryImpactSu
 	const { roots, familyIds } = rootBeats(design, subject);
 	const rootIds = new Set(roots.map((beat) => beat.id));
 	const dependents = storyDependentClosure(design.story, [...rootIds]).filter((beat) => !rootIds.has(beat.id));
+	// 改的是一节时，紧接着的下一节要接上它的结尾：顺序上的接缝，不论有没有声明 refs.beat，只算一跳。
+	const next =
+		subject.kind === "beat"
+			? design.story.beats.find((beat) => beat.ordinal === (roots[0]?.ordinal ?? -2) + 1)
+			: undefined;
+	if (next !== undefined && !rootIds.has(next.id) && !dependents.includes(next)) dependents.push(next);
 	const involved = [...roots, ...dependents];
 	const byOrdinal = (left: StoryBeat, right: StoryBeat) => left.ordinal - right.ordinal;
 	const subjectRef = `${subject.kind}:${subject.id}`;

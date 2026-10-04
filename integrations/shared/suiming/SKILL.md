@@ -55,7 +55,7 @@ description: 在 Suiming Open Story Directory 中设计、写作、审稿、抽�
 suim --json design impact <kind>:<id>    # kind: beat / character / place / resource / world / contract / intent
 ```
 
-返回直接涉及的 Beat、经 refs 依赖它们的下游 Beat、相关人物 / 地点 / 资源 / World / Contract / Intent 及其路径。它只是召回，不是编辑前置门，也不代替语义判断；合并主要修改对象，读完整相关信息，一次完成最小但语义完整的联动修订。多个 finding 相关时先合并共同根因。
+返回直接涉及的 Beat、经 refs 依赖它们的下游 Beat（改 Beat 时也带上紧接着的下一节；对上一节的依赖不往后传）、相关人物 / 地点 / 资源 / World / Contract / Intent 及其路径。它只是召回，不是编辑前置门，也不代替语义判断；合并主要修改对象，读完整相关信息，一次完成最小但语义完整的联动修订。多个 finding 相关时先合并共同根因。
 
 **自检、提交与 Review。** 完整创建或修订 Design 后，先用下面几问自检，已知问题直接修，不留给 Reviewer：
 

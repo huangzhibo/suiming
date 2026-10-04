@@ -137,7 +137,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 | 能力 | 工具 | replay | 说明 |
 | --- | --- | --- | --- |
-| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` `read_result` | read | `read` 按行分页（默认 2000 行），按大小折叠还没做（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact` |
+| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` `read_result` | read | `read` 按行分页（默认 2000 行），按大小折叠还没做（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
 | 修改候选 | `write` `edit` `copy` `move` `delete` | reconcile（journal） | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | read / reconcile（receipt） | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | read | 模型主动压缩；系统触发的压缩见第 7 节 |

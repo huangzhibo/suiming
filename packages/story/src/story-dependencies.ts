@@ -58,26 +58,29 @@ export function buildStoryDependencyGraph(story: StoryOutline): StoryDependencyG
 	return { directDependenciesByBeatId, directDependentsByBeatId };
 }
 
-function transitiveClosure(
-	story: StoryOutline,
-	rootIds: readonly string[],
-	edges: ReadonlyMap<string, readonly string[]>,
-): StoryBeat[] {
+/**
+ * 依赖闭包：沿 refs.beat 层层找下游。对紧挨着的上一节的依赖只算一跳、不往后传：相邻已由顺序表达，
+ * 抽出来的作品又常常每节都连上一节（示例三国一半的 refs.beat 只跨一节），沿这条链传下去，
+ * 改前半本任何一节都会召回后文的近九成。
+ */
+export function storyDependentClosure(story: StoryOutline, rootIds: readonly string[]): StoryBeat[] {
+	const dependents = buildStoryDependencyGraph(story).directDependentsByBeatId;
+	const ordinals = new Map(story.beats.map((beat) => [beat.id, beat.ordinal]));
 	const roots = new Set(rootIds);
 	const seen = new Set<string>();
+	const expanded = new Set(rootIds);
 	const pending = [...rootIds];
 	while (pending.length > 0) {
 		const current = pending.pop();
 		if (current === undefined) continue;
-		for (const next of edges.get(current) ?? []) {
-			if (roots.has(next) || seen.has(next)) continue;
+		for (const next of dependents.get(current) ?? []) {
+			if (roots.has(next)) continue;
 			seen.add(next);
+			const adjacent = (ordinals.get(next) ?? 0) - (ordinals.get(current) ?? 0) === 1;
+			if (adjacent || expanded.has(next)) continue;
+			expanded.add(next);
 			pending.push(next);
 		}
 	}
 	return story.beats.filter((beat) => seen.has(beat.id));
-}
-
-export function storyDependentClosure(story: StoryOutline, rootIds: readonly string[]): StoryBeat[] {
-	return transitiveClosure(story, rootIds, buildStoryDependencyGraph(story).directDependentsByBeatId);
 }

@@ -32,6 +32,33 @@ async function withProject<T>(body: (project: LocalProjectService, checkoutPath:
 
 const code = (error: unknown): string | undefined => (error as { code?: string }).code;
 
+test("design impact 改一节时召回紧接着的下一节，不论它有没有声明 refs.beat；改别的主体不额外带下一节", async () => {
+	const files = sampleWorkFiles().map((file) =>
+		file.path === "outline/story/vol-0001/beat-0002.md"
+			? {
+					...file,
+					bytes: new TextEncoder().encode(
+						new TextDecoder().decode(file.bytes).replace("  beat: [beat-0001]\n", ""),
+					),
+				}
+			: file,
+	);
+	assert.notDeepEqual(files, sampleWorkFiles(), "样例里 beat-0002 的 refs.beat 应已去掉");
+	const checkoutPath = await mkdtemp(join(tmpdir(), "suiming-host-context-"));
+	await materializeOpenStoryDirectorySnapshot(checkoutPath, files);
+	const project = await LocalProjectService.init({ checkoutPath, projectId: "host-context-seam" });
+	try {
+		const candidate = await project.checkoutCandidate();
+		assert.deepEqual(storyImpact(candidate, parseStoryImpactSubject("beat:beat-0001")).dependentStoryBeatIds, [
+			"beat-0002",
+		]);
+		assert.deepEqual(storyImpact(candidate, { kind: "place", id: "赤壁" }).dependentStoryBeatIds, []);
+	} finally {
+		project.close();
+		await rm(checkoutPath, { recursive: true, force: true });
+	}
+});
+
 test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及的全部 Beat、Contract 的 open / resolve 与 deadline、Intent 的范围", async () => {
 	await withProject(async (project) => {
 		const candidate = await project.checkoutCandidate();

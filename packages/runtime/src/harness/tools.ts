@@ -488,7 +488,7 @@ export function impactTool(scan: CandidateScanner): HarnessTool<typeof ImpactSch
 		name: "impact",
 		label: "impact",
 		description:
-			"改一个人物、物品、地点、World、Contract 或 Beat 之前，按 refs 与 refs.beat 召回可能受影响的 Beat 与文件路径；带 sourceId 查那份 Source 的抽取。只召回，不判断语义。",
+			"改一个人物、物品、地点、World、Contract 或 Beat 之前，按 refs 与 refs.beat 召回可能受影响的 Beat 与文件路径（改 Beat 时也带上紧接着的下一节）；带 sourceId 查那份 Source 的抽取。只召回，不判断语义。",
 		parameters: ImpactSchema,
 		replay: "read",
 		async execute(_toolCallId, params) {
