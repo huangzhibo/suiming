@@ -383,7 +383,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 
 | 切片 | 内容 | 状态 |
 | --- | --- | --- |
-| C | loop 与 Context | 已做：binding 按 turn、steering 只给根、turn 开始的状态行与结束对账、窗口保护（折叠的粗版本）、`write` / `edit` 带 `check`、`submit_review` 引文校验。**剩下**：按大小折叠与 `recall`、commit 后与 turn 结束后的边界压缩（第 7 节）；「子任务运行中作者发消息」已实现、没有测试（第 14 节）。各项彼此独立，可以分开提交 |
+| C | loop 与 Context | 已做：binding 按 turn、steering 只给根、turn 开始的状态行与结束对账、窗口保护（折叠的粗版本）、`write` / `edit` 带 `check`、`submit_review` 引文校验。**剩下**：按大小折叠与 `recall`、commit 后与 turn 结束后的边界压缩（第 7 节）。各项彼此独立，可以分开提交 |
 | E | 调研：三个工具、Researcher profile、config、安全边界、对账项（第 8.1–8.4、8.6 节） | 未做；`harness/research/` 预计新增约 400 行 |
 | F | 计算：`run_command`（Seatbelt profile、解释器探测、超时与输出上限、折叠；第 8.5 节） | 未做；`harness/sandbox/` 预计新增约 150 行，无新依赖 |
 
@@ -410,7 +410,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 两个 turn 之间升级了工具面或宪法 | 下一 turn 用新绑定；之后中途退出的 turn 按这一轮冻结的声明恢复（不是会话第一次请求的）；参数半途变了报 `binding_mismatch` | `agent`「半途恢复按这一轮冻结的工具声明：两轮之间升级过工具面也能续上，参数半途变了仍报 binding_mismatch」 |
 | 退出后重开；显式换模型 | 重开同 session 从 checkpoint 续；换模型只在无未决副作用时生效 | `agent`「进程重启：持有进程已死的 running session 收敛回 idle 记 process_restart，下一句从 checkpoint 续」「模型结果未知才 paused；不授权重发就一直停着；换模型要先核对；重发后才能在边界换绑」；`harness-recovery`「换绑只在没有未决副作用的边界发生；停在动作中间时报 binding_mismatch」；`execution-state`「换模型只在不跑的时候；删除 session 带走它的子任务」；`conversation-model`「session 的模型独立于全局默认，思考参数真实传入；turn 边界换绑与设置保存都不打断当前回复」 |
 | 指令已接收但应用前退出；应用后确认回复丢失 | 下一 Context 恰好包含一次该消息；重放返回原确认 | `harness-recovery`「作者消息已存入 checkpoint 而消息发布失败时，恢复补齐同一条消息」；`agent`「turn 进行中作者补一句：模型停下时 inbox 有新消息就在同一 turn 里继续；turn 结束后的消息等下一个 turn」；`agent-loop-persistence`「读取 steering 失败必须停止，不能冒充没有作者指令而继续调用」 |
-| **子任务运行中作者发消息** | 消息留在 inbox，子任务不接收；子任务返回后根 Agent 在下一边界取走 | **没有测试**（已实现：子任务的 loop 不接 inbox） |
+| 子任务运行中作者发消息 | 消息留在 inbox，子任务不接收；子任务返回后根 Agent 在下一边界取走 | `agent`「子任务运行中作者发消息：子任务看不到，交付之后根 Agent 在下一次请求里接着工具结果读到」 |
 | 两进程争用、旧 owner 迟到 | 只有一个有效推进者；拒绝陈旧确认 | `local-project-regressions`「执行状态按行保存：另一进程新增的 session 不被抹掉，版本落后的写入报告冲突」；`workspace`「命令重发校验输入：并发 send 只有一个 controller…」；`execution-persistence`「SQLite 已提交但确认返回丢失时，旧实例停下，重开从原回执恢复」 |
 | **`write` 到 Story 根之外** | 写入成功；`commit` 结果点名它未进版本 | `agent`「Agent 直接修改与阶段提交，不强制 Review 或子任务；不属于作品的文件不进版本，提交结果点名」（`scripts/count.py` 写进真实 checkout，`ignored` 与 `suim diff` 是同一份） |
 | 模型把目录当文件读、写、删 | `is_a_directory` 作为工具拒绝回到模型手里，turn 继续；`list` 列一层目录、私有目录与读范围之外的不列 | `confined-env`「读、写、删一个目录：如实拒绝并指向 list，不抛原始 EISDIR 掀掉整个 turn」「list：列出一层目录…」——前者是 2026-10-01 真实模型回归里 Writer 读目录、原始 EISDIR 掀掉整个 turn 之后补的 |

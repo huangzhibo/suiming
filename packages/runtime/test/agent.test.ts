@@ -385,6 +385,41 @@ test("turn 进行中作者补一句：模型停下时 inbox 有新消息就在�
 	}
 });
 
+test("子任务运行中作者发消息：子任务看不到，交付之后根 Agent 在下一次请求里接着工具结果读到", async () => {
+	// 作者插话只进根 Agent 的消息列表（Harness 设计第 4 节「steering 只给根 Agent」）：子任务的 loop 不接 inbox，
+	// 插话不会混进 Worker 的上下文，也不会因为子任务在跑而丢掉。
+	const f = await fixture();
+	try {
+		const id = (await f.harness.createSession()).id;
+		const aside = "顺便把阚泽也看一下";
+		f.provider.setResponses([
+			call("delegate", { goal: "读黄盖的人物档后交付", profile: "main" }),
+			async () => {
+				f.project.queueInbox(id, aside);
+				return call("read", { path: "world/characters/黄盖.md" });
+			},
+			async (context) => {
+				assert.doesNotMatch(JSON.stringify(context.messages), /阚泽也看/u, "子任务的请求里没有作者插话");
+				return call("submit_task", { summary: "黄盖的人物档读过了" });
+			},
+			async (context) => {
+				const texts = context.messages.map((message) => JSON.stringify(message.content));
+				const result = texts.findIndex((text) => text.includes("黄盖的人物档读过了"));
+				const steered = texts.findIndex((text) => text.includes(aside));
+				assert.ok(result >= 0 && steered > result, "插话排在子任务交付之后，不早于它也没有丢");
+				return reply("黄盖看过了，接着看阚泽");
+			},
+		]);
+		const outcome = await f.say("让子任务看看黄盖", id);
+		assert.equal(outcome.failure, undefined);
+		assert.equal(outcome.value?.reply, "黄盖看过了，接着看阚泽");
+		assert.equal(f.provider.state.callCount, 4);
+		assert.equal(outcome.session.inboxSequence, 2, "两条作者消息都在这一个 turn 里取走");
+	} finally {
+		await f.close();
+	}
+});
+
 test("连续重复同一被拒绝动作：turn 以 run_no_progress 结束回 idle；作者下一句就能续", async () => {
 	const f = await fixture();
 	try {
