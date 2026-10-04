@@ -1,6 +1,6 @@
 {
 	"name": "@suiming/cloud-s3",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
@@ -13,7 +13,7 @@
 	"files": ["dist"],
 	"dependencies": {
 		"@aws-sdk/client-s3": "3.1125.0",
-		"@suiming/runtime": "0.0.0"
+		"@suiming/runtime": "0.1.0"
 	},
 	"engines": {
 		"node": ">=24.0.0"

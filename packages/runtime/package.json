@@ -1,6 +1,6 @@
 {
 	"name": "@suiming/runtime",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"private": true,
 	"license": "MIT",
 	"type": "module",
@@ -20,8 +20,8 @@
 		"@opentelemetry/exporter-trace-otlp-http": "0.222.0",
 		"@opentelemetry/resources": "2.11.0",
 		"@opentelemetry/sdk-trace": "2.11.0",
-		"@suiming/sdk": "0.0.0",
-		"@suiming/story": "0.0.0",
+		"@suiming/sdk": "0.1.0",
+		"@suiming/story": "0.1.0",
 		"isomorphic-git": "^1.42.2",
 		"proper-lockfile": "4.1.2",
 		"smol-toml": "1.8.0",
