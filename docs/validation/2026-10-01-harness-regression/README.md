@@ -242,3 +242,7 @@ Skill 校准清单里通用的几条并进 `STORY_TEXT_METHOD`（扩写细纲的
 ## 文档核对之后（2026-10-04）
 
 逐条核对文档时顺带改了 Story Language 的三句（期限当节 resolve 也算按期、样章 id 必须是 `style_` 开头的 ASCII、期待泳道显示正文第一个标题），它们进 Agent 经 `story_guide` 读到的内容。构建 `7babfc2`，读 Story Language 的两项各 1 次：write-back ✔（27 s，$0.035），design-edit ✔（44 s，$0.031），2 / 2。
+
+## 每轮用量检查点之后（2026-10-04）
+
+loop 加了两道停止条件：一轮估算花费到 $10 停下（每轮用量检查点），连续五次回复的动作全被拒绝也算 `run_no_progress`。要看的是第二条会不会误停正常的修错，于是跑会反复撞 Checker 再修的两项，构建 `4260676`，各 1 次：check-issues ✔（49 s，$0.037），delegate-writer-issues ✔（297 s，$0.140），2 / 2。检查点在这类任务上远够不着，按设计不会触发。
