@@ -111,8 +111,9 @@ test("Langfuse 导出参数：OTLP HTTP traces 端点与 Basic auth；没有 key
 	await langfuse.context.startSpan({ name: "unreachable" }, async () => undefined);
 	const started = Date.now();
 	await langfuse.flush(200);
-	assert.ok(Date.now() - started < 5000);
-	await langfuse.shutdown();
+	assert.ok(Date.now() - started < 2000, "flush(200) 应在超时附近返回");
+	// 收尾也给有界超时：默认值下对不可达端点要白等近一秒。
+	await langfuse.shutdown(200);
 });
 
 test("关联维度传给子 observation，Task 覆盖父值，用量与错误不继承", async () => {

@@ -805,8 +805,9 @@ test("执行命令只写自己改动的行：一个 turn 里整份导出与整�
 			await f.close();
 		}
 	};
+	// 2 轮对 6 轮就看得出次数随不随轮数变；原来跑 20 轮，只是多花时间（2026-10-04 测试审查）。
 	const few = await run(2);
-	assert.deepEqual(await run(20), few);
+	assert.deepEqual(await run(6), few);
 });
 
 test("半途恢复按这一轮冻结的工具声明：两轮之间升级过工具面也能续上，参数半途变了仍报 binding_mismatch", async () => {

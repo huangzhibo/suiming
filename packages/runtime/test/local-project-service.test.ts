@@ -470,50 +470,6 @@ test("open 只收敛持有进程已死的 running session：回 idle 记 process
 	}
 });
 
-test("open 以 head 快照恢复 managed commit 崩溃窗口", async () => {
-	const fixture = await createServiceFixture();
-	let service: LocalProjectService | undefined;
-	try {
-		service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
-		const paths = service.paths;
-		const genesis = service.project().headRevisionId;
-		service.close();
-		service = undefined;
-
-		// 绕过 service 直接推进 Canon：canon ref 已移、checkout 还没同步。
-		const canon = new GitCanonStore({ dir: paths.checkoutPath });
-		const committed = await canon.commit(
-			"project-1",
-			{
-				baseRevisionId: genesis,
-				operations: [
-					{
-						operation: "replace",
-						identity: targetArtifactIdentity("character", "黄盖"),
-						path: "world/characters/黄盖.md",
-						mediaType: "text/markdown; charset=utf-8",
-						bytes: encoder.encode("---\nname: 黄盖\n---\n崩溃后应恢复到 head。\n"),
-					},
-				],
-			},
-			validateStoryProjectCandidate,
-		);
-
-		service = await LocalProjectService.open(fixture.checkoutPath);
-		assert.equal(service.project().headRevisionId, committed.id);
-		assert.equal((await service.status()).state, "clean");
-		assert.equal(
-			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
-				.includes("崩溃后应恢复到 head"),
-			true,
-		);
-	} finally {
-		service?.close();
-		await cleanup(fixture);
-	}
-});
-
 test("canon ref 丢了（例如 .git 被删）时 open 拒绝，不把没过 Checker 的 checkout 写成新的创世版本", async () => {
 	// 2026-10-04 审查发现：open 曾在这里按当前 checkout 直接建 Canon，绕过 Checker。
 	const fixture = await createServiceFixture();

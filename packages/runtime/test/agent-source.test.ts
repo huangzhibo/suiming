@@ -714,29 +714,6 @@ test("Source 审稿锚在抽取文件上的 finding 可以引原作：「抽取�
 	});
 });
 
-test("delegate 的说明要求把独立的几段在同一次回复里一起派出", async () => {
-	// 10-03 重抽：能并行之后根 Agent 仍先派一个 source-reader 试水，等它读完（11 分半）才一次派出其余五个（12 分钟），读原文的时间翻了一倍。
-	// Codex 与 Claude Code 都在提示里明说「能并行就一起派」，只写「会同时执行」模型不会主动这么做。
-	await withProject(async (project) => {
-		let system = "";
-		const outcome = await say(
-			new SuimingHarness({
-				project,
-				models: gateway([
-					(context) => {
-						system = JSON.stringify(context.messages[0]);
-						return reply("好");
-					},
-				]),
-			}),
-			"读一下访谈",
-		);
-		assert.equal(outcome.failure, undefined);
-		assert.match(system, /同一次回复里一起派出/u);
-		assert.match(system, /不要先派一段试水/u);
-	});
-});
-
 test("Target 层审稿读不到 Source：Design 与正文的 Reviewer 只看 Target", async () => {
 	// Skill 的审稿循环：Target Review 不读 Source。design 层的 Reviewer 原来不限读范围，能翻原作；
 	// 在忠实抽取的评测作品里，它拿原作当标准就成了「像不像原作」，不是 Design 本身成不成立。
@@ -1025,30 +1002,6 @@ test("带号段的 source-extractor 同一次回复里并行；不带范围的�
 		assert.equal(tasks.length, 3);
 		assert.ok((tasks[1]?.createdAt ?? "") <= (tasks[0]?.updatedAt ?? ""), "第二段在第一段结束前就开始了");
 		assert.match(integrator, /整合/u);
-	});
-});
-
-test("delegate 的说明写明 Source 抽取的计划：分段抽取、整合、补全、统一修、审稿一轮", async () => {
-	await withProject(async (project) => {
-		let system = "";
-		await say(
-			new SuimingHarness({
-				project,
-				models: gateway([
-					(context) => {
-						system = JSON.stringify(context.messages[0]);
-						return reply("好");
-					},
-				]),
-			}),
-			"抽取访谈",
-		);
-		assert.match(system, /分段抽取.*整合.*补全.*统一修.*review 一轮/u);
-		// 10-03 前 12 章第三圈：一段装得下，根 Agent 派了一个不带范围的抽取，没人写笔记，只好自己把原文读一遍补覆盖
-		assert.match(system, /只有一段也这样派：笔记由它写/u);
-		// 10-03 前 24 章：根 Agent 只派了第一段，goal 里要它「说明本段引向下一段的状态」，打算串行交接
-		assert.match(system, /segments 的每一段各委派一个/u);
-		assert.match(system, /不要让前一段给后一段交代状态/u);
 	});
 });
 

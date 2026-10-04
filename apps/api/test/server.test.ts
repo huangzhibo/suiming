@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { CloudProjectService } from "@suiming/runtime";
-import { DOMAIN_API_ROUTES, encodeDomainApiOpenStoryPackage } from "@suiming/sdk";
+import { DOMAIN_API_ROUTES, DomainApiErrorSchema, encodeDomainApiOpenStoryPackage } from "@suiming/sdk";
+import { Value } from "typebox/value";
 import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import {
@@ -40,7 +41,11 @@ test("real Fastify composition registers OpenAPI and the Domain API, and closes 
 		method: "GET",
 		url: "/v1/projects/project-1",
 	});
+	// 真 Fastify 经适配器转发：状态码、JSON content-type 与错误信封都来自 DomainApiHandler（原来另有一条用手写假
+	// Fastify 测同一件事的，2026-10-04 并进这里）。
 	assert.equal(response.statusCode, 401);
+	assert.equal(response.headers["content-type"], "application/json; charset=utf-8");
+	assert.equal(Value.Check(DomainApiErrorSchema, response.json()), true);
 	assert.equal(response.json().error.code, "cloud_authentication_required");
 
 	// OpenAPI 只由 @fastify/swagger 从注册的路由生成：文档里的操作恰好是 SDK 路由目录里的那些，不多不少。

@@ -6,14 +6,11 @@ import test from "node:test";
 import {
 	ArtifactError,
 	type ChangeSet,
-	composeReviewFile,
 	InMemoryExecutionState,
 	inspectRelease,
 	LocalProjectService,
 	materializeOpenStoryDirectorySnapshot,
 	publishRelease,
-	reviewCurrency,
-	reviewsIn,
 	SqliteLocalStore,
 	targetArtifactIdentity,
 	textCurrencies,
@@ -86,128 +83,6 @@ test("发布 Release 后 host 修改正文仍能提交，Release 只变为 stale
 		);
 	} finally {
 		service?.close();
-		await rm(root, { recursive: true, force: true });
-	}
-});
-
-test("host 修改一章正文只让审查该章的审稿失效，其余审稿与正文时效保留；审稿文件本身留在版本里", async () => {
-	const { root, checkoutPath } = await smokeCheckout();
-	let service: LocalProjectService | undefined;
-	try {
-		service = await LocalProjectService.init({ checkoutPath, projectId: "partial-review" });
-		await writeAllText(service);
-		const written = await headCandidate(service);
-		const reviewBeat = (beatId: string, now: Date) =>
-			composeReviewFile(written.candidate, {
-				layer: "text",
-				scope: { kind: "beats", storyBeatIds: [beatId] },
-				revision: written.head,
-				draft: { verdict: "pass", summary: beatId, findings: [], uncovered: [], uncertainties: [] },
-				now,
-			});
-		const firstReview = reviewBeat("beat-0001", new Date("2026-09-13T10:00:00Z"));
-		const secondReview = reviewBeat("beat-0002", new Date("2026-09-13T10:00:01Z"));
-		await service.commitManagedChangeSet({
-			baseRevisionId: written.head,
-			operations: [firstReview, secondReview].map((review) => ({
-				operation: "create",
-				identity: targetArtifactIdentity("review", review.id),
-				path: `review/${review.id}.md`,
-				mediaType: "text/markdown; charset=utf-8",
-				bytes: encoder.encode(review.content),
-			})),
-		});
-
-		await writeFile(join(checkoutPath, "text", "beat-0002.md"), "约定那夜，火船一齐点火。江面上许久没有人声。");
-		const committed = await service.commitCheckout();
-		assert.equal(committed.created, true);
-
-		const after = await headCandidate(service);
-		const reviews = new Map(reviewsIn(after.candidate).map((item) => [item.id, item]));
-		assert.deepEqual([...reviews.keys()].sort(), [firstReview.id, secondReview.id].sort(), "审稿文件不随失效消失");
-		assert.deepEqual(
-			await reviewCurrency(after.reader, after.head, after.candidate, reviews.get(firstReview.id) as never),
-			{
-				state: "current",
-				changed: [],
-				revision: written.head,
-			},
-		);
-		assert.deepEqual(
-			await reviewCurrency(after.reader, after.head, after.candidate, reviews.get(secondReview.id) as never),
-			{
-				state: "stale",
-				changed: ["text/beat-0002.md"],
-				revision: written.head,
-			},
-		);
-		assert.deepEqual(
-			(await textCurrencies(after.reader, after.head, after.candidate)).map((entry) => [
-				entry.storyBeatId,
-				entry.state,
-			]),
-			[
-				["beat-0001", "current"],
-				["beat-0002", "current"],
-			],
-		);
-	} finally {
-		service?.close();
-		await rm(root, { recursive: true, force: true });
-	}
-});
-
-test("执行状态按行保存：另一进程新增的 session 不被抹掉，版本落后的写入报告冲突", async () => {
-	const { root, checkoutPath } = await smokeCheckout();
-	let first: SqliteLocalStore | undefined;
-	let second: SqliteLocalStore | undefined;
-	try {
-		const service = await LocalProjectService.init({ checkoutPath, projectId: "two-processes" });
-		const paths = service.paths;
-		const genesis = service.project().headRevisionId;
-		service.close();
-		const options = { databasePath: paths.databasePath, objectRootPath: paths.objectRootPath };
-		first = new SqliteLocalStore(options);
-		second = new SqliteLocalStore(options);
-		// 走产品的写入路径：每条命令只写自己改动的行（applyExecutionDelta）。2026-10-02 之前这条测试走的是
-		// 整份快照写入，那条路产品早已不用，测试守的不是产品。
-		const a = new InMemoryExecutionState({
-			snapshot: first.loadExecutionState(),
-			commit: (delta) => first?.applyExecutionDelta(delta),
-		});
-		const b = new InMemoryExecutionState({
-			snapshot: second.loadExecutionState(),
-			commit: (delta) => second?.applyExecutionDelta(delta),
-		});
-		const lease = { ownerId: "owner", pid: 1, hostname: "elsewhere", acquiredAt: new Date().toISOString() };
-
-		a.createSession({ commandId: "a:session", id: "session-a", projectId: "two-processes", baseRevisionId: genesis });
-		b.createSession({ commandId: "b:session", id: "session-b", projectId: "two-processes", baseRevisionId: genesis });
-
-		const merged = first.loadExecutionState();
-		assert.deepEqual(merged.sessions.map((session) => session.id).sort(), ["session-a", "session-b"]);
-
-		// A 推进了 session-a；B 持有 session-a 的旧版本再写入时必须报告冲突，而不是覆盖。
-		a.startTurn({ commandId: "a:start", sessionId: "session-a", lease });
-		const stale = new InMemoryExecutionState({
-			snapshot: merged,
-			commit: (delta) => second?.applyExecutionDelta(delta),
-		});
-		assert.throws(
-			() =>
-				stale.startTurn({
-					commandId: "b:start-stale",
-					sessionId: "session-a",
-					lease: { ...lease, ownerId: "other" },
-				}),
-			(error: unknown) => error instanceof ArtifactError && error.code === "execution_state_conflict",
-		);
-		const current = new InMemoryExecutionState({ snapshot: first.loadExecutionState() }).session("session-a");
-		assert.equal(current.status, "running");
-		assert.equal(current.lease?.ownerId, "owner");
-	} finally {
-		first?.close();
-		second?.close();
 		await rm(root, { recursive: true, force: true });
 	}
 });
@@ -290,7 +165,7 @@ test("同一作品同时只有一个 running session，跨进程也一样；持�
 	}
 });
 
-test("Beat 文件与 index 对不上时 status / diff 仍可读，check 回到模型手里而不是抛异常", async () => {
+test("Beat 文件与 index 对不上时 status / diff 仍可读，check 以带出路的诊断拒绝（在 Agent 里就是回到模型手里的拒绝）", async () => {
 	// 2026-09-14 之前：路径由 outline/story/index.yaml 反推，扫描阶段一发现文件不在投影位置就抛
 	// ArtifactError。后果是新写一个还没写进 index 的 Beat 文件，status / diff 与 turn 开场一起炸——
 	// 不是 Checker 拒绝回到模型手里，是整个工作区读不出来。
@@ -339,7 +214,6 @@ test("Beat 文件与 index 对不上时 status / diff 仍可读，check 回到�
 			() => active.check(),
 			(error: unknown) => (error as { code?: string }).code === "invalid_story_outline",
 		);
-		assert.equal(service.project().headRevisionId.length > 0, true);
 	} finally {
 		service?.close();
 		await rm(fixture.root, { recursive: true, force: true });

@@ -73,13 +73,15 @@ const candidates = [
 	{ label: "pro", text: "赤壁的门吱呀一声。黄盖站在门口，没有马上进去；等他出来时，袖子里多了一封信。" },
 ];
 
-test("盲读评委：候选匿名打乱、每轮一个顺序、名次经校验后按原始 label 合并，结果作为执行对象持久化", async () => {
+test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个顺序、名次经校验后按原始 label 合并，结果作为执行对象持久化", async () => {
 	await withProject(async (project) => {
 		const orders: string[][] = [];
 		const goals: boolean[] = [];
+		let system = "";
 		// 评委第一轮把先出现的排第一，第二轮顺序反过来仍把先出现的排第一：两版平均名次相同，靠第一轮名次定序。
 		const responses: Responses = [
 			(context: Context) => {
+				system = JSON.stringify(context.messages[0]);
 				const labels = blindLabelsIn(context);
 				orders.push(labels);
 				goals.push(userText(context).includes("作者这次特别要比的：\n看谁更像人在现场"));
@@ -117,6 +119,9 @@ test("盲读评委：候选匿名打乱、每轮一个顺序、名次经校验�
 			goal: "看谁更像人在现场",
 		});
 		assert.equal(result.rounds, 2);
+		// 默认按本作宪法与写作准则评，结果标明口径（读者口径另有一条测试）。
+		assert.equal(result.rubric, "constitution");
+		assert.match(system, /旁白替人物作证/u);
 		// 作者想比的点原样交给评委（原来只断言它存进了 session 记录的 input，那个字段没人读，已删）。
 		assert.deepEqual(goals, [true]);
 		assert.deepEqual(result.judge, { provider: "suiming-rank-faux", model: "judge-model", sameModelAsWriter: false });
@@ -288,34 +293,4 @@ test("读者口径的评委：不带宪法与写作准则、不看 Design，只�
 		},
 		{ "text/beat-0001.md": prior },
 	);
-});
-
-test("默认仍按本作宪法与写作准则评，结果标明口径", async () => {
-	await withProject(async (project) => {
-		let system = "";
-		const responses: Responses = [
-			(context: Context) => {
-				system = JSON.stringify(context.messages[0]);
-				const labels = blindLabelsIn(context);
-				return fauxAssistantMessage(
-					fauxToolCall("submit_ranking", {
-						ranking: labels.map((label, index) => ({
-							candidate: label,
-							rank: index + 1,
-							reason: "好",
-							flaws: [],
-						})),
-						summary: "默认。",
-					}),
-				);
-			},
-		];
-		const result = await runRankExperiment(new SuimingHarness({ project, models: gateway(responses) }), {
-			storyBeatId: "beat-0001",
-			candidates,
-			rounds: 1,
-		});
-		assert.equal(result.rubric, "constitution");
-		assert.match(system, /旁白替人物作证/u);
-	});
 });

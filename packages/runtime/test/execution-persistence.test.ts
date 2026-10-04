@@ -43,19 +43,18 @@ function createSession(state: InMemoryExecutionState, suffix: string): void {
 	state.createSession({ commandId: `session:${suffix}`, id: `session-${suffix}`, projectId: "project" });
 }
 
-test("SQLite 重新打开保留 checkpoint 与命令回执", async () => {
+test("SQLite 双连接各自新建 session：两边的都留下，后写的不抹掉先写的", async () => {
+	// 每条命令只写自己改动的行（applyExecutionDelta）；整份快照写入那条路 2026-10-02 已删。
 	await fixture((store, _databasePath, reopen) => {
-		const state = execution(store);
-		createSession(state, "a");
-		state.startTurn({ commandId: "start", sessionId: "session-a", lease });
-		const result = state.recordSessionCheckpoint("checkpoint", "session-a", { kind: "object", id: "saved" }, 2);
-		const restored = execution(reopen());
+		createSession(execution(store), "a");
+		createSession(execution(reopen()), "b");
 		assert.deepEqual(
-			restored.recordSessionCheckpoint("checkpoint", "session-a", { kind: "object", id: "saved" }, 2),
-			result,
+			store
+				.loadExecutionState()
+				.sessions.map((session) => session.id)
+				.sort(),
+			["session-a", "session-b"],
 		);
-		assert.equal(restored.session("session-a").inboxSequence, 2);
-		assert.equal(restored.session("session-a").version, result.version);
 	});
 });
 

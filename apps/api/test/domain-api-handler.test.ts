@@ -5,13 +5,7 @@ import { DOMAIN_API_ROUTES, DomainApiErrorSchema, encodeDomainApiOpenStoryPackag
 import { Value } from "typebox/value";
 import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
-import {
-	createBearerTokenAuthenticator,
-	DomainApiHandler,
-	domainApiTransportRoutes,
-	type FastifyDomainApiRouteOptions,
-	registerFastifyDomainApiRoutes,
-} from "../src/index.js";
+import { createBearerTokenAuthenticator, DomainApiHandler, domainApiTransportRoutes } from "../src/index.js";
 
 const ownerId = "author-1";
 const projectId = "project-1";
@@ -184,39 +178,4 @@ test("transport route projection preserves the SDK route catalog exactly", () =>
 		assert.equal(descriptor.schema.operationId, source.operationId);
 		assert.equal(descriptor.schema.response[source.successStatus], source.response);
 	}
-});
-
-test("Fastify adapter registers every catalog route and forwards framework request/reply without domain logic", async () => {
-	const { handler } = setup();
-	const registered: FastifyDomainApiRouteOptions[] = [];
-	registerFastifyDomainApiRoutes(
-		{
-			route: (options) => registered.push(options),
-		},
-		handler,
-	);
-	assert.equal(registered.length, Object.keys(DOMAIN_API_ROUTES).length);
-	const readProject = registered.find((route) => route.url === "/v1/projects/:projectId" && route.method === "GET");
-	assert.ok(readProject);
-	let status = 0;
-	let responseHeaders: Readonly<Record<string, string>> = {};
-	let body: unknown;
-	const reply = {
-		code(value: number) {
-			status = value;
-			return this;
-		},
-		headers(value: Readonly<Record<string, string>>) {
-			responseHeaders = value;
-			return this;
-		},
-		send(value: unknown) {
-			body = value;
-			return value;
-		},
-	};
-	await readProject.handler({ headers: {}, params: { projectId }, query: {}, body: undefined }, reply);
-	assert.equal(status, 401);
-	assert.equal(responseHeaders["content-type"], "application/json; charset=utf-8");
-	assert.equal(Value.Check(DomainApiErrorSchema, body), true);
 });
