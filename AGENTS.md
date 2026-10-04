@@ -88,7 +88,7 @@ npm run dev:api      # Cloud 开发进程（只剩 Canon 与同步），读 .env
 node --import tsx apps/cli/src/bin.ts --json status    # 从源码跑 suim
 npm run test:desktop   # 构建 renderer + 真实 Electron E2E；只改测试时可直接 node --import tsx --test apps/desktop/test/desktop.test.ts
 cd apps/web && npx shadcn@latest add <component>   # 生成 shadcn/ui 组件到 src/components/ui，之后跑 npm run format
-npm run regression:harness -- --only check-issues --trials 1   # 真实模型回归，节奏见下
+npm run regression:harness -- --only check --trials 1   # 真实模型回归，--only 可写任务名或分组（writer / design / check / smoke），节奏见下
 ```
 
 - workspace 包的 exports 指向 dist。测试和 CLI 里 `@suiming/*` 的跨包 import 走 dist，改了 packages/* 之后先 `npm run check`（其中 `tsc -b` 会重新 emit）或 `npm run build` 再 `npm test`，否则测的是旧代码。包内测试用 `../src` 相对路径，不受影响。

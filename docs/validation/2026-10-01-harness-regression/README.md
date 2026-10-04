@@ -250,3 +250,14 @@ loop 加了两道停止条件：一轮的用量到线停下（每轮用量检查
 ## 同一动作同一结果连续三次也停之后（2026-10-04）
 
 `run_no_progress` 的「同一动作连续三次」改为成功的也算。这条规则对每个任务都生效，所以全套各跑 1 次，看真实模型会不会正常地连续三次做同一件事：write-back ✔（38 s，$0.026），design-edit ✔（40 s，$0.051），check-issues ✔（45 s，$0.027），discuss ✔（53 s，$0.020），review ✔（101 s，$0.047），delegate-writer ✔（231 s，$0.137），write-text ✔（301 s，$0.158），delegate-writer-issues ✔（266 s，$0.126），8 / 8，合计 $0.59。构建是 `420fc25` 加未提交的这处改动。
+
+## Write Context 补 world/core 之后（2026-10-04）
+
+Write Context 补上 world/core 与只在硬状态变化里出现的参与者（`322b5b9`）。样例没有 world/core，也没有这样的参与者，Writer 的上下文只多了卷名，所以只跑 delegate-writer 1 次看委派写作这条路没坏：✔（364 s，$0.152）。新内容在回归里触发不到，正确与否由 `write-context.test.ts` 确定性地保证。
+
+## 任务收敛、判分收紧（2026-10-04）
+
+测试审查之后改了两处，之后的结果不能和本页之前的数字逐项比，下一次全套要重新立基线：
+
+- **判分收紧**（`5e080bc`）：几项原来几乎总算过——「回复点名没兑现的期待」只看回复里有没有「诈降」（那就是样例的主题）；委派只看「有子任务完成」；review 没有正文 finding 时 0 等于 0。现在要兑现 / 期限一类的词、要 delegate 动作指向 beat-0001、没有样本时记「未测」；写正文补上整书 Checker、无遗留未提交、没取写作依据就写正文为 0。模型服务出错记「作废」，不进通过率。
+- **任务从 8 个收成 6 个**：GPT-6.1 Sol 上 write-text 每次都自己委派 writer、独立审稿，与 delegate-writer 走同一条路（并行全套里调用数 10 / 10 / 11 对 12 / 12 / 17），删掉 delegate-writer，显式委派由 delegate-writer-issues 覆盖；换回不爱委派的模型时要加回来。write-back 并进 design-edit，改测隐式写回——作者提别的要求时顺口说一条长期设定，判它写回了 beat-0002 之外的意图或人物档。`--only` 可以写分组：writer、design、check、smoke。

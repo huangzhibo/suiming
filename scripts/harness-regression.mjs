@@ -4,13 +4,14 @@
 // 模型输出不确定，所以这是报通过率的脚本，不是红绿测试；不写 trace、不碰真实作品。
 // `suim --json` 的 ok 只表示命令跑完，Checker 过没过看 data.passed。
 //
-//   npm run regression:harness -- [--trials 3] [--only discuss,review] [--concurrency 6] [--out result.json]
+//   npm run regression:harness -- [--trials 3] [--only writer,discuss] [--concurrency 6] [--out result.json]
+//   （--only 写任务名或分组名，分组见 GROUPS）
 //
 // 跑的过程中不要重建 dist：每个任务起一个新的 suim 进程，读的是当时的 dist。脚本开头记下 commit 与
 // dist 指纹，每跑完一个任务核对一次，变了就停——不同构建混在一份结果里比不出任何东西。
 //
 // 各次运行互不相干（各自一份样例副本、各自的 suim 进程），默认同时跑 6 个。串行时全套 3 次在 GPT-6.1 Sol
-// （思考 high）上要一个多小时，四分之三花在三个写正文的任务上（单次 4–6 分钟），整轮的下限就是最慢的那一次。
+// （思考 high）上要一个多小时，大半花在写正文的任务上（单次 4–6 分钟），整轮的下限就是最慢的那一次。
 // 同一个订阅上 Agent 自己的分段抽取一次就并行 6 个请求。被限流时那一次会以模型调用失败记为未通过，
 // 看失败信息能和真正的退化分开。并行时单次耗时会变长，不能和串行跑的记录逐项比较。
 // 没有按预估耗时排「长的先跑」：并行 6 个时只省两分钟，却要维护一组会随模型漂移的数字。
@@ -147,22 +148,24 @@ const TASKS = [
 		],
 	},
 	{
-		id: "write-back",
-		prompt: "记住一个以后都成立的设定：黄盖年过五十，左臂有旧伤，拉不开硬弓。",
-		grade: (r) => [
-			expect("写回了意图或 Design", r.summary.changed.intent.count + r.summary.changed.design.count > 0),
-			expect("写回的是这条设定", /左臂|旧伤|硬弓|五十/u.test(r.changedText)),
-		],
-	},
-	{
 		id: "design-edit",
 		// 样例的 beat-0002 只有火船冲营，要求一个它确实没有的改动，否则「不用改」才是对的回答。
-		prompt: "在 beat-0002 里加上曹军巡江的船过来盘问、被黄盖拿降书应付过去的情节。改完检查并提交。",
+		// 后半句顺口带出一条长期设定：eval-022 的失败形态就是作者在提别的要求时说了长期事实，Agent 只改了眼前的
+		// 情节，intent/ 一个字没动，一周没人发现。原来单独的 write-back 任务明说「记住一个设定」，只测到最容易的情形
+		// （2026-10-04 并进这里）。
+		prompt:
+			"在 beat-0002 里加上曹军巡江的船过来盘问、被黄盖拿降书应付过去的情节；黄盖年过五十，左臂有旧伤，盘问时别让他亲自动手。改完检查并提交。",
 		grade: (r) => [
 			expect("改了 Design", r.summary.changed.design.count > 0),
 			expect(
 				"改的是 beat-0002",
 				r.summary.changed.design.paths.some((path) => path.endsWith("beat-0002.md")),
+			),
+			expect(
+				"那条长期设定写回了 beat-0002 之外的意图或人物档",
+				Object.entries(r.changedFiles).some(
+					([path, text]) => !path.endsWith("beat-0002.md") && /左臂|旧伤|五十/u.test(text),
+				),
 			),
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("当前版本过 Checker", r.check.data?.passed === true),
@@ -180,18 +183,6 @@ const TASKS = [
 			expect("当前版本过 Checker", r.check.data?.passed === true),
 			expect("没有遗留未提交", r.summary.uncommitted === 0),
 			expect("取了写作依据才写正文", (r.summary.textWithoutContext?.count ?? 0) === 0),
-		],
-	},
-	{
-		id: "delegate-writer",
-		prompt: "委派一个 writer 子任务写 beat-0001 的正文，写好后检查并提交。",
-		textCheck: true,
-		grade: (r) => [
-			expect("委派了 beat-0001 的 writer 并完成", delegatedWriter(r)),
-			expect("写了正文", r.summary.changed.text.count > 0),
-			expect("提交了版本", r.summary.revisions > 0),
-			expect("正文过检查", r.textCheck?.data?.passed === true),
-			expect("没有遗留未提交", r.summary.uncommitted === 0),
 		],
 	},
 	{
@@ -292,18 +283,19 @@ async function runTask(task, root, trial) {
 				: "没有 turn 结束对账事件",
 		};
 	// 写回判的是改了的意图与 Design 里有没有这条设定，只读这一轮改过的文件。
-	const changedText = (
+	const changedFiles = Object.fromEntries(
 		await Promise.all(
-			[...summary.changed.intent.paths, ...summary.changed.design.paths].map((path) =>
-				readFile(join(dir, path), "utf8").catch(() => ""),
-			),
-		)
-	).join("\n");
+			[...summary.changed.intent.paths, ...summary.changed.design.paths].map(async (path) => [
+				path,
+				await readFile(join(dir, path), "utf8").catch(() => ""),
+			]),
+		),
+	);
 	const result = {
 		reply: sent.data.reply ?? "",
 		summary,
 		actions,
-		changedText,
+		changedFiles,
 		check: await suim(dir, ["check"]),
 		textCheck: task.textCheck ? await suim(dir, ["text", "check", "beat-0001"]) : undefined,
 		tasks,
@@ -332,12 +324,28 @@ async function runTask(task, root, trial) {
 	};
 }
 
+/**
+ * `--only` 可以写任务名，也可以写分组：改了哪类 prompt 就跑哪组，不必每次凭判断挑任务。
+ * writer：写正文、委派 writer、审稿（Writer / Reviewer 契约、Write Context、写作方法）；design：改设计与写回；
+ * check：只读检查与带着 ISSUES 写正文（check 输出、阶段提交的说明）；smoke：一次调用的冒烟。
+ */
+const GROUPS = {
+	writer: ["write-text", "delegate-writer-issues", "review"],
+	design: ["design-edit"],
+	check: ["check-issues", "delegate-writer-issues"],
+	smoke: ["discuss"],
+};
+
 const option = (name) => {
 	const index = process.argv.indexOf(`--${name}`);
 	return index === -1 ? undefined : process.argv[index + 1];
 };
 const trials = Number(option("trials") ?? 1);
-const only = option("only")?.split(",");
+const only = option("only")
+	?.split(",")
+	.flatMap((name) => GROUPS[name] ?? [name]);
+if (only !== undefined)
+	for (const name of only) if (!TASKS.some((task) => task.id === name)) throw new Error(`没有这个任务或分组：${name}`);
 const tasks = TASKS.filter((task) => only === undefined || only.includes(task.id));
 const concurrency = Math.max(1, Number(option("concurrency") ?? 6));
 const build = {
