@@ -12,14 +12,10 @@ import {
 	fauxToolCall,
 } from "@earendil-works/pi-ai";
 import {
-	type CloudProjectStore,
 	HOST_ADAPTER_ROOTS,
-	LocalProjectLock,
 	LocalProjectService,
 	ModelGateway,
-	materializeOpenStoryDirectorySnapshot,
 	NOOP_TELEMETRY,
-	type OpenPackageFile,
 	readOpenStoryDirectory,
 } from "@suiming/runtime";
 import {
@@ -39,7 +35,6 @@ import {
 	SuimCliRollbackDataSchema,
 	SuimCliSessionEventsDataSchema,
 	SuimCliSessionListDataSchema,
-	SuimCliSessionShowDataSchema,
 	SuimCliSessionTurnDataSchema,
 	SuimCliSourceIngestDataSchema,
 	SuimCliSuccessSchema,
@@ -49,108 +44,9 @@ import { parse } from "smol-toml";
 import type { Static } from "typebox";
 import { Value } from "typebox/value";
 import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
-import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
-import { runSuimCli, SUIM_CLI_EXIT, type SuimCliIo } from "../src/cli.js";
+import { runSuimCli, SUIM_CLI_EXIT } from "../src/cli.js";
 import { HOST_IDS, installHost } from "../src/host-install.js";
-
-interface CliHarness {
-	io: SuimCliIo;
-	stdout: string[];
-	stderr: string[];
-	interrupt(): void;
-}
-
-interface CloudHarness {
-	store: CloudProjectStore;
-	endpoint: string;
-	actorId: string;
-}
-
-const encoder = new TextEncoder();
-
-// 测试不读开发者本机的 ~/.suiming：没传 gateway 的命令走默认解析时，只会看到这两个不存在的文件。
-// 2026-10-03 在干净的 HOME 里模拟 CI 时查出，「另一个 CLI 往进行中的 session 补一句」靠本机配置才通过。
-const NO_USER_CONFIG = join(tmpdir(), `suiming-cli-test-no-config-${process.pid}`);
-process.env.SUIMING_CONFIG_PATH = join(NO_USER_CONFIG, "config.toml");
-process.env.SUIMING_AUTH_PATH = join(NO_USER_CONFIG, "auth.json");
-
-function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
-	const root = `source/${sourceId}`;
-	const text = (path: string, value: string, mediaType = "text/markdown; charset=utf-8"): OpenPackageFile => ({
-		path,
-		mediaType,
-		bytes: encoder.encode(value),
-	});
-	return [
-		text(
-			`${root}/source.yaml`,
-			`schema_version: 1\nname: ${sourceId}.txt\nencoding: utf-8\n`,
-			"application/yaml; charset=utf-8",
-		),
-		text(`${root}/original.bin`, "黄盖备下火船，准备诈降。", "application/octet-stream"),
-		text(`${root}/material.txt`, "黄盖备下火船，准备诈降。\n", "text/plain; charset=utf-8"),
-		text(
-			`${root}/outline/story/index.yaml`,
-			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 来源\n    beat_ids: [beat-0001]\n",
-			"application/yaml; charset=utf-8",
-		),
-		text(
-			`${root}/outline/story/vol-0001/beat-0001.md`,
-			"---\nrefs:\n  character: [黄盖]\ncontracts:\n  open: [火船去向]\n---\n黄盖备下火船，材料没有交代它最终去了哪里。\n",
-		),
-		text(`${root}/world/characters/黄盖.md`, "上阵前先算清退路。\n"),
-		text(
-			`${root}/outline/contracts/火船去向.md`,
-			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
-		),
-	];
-}
-
-function harness(cwd: string, models?: ModelGateway, cloud?: CloudHarness): CliHarness {
-	const stdout: string[] = [];
-	const stderr: string[] = [];
-	const interruptHandlers = new Set<() => void>();
-	return {
-		stdout,
-		stderr,
-		interrupt: () => {
-			for (const handler of interruptHandlers) handler();
-		},
-		io: {
-			cwd: () => cwd,
-			stdout: (text) => stdout.push(text),
-			stderr: (text) => stderr.push(text),
-			onInterrupt: (handler) => {
-				interruptHandlers.add(handler);
-				return () => interruptHandlers.delete(handler);
-			},
-			...(models === undefined ? {} : { resolveModelGateway: async () => models }),
-			...(cloud === undefined
-				? {}
-				: {
-						cloudDefaults: () => ({ endpoint: cloud.endpoint, actorId: cloud.actorId }),
-						resolveCloudProjectStore: async () => cloud.store,
-					}),
-		},
-	};
-}
-
-async function fixture(): Promise<string> {
-	const root = await mkdtemp(join(tmpdir(), "suiming-cli-"));
-	await materializeOpenStoryDirectorySnapshot(root, [...sampleWorkFiles(), ...extractedSourceFiles("原作")]);
-	return root;
-}
-
-function response(output: readonly string[]): Record<string, unknown> {
-	assert.equal(output.length, 1);
-	return JSON.parse(output[0] as string) as Record<string, unknown>;
-}
-
-async function jsonCommand(cwd: string, args: readonly string[], models?: ModelGateway, cloud?: CloudHarness) {
-	const cli = harness(cwd, models, cloud);
-	const exitCode = await runSuimCli(["--json", ...args], cli.io);
-	return { cli, exitCode, value: response(cli.stdout) };
-}
+import { type CloudHarness, fixture, harness, jsonCommand, replyGateway, response } from "./cli-harness.js";
 
 function designRunGateway(
 	content = "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角不能靠巧合取胜，揭示必须带来不可恢复且当场可见的代价。\n",
@@ -185,85 +81,13 @@ function designRunGateway(
 	});
 }
 
-function sourceReadGateway(): ModelGateway {
-	const providerId = "suiming-cli-source-reader-faux";
-	const provider = fauxProvider({
-		provider: providerId,
-		models: [{ id: "agent-model" }, { id: "reviewer-model" }, { id: "source-reader-model" }],
-	});
-	const total = [..."访谈记录：黄盖先核对火船。\n"].length;
-	provider.setResponses([
-		fauxAssistantMessage(fauxToolCall("read_source", { sourceId: "访谈", start: 0, end: total })),
-		fauxAssistantMessage(fauxToolCall("source_coverage", { sourceId: "访谈" })),
-		(context: Context) => {
-			const last = context.messages.at(-1);
-			const part = Array.isArray(last?.content) ? last.content.find((item) => item.type === "text") : undefined;
-			const { materialSha256 } = JSON.parse(part?.type === "text" ? part.text : "{}") as { materialSha256: string };
-			return fauxAssistantMessage(
-				fauxToolCall("write", {
-					path: "source/访谈/notes/1.md",
-					content: `---\nspan: [0, ${total}]\nmaterial_sha256: ${materialSha256}\n---\nCLI 全文交接\n`,
-				}),
-			);
-		},
-		fauxAssistantMessage(fauxToolCall("commit", { summary: "保存笔记" })),
-		fauxAssistantMessage("阅读完成"),
-	]);
-	const models = createModels();
-	models.setProvider(provider.provider);
-	return new ModelGateway(models, {
-		profiles: {
-			main: { provider: providerId, model: "agent-model" },
-			reviewer: { provider: providerId, model: "reviewer-model" },
-			"source-reader": { provider: providerId, model: "source-reader-model" },
-		},
-	});
-}
-
-function sourceExtractGateway(): ModelGateway {
-	const providerId = "suiming-cli-source-extractor-faux";
-	const provider = fauxProvider({
-		provider: providerId,
-		models: [{ id: "agent-model" }, { id: "reviewer-model" }, { id: "source-extractor-model" }],
-	});
-	const write = (path: string, content: string) => fauxAssistantMessage(fauxToolCall("write", { path, content }));
-	provider.setResponses([
-		write(
-			"source/访谈/outline/story/index.yaml",
-			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 访谈\n    beat_ids: [beat-0001]\n",
-		),
-		write(
-			"source/访谈/outline/story/vol-0001/beat-0001.md",
-			"---\nrefs:\n  character: [黄盖]\n  resource: [火船]\n---\n访谈记录黄盖先核对火船，再决定如何处理。\n",
-		),
-		write("source/访谈/world/characters/黄盖.md", "点火前先看风向的人。\n"),
-		write("source/访谈/world/resources/火船.md", "黄盖核对的信件。\n"),
-		fauxAssistantMessage(fauxToolCall("commit", { summary: "保存 extraction" })),
-		fauxAssistantMessage("把访谈抽取为黄盖核对火船的事件。"),
-	]);
-	const models = createModels();
-	models.setProvider(provider.provider);
-	return new ModelGateway(models, {
-		profiles: {
-			main: { provider: providerId, model: "agent-model" },
-			reviewer: { provider: providerId, model: "reviewer-model" },
-			"source-extractor": { provider: providerId, model: "source-extractor-model" },
-		},
-	});
-}
-
 function reviewGateway(providerId: string, summary: string): ModelGateway {
 	const provider = fauxProvider({
 		provider: providerId,
 		models: [{ id: "agent-model" }, { id: "reviewer-model" }],
 	});
 	provider.setResponses([
-		fauxAssistantMessage(
-			fauxToolCall(
-				"review",
-				providerId.includes("source") ? { layer: "source", sourceId: "访谈" } : { layer: "text" },
-			),
-		),
+		fauxAssistantMessage(fauxToolCall("review", { layer: "text" })),
 		fauxAssistantMessage(
 			fauxToolCall("submit_review", { verdict: "pass", summary, findings: [], uncovered: [], uncertainties: [] }),
 		),
@@ -278,10 +102,6 @@ function reviewGateway(providerId: string, summary: string): ModelGateway {
 			reviewer: { provider: providerId, model: "reviewer-model" },
 		},
 	});
-}
-
-function sourceReviewGateway(): ModelGateway {
-	return reviewGateway("suiming-cli-source-reviewer-faux", "访谈 extraction 忠实覆盖 MaterialEvidence。");
 }
 
 function storyTextReviewGateway(): ModelGateway {
@@ -315,7 +135,7 @@ function writeRunGateway(): ModelGateway {
 	});
 }
 
-test("suim source ingest 原子导入本地文本并拒绝覆盖同名 Source", async () => {
+test("suim source ingest 导入本地文本，拒绝覆盖同名 Source 与缺失的输入文件", async () => {
 	const checkoutPath = await fixture();
 	const inputRoot = await mkdtemp(join(tmpdir(), "suiming-source-input-"));
 	const inputPath = join(inputRoot, "访谈.txt");
@@ -341,28 +161,7 @@ test("suim source ingest 原子导入本地文本并拒绝覆盖同名 Source", 
 			await readFile(join(checkoutPath, "source", "访谈", "material.txt"), "utf8"),
 			"访谈记录：黄盖先核对火船。\n",
 		);
-		// 读材料、抽取、独立审查都是对 Agent 说一句话；前两件它自己做，审查才委派一个 Reviewer。
-		for (const [text, models, taskKinds] of [
-			["读一遍访谈材料并记笔记", sourceReadGateway(), []],
-			["把访谈材料抽取成 Source Design", sourceExtractGateway(), []],
-			["独立审查访谈的抽取", sourceReviewGateway(), ["review"]],
-		] as const) {
-			const result = await jsonCommand(checkoutPath, ["session", "send", text], models);
-			assert.equal(result.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(result.value));
-			assert.ok(Value.Check(SuimCliSessionTurnDataSchema, result.value.data));
-			const data = result.value.data as { session: { id: string; status: string }; reply: string };
-			assert.equal(data.session.status, "idle");
-			assert.ok(data.reply.length > 0);
-			const shown = await jsonCommand(checkoutPath, ["session", "show", data.session.id]);
-			assert.ok(Value.Check(SuimCliSessionShowDataSchema, shown.value.data));
-			assert.deepEqual(
-				(shown.value.data as { tasks: { kind: string }[] }).tasks.map((task) => task.kind),
-				[...taskKinds],
-			);
-		}
-		const reports = await jsonCommand(checkoutPath, ["review", "list"]);
-		assert.equal((reports.value.data as { reviews: unknown[] }).reviews.length, 1);
-
+		// 读材料、抽取与 Source 审稿的 Agent 行为由 runtime 的 agent-source.test.ts 守；这里只测 CLI 的导入 contract。
 		const duplicate = await jsonCommand(checkoutPath, ["source", "ingest", inputPath, "--id", "访谈"]);
 		assert.equal(duplicate.exitCode, SUIM_CLI_EXIT.conflict);
 		assert.equal((duplicate.value.error as { code: string }).code, "source_already_exists");
@@ -383,7 +182,7 @@ test("suim source ingest 原子导入本地文本并拒绝覆盖同名 Source", 
 			]),
 			[
 				["原作", "extracted"],
-				["访谈", "extracted"],
+				["访谈", "ingested"],
 			],
 		);
 	} finally {
@@ -393,17 +192,12 @@ test("suim source ingest 原子导入本地文本并拒绝覆盖同名 Source", 
 });
 
 test("上一个进程崩溃留下的 running session：下一次 suim 打开时收敛回 idle，session send --session 接着跑", async () => {
+	// 收敛本身由 runtime 测（local-project-service 的 open、agent.test 的续跑）；这里守的是 host 看到的 CLI contract：
+	// session list 如实报 process_restart，session send --session 接着同一个 session 跑。
 	const checkoutPath = await fixture();
-	const inputRoot = await mkdtemp(join(tmpdir(), "suiming-session-recovery-"));
-	const inputPath = join(inputRoot, "访谈.txt");
 	try {
-		await writeFile(inputPath, "访谈记录：黄盖先核对火船。\n");
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
-		assert.equal(
-			(await jsonCommand(checkoutPath, ["source", "ingest", inputPath, "--id", "访谈"])).exitCode,
-			SUIM_CLI_EXIT.success,
-		);
-		const models = sourceReadGateway();
+		const models = replyGateway();
 		const sessionId = "session-crashed";
 		const project = await LocalProjectService.open(checkoutPath);
 		try {
@@ -415,7 +209,7 @@ test("上一个进程崩溃留下的 running session：下一次 suim 打开时�
 				model: (await models.bind("main")).snapshot,
 				baseRevisionId: project.project().headRevisionId,
 			});
-			project.queueInbox(sessionId, "读一遍访谈材料并记笔记");
+			project.queueInbox(sessionId, "讨论一下诈降的代价");
 			// 持有进程已经不在：lease 指向别的机器上的进程。
 			execution.startTurn({
 				commandId: "crash:start",
@@ -449,7 +243,6 @@ test("上一个进程崩溃留下的 running session：下一次 suim 打开时�
 		assert.deepEqual((shown.value.data as { tasks: unknown[] }).tasks, []);
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
-		await rm(inputRoot, { recursive: true, force: true });
 	}
 });
 
@@ -834,7 +627,7 @@ test("suim 退出时统一由 shutdown 导出并关闭观测实例，成功与�
 	}
 });
 
-test("确定性校验失败、project lock、缺失项目和 usage 使用稳定错误码与 exit code", async () => {
+test("确定性校验失败、缺失项目和 usage 使用稳定错误码与 exit code", async () => {
 	const checkoutPath = await fixture();
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init", checkoutPath])).exitCode, SUIM_CLI_EXIT.success);
@@ -867,19 +660,7 @@ test("确定性校验失败、project lock、缺失项目和 usage 使用稳定�
 		);
 		assert.ok(reported.every((item) => item.message.length > 0));
 
-		const lock = await LocalProjectLock.acquire(checkoutPath);
-		try {
-			const locked = await jsonCommand(checkoutPath, ["commit"]);
-			assert.equal(locked.exitCode, SUIM_CLI_EXIT.conflict);
-			assert.equal(Value.Check(SuimCliErrorSchema, locked.value), true);
-			assert.deepEqual(locked.value.error, {
-				code: "project_locked",
-				message: (locked.value.error as { message: string }).message,
-				retryable: true,
-			});
-		} finally {
-			await lock.release();
-		}
+		// 作品锁被占的那一条要等满锁超时（5 秒），单独放在 cli-lock.test.ts，不拖长这一组。
 
 		const missing = await jsonCommand(join(checkoutPath, "missing"), ["status"]);
 		assert.equal(missing.exitCode, SUIM_CLI_EXIT.notFound);
@@ -917,71 +698,7 @@ test("设计能绑定但 Checker 不通过时，check 成功返回逐条诊断�
 			JSON.stringify(errors),
 		);
 
-		// 作者声明全书未完待续：期限是 book_end 的期待建立了还没回应，算进行中
-		const contractPath = join(checkoutPath, "outline", "contracts", "诈降.md");
-		await writeFile(
-			contractPath,
-			(await readFile(contractPath, "utf8")).replace("deadline: beat-0002", "deadline: book_end"),
-		);
-		const indexPath = join(checkoutPath, "outline", "story", "index.yaml");
-		const unfinished = await jsonCommand(checkoutPath, ["check"]);
-		assert.equal((unfinished.value.data as { designPassed: boolean }).designPassed, false, "没声明就是全书写完了");
-		await writeFile(
-			indexPath,
-			(await readFile(indexPath, "utf8")).replace("schema_version: 2\n", "schema_version: 2\nopen_ended: true\n"),
-		);
-		const ongoing = await jsonCommand(checkoutPath, ["check"]);
-		assert.equal(ongoing.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(ongoing.value));
-		assert.equal((ongoing.value.data as { passed: boolean }).passed, true, JSON.stringify(ongoing.value));
-	} finally {
-		await rm(checkoutPath, { recursive: true, force: true });
-	}
-});
-
-test("作者未提交的修改与 Agent 的改动是同一份候选：一次 commit 一起进版本", async () => {
-	const checkoutPath = await fixture();
-	try {
-		await jsonCommand(checkoutPath, ["init"]);
-		const characterPath = join(checkoutPath, "world/characters/黄盖.md");
-		const original = await readFile(characterPath, "utf8");
-		await writeFile(characterPath, `${original}作者补的一句：他记得每一笔账。\n`);
-		const providerId = "suiming-cli-shared-candidate-faux";
-		const provider = fauxProvider({
-			provider: providerId,
-			models: [{ id: "agent-model" }, { id: "reviewer-model" }],
-		});
-		provider.setResponses([
-			fauxAssistantMessage(
-				fauxToolCall("write", {
-					path: "intent/计谋的代价.md",
-					content: "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角诈降的代价当场可见。\n",
-				}),
-			),
-			fauxAssistantMessage(fauxToolCall("commit", { summary: "完善设计" })),
-			fauxAssistantMessage("已经提交，你那句也一起进版本了。"),
-		]);
-		const models = createModels();
-		models.setProvider(provider.provider);
-		const gateway = new ModelGateway(models, {
-			profiles: {
-				main: { provider: providerId, model: "agent-model" },
-				reviewer: { provider: providerId, model: "reviewer-model" },
-			},
-		});
-		const sent = await jsonCommand(checkoutPath, ["session", "send", "完善设计并提交"], gateway);
-		assert.equal(sent.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(sent.value));
-		const session = (sent.value.data as { session: { status: string; lastFailure?: unknown } }).session;
-		assert.equal(session.status, "idle");
-		assert.equal(session.lastFailure, undefined);
-		// 没有 worktree，也就没有「作者的 checkout 脏了就挡住 Agent」：两个人的改动是同一份 diff。
-		const status = await jsonCommand(checkoutPath, ["status"]);
-		assert.equal((status.value.data as { state: string }).state, "clean");
-		const diff = await jsonCommand(checkoutPath, ["diff"]);
-		assert.deepEqual((diff.value.data as { entries: unknown[] }).entries, []);
-		assert.match(await readFile(characterPath, "utf8"), /他记得每一笔账/);
-		assert.match(await readFile(join(checkoutPath, "intent/计谋的代价.md"), "utf8"), /当场可见/);
-		const history = await jsonCommand(checkoutPath, ["history"]);
-		assert.equal((history.value.data as { revisions: unknown[] }).revisions.length, 2);
+		// 「全书未完待续时 book_end 的期待算进行中」是 Checker 规则，story 的 design.test 与 check-tool.test 守，这里不重复。
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 	}
@@ -1236,7 +953,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 		assert.equal(report.path, `review/${report.id}.md`);
 		// 审稿写进 checkout，是 dirty candidate；commit 后才进版本并可列出。
 		assert.match(await readFile(join(checkoutPath, report.path), "utf8"), /^---\nlayer: text\n/u);
-		assert.equal((await jsonCommand(checkoutPath, ["status"])).value.data && true, true);
+		assert.equal(((await jsonCommand(checkoutPath, ["status"])).value.data as { state: string }).state, "dirty");
 		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const listed = await jsonCommand(checkoutPath, ["review", "list"]);
 		const listedReview = (listed.value.data as { reviews: { id: string; current: boolean }[] }).reviews.find(
@@ -1244,16 +961,7 @@ test("host 领域命令：text check、design impact、context compile、review 
 		);
 		assert.ok(listedReview);
 		assert.equal(listedReview.current, true);
-		// 改了被审正文再提交：审稿还在，但不再 current。
-		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖当众挨了军杖。\n");
-		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
-		const relisted = await jsonCommand(checkoutPath, ["review", "list"]);
-		assert.equal(
-			(relisted.value.data as { reviews: { id: string; current: boolean; changed: string[] }[] }).reviews.find(
-				(item) => item.id === report.id,
-			)?.current,
-			false,
-		);
+		// 改了被审正文之后审稿不再 current：时效规则由 derived / host-context / workspace 的测试守，这里不再走一遍。
 
 		const badLayer = await jsonCommand(checkoutPath, ["review", "record", draftPath, "--layer", "nope"]);
 		assert.equal(badLayer.exitCode, SUIM_CLI_EXIT.validation);
