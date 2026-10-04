@@ -63,7 +63,7 @@ export function NeighborhoodView({
 	const upCount = up.reduce((sum, group) => sum + group.items.length, 0);
 	const downCount = down.reduce((sum, group) => sum + group.items.length, 0);
 	const label = (text: string, max = 12) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
-	const color = (kind: string) => KIND_COLOR[kind] ?? "#71717a";
+	const color = (kind: string) => KIND_COLOR[kind] ?? "var(--muted-foreground)";
 	const column = (placed: Placed[], side: "up" | "down") =>
 		placed.map((item) => {
 			const x = COL[side];

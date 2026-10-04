@@ -17,6 +17,19 @@ export function PanelToolbar({ className, ...props }: ComponentProps<"div">) {
 	);
 }
 
+/** 工作面里的空状态：虚线框加一段说明，下面可以接动作按钮。故事轴与正文页共用。 */
+export function EmptyNote({ className, ...props }: ComponentProps<"div">) {
+	return (
+		<div
+			className={cn(
+				"rounded-lg border border-dashed border-[#d4d4d8] px-5 py-[18px] text-[12.5px] leading-[1.7] text-muted-foreground",
+				className,
+			)}
+			{...props}
+		/>
+	);
+}
+
 /** 简短补充说明；复用实际触发元素，不额外改变行、树或分栏布局。 */
 export function Hint({
 	content,

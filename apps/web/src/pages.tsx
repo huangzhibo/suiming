@@ -31,7 +31,7 @@ import {
 	versionPage,
 } from "./model.js";
 import { verdictLabel, verdictTone } from "./review-verdict.js";
-import { ActionButton, reviewCurrencyLabel, reviewLayerLabel, Tag, toneText } from "./ui-bits.js";
+import { ActionButton, EmptyNote, reviewCurrencyLabel, reviewLayerLabel, Tag, toneText } from "./ui-bits.js";
 import type { OpenPage, PageState } from "./view-state.js";
 
 const CodeEditor = lazy(() => import("./code-editor.js"));
@@ -242,7 +242,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 }
 function NoText({ delegateWrite, openEditor }: { delegateWrite(): void; openEditor(): void }) {
 	return (
-		<div className="rounded-lg border border-dashed border-[#d4d4d8] px-5 py-[18px] text-[12.5px] leading-[1.7] text-muted-foreground">
+		<EmptyNote>
 			正文尚未开始。可以先完善设计，也可以从这里开始写作。
 			<div className="mt-2.5 flex gap-1.5">
 				<Button size="sm" onClick={delegateWrite}>
@@ -252,7 +252,7 @@ function NoText({ delegateWrite, openEditor }: { delegateWrite(): void; openEdit
 					自己开始写
 				</Button>
 			</div>
-		</div>
+		</EmptyNote>
 	);
 }
 

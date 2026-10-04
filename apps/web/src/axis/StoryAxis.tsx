@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type Book, issuePage, type ReviewReport } from "../model.js";
 import { verdictColor, verdictLabel } from "../review-verdict.js";
-import { Hint, reviewCurrencyLabel } from "../ui-bits.js";
+import { EmptyNote, Hint, reviewCurrencyLabel } from "../ui-bits.js";
 import {
 	type AxisModel,
 	arcHeight,
@@ -344,10 +344,10 @@ export function StoryAxis({
 				)}
 			</div>
 			{beats.length === 0 ? (
-				<div className="m-6 rounded-lg border border-dashed border-[#d4d4d8] px-5 py-[18px] text-[12.5px] leading-[1.7] text-muted-foreground">
+				<EmptyNote className="m-6">
 					还没有情节。故事轴按故事目录（outline/story/index.yaml）里的情节顺序展开；先请 Agent 做设计，或在
 					outline/story 下新建情节并加进目录。
-				</div>
+				</EmptyNote>
 			) : (
 				<div
 					ref={scrollRef}

@@ -72,11 +72,11 @@ const externalChange = Annotation.define<boolean>();
 const highlight = HighlightStyle.define([
 	{ tag: tags.heading, fontWeight: "600" },
 	{ tag: tags.strong, fontWeight: "600" },
-	{ tag: tags.emphasis, color: "#7c3aed" },
+	{ tag: tags.emphasis, color: "var(--purple)" },
 	{ tag: tags.link, textDecoration: "underline" },
 	{ tag: tags.monospace, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "0.9em" },
-	{ tag: tags.processingInstruction, color: "#a1a1aa" },
-	{ tag: tags.meta, color: "#a1a1aa" },
+	{ tag: tags.processingInstruction, color: "var(--faint)" },
+	{ tag: tags.meta, color: "var(--faint)" },
 	{ tag: [tags.keyword, tags.propertyName], color: "var(--primary)" },
 ]);
 /** 中文长文的排版：宋体 16px / 28px 行高，软换行，不显示行号。 */
@@ -87,7 +87,7 @@ const theme = EditorView.theme({
 		padding: "0 var(--page-gutter)",
 		maxWidth: "var(--editor-max-width, none)",
 		margin: "0 auto",
-		caretColor: "#18181b",
+		caretColor: "var(--foreground)",
 	},
 	".cm-line": { padding: "0" },
 	"&.cm-focused": { outline: "none" },

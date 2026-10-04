@@ -52,15 +52,16 @@ export const KIND_LABEL: Record<string, string> = {
 	review: "审稿",
 	"source-note": "原作笔记",
 };
+/** 邻域图按种类着色，取全局 token（style.css），不写死色值。 */
 export const KIND_COLOR: Record<string, string> = {
-	"story-beat": "#18181b",
-	"story-text": "#18181b",
-	character: "#2e6b4e",
-	"story-contract": "#b45309",
-	place: "#71717a",
-	resource: "#71717a",
-	world: "#71717a",
-	intent: "#7c3aed",
+	"story-beat": "var(--foreground)",
+	"story-text": "var(--foreground)",
+	character: "var(--success)",
+	"story-contract": "var(--amber)",
+	place: "var(--muted-foreground)",
+	resource: "var(--muted-foreground)",
+	world: "var(--muted-foreground)",
+	intent: "var(--purple)",
 };
 export const textPathFor = (beatId: string) => `text/${beatId}.md`;
 

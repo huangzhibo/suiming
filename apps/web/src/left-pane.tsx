@@ -26,8 +26,8 @@ export interface PaneProps {
 	open(page: string, extra?: Partial<ViewState>): void;
 }
 
-const CONTRACT_MARK = "#b45309";
-const REVIEW_MARK = "#7c3aed";
+const CONTRACT_MARK = "var(--amber)";
+const REVIEW_MARK = "var(--purple)";
 const Tools = ({ children }: { children: React.ReactNode }) => (
 	<PanelToolbar className="justify-center">{children}</PanelToolbar>
 );
@@ -282,7 +282,7 @@ export function IdsPane({ book, view, page, patch, open }: PaneProps) {
 										? CONTRACT_MARK
 										: state.resolved
 											? "var(--success)"
-											: "#a1a1aa",
+											: "var(--faint)",
 								count: state.opened ? 1 : 0,
 							};
 						}
