@@ -875,6 +875,16 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 		assert.equal(handle.y, header.y, "拖动条从窗口顶部开始");
 		assert.equal(handle.y + handle.height, pane.y + pane.height, "拖动条贯通至内容底部");
 	};
+	// 侧栏收起后，标签栏紧贴展开按钮块：中间多出的外边距露出窗格的 chrome 底色，曾在标签左边留下一道灰条（作者截图发现）。
+	const flushWithToggle = async (side: "left" | "right") => {
+		const toggle = await page.locator(`[data-side-toggle='${side}']`).boundingBox();
+		const strips = page.locator("[data-pane-id] .drag");
+		const strip = await (side === "left" ? strips.first() : strips.last()).boundingBox();
+		assert.ok(toggle && strip);
+		if (side === "left") assert.equal(strip.x, toggle.x + toggle.width, "标签栏从左侧展开按钮块的右边缘开始");
+		else assert.equal(strip.x + strip.width, toggle.x, "标签栏到右侧展开按钮块的左边缘为止");
+		assert.equal(toggle.y + toggle.height, strip.y + strip.height, "按钮块与标签栏的底边线在同一行");
+	};
 	try {
 		await page.locator('.beat-row[data-page$="beat-0001.md"]').click();
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
@@ -891,6 +901,7 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 		const reopen = page.getByRole("button", { name: "展开右栏", exact: true });
 		const reopenBox = await reopen.boundingBox();
 		assert.ok(reopenBox);
+		await flushWithToggle("right");
 		for (const strip of await page.locator("[data-pane-id] .drag").all()) {
 			const box = await strip.boundingBox();
 			assert.ok(box && box.x + box.width <= reopenBox.x, "标签栏拖动区域不能覆盖右栏展开按钮");
@@ -1041,6 +1052,12 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 			return true;
 		});
 		await page.getByRole("button", { name: "展开左栏", exact: true }).waitFor();
+		await flushWithToggle("left");
+		// 测试源码不带 DOM 类型，计算样式在页面里取。
+		const [railBackground, mainBackground] = (await page.evaluate(
+			`['nav[aria-label="全局动作"]', "main"].map((selector) => getComputedStyle(document.querySelector(selector)).backgroundColor)`,
+		)) as string[];
+		assert.equal(railBackground, mainBackground, "左栏收起后动作栏与主工作面同为白底");
 		assert.equal(await right.getAttribute("aria-valuenow"), "316");
 		assert.equal((await page.locator("main").boundingBox())?.width, 600);
 		await page.getByRole("button", { name: "展开左栏", exact: true }).click();

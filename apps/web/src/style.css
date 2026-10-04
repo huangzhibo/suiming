@@ -60,6 +60,8 @@
  --control-selected: #e9e9eb;
  --tool-selected: #e3e3e3;
 	--window-controls-inset: 4px;
+	/* 左栏收起后展开按钮那一块的宽度；标签栏的左外边距取同一个值，两者对齐才不露出底下的 chrome。 */
+	--side-toggle-width: calc(var(--window-controls-inset) + var(--tool-width) + 6px);
 }
 
 :root[data-window-controls="left"] {

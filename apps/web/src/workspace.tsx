@@ -985,10 +985,10 @@ function WorkspaceSurface({
 	const tabStrip = (
 		<div
 			className="drag relative flex h-(--workbench-header-height) min-w-0 shrink-0 items-end border-b border-line bg-titlebar pl-2"
-			// 用外边距避开侧栏按钮；padding 仍属于 Electron 原生拖动区，会吞掉鼠标点击。
+			// 用外边距避开两侧的展开按钮；padding 仍属于 Electron 原生拖动区，会吞掉鼠标点击。外边距必须与按钮块
+			// 一样宽（左 --side-toggle-width、右 w-11）：多出来的部分露出窗格的 chrome 底色，曾经在标签左边留下一道灰条。
 			style={{
-				marginLeft: first && !showLeft ? 86 : undefined,
-				paddingLeft: first && !showLeft ? 0 : undefined,
+				marginLeft: first && !showLeft ? "var(--side-toggle-width)" : undefined,
 				marginRight: last && !showRight ? 44 : undefined,
 			}}
 		>
@@ -1707,7 +1707,11 @@ function WorkspaceSurface({
 						</ToolButton>
 					</div>
 				) : (
-					<div className="relative z-[5] flex items-center bg-titlebar pr-1.5 pl-(--window-controls-inset)">
+					// 盖在标签栏的左外边距上，并多盖一像素画出底边线：那一段标签栏没有自己的底边。
+					<div
+						data-side-toggle="left"
+						className="relative z-[5] -mb-px flex w-(--side-toggle-width) shrink-0 items-center border-b border-line bg-titlebar pr-1.5 pl-(--window-controls-inset)"
+					>
 						<ToolButton
 							label="展开左栏"
 							onClick={() => {
@@ -1736,7 +1740,10 @@ function WorkspaceSurface({
 						</ToolButton>
 					</div>
 				) : (
-					<div className="relative z-[5] flex items-center bg-titlebar px-2">
+					<div
+						data-side-toggle="right"
+						className="relative z-[5] -mb-px flex w-11 shrink-0 items-center border-b border-line bg-titlebar px-2"
+					>
 						<ToolButton
 							label="展开右栏"
 							onClick={() => {
@@ -1751,7 +1758,11 @@ function WorkspaceSurface({
 				)}
 			</div>
 			<div className="flex min-h-0 flex-1 divide-x divide-line">
-				<nav aria-label="全局动作" className="flex w-11 shrink-0 flex-col items-center gap-2 py-2">
+				{/* 左栏收起后动作栏改用正文的白底，与主工作面连成一片；展开时随左栏是浅灰。 */}
+				<nav
+					aria-label="全局动作"
+					className={`flex w-11 shrink-0 flex-col items-center gap-2 py-2 ${showLeft ? "" : "bg-background"}`}
+				>
 					<ToolButton
 						label="打开故事轴"
 						side="right"
