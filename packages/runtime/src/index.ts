@@ -267,7 +267,7 @@ export type {
 	ModelGatewayOptions,
 } from "./model/model-gateway.js";
 export { createBuiltinModelGateway, ModelGateway } from "./model/model-gateway.js";
-export { profileOptionKeysForApi, validateProfileOptions } from "./model/model-options-schema.js";
+export { validateProfileOptions } from "./model/model-options-schema.js";
 export { proxyFromPacResult, useEnvironmentProxy } from "./model/proxy.js";
 export type {
 	CreateOpenTelemetryOptions,

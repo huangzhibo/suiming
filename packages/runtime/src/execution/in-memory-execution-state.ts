@@ -284,18 +284,6 @@ export class InMemoryExecutionState {
 		});
 	}
 
-	/** 不在 turn 里时换绑；running 中换要走下一个 turn 边界。 */
-	setSessionModel(commandId: string, sessionId: string, model: ModelBindingSnapshot): SessionRecord {
-		return this.#execute(commandId, { commandId, sessionId, model }, () => {
-			const session = this.#requireSession(sessionId);
-			if (session.status === "running")
-				throw new ExecutionStateError("session_running", "turn 进行中不能换模型；停下后再换");
-			session.model = clone(model);
-			touch(session, this.#timestamp());
-			return clone(session);
-		});
-	}
-
 	recordSessionCheckpoint(
 		commandId: string,
 		sessionId: string,

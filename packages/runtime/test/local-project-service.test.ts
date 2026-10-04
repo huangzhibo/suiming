@@ -58,7 +58,7 @@ test("Local Project application service 从真实 checkout 计算、检查并提
 		const beat = decoder.decode(await readFile(beatPath));
 		await writeFile(beatPath, beat.replace("各船同时点火", "二十艘船同时点火"));
 
-		const diff = await service.diff();
+		const diff = await service.status();
 		assert.equal(diff.state, "dirty");
 		assert.equal(diff.baseRevisionId, genesis);
 		assert.deepEqual(
@@ -241,7 +241,7 @@ test("host 换卷是改 index 加 mv 两步，diff 里两个 artifact 都算改�
 		await mkdir(dirname(to), { recursive: true });
 		await rename(from, to);
 
-		const diff = await service.diff();
+		const diff = await service.status();
 		// 文件挪了位置、内容一个字没改，也是这个 artifact 变了：路径是事实，不是从 index 推出来的。
 		assert.deepEqual(
 			diff.entries.map((entry) => [entry.kind, entry.identity.kind, entry.identity.localId]),

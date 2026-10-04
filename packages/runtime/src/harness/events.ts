@@ -149,10 +149,6 @@ export class SessionEventStream {
 	assertWritable(): void {
 		if (this.#failure !== undefined) throw this.#failure.error;
 	}
-	durableEvents(): SessionEvent[] {
-		this.refresh();
-		return structuredClone(this.#events);
-	}
 	/** 最后一条已持久事件的序号；turn 开始时记下，结束时的对账只看这之后的事件。 */
 	lastSequence(): number {
 		this.refresh();

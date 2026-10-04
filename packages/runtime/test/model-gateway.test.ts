@@ -13,7 +13,6 @@ import {
 	ModelGatewayError,
 	type ModelProfileOptions,
 	type ModelRoutingConfig,
-	profileOptionKeysForApi,
 } from "../src/index.js";
 
 test("用户 config.toml 与环境覆盖按固定优先级解析", async () => {
@@ -426,8 +425,6 @@ test("profile options 在 bind 时按模型 API 的选项 schema 校验，写错
 		() => gateway({ toolChoice: "none" }).bind("main"),
 		(error: unknown) => error instanceof ModelGatewayError && error.code === "invalid_model_options",
 	);
-	assert.deepEqual(profileOptionKeysForApi("openai-completions")?.includes("reasoningEffort"), true);
-	assert.equal(profileOptionKeysForApi("custom-unknown-api"), undefined);
 	// 未知 API 无法校验，只能放行。
 	const custom = fauxProvider({ provider: "suiming-faux-custom", models: [{ id: "agent-model" }] });
 	models.setProvider(custom.provider);

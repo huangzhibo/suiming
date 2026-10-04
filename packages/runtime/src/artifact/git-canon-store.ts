@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sha256Buffer, sha256Hex } from "@suiming/story";
 import git from "isomorphic-git";
+import type { CanonStore } from "./canon-store.js";
 import { applyChangeOperations } from "./change-operations.js";
 import { ArtifactError } from "./errors.js";
 import { artifactIdentityKey } from "./identity.js";
@@ -72,7 +73,7 @@ export interface GitCanonStoreOptions {
  *
  * 实现 `CanonStore` 契约。revision id 就是 commit sha；快照就是 tree；history 就是 canon ref 的祖先链。
  */
-export class GitCanonStore {
+export class GitCanonStore implements CanonStore {
 	readonly #dir: string;
 	readonly #now: () => Date;
 

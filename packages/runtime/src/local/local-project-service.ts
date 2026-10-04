@@ -364,11 +364,8 @@ export class LocalProjectService {
 		return this.#store.clearRemoteBinding(this.projectId);
 	}
 
+	/** checkout 相对 head 的差异；`suim status` 与 `suim diff` 是同一份数据的两种用法。 */
 	async status(): Promise<LocalProjectDiff> {
-		return (await this.#buildCheckoutCandidate()).diff;
-	}
-
-	async diff(): Promise<LocalProjectDiff> {
 		return (await this.#buildCheckoutCandidate()).diff;
 	}
 
@@ -390,7 +387,8 @@ export class LocalProjectService {
 	}
 
 	/**
-	 * 唯一的提交路径：扫 checkout diff → Checker → 推进 canon ref → 同步 checkout。带 `command` 时
+	 * 作者、host agent 与 Agent 共用的提交路径：扫 checkout diff → Checker → 推进 canon ref → 同步 checkout。
+	 * 系统生成的 ChangeSet（导入原作、发布、Cloud pull）走 `commitManagedChangeSet`，要求 checkout 干净。带 `command` 时
 	 * 额外写一条回执，崩溃后 `recoverCommittedAction` 用它认领已经完成的提交，不会重复提交。
 	 */
 	async commitCheckout(command?: ProjectCommitCommand): Promise<LocalProjectCommitResult> {

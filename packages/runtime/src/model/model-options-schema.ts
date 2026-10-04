@@ -127,12 +127,6 @@ function allowedKeys(schema: TSchema): string[] {
 	return Object.keys(properties).sort();
 }
 
-/** 已知 API 的 profile options 键；未知 API 返回 undefined。 */
-export function profileOptionKeysForApi(apiId: string): string[] | undefined {
-	const schema = API_OPTION_SCHEMAS[apiId];
-	return schema === undefined ? undefined : allowedKeys(schema);
-}
-
 /**
  * 在 bind 时校验：模型的 API 已知就按它的选项 schema 逐键检查，未知 API 只能放行。
  * 报错带上该 API 允许的键，让写错的人一眼看到该用哪个名字。

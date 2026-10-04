@@ -184,24 +184,17 @@ test("进程恢复把持有者已死的 running session 收敛回 idle 并记一
 	assert.deepEqual(restored.recoverUnfinished("recover-2"), recovered);
 });
 
-test("换模型只在不跑的时候；删除 session 带走它的子任务", () => {
+test("删除 session 带走它的子任务；turn 进行中不能删", () => {
+	// 换模型没有单独的命令（Harness 设计第 10 节）：新模型随 session.send 给，在 turn 边界由 startTurn 换绑。
 	const execution = state();
 	createSession(execution);
 	execution.startTurn({ commandId: "turn-1", sessionId: "session-1", lease });
-	assert.throws(
-		() => execution.setSessionModel("model-1", "session-1", { ...modelBinding, model: "model-b" }),
-		(error: unknown) => error instanceof ExecutionStateError && error.code === "session_running",
-	);
 	execution.addTask({ commandId: "task-1", id: "task-1", sessionId: "session-1", kind: "subagent", key: "a" });
 	assert.throws(
 		() => execution.deleteSession("delete-early", "session-1"),
 		(error: unknown) => error instanceof ExecutionStateError && error.code === "session_running",
 	);
 	execution.endTurn({ commandId: "end-1", sessionId: "session-1", status: "idle" });
-	assert.equal(
-		execution.setSessionModel("model-1", "session-1", { ...modelBinding, model: "model-b" }).model?.model,
-		"model-b",
-	);
 	execution.deleteSession("delete-1", "session-1");
 	assert.throws(() => execution.session("session-1"), ExecutionStateError);
 	assert.throws(() => execution.task("task-1"), ExecutionStateError);

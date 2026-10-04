@@ -122,7 +122,6 @@ export interface RootLoopSpec {
 	systemPrompt: string;
 	/** 只在 session 第一次跑时进消息列表的开场（作品 Frame 等）。 */
 	prompt?: string;
-	writable?: (logicalPath: string) => boolean;
 	tools(handle: TaskHandle): HarnessTool[];
 	/** 作者消息进消息列表前附的确定性状态行（head、候选状态）；在取走消息的那一刻算。 */
 	decorateInbox?(text: string, sequence: number): string | Promise<string>;
@@ -243,10 +242,6 @@ export class HarnessSession {
 		this.#telemetry = input.telemetry;
 	}
 
-	get projectId(): string {
-		return this.#engine.project.projectId;
-	}
-
 	/** 工具要查作品状态、读执行对象时用的端口。 */
 	get projectPort(): HarnessProjectPort {
 		return this.#engine.project;
@@ -267,12 +262,6 @@ export class HarnessSession {
 
 	get record(): SessionRecord {
 		return this.#execution.session(this.sessionId);
-	}
-
-	get turnId(): string {
-		const turnId = this.record.turnId;
-		if (!turnId) throw new SuimingHarnessError("session_owner_lost", "session 没有进行中的 turn");
-		return turnId;
 	}
 
 	/** 已提交基线，即 turn 开始时的 head、或最近一次阶段提交之后的版本。 */
@@ -335,11 +324,9 @@ export class HarnessSession {
 		const record = this.record;
 		if (!record.model) throw new SuimingHarnessError("model_binding_missing", "session 没有模型绑定");
 		const model = await this.#engine.bindModel("main", record.model);
-		const env = new ConfinedExecutionEnv({
-			rootPath: this.checkoutPath,
-			policy: "write",
-			...(spec.writable === undefined ? {} : { writable: spec.writable }),
-		});
+		// 根 Agent 的写范围是整个 checkout（.git / .suiming 与 host 接入目录除外，由 ConfinedExecutionEnv 拦），
+		// 合法性在 commit 时由 Checker 判；只有子任务按角色缩小写范围（Harness 设计第 6 节）。
+		const env = new ConfinedExecutionEnv({ rootPath: this.checkoutPath, policy: "write" });
 		const restored = await this.#restore(record.checkpointRef);
 		// turn 边界且 inbox 没有新消息：不该开新的模型调用（resume 只是回到 idle）。
 		if (

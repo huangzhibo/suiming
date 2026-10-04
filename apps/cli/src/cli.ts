@@ -660,7 +660,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 		.description("显示 artifact 差异，不暴露 ChangeSet 输入")
 		.action(async () => {
 			await execute("project.diff", () =>
-				withProject(projectPath(program), async (service) => diffData(await service.diff())),
+				withProject(projectPath(program), async (service) => diffData(await service.status())),
 			);
 		});
 

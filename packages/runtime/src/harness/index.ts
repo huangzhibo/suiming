@@ -41,7 +41,7 @@ export {
 	renderSourceNotes,
 	sourceMaterialText,
 } from "./material.js";
-export { CONSTITUTION_PROMPT_BINDING, withConstitution } from "./prompts.js";
+export { withConstitution } from "./prompts.js";
 export {
 	JUDGE_SYSTEM_PROMPT,
 	RANK_RUBRICS,

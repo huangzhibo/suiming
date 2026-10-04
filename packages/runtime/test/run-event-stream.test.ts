@@ -22,7 +22,7 @@ test("恢复对话保留消息与工具的原始次序，工具更新不移到�
 		replace: true,
 		content: { taskId: "agent", label: "read", status: "completed" },
 	});
-	const durable = events.durableEvents();
+	const durable = events.durableEventsAfter(0);
 	const original = structuredClone(durable);
 	const snapshot = productEventSnapshot(durable);
 	const messages = snapshot.find((event) => event.type === "MESSAGES_SNAPSHOT");
@@ -57,7 +57,7 @@ test("事件先保存再发布；UI 监听器失败和修改不污染事件", ()
 	});
 	events.emit({ type: EventType.RUN_STARTED, runId: "interaction", threadId: "conversation" });
 	assert.deepEqual(order, ["saved", "published:1"]);
-	assert.equal(events.durableEvents()[0]?.sequence, 1);
+	assert.equal(events.durableEventsAfter(0)[0]?.sequence, 1);
 });
 
 test("事件保存失败后不发布、不给后续事件放行", () => {
@@ -81,7 +81,7 @@ test("事件保存失败后不发布、不给后续事件放行", () => {
 		() => events.emit({ type: EventType.RUN_STARTED, runId: "different", threadId: "conversation" }),
 		(error) => error === failure,
 	);
-	assert.deepEqual(events.durableEvents(), []);
+	assert.deepEqual(events.durableEventsAfter(0), []);
 	assert.equal(writes, 1);
 	assert.equal(notifications, 0);
 });

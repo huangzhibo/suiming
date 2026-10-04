@@ -330,7 +330,7 @@ test("Beat 文件与 index 对不上时 status / diff 仍可读，check 回到�
 			join(fixture.checkoutPath, "outline", "story", "vol-0001", "beat-0002.md"),
 			join(fixture.checkoutPath, "outline", "story", "vol-0009", "beat-0002.md"),
 		);
-		const moved = await active.diff();
+		const moved = await active.status();
 		assert.deepEqual(
 			moved.entries.map((entry) => [entry.kind, entry.identity.localId, entry.after?.path]),
 			[["modified", "beat-0002", "outline/story/vol-0009/beat-0002.md"]],
