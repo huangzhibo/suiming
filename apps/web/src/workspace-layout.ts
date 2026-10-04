@@ -231,18 +231,13 @@ export function resolveWorkspaceDocuments(layout: WorkspaceLayout, book: Book): 
 	return changed ? { ...layout, groups, recentPages } : layout;
 }
 
-/** 页面旧表示只在恢复时迁移，不进入日常导航分支。 */
+/** 恢复时把存下的页面收回到当前形状：不认识的字段丢掉，枚举值不合法就回默认。 */
 export function normalizePage(value: PageState): PageState {
 	const defaults = pageState();
 	return {
 		...defaults,
 		...Object.fromEntries(Object.entries(value).filter(([key]) => key in defaults)),
-		scrolls: Object.fromEntries(
-			Object.entries(value.scrolls ?? {}).map(([key, position]) => [
-				key.replace(/^(body:(?:design|text)):(?:source|preview)$/, "$1"),
-				position,
-			]),
-		),
+		scrolls: { ...(value.scrolls ?? {}) },
 		beatView: value.beatView === "text" ? "text" : "design",
 		edit: value.edit === "edit" ? "edit" : "read",
 		diffLayout: value.diffLayout === "unified" || value.diffLayout === "split" ? value.diffLayout : null,
@@ -257,20 +252,9 @@ function restorePages(value: unknown): PageState[] {
 		? value.flatMap((item) => (typeof record(item).page === "string" ? [normalizePage(item)] : []))
 		: [];
 }
-function restoreTabs(value: unknown, legacy: Record<string, unknown>): WorkbenchTab[] {
+function restoreTabs(value: unknown): WorkbenchTab[] {
 	if (!Array.isArray(value)) return [];
-	return value.flatMap((item, index) => {
-		if (typeof item === "string") {
-			const tab = createTab({
-				...pageState(item.startsWith("graph:") ? item.slice(6) : item),
-				beatView: legacy.beatView === "design" ? "design" : "text",
-			});
-			const back = record(
-				Array.isArray(legacy.history) ? legacy.history[index] : record(legacy.history)[index],
-			).back;
-			tab.back = Array.isArray(back) ? back.filter((p): p is string => typeof p === "string").map(pageState) : [];
-			return [tab];
-		}
+	return value.flatMap((item) => {
 		const tab = record(item);
 		if (typeof record(tab.location).page !== "string") return [];
 		return [
@@ -300,7 +284,7 @@ export function restoreWorkspace(value: unknown): WorkspaceLayout {
 				return typeof value === typeof initial && (typeof value !== "number" || Number.isFinite(value));
 			}),
 		),
-		tabs: restoreTabs(parsed.tabs, parsed),
+		tabs: restoreTabs(parsed.tabs),
 		composerDrafts: restoreComposerDrafts(parsed.composerDrafts),
 	};
 	state.active = activeIndex(state.active, state.tabs.length);
@@ -310,7 +294,7 @@ export function restoreWorkspace(value: unknown): WorkspaceLayout {
 		? parsed.groups.flatMap((item) => {
 				const group = record(item);
 				if (typeof group.id !== "string") return [];
-				const tabs = restoreTabs(group.tabs, parsed);
+				const tabs = restoreTabs(group.tabs);
 				return [
 					{
 						id: group.id,

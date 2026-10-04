@@ -129,24 +129,31 @@ test("比较布局按实际宽度自动选择，手动选择与恢复不受窗�
 	assert.equal(saved.diffLayout, "unified");
 });
 
-test("旧单窗格一次迁移页面和引用，未确认提交与草稿完整保留；旧 Run 字段不再带过来", () => {
-	const legacyPending = { id: "same-command", text: "冻结目标与引用", phase: "send", resume: false, runId: "run-1" };
-	const pending = { id: "same-command", text: "冻结目标与引用" };
+test("恢复时未确认提交与草稿完整保留，认不出的标签与多余字段丢掉，再存再读不变", () => {
+	// 2026-10-04 删掉了 09-09 之前旧单窗格格式（字符串标签、graph: 前缀、context 字段）的迁移：
+	// 那些格式只在开源前的本机存过，认不出的标签照样丢掉，不连带丢文件草稿与未确认提交。
+	const pending = { id: "same-command", text: "冻结目标与引用", runId: "run-1" };
 	const restored = restoreWorkspace({
-		tabs: ["graph:beat/a"],
-		history: [{ back: ["beat/b"] }],
+		tabs: ["beat/b", { id: "tab-a", location: pageState("beat/a"), back: [pageState("beat/b")], forward: [] }],
 		active: 99,
-		beatView: "design",
 		documents: { "beat/a": { content: "未保存内容", baseContent: "原稿", baseSHA: "sha" } },
-		composerDrafts: { new: { goal: "后续输入", context: "旧选段", pending: legacyPending } },
+		composerDrafts: {
+			new: {
+				goal: "后续输入",
+				attachments: [{ id: "s1", label: "作品引用", kind: "selection", status: "ready", content: "选段" }],
+				pending,
+			},
+		},
 	});
+	assert.deepEqual(
+		groupView(restored).tabs.map((tab) => tab.location.page),
+		["beat/a"],
+	);
 	assert.equal(groupView(restored).active, 0);
-	assert.equal(groupView(restored).tabs[0]?.location.page, "beat/a");
 	assert.equal(groupView(restored).tabs[0]?.back[0]?.page, "beat/b");
 	assert.equal(restored.documents["beat/a"]?.content, "未保存内容");
-	assert.deepEqual(restored.composerDrafts.new?.pending, pending);
-	assert.equal(restored.composerDrafts.new?.attachments[0]?.content, "旧选段");
-	assert.equal("context" in (restored.composerDrafts.new ?? {}), false);
+	assert.deepEqual(restored.composerDrafts.new?.pending, { id: "same-command", text: "冻结目标与引用" });
+	assert.equal(restored.composerDrafts.new?.attachments[0]?.content, "选段");
 	const again = restoreWorkspace(JSON.parse(JSON.stringify(restored)));
 	assert.deepEqual(again, restored);
 });
@@ -179,7 +186,7 @@ test("多窗格恢复保留比例、编辑位置与阅读位置；无效树收�
 	}
 });
 
-test("恢复边界过滤无效标签并约束当前索引，旧表示不再进入活动页面", () => {
+test("恢复边界过滤无效标签并约束当前索引，不认识的页面字段丢掉", () => {
 	const restored = restoreWorkspace({
 		tabs: [
 			null,
@@ -188,7 +195,7 @@ test("恢复边界过滤无效标签并约束当前索引，旧表示不再进�
 					page: "beat/a",
 					fileView: "source",
 					returnView: "preview",
-					scrolls: { "body:design:source": { top: 70, left: 0 } },
+					scrolls: { "body:design": { top: 70, left: 0 } },
 				},
 			},
 		],

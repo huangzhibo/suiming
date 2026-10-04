@@ -148,13 +148,13 @@ export async function contentFingerprint(content: string): Promise<string> {
 	return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-/** 旧 context 只在本机草稿恢复时转换；运行中的输入只有 attachments 一种表示。 */
+/** 本机草稿恢复：字段逐个校验，不认识的丢掉；输入只有 attachments 一种表示。 */
 export function restoreComposerDrafts(value: unknown): Record<string, ComposerDraft> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
 	return Object.fromEntries(
 		Object.entries(value).flatMap(([key, value]) => {
 			if (!value || typeof value !== "object") return [];
-			const saved = value as Partial<ComposerDraft> & { context?: string };
+			const saved = value as Partial<ComposerDraft>;
 			const attachments: ComposerAttachment[] = Array.isArray(saved.attachments)
 				? saved.attachments.filter(
 						(a) =>
@@ -166,14 +166,6 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 							["reading", "ready", "failed"].includes(a.status),
 					)
 				: [];
-			if (typeof saved.context === "string" && saved.context)
-				attachments.unshift({
-					id: `legacy-context:${key}`,
-					label: "作品引用",
-					kind: "selection",
-					status: "ready",
-					content: saved.context,
-				});
 			const pending = saved.pending;
 			return [
 				[
