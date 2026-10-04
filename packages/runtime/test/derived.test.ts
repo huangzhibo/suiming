@@ -92,7 +92,7 @@ test("正文时效从历史派生：写成时的 Design 闭包没变就是 curre
 			["beat-0002", "missing"],
 		],
 	);
-	// 样例作品很小，两个 Beat 的闭包都是整套 Design。
+	// beat-0001 引用了黄盖，人物档在它的闭包里。
 	assert.ok(designClosurePaths(history.candidate(r1), "beat-0001").includes("world/characters/黄盖.md"));
 
 	const withText = [...design, ...texts()];

@@ -30,5 +30,5 @@ jobs:
       # check 里的 tsc -b 会 emit dist；测试与 CLI 的跨包 import 走 dist，所以必须先 check 再 test。
       - run: npm run check
       # 需要真实 PostgreSQL / S3 / 双进程的 5 个用例没有对应环境变量时自动跳过；
-      # 另有一条读维护者本机作品（~/stories/eval-022-suiming）的用例，找不到时也跳过。
+      # 另有一条读维护者本机作品副本的用例，找不到时也跳过。
       - run: npm test

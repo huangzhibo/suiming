@@ -43,7 +43,7 @@ Checker 对它们只查形状：`review/**` 与 `source/<id>/notes/**` 的 front
 | 函数 | 定义 | 结果 |
 | --- | --- | --- |
 | `writtenAtMap(reader, head)` | 从 head 沿祖先链一次算出每个路径的 blob 最后一次变化的 revision，按 head 缓存 | 路径 → revision id |
-| `designClosurePaths(candidate, beatId)` | `designFrame(candidate, seeds: [beat])` 选中的 artifact 路径集 | 路径集 |
+| `designClosurePaths(candidate, beatId)` | Writer 写这个 Beat 时读到的那部分 Design，与 Write Context 同一套选择（见上文 (b)） | 路径集 |
 | `textCurrency(reader, head, candidate, beatId)` | `D` = 正文文件的最后变化点；比较 `designClosurePaths` 在 D 与 head 下的内容 hash（闭包里新增或删除的文件也算变化；story index 只比这个 Beat 的那一段）；全书一次算用 `textCurrencies` | `{ storyBeatId, state: "current" \| "design-changed" \| "uncommitted" \| "missing", writtenAt?, changed }` |
 | `reviewCurrency(reader, head, candidate, review)` | 拿 `review.subjects`（审的时候各主体文件的 sha256）与当前候选同一批路径的摘要比：摘要不同、文件没了、或出现了审稿时不存在的主体文件，都算变。不看历史 | `{ state: "current" \| "stale", changed, revision? }`（`revision` 只是展示标签） |
 | `sourceCoverage(candidate, sourceId)` | 取 `material_sha256` 等于当前 `material.txt` sha 的笔记，span 并集 | `{ sourceId, materialCodePoints, materialSha256, covered, gaps }` |
@@ -78,7 +78,7 @@ Checker 对它们只查形状：`review/**` 与 `source/<id>/notes/**` 的 front
 
 | 故障或操作 | 必须得到的结果 | 测试 |
 | --- | --- | --- |
-| 正文提交后改了它闭包里的一个人物文件 | 该 Beat `design-changed`，`changed` 列出该文件；闭包外的 Beat 仍 `current` | `derived.test.ts`「正文时效从历史派生…」、`local-project-service.test.ts`「host 提交 StoryText 后正文时效从 git 历史派生…」（样例作品两个 Beat 的闭包都是整套 Design，闭包外的情形由 `derived.test.ts` 的 r4 一步覆盖） |
+| 正文提交后改了它闭包里的一个人物文件 | 该 Beat `design-changed`，`changed` 列出该文件；闭包外的 Beat 仍 `current` | `derived.test.ts`「正文时效从历史派生…」、`local-project-service.test.ts`「host 提交 StoryText 后正文时效从 git 历史派生…」（闭包外的情形由 `derived.test.ts` 的 r4 一步覆盖） |
 | 改了闭包外的文件 | 全部正文仍 `current` | `derived.test.ts` Release 一节：加审稿与 Release 文件不改变正文时效 |
 | 正文写了、还从没提交过（head 里没有） | 该 Beat `uncommitted` | `derived.test.ts`「候选里有正文、head 里没有」 |
 | 审稿之后主体文件改了（哪怕和审稿落在同一次提交），或出现了审稿时不存在的主体文件 | `stale`，`changed` 列出这些路径 | `derived.test.ts`「审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间」 |

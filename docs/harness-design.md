@@ -297,7 +297,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 **为什么不是以前的「先读后抽」**：并行 reader 先把原文改写成笔记，抽取再读笔记。笔记要么太短丢因果（10-02 GPT 版只有原文的 12%），要么太长等于照抄（10-03 小样本 62%–79%，与原文 8 字片段重合仅 11%，是逐段复述）；而写好的 Beat 本身就是笔记该有的样子（因果完整、可以详细），先笔记后 Beat 是同一件事做两遍、多损失一道。并行 reader 各只看见自己那一段，伏笔更认不出来；Source 审稿读笔记加抽取时，笔记里漏掉的东西抽取与审稿共用同一个盲区。**为什么不是单个抽取者边读边写**：与窗口无关、也只读一遍，但全程串行，而且没被强调的伏笔在第一遍读不出来，照样需要带着答案的第二遍。**为什么第二遍是补全而不是审稿**：目的是让抽取更完整，做成只读审稿就要「出意见 → 派子任务改 → 再审」，10-03 的 120 章运行来回了三轮。
 
-窗口只决定分段大小；超长的书在第 2 步先按卷整合、再整书整合，流程不变。Story Language 不变：笔记仍是 `span` 加交接，覆盖率与 `review:source` 的规则照旧。这是给根 Agent 的计划模板（写在 `delegate` 的说明与抽取方法里），不是代码里的固定流水线；分段与补全两步按写范围并行，整合与统一修串行。
+窗口只决定分段大小；超长的书在第 2 步应先按卷整合、再整书整合，流程不变——这一步还没写进模板，三国前五十回的补全因此放不下（[当前状态](current-status.md)已知缺陷）。Story Language 不变：笔记仍是 `span` 加交接，覆盖率与 `review:source` 的规则照旧。这是给根 Agent 的计划模板（写在 `delegate` 的说明与抽取方法里），不是代码里的固定流水线；分段与补全两步按写范围并行，整合与统一修串行。
 
 子失败返回结构化失败与实际完成范围，父可改策略、新建工作或问作者，不自动无界重试；`paused` 之后 `resume` 沿用子 Task 自己的 checkpoint。已完成的 Task 不重开，修订另建。
 
@@ -333,7 +333,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 | 命令 | 语义 |
 | --- | --- |
-| `session.send { sessionId?, text, model? }` | 入 inbox；没有 sessionId 就新建 session；`idle` 则启动 turn，`running` 则在下一边界注入；本进程正在跑另一个 session 时拒绝（`session_running`）。返回 `{ sessionId, sequence }`。换模型也走它：没有单独的换绑命令（第 10 节） |
+| `session.send { sessionId?, text, model? }` | 入 inbox；没有 sessionId 就新建 session；`idle` 则启动 turn，`running` 则在下一边界注入；同一作品已有别的 running session、且持有进程还活着时拒绝（`session_running`，跨进程）。返回 `{ sessionId, sequence }`。换模型也走它：没有单独的换绑命令（第 10 节） |
 | `session.interrupt` | 第 3 节 |
 | `session.resume` | 从 `paused` 继续；显式重发结果未知的请求用 `retryUnknown`（CLI `--retry-unknown`） |
 | `session.list` / `session.show`（CLI）/ `session.tasks`（IPC） | 查询；摘要投影只有一份（`sessionSummary`），标题是 inbox 第一条。候选 diff 是 `project.diff`，没有 `session.diff`——候选不属于 session |
@@ -478,7 +478,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 一个 Project 一个 `running` session | 没有 worktree 后并行会互相覆盖；要并行再给 session 配工作目录 |
 | `story_guide` / `frame` / `write_context` / `project_status` / `search` / `impact` / `compact_context` | 原生匹配 Open Story Package 就是这几个 |
 | 未确认调用计数 | `model_call_unknown` 时作者要看的就是它，几行 |
-| `rejected × 3` 停 turn | 根 Agent 唯一的死循环闸，不进 `paused` |
+| `run_no_progress`（同一动作同一结果连续 3 次、连续 5 次回复的动作全被拒）与每轮用量检查点 | 根 Agent 的死循环兜底，回 idle、不进 `paused`；为什么是这几道见第 4、10 节 |
 | 模型输出平面 `Type.Object` | 真实 provider 把 union 下的数组序列化成字符串 |
 | `rank` 作 `session.kind` | Eval 协议，零新存储 |
 | telemetry span | 可丢失的观测，不是真源 |

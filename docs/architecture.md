@@ -135,7 +135,7 @@ Frame 决定每次 loop 的初始 Context，模型在 loop 中用只读工具按
 
 角色读取边界由具体任务契约决定：Agent 在 checkout 上渐进发现；独立 Reviewer 在指定审查域内补查；采用隔离 Writer 时防止无关父会话影响，Source Reader 不被 Target 创作目标污染。作者打开同一视图不等于模型读过它。
 
-Story Search 是正式的发现能力，也是**唯一的搜索函数**：Agent 的 `search` 工具与 CLI `search` 都调 `searchStoryCandidate`（`artifact/story-search.ts`）。它在候选的解码文本上做结构导航、精确文本与中文双字片段匹配（超过两字的汉字段落会拆成相邻二元组），命中结果定位到原始 artifact 与原文范围，排序和摘要是可删除派生值。没有 PostgreSQL 全文或 `pg_trgm` 后端；Cloud 现在不提供搜索，将来要有也调同一个函数。语义检索只有经中文长篇消融证明收益后才进默认路径。
+Story Search 是正式的发现能力，也是 artifact 检索的**唯一函数**：Agent 的 `search` 工具与 CLI `search` 都调 `searchStoryCandidate`（`artifact/story-search.ts`）。原文按字查找（`search_source`、`search_material`）另走 `findInMaterial`（`harness/material.ts`），返回码点区间供 `source_span` 锚定，不做结构导航与排序。它在候选的解码文本上做结构导航、精确文本与中文双字片段匹配（超过两字的汉字段落会拆成相邻二元组），命中结果定位到原始 artifact 与原文范围，排序和摘要是可删除派生值。没有 PostgreSQL 全文或 `pg_trgm` 后端；Cloud 现在不提供搜索，将来要有也调同一个函数。语义检索只有经中文长篇消融证明收益后才进默认路径。
 
 ### 6.4 执行状态与恢复
 
@@ -188,11 +188,11 @@ Cloud Web（可选扩展，冻结）          → Domain API + 同一事件契�
 
 **Cloud 保留自己的 Canon 存储。**PostgreSQL 保存 Project、ArtifactVersion 与 ProjectRevision，S3-compatible 对象存储保存大对象，写入顺序是先对象后事务。本地改用 git 没有波及它：Cloud 没有 git 实现，也不在本轮解冻范围内，而 `packages/cloud-postgres` 是 `apps/api` 的活代码。两者是同一套领域语义的两个实现——不变量 3 约束的是「每个 Project 只有一个权威」，不是「全局只有一种存储」；将来若要给 Cloud 也换 git，它跑的是同一份 `CanonStore` 契约测试。
 
-单 actor 部署，没有成员与角色模型。Cloud 服务端永远重新解析、核对 hash、运行 Checker 并验证 baseRevision，不信任客户端的成功声明。
+单 actor 部署：一个 `SUIMING_CLOUD_ACTOR_ID`，没有登录与多人。代码里还留着冻结前的成员与角色（`project_members` 表、owner / editor / viewer、`setProjectMember` 路由），不是现行能力；Cloud 解冻时按终局需要决定删掉还是接上。Cloud 服务端永远重新解析、核对 hash、运行 Checker 并验证 baseRevision，不信任客户端的成功声明。
 
 **Cloud 没有执行。**执行 adapter、run-event store、SSE 与 `apps/worker` 已于 2026-09-13 删除（migration `004_drop_execution`，约 2400 行）。它们撑着的是一个刻意留的空洞：Worker 领到 Task 只会以 `cloud_task_executor_not_found` 确定性失败；为它把 schema 改成 session 是没有用户的成本。解冻时的接口位置是 Runtime 的 `HarnessProjectPort`，不是重建那几个 store：Cloud host 领取或接管 session owner，materialize 一份 checkout，由同一 SuimingHarness 推进。那时有一条约束照办：过期 lease 只表示需要从原 checkpoint 核对恢复，不能仅因进程变化就结束执行并重做任务。
 
-Local 与 Cloud Project 拥有独立 revision identity，不后台双写。同步通过 Cloud SDK 与 Domain API 显式执行：`checkout` 从明确 Cloud revision 建立标准 Local Project；`import` 创建独立 Cloud Project；`link` 只在内容证据匹配时建立包外 remote binding；`status` 比较同步基线、本地 revision、Cloud head 与 dirty checkout；`push / pull` 只移动已提交内容并重新验证；`unlink` 不删除任一侧数据。同一 artifact 两侧修改、引用失效或语义无法确定时报告 conflict，不用时间戳或 last-write-wins。remote binding 保存在 `.suiming`，凭据在用户级配置或 OS credential store，本地 SQLite、缓存与 trace 不上传。
+Local 与 Cloud Project 拥有独立 revision identity，不后台双写。同步通过 Cloud SDK 与 Domain API 显式执行：`checkout` 从明确 Cloud revision 建立标准 Local Project；`import` 创建独立 Cloud Project；`link` 只在内容证据匹配时建立包外 remote binding；`status` 比较同步基线、本地 revision、Cloud head 与 dirty checkout；`push / pull` 只移动已提交内容并重新验证；`unlink` 不删除任一侧数据。同一 artifact 两侧修改、引用失效或语义无法确定时报告 conflict，不用时间戳或 last-write-wins。remote binding 保存在 `.suiming`，凭据在用户级的 `~/.suiming/auth.json`（权限 0600、明文，接 Keychain 是后续，见[技术栈](technology.md)），本地 SQLite、缓存与 trace 不上传。
 
 Cloud 按 ADR-0008 冻结投入：共享契约变了，已有 adapter 随之修正，其余简化在 Cloud 恢复投入时再做。
 
