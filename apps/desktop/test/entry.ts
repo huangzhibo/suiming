@@ -268,10 +268,7 @@ if (process.argv.includes("--product-audit-test")) {
 			if (channel === "suiming:command") commands.push(request.command);
 			return listener(event, request, ...args);
 		});
-	provider.setResponses([
-		fauxAssistantMessage("已核对作品状态，准备交付。".repeat(20)),
-		fauxAssistantMessage("预算调整后已交付，作品未修改。"),
-	]);
+	provider.setResponses([fauxAssistantMessage("已核对作品状态，作品未修改。".repeat(20))]);
 }
 models.setProvider(provider.provider);
 const profile = { provider: provider.provider.id, model: provider.getModel().id };

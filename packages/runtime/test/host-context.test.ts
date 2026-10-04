@@ -65,7 +65,7 @@ test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及�
 		const beat = storyImpact(candidate, parseStoryImpactSubject("beat:beat-0001"));
 		assert.deepEqual(beat.storyBeatIds, ["beat-0001"]);
 		assert.deepEqual(beat.dependentStoryBeatIds, ["beat-0002"], "beat-0002 经 refs.beat 依赖 beat-0001");
-		assert.deepEqual(beat.characterIds, ["黄盖"]);
+		assert.deepEqual(beat.characterIds, ["阚泽", "黄盖"], "阚泽只出现在这一节的硬状态变化里，也算它涉及的人物");
 		assert.deepEqual(beat.placeIds, ["赤壁"]);
 		assert.deepEqual(beat.resourceIds, ["火船"]);
 		assert.deepEqual(beat.contractIds, ["诈降"]);

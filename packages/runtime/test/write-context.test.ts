@@ -4,41 +4,15 @@ import { compileWriteContext } from "../src/harness/index.js";
 import { artifactIdentityKey, candidateFromOpenStoryFiles, designClosurePaths } from "../src/index.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
-const encoder = new TextEncoder();
-
-/**
- * 样例作品加两样东西：一份 world/core（全书公理，Story Language 不要求 Beat 引用它），一个只出现在 beat-0001
- * 硬状态变化里、refs 没写的人物阚泽（他替黄盖过江送降书）。
- */
+/** 样例作品里有 world/core（全书公理，不要求 Beat 引用）与只出现在 beat-0001 硬状态变化里的阚泽。 */
 function workWithCoreAndStateOnlyCharacter() {
-	const files = sampleWorkFiles().map((file) =>
-		file.path === "outline/story/vol-0001/beat-0001.md"
-			? {
-					...file,
-					bytes: encoder.encode(
-						new TextDecoder()
-							.decode(file.bytes)
-							.replace("    黄盖.location: 赤壁\n", "    黄盖.location: 赤壁\n    阚泽.location: 赤壁\n"),
-					),
-				}
-			: file,
-	);
-	const markdown = (path: string, text: string) => ({
-		path,
-		mediaType: "text/markdown; charset=utf-8",
-		bytes: encoder.encode(text),
-	});
-	files.push(
-		markdown("world/core.md", "# 汉末天下\n\n汉室名义仍在，曹操挟天子以令诸侯；孙刘两家只能靠盟约抵挡。\n"),
-		markdown("world/characters/阚泽.md", "---\nname: 阚泽\n---\n江东参谋，胆大口利，替黄盖过江向曹操献降书。\n"),
-	);
-	return candidateFromOpenStoryFiles(files, "write-context-test");
+	return candidateFromOpenStoryFiles(sampleWorkFiles(), "write-context-test");
 }
 
 test("Write Context 带上 world/core 与只出现在本节硬状态变化里的人物", () => {
 	const candidate = workWithCoreAndStateOnlyCharacter();
 	const context = compileWriteContext(candidate, "beat-0001");
-	assert.match(context.text, /### world core（world\/core\.md，全书公理）\n# 汉末天下/u);
+	assert.match(context.text, /### world core（world\/core\.md，全书公理）\n# 赤壁之战的天下/u);
 	assert.match(context.text, /### character 阚泽（world\/characters\/阚泽\.md，只出现在本节的硬状态变化里）/u);
 	// refs 里写了的人物排在前面，只在 changes 里出现的跟在后面。
 	assert.ok(context.text.indexOf("### character 黄盖") < context.text.indexOf("### character 阚泽"));

@@ -40,7 +40,6 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 		await input.fill("讨论一下人物的选择");
 		await input.press("Meta+Enter");
 		await page.locator(".message.assistant").filter({ hasText: "模型 B 已按高思考深度完成讨论" }).waitFor();
-		assert.equal(await page.getByText("调整预算", { exact: true }).count(), 0);
 		const settings = await page.evaluate(() => window.suiming?.invoke("models.show", {}));
 		assert.equal(settings?.profiles.find((profile) => profile.id === "main")?.model, "first");
 		assert.equal(settings?.profiles.find((profile) => profile.id === "main")?.thinking, "low");
