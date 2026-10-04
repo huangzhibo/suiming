@@ -23,6 +23,30 @@ describeCanonStore("git（ADR-0010）", async () => {
 	};
 });
 
+test("git Canon 的版本身份只有 id 与 parentId：history 不展开 tree，不随作品变大而变慢", async () => {
+	// 多一个字段就是多一次全树读取（packages/runtime/AGENTS.md「Canon、目录与存储」）。这道闸原来只在
+	// git-canon-real-work.test 里、要维护者本机的 eval-022 才跑，CI 与别的机器上整条 skip；挪到样例上。
+	const root = await mkdtemp(join(tmpdir(), "suiming-canon-shape-"));
+	try {
+		const files = sampleWorkFiles();
+		await materializeOpenStoryDirectorySnapshot(root, files);
+		const store = new GitCanonStore({ dir: root, now: () => new Date("2026-09-12T00:00:00.000Z") });
+		const genesis = await store.init(files);
+		assert.deepEqual(Object.keys(genesis).sort(), ["id", "parentId"]);
+		const history = await store.history("project-shape");
+		assert.deepEqual(
+			history.map((revision) => Object.keys(revision).sort()),
+			[["id", "parentId"]],
+		);
+		assert.deepEqual(Object.keys(await store.readProjectRevision("project-shape", genesis.id)).sort(), [
+			"id",
+			"parentId",
+		]);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 /**
  * 合并策略是作者在自己仓里 `git merge` 时才生效的东西，契约测试碰不到它——那里没有第二条线。
  * 这条钉住两件事：`text/**` 标了 `merge=binary`（两侧都改即冲突，见收敛方案 3.5），以及它是仓库

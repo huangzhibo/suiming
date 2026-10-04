@@ -38,7 +38,7 @@
 ## Canon、目录与存储
 
 - **`LocalProjectService` 的 head 不是真源，canon ref 才是**（2026-10-01）。桌面、CLI 与 host 的 `suim commit` 是不同进程里的不同实例，作品锁只锁 open 与 commit，谁都会推进 `refs/suiming/canon`。原先注释假设「本服务是 canon ref 的唯一写入者」只缓存不重读，斗破运行时 CLI 提交到 r7、开着的桌面停在 r4，已提交的文件标成「候选未提交」，桌面里提交会因基线过期被拒、直到重开。现在需要准确 head 的异步操作都先 `refreshHead()`（服务内部、桌面每条作品命令、harness 每个 turn 开场与 `readProjectStatus`）；同步的 `project()` 只返回最后读到的值。不要为了省一次小文件读取把缓存改回去。
-- `ProjectRevision` 只有 `{id, parentId}`，理由与实测见[系统架构](../../docs/architecture.md) 4.2。**不要往版本身份上加字段**——加一个就是加一次全树读取；`git-canon-real-work.test.ts` 断言 `Object.keys` 恰好是这两个。`history()` 仍按 head 缓存（与 `historyReader()` 同一份），因为它是每秒十次的查询。
+- `ProjectRevision` 只有 `{id, parentId}`，理由与实测见[系统架构](../../docs/architecture.md) 4.2。**不要往版本身份上加字段**——加一个就是加一次全树读取；`canon-store.test.ts` 在样例上断言 `Object.keys` 恰好是这两个（eval-022 上的真实作品版本在 `git-canon-real-work.test.ts`，没有本机副本时 skip）。`history()` 仍按 head 缓存（与 `historyReader()` 同一份），因为它是每秒十次的查询。
 - artifact 的 identity 与 path 都是扫描得到的事实，换卷是改 `index.yaml` 加 `mv` 文件两步，理由见[系统架构](../../docs/architecture.md) 4.1。手写 ChangeSet 的 create / replace 要自己填 `path`，`applyChangeOperations` 用 `identityForPath`（不看 index，所以不是自证）比对，拼错报 `path_identity_mismatch`。三个错误码（`noncanonical_story_path` / `path_projection_mismatch` / `story_beat_not_indexed`）与 `storyBeatVolumeById` 已删，不要重建。
 - 按 identity 存 artifact 的 store 必须自己存路径：`InMemoryArtifactStore` 存在内部记录里，Cloud PostgreSQL 是 `revision_artifacts.path`（migration 006）。git 不用，tree 天然带路径。
 - 审稿时效比 `subjects` 内容摘要，不比版本，理由见 [派生状态设计](../../docs/derived-evidence-design.md)。写审稿和判时效共用 `reviewSubjectPaths`，改主体范围时改一处；不要为了这个把 ContextSnapshot 加回来——摘要是审稿文件自己的字段，不是第二套记录。

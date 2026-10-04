@@ -126,6 +126,20 @@ test("project lock 拒绝双开、可安全释放并回收本机死进程锁", a
 	}
 });
 
+test("project lock 带等待：别人释放之后在等待期内拿到，host 并行跑 suim 不必立刻失败", async () => {
+	// waitMs 是为 host 同时跑几个 suim 设计的（作品锁只锁 open 与 commit，一瞬间就放）；原来只有超时那条路被测到。
+	const root = await mkdtemp(join(tmpdir(), "suiming-project-lock-wait-"));
+	try {
+		const first = await LocalProjectLock.acquire(root);
+		const waiting = LocalProjectLock.acquire(root, { waitMs: 3000 });
+		setTimeout(() => void first.release(), 100);
+		const second = await waiting;
+		await second.release();
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test("SQLite 本地 Project 登记与 remote binding 跨重启保持", async () => {
 	const fixture = await createLocalFixture();
 	try {

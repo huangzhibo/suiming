@@ -187,6 +187,50 @@ test("cloud import 与单侧 push / pull 只移动已提交 revision", async () 
 	}
 });
 
+test("link 只在两边内容相同、checkout 干净时成立；Cloud 有新版本而本地没东西可推时 push 要先 pull", async () => {
+	// link 原来只有 CLI 里一条成功路径；这几条拒绝是「不后台双写、不猜」的边界，2026-10-04 测试审查补上。
+	const root = await mkdtemp(join(tmpdir(), "suiming-cloud-link-"));
+	const cloud = new InMemoryCloudProjectStore();
+	let local: LocalProjectService | undefined;
+	try {
+		local = await createLocal(root, "local-link");
+		await createCloud(cloud, "cloud-link");
+		const sync = new LocalCloudSyncService({ local, cloud, endpoint, actorId });
+		const code = (expected: string) => (error: unknown) => error instanceof CloudSyncError && error.code === expected;
+
+		// checkout 有未提交的修改：不能 link。
+		const placePath = join(local.paths.checkoutPath, "world/places/赤壁.md");
+		const place = await readFile(placePath, "utf8");
+		await writeFile(placePath, `${place}未提交。\n`);
+		await assert.rejects(() => sync.link({ cloudProjectId: "cloud-link" }), code("cloud_sync_dirty_checkout"));
+		await writeFile(placePath, place);
+
+		// 本地多提交了一版，两边内容不同：不能 link，不猜哪边是对的。
+		await editAndCommitLocal(local, "world/characters/黄盖.md", "他宁可自己受刑", "他宁可自己当众受刑");
+		await assert.rejects(() => sync.link({ cloudProjectId: "cloud-link" }), code("cloud_sync_content_mismatch"));
+
+		// Cloud 跟上同一处修改后内容相同，link 成立。
+		await commitCloudArtifact(cloud, "cloud-link", "character", "黄盖", "他宁可自己受刑", "他宁可自己当众受刑", "c1");
+		await sync.link({ cloudProjectId: "cloud-link" });
+		assert.equal((await sync.status()).state, "in_sync");
+
+		// Cloud 又有新版本、本地没有可推的：push 要先 pull。
+		await commitCloudArtifact(
+			cloud,
+			"cloud-link",
+			"story-beat",
+			"beat-0002",
+			"各船同时点火",
+			"各船立刻同时点火",
+			"c2",
+		);
+		await assert.rejects(() => sync.push({ idempotencyKey: "push-behind" }), code("cloud_sync_pull_required"));
+	} finally {
+		local?.close();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test("pull 合并非交叉分叉后保留 Local ahead，随后 push 收敛到同一快照", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-cloud-diverged-"));
 	const cloud = new InMemoryCloudProjectStore();

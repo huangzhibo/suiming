@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -691,6 +691,53 @@ test("Agent 按模型决定调用独立 Review，经持久引用取得报告后�
 	}
 });
 
+test("Reviewer 交的引文在被审文件里找不到：拒绝回到 Reviewer 手里，改正后重交、审稿照常落盘", async () => {
+	// submit_review 的引文校验原来只在 composeReviewFile 与 story 解析层测，Reviewer 被拒之后能不能接着交没人测。
+	const finding = (evidence: string) => ({
+		severity: "minor",
+		anchor: { kind: "artifact", path: "world/characters/黄盖.md" },
+		issue: "人物档没交代他为什么肯挨这顿打",
+		evidence,
+		repairLayer: "design",
+		suggestion: "补一句他对这条计的盘算。",
+	});
+	const draft = (evidence: string) => ({
+		verdict: "revise",
+		summary: "人物档还缺一笔",
+		findings: [finding(evidence)],
+		uncovered: [],
+		uncertainties: [],
+	});
+	const f = await fixture();
+	try {
+		f.provider.setResponses([
+			call("review", { layer: "design", goal: "核对人物档" }),
+			call("submit_review", draft("「他从来没到过赤壁」")),
+			async (context) => {
+				const result = context.messages.at(-1);
+				assert.equal(result?.role, "toolResult");
+				assert.equal((result as { isError?: boolean }).isError, true);
+				assert.match(JSON.stringify(result?.content), /review_quote_not_found/u);
+				return call("submit_review", draft("「江东老将，跟过孙坚、孙策」"));
+			},
+			reply("审完了，人物档有一条意见"),
+		]);
+		const outcome = await f.say("独立审一下人物档");
+		assert.equal(outcome.failure, undefined);
+		assert.deepEqual(
+			f.project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
+			[["review", "completed"]],
+		);
+		const reviews = (await readdir(join(f.root, "review"))).filter((name) => name.startsWith("design-"));
+		assert.equal(reviews.length, 1);
+		const written = await f.checkoutFile(`review/${reviews[0]}`);
+		assert.match(written, /江东老将，跟过孙坚、孙策/u);
+		assert.doesNotMatch(written, /他从来没到过赤壁/u);
+	} finally {
+		await f.close();
+	}
+});
+
 test("委派的子任务没交付：失败回到父模型手里作为工具错误，turn 不崩", async () => {
 	const f = await fixture();
 	try {
@@ -775,6 +822,31 @@ test("模型结果未知才 paused；不授权重发就一直停着；换模型�
 		const next = await f.say("换了模型再聊", id);
 		assert.equal(next.value?.reply, "新模型接着原对话");
 		assert.equal(f.alternate.state.callCount, 1);
+	} finally {
+		await f.close();
+	}
+});
+
+test("工具参数形状不对（真实 provider 把数组序列化成了字符串）是回到模型手里的拒绝，turn 不崩，改正后照常完成", async () => {
+	// AGENTS.md 测试纪律：真实 provider 暴露的每种 malformed output 都要有等价回归，由 tool contract 拒绝。
+	// qwen3.8-max 把 union 下的数组写成字符串（packages/runtime/AGENTS.md「模型与凭据」）；loop 的
+	// invalid_tool_arguments 原来没有任何测试触发。
+	const f = await fixture();
+	try {
+		f.provider.setResponses([
+			call("review", { layer: "design", storyBeatIds: '["beat-0001"]' }),
+			async (context) => {
+				const result = context.messages.at(-1);
+				assert.equal(result?.role, "toolResult");
+				assert.equal((result as { isError?: boolean }).isError, true);
+				assert.match(JSON.stringify(result?.content), /invalid_tool_arguments: \/storyBeatIds/u);
+				return reply("参数写错了，先不审");
+			},
+		]);
+		const outcome = await f.say("审一下第一节的设计");
+		assert.equal(outcome.failure, undefined);
+		assert.equal(outcome.session.status, "idle");
+		assert.equal(outcome.value?.reply, "参数写错了，先不审");
 	} finally {
 		await f.close();
 	}
