@@ -6,10 +6,11 @@
  *   node scripts/capture-media.mjs --work <作品目录> --plan <分镜.json> --out <输出目录> [--video]
  *
  * 分镜文件写这部作品里要点的东西（名字按界面上显示的写）：
- *   { "beat": "情节标题", "volume": "卷名", "character": "人物名", "contract": "读者期待名" }
+ *   { "beat": "情节标题", "volume": "卷名", "character": "人物名", "contract": "读者期待名", "folder": "左栏显示的作品名（可省）" }
  *
  * 输出：axis.png（全书故事轴）、axis-state.png（选中一节并查看状态）、volume.png（进入一卷）、
- * contract.png（读者期待的轨迹）、character.png（人物页的关系图）、reading.png（那一节的正文与最近一次对话）；
+ * contract.png（读者期待的轨迹）、character.png（人物页的关系图）、reading.png（那一节的正文与最近一次对话）、
+ * workbench.png（三栏全开的全局界面）；
  * 带 --video 时另出 tour.webp。
  * 截图是 2 倍像素。动图不用 Playwright 自带的录像（码率低，中文发糊），而是录 Chromium 的逐帧画面，
  * 按时间戳重采样后用 img2webp 合成；需要本机有 ImageMagick（magick）与 libwebp（img2webp）。
@@ -18,7 +19,7 @@
 import { execFileSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron } from "playwright";
 
@@ -50,7 +51,8 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const data = await mkdtemp(join(tmpdir(), "suiming-capture-"));
 // 打开的是副本：没有 .suiming 的目录会被主进程就地初始化（git init、.suiming、.gitattributes），
 // 直接打开仓库里的 examples/sanguo 就在仓库里套出一个 git 仓库。
-const project = join(data, "work");
+// 副本目录名就是左栏底部显示的作品名：分镜里的 folder，没写就沿用原目录名。
+const project = join(data, plan.folder ?? basename(resolve(values.work)));
 await cp(resolve(values.work), project, { recursive: true });
 const app = await electron.launch({
 	cwd: repo,
@@ -243,6 +245,13 @@ try {
 	await sleep(1200);
 
 	if (recording) await recording.send("Page.stopScreencast");
+
+	// 7. 全局界面（不进动图）：左栏大纲、中间这一节的设计、右栏对话，三栏全开。前面几张都收起了侧栏、只看局部。
+	await click(page.getByRole("button", { name: "展开左栏" }));
+	const design = page.getByRole("radio", { name: "设计" }).or(page.getByRole("button", { name: "设计", exact: true }));
+	if (await design.count()) await click(design.first());
+	await sleep(1500);
+	await shot("workbench");
 } finally {
 	await app.close();
 	await rm(data, { recursive: true, force: true });
