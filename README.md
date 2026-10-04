@@ -237,4 +237,4 @@ The animation above shows the bundled example, the first 50 chapters of *Romance
 
 **Try it** (Node.js 24+, git): `npm install && npm run dev:desktop` for the desktop app, or `npm install && npm run build && npm link -w @suiming/cli` for the CLI, then `suim init <dir> --intent-file intent.md`. Configure models in the desktop settings or in `~/.suiming/config.toml`; any provider supported by [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) works.
 
-Documentation and code comments are in Chinese. [AGENTS.md](AGENTS.md) is the source of truth for the product's invariants and engineering rules. Licensed under [MIT](LICENSE).
+The interface, the agent's prompts, documentation and code comments are all in Chinese, and it has only been exercised on Chinese fiction. [AGENTS.md](AGENTS.md) is the source of truth for the product's invariants and engineering rules. Licensed under [MIT](LICENSE).
