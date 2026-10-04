@@ -258,7 +258,9 @@ try {
 		await click(page.getByRole("button", { name: "故事状态", exact: true }));
 		await click(page.getByRole("button", { name: "适应窗口" }));
 	} else {
-		const design = page.getByRole("radio", { name: "设计" }).or(page.getByRole("button", { name: "设计", exact: true }));
+		const design = page
+			.getByRole("radio", { name: "设计" })
+			.or(page.getByRole("button", { name: "设计", exact: true }));
 		if (await design.count()) await click(design.first());
 	}
 	await sleep(1500);
