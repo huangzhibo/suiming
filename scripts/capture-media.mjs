@@ -6,7 +6,8 @@
  *   node scripts/capture-media.mjs --work <作品目录> --plan <分镜.json> --out <输出目录> [--video]
  *
  * 分镜文件写这部作品里要点的东西（名字按界面上显示的写）：
- *   { "beat": "情节标题", "volume": "卷名", "character": "人物名", "contract": "读者期待名", "folder": "左栏显示的作品名（可省）" }
+ *   { "beat": "情节标题", "volume": "卷名", "character": "人物名", "contract": "读者期待名",
+ *     "folder": "左栏显示的作品名（可省）", "workbench": "axis（可省：全局图中间放故事轴、右栏放故事状态）" }
  *
  * 输出：axis.png（全书故事轴）、axis-state.png（选中一节并查看状态）、volume.png（进入一卷）、
  * contract.png（读者期待的轨迹）、character.png（人物页的关系图）、reading.png（那一节的正文与最近一次对话）、
@@ -246,10 +247,20 @@ try {
 
 	if (recording) await recording.send("Page.stopScreencast");
 
-	// 7. 全局界面（不进动图）：左栏大纲、中间这一节的设计、右栏对话，三栏全开。前面几张都收起了侧栏、只看局部。
+	// 7. 全局界面（不进动图）：三栏全开，前面几张都收起了侧栏、只看局部。默认中间是这一节的设计、右栏对话；
+	// 分镜写 "workbench": "axis" 时中间放全书故事轴、右栏放故事状态，只有结构（斗破只在仓库外用、不露正文与对话），
+	// 窗口放大到 1680×1050，三栏都开着时轴才放得下一百多节。
 	await click(page.getByRole("button", { name: "展开左栏" }));
-	const design = page.getByRole("radio", { name: "设计" }).or(page.getByRole("button", { name: "设计", exact: true }));
-	if (await design.count()) await click(design.first());
+	if (plan.workbench === "axis") {
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1680, 1050));
+		await sleep(800);
+		await click(page.getByRole("button", { name: "打开故事轴" }));
+		await click(page.getByRole("button", { name: "故事状态", exact: true }));
+		await click(page.getByRole("button", { name: "适应窗口" }));
+	} else {
+		const design = page.getByRole("radio", { name: "设计" }).or(page.getByRole("button", { name: "设计", exact: true }));
+		if (await design.count()) await click(design.first());
+	}
 	await sleep(1500);
 	await shot("workbench");
 } finally {
