@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CloudProjectService, InMemoryCloudProjectStore } from "@suiming/runtime";
+import { CloudProjectService } from "@suiming/runtime";
 import {
 	DOMAIN_API_ROUTES,
 	DomainApiErrorSchema,
@@ -8,6 +8,7 @@ import {
 	SUIMING_DOMAIN_API_VERSION,
 } from "@suiming/sdk";
 import { Value } from "typebox/value";
+import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import {
 	createBearerTokenAuthenticator,

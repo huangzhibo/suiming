@@ -132,7 +132,6 @@ export type {
 	CloudProjectStore,
 	CommitCloudProjectInput,
 	CreateCloudProjectInput,
-	InMemoryCloudProjectStoreOptions,
 	ReadCloudProjectInput,
 	ReadCloudProjectRevisionInput,
 	SetCloudProjectMemberInput,
@@ -141,21 +140,13 @@ export {
 	cloudChangeOperationPayload,
 	cloudCommitProjectIdempotencyPayload,
 	cloudCreateProjectIdempotencyPayload,
+	cloudIdempotencyFingerprint,
 	cloudSetProjectMemberIdempotencyPayload,
-	InMemoryCloudProjectStore,
 	normalizeCloudProjectStoreString,
 } from "./cloud/cloud-project-store.js";
 export { CloudStoreError } from "./cloud/errors.js";
-export type {
-	CloudIdempotencyReceipt,
-	CloudIdempotencyScope,
-	CloudIdempotencyStore,
-	ExecuteCloudIdempotentInput,
-	InMemoryCloudIdempotencyStoreOptions,
-} from "./cloud/idempotency.js";
-export { cloudIdempotencyFingerprint, InMemoryCloudIdempotencyStore } from "./cloud/idempotency.js";
 export type { CloudObjectStore, CloudStoredObject } from "./cloud/object-store.js";
-export { cloudObjectKey, InMemoryCloudObjectStore } from "./cloud/object-store.js";
+export { cloudObjectKey } from "./cloud/object-store.js";
 export type { CloudPostgresMigration } from "./cloud/postgres-migrations.js";
 export { CLOUD_POSTGRES_MIGRATIONS } from "./cloud/postgres-migrations.js";
 export type {

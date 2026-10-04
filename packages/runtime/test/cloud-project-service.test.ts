@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-	CloudProjectService,
-	CloudStoreError,
-	InMemoryCloudProjectStore,
-	openStoryContentFingerprint,
-} from "../src/index.js";
+import { CloudProjectService, CloudStoreError, openStoryContentFingerprint } from "../src/index.js";
+import { InMemoryCloudProjectStore } from "./in-memory-cloud.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
 const encoder = new TextEncoder();

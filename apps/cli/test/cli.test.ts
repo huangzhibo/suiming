@@ -14,7 +14,6 @@ import {
 import {
 	type CloudProjectStore,
 	HOST_ADAPTER_ROOTS,
-	InMemoryCloudProjectStore,
 	LocalProjectLock,
 	LocalProjectService,
 	ModelGateway,
@@ -26,6 +25,7 @@ import {
 import { parse } from "smol-toml";
 import type { Static } from "typebox";
 import { Value } from "typebox/value";
+import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import { HOST_IDS, installHost } from "../src/host-install.js";
 import {

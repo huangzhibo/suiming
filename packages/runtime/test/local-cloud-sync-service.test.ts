@@ -6,7 +6,6 @@ import test from "node:test";
 import {
 	CloudSyncError,
 	classifyOpenStoryDirectoryFile,
-	InMemoryCloudProjectStore,
 	LocalCloudSyncService,
 	LocalProjectService,
 	materializeOpenStoryDirectorySnapshot,
@@ -14,6 +13,7 @@ import {
 	storyPackageCodec,
 	validateStoryProjectCandidate,
 } from "../src/index.js";
+import { InMemoryCloudProjectStore } from "./in-memory-cloud.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
 const encoder = new TextEncoder();

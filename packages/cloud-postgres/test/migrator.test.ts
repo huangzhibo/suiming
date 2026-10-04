@@ -9,12 +9,12 @@ import {
 	CloudStoreError,
 	type CommitCloudProjectInput,
 	classifyOpenStoryDirectoryFile,
-	InMemoryCloudObjectStore,
 	storyPackageCodec,
 	targetArtifactIdentity,
 	validateStoryProjectCandidate,
 } from "@suiming/runtime";
 import { sql } from "kysely";
+import { InMemoryCloudObjectStore } from "../../runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../runtime/test/sample-work.js";
 import {
 	CloudPostgresError,

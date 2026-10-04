@@ -119,7 +119,7 @@ npm run regression:harness -- --only check-issues --trials 1   # 真实模型回
 
 ## 测试纪律
 
-- 测试 helper 是 test/ 目录下的普通文件，按相对路径引用：story 层 fixture 在 packages/story/test/fixture.ts，唯一的样例作品在 packages/runtime/test/sample-work.ts（2 个 StoryBeat）；packages/runtime/test/synthetic-work.ts 是给 Frame 规模测试合成的 3 卷 36 Beat Design，没有文学内容，不当样例用。曾做过独立 `@suiming/testing` 包和 `@suiming/runtime/testing` 子路径导出，都因为是第二套机制或污染产品导出面被删，不要再建。
+- 测试 helper 是 test/ 目录下的普通文件，按相对路径引用：story 层 fixture 在 packages/story/test/fixture.ts，唯一的样例作品在 packages/runtime/test/sample-work.ts（2 个 StoryBeat）；packages/runtime/test/synthetic-work.ts 是给 Frame 规模测试合成的 3 卷 36 Beat Design，没有文学内容，不当样例用。内存版 Cloud store（`InMemoryCloudProjectStore` 等）在 packages/runtime/test/in-memory-cloud.ts，2026-10-04 才从 runtime 的产品导出面挪出来，不要再放回 src。曾做过独立 `@suiming/testing` 包和 `@suiming/runtime/testing` 子路径导出，都因为是第二套机制或污染产品导出面被删，不要再建。
 - 被删模块的测试随模块删除，不留空壳。不加只测 in-memory 假对象、或断言临时空洞（如「Worker 零 executor」）的测试；冻结面只保留能发现真问题的测试。
 - 真实 provider 暴露的每种 malformed output 都要有等价回归，由 Checker 或 tool contract 拒绝，不靠改 prompt 兜底。
 - 默认 skip 的集成测试不会告诉你它坏了：改 Cloud schema 后的真跑办法见 [packages/cloud-postgres/AGENTS.md](packages/cloud-postgres/AGENTS.md)。桌面 E2E 的纪律见 [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md)。

@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
-import { CloudProjectService, InMemoryCloudProjectStore } from "@suiming/runtime";
+import { CloudProjectService } from "@suiming/runtime";
 import { encodeDomainApiOpenStoryPackage } from "@suiming/sdk";
+import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import {
 	createBearerTokenAuthenticator,
