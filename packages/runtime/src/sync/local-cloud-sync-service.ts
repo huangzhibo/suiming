@@ -1,10 +1,7 @@
+import { changeOperationsBetween } from "../artifact/change-operations.js";
 import type { OpenPackageFile } from "../artifact/open-package.js";
 import { materializeOpenStoryDirectorySnapshot } from "../artifact/open-story-directory.js";
-import {
-	candidateFromOpenStoryFiles,
-	changeOperationsBetweenCandidates,
-	openStoryFilesFromCandidate,
-} from "../artifact/open-story-snapshot.js";
+import { candidateFromOpenStoryFiles, openStoryFilesFromCandidate } from "../artifact/open-story-snapshot.js";
 import { validateStoryProjectCandidate } from "../artifact/story-design-validator.js";
 import type { ChangeSet, ProjectRevision } from "../artifact/types.js";
 import type { CloudProjectRevisionSnapshot, CloudProjectStore } from "../cloud/cloud-project-store.js";
@@ -260,7 +257,7 @@ export class LocalCloudSyncService {
 		const targetForCloud = candidateFromOpenStoryFiles(targetFiles, analysis.cloudHeadRevisionId);
 		const cloudChangeSet: ChangeSet = {
 			baseRevisionId: analysis.cloudHeadRevisionId,
-			operations: changeOperationsBetweenCandidates(cloudBase, targetForCloud),
+			operations: changeOperationsBetween(cloudBase, targetForCloud),
 		};
 		const cloudRevision =
 			cloudChangeSet.operations.length === 0 &&
@@ -405,7 +402,7 @@ export class LocalCloudSyncService {
 		const next = candidateFromOpenStoryFiles(targetFiles, localProject.headRevisionId);
 		const committed = await this.#local.commitManagedChangeSet({
 			baseRevisionId: localProject.headRevisionId,
-			operations: changeOperationsBetweenCandidates(base, next),
+			operations: changeOperationsBetween(base, next),
 		});
 		return { id: committed.id, created: true };
 	}

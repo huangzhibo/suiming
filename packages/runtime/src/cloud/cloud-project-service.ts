@@ -1,9 +1,6 @@
+import { changeOperationsBetween } from "../artifact/change-operations.js";
 import type { OpenPackageFile } from "../artifact/open-package.js";
-import {
-	candidateFromOpenStoryFiles,
-	changeOperationsBetweenCandidates,
-	openStoryFilesFromCandidate,
-} from "../artifact/open-story-snapshot.js";
+import { candidateFromOpenStoryFiles, openStoryFilesFromCandidate } from "../artifact/open-story-snapshot.js";
 import { validateStoryProjectCandidate } from "../artifact/story-design-validator.js";
 import type { ArtifactVersion } from "../artifact/types.js";
 import {
@@ -114,7 +111,7 @@ export class CloudProjectService {
 				idempotencyKey: nonempty(input.idempotencyKey, "idempotencyKey"),
 				changeSet: {
 					baseRevisionId,
-					operations: changeOperationsBetweenCandidates(baseSnapshot.candidate, nextCandidate),
+					operations: changeOperationsBetween(baseSnapshot.candidate, nextCandidate),
 				},
 			},
 			validateStoryProjectCandidate,

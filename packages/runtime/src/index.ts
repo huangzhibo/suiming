@@ -69,7 +69,6 @@ export {
 } from "./artifact/open-story-directory.js";
 export {
 	candidateFromOpenStoryFiles,
-	changeOperationsBetweenCandidates,
 	openStoryFilesFromCandidate,
 } from "./artifact/open-story-snapshot.js";
 export { validateOpenStoryFiles } from "./artifact/open-story-validation.js";
