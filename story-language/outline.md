@@ -52,7 +52,7 @@ frontmatter 只有可选 `title / refs / contracts / changes`，Markdown 主体�
 
 关系在故事中的建立、解除、承认、误解与情感变化写 StoryBeat，确实需要沿人物召回时写进 `refs.character`，不另建 Relationship artifact（人物与家族怎么写见 character 主题）。`refs.character` 不表示人物出场、行动或相关叙述为真。
 
-`refs.beat` 只引用更早的 Beat，为长距离承诺、选择、揭示和后果建立稳定依赖；它不复制故事内容。普通相邻顺序和主题相似不连边。StoryBeat 主体只写故事内语义，不用 ID、文件路径或“依照某 Beat”等仓库信息代替时间与因果。
+`refs.beat` 只引用更早的 Beat，为长距离承诺、选择、揭示和后果建立稳定依赖；它不复制故事内容。紧挨着的上一节不用连：相邻由 index 的顺序表达，每一节本来就接着上一节；主题相似也不连边。StoryBeat 主体只写故事内语义，不用 ID、文件路径或“依照某 Beat”等仓库信息代替时间与因果。
 
 ### 完整性与表达边界
 
