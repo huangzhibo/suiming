@@ -320,3 +320,122 @@ test("请求带上 loop 的 id 作 sessionId：按会话做 prompt cache 的 pro
 	});
 	assert.deepEqual(sessionIds, ["session-cache", "session-cache"]);
 });
+
+/** 折叠测试用的读取结果大约 12 KB，过 FOLD_BYTES（10 KB）；窗口给得很大，清理与压缩都不会触发。 */
+const FOLD_SIZE = 4000;
+
+function toolTexts(context: Transcript): string[] {
+	return lastToolResults(context);
+}
+
+test("上一轮停下之后作者再说一句：之前的大读取结果折成头尾，这一轮读的照常全文；干活中途的插话不折，原消息不改", async () => {
+	const { provider, model } = await fixture(1_000_000);
+	const inbox: { sequence: number; text: string }[] = [];
+	const seen: Transcript[] = [];
+	let checkpoint: LoopCheckpoint | undefined;
+	const big = bigTool(FOLD_SIZE);
+	const run = (responses: ((context: Transcript) => Promise<ReturnType<typeof fauxAssistantMessage>>)[]) => {
+		provider.setResponses(
+			responses.map((respond) => async (context: Transcript) => {
+				seen.push(context);
+				return respond(context);
+			}),
+		);
+		return runTaskLoop({
+			model,
+			systemPrompt: "测试",
+			...(checkpoint === undefined ? { prompt: "先读一段" } : { checkpoint }),
+			tools: [big],
+			budget: { maxTurns: 20 },
+			steering: () => inbox,
+			saveCheckpoint: async (next) => {
+				checkpoint = structuredClone(next);
+			},
+		});
+	};
+	await run([
+		async () => {
+			// 模型还在干活时作者插了一句：不是边界，刚读的结果下一次请求照常全文。
+			inbox.push({ sequence: 1, text: "读的时候留意黄盖" });
+			return fauxAssistantMessage(fauxToolCall("big", {}));
+		},
+		async (context) => {
+			assert.match(toolTexts(context)[0] ?? "", /^第1段：(黄盖受刑)+$/u, "插话之后第一段仍是全文");
+			return fauxAssistantMessage("第一段读完了");
+		},
+	]);
+	inbox.push({ sequence: 2, text: "再读一段" });
+	await run([
+		async (context) => {
+			const [first] = toolTexts(context);
+			assert.match(first ?? "", /^\[已折叠：上一个边界（新一轮或提交）之前的 big \{\}，原文 \d+ 字/u);
+			assert.match(first ?? "", /\n第1段：黄盖受刑/u, "留着开头");
+			assert.ok((first?.length ?? 0) < 1000, "只剩头尾");
+			return fauxAssistantMessage(fauxToolCall("big", {}));
+		},
+		async (context) => {
+			const [first, second] = toolTexts(context);
+			assert.match(first ?? "", /^\[已折叠/u, "上一轮的仍然折着，前缀不变");
+			assert.match(second ?? "", /^第2段：(黄盖受刑)+$/u, "边界之后读的照常全文");
+			return fauxAssistantMessage("第二段也读完了");
+		},
+	]);
+	assert.equal(seen.length, 4);
+	const stored = (checkpoint?.messages ?? []).filter((message) => message.role === "toolResult");
+	assert.equal(stored.length, 2);
+	assert.ok(
+		stored.every((message) =>
+			/^第\d段：(黄盖受刑)+$/u.test(message.content.map((part) => (part.type === "text" ? part.text : "")).join("")),
+		),
+		"checkpoint 里的原消息一字不改",
+	);
+});
+
+test("提交产生新版本是边界：之前的大读取结果折成头尾；写入这类非读取工具的大结果不折，小结果不折", async () => {
+	const { provider, model } = await fixture(1_000_000);
+	const seen: Transcript[] = [];
+	const respond = [
+		fauxAssistantMessage([fauxToolCall("big", {}), fauxToolCall("delegate", {}), fauxToolCall("small", {})]),
+		fauxAssistantMessage(fauxToolCall("commit", {})),
+		async (context: Transcript) => {
+			seen.push(context);
+			return fauxAssistantMessage("提交完了");
+		},
+	];
+	provider.setResponses(respond);
+	const tool = (name: string, replay: HarnessTool["replay"], text: string, boundary = false): HarnessTool => ({
+		name,
+		description: name,
+		parameters: Type.Object({}, { additionalProperties: false }),
+		replay,
+		prepare: async () => ({
+			content: [{ type: "text" as const, text }],
+			...(boundary ? { contextBoundary: true } : {}),
+		}),
+		execute: async (_id, _params, _signal, _update, prepared) =>
+			prepared as { content: { type: "text"; text: string }[] },
+		...(replay === "reconcile"
+			? {
+					reconcile: async (_id: string, _params: unknown, prepared: unknown) =>
+						prepared as { content: { type: "text"; text: string }[] },
+				}
+			: {}),
+	});
+	await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: "读、委派、提交",
+		tools: [
+			bigTool(FOLD_SIZE),
+			tool("delegate", "reconcile", `子任务交付：${"阚泽献书".repeat(FOLD_SIZE / 4)}`),
+			tool("small", "read", "小结果"),
+			tool("commit", "reconcile", "已提交 r2", true),
+		],
+		budget: { maxTurns: 10 },
+	});
+	const [big, delegated, small, committed] = toolTexts(seen[0] as Transcript);
+	assert.match(big ?? "", /^\[已折叠：上一个边界（新一轮或提交）之前的 big/u);
+	assert.match(delegated ?? "", /^子任务交付：(阚泽献书)+$/u, "非读取工具重调不得，不折");
+	assert.equal(small, "小结果");
+	assert.equal(committed, "已提交 r2");
+});

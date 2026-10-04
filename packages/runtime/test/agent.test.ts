@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -415,6 +415,46 @@ test("子任务运行中作者发消息：子任务看不到，交付之后根 A
 		assert.equal(outcome.value?.reply, "黄盖看过了，接着看阚泽");
 		assert.equal(f.provider.state.callCount, 4);
 		assert.equal(outcome.session.inboxSequence, 2, "两条作者消息都在这一个 turn 里取走");
+	} finally {
+		await f.close();
+	}
+});
+
+test("提交产生新版本之后，之前读的大文件在请求里折成头尾；没产生新版本的提交不算边界", async () => {
+	const f = await fixture();
+	try {
+		await mkdir(join(f.root, "notes"));
+		await writeFile(join(f.root, "notes/赤壁长注.md"), `# 赤壁长注\n\n${"黄盖诈降，阚泽献书。".repeat(600)}`);
+		const reads = (context: { messages: readonly { role: string; content?: unknown }[] }) =>
+			context.messages
+				.filter((message) => message.role === "toolResult")
+				.map((message) => (message.content as { type: string; text?: string }[])[0]?.text ?? "")
+				.filter((text) => text.includes("赤壁长注"));
+		const read = () => call("read", { path: "notes/赤壁长注.md" });
+		f.provider.setResponses([
+			read(),
+			call("write", { path: "intent/计谋的代价.md", content: "揭示真相必须让选择者承担不可逆的后果。" }),
+			call("commit", { summary: "记下计谋的代价" }),
+			async (context) => {
+				const [first] = reads(context);
+				assert.match(
+					first ?? "",
+					/^\[已折叠：上一个边界（新一轮或提交）之前的 read \{"path":"notes\/赤壁长注\.md"\}/u,
+				);
+				return read();
+			},
+			call("commit", { summary: "没有新改动" }),
+			async (context) => {
+				const [first, second] = reads(context);
+				assert.match(first ?? "", /^\[已折叠/u);
+				assert.match(second ?? "", /^1: # 赤壁长注/u, "没产生新版本的提交不是边界，之后重读的仍是全文");
+				assert.match(JSON.stringify(context.messages), /没有产生新版本/u);
+				return reply("提交了一个版本，第二次没有改动");
+			},
+		]);
+		const outcome = await f.say("读长注，记下代价并提交");
+		assert.equal(outcome.failure, undefined);
+		assert.equal(f.provider.state.callCount, 6);
 	} finally {
 		await f.close();
 	}

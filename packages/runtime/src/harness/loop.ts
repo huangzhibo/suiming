@@ -63,6 +63,8 @@ export interface LoopCheckpoint {
 	reduction?: { summary: string; throughMessage: number; actionId: string; modelCallId: string };
 	/** 消息下标小于它的工具结果在请求里换成占位；原消息不改。只往前推，前缀因此在两次清理之间稳定。 */
 	cleared?: number;
+	/** 最近一个边界之后第一条消息的下标；它之前的大读取结果在请求里折成头尾（见 FOLD_BYTES）。只往前推。 */
+	boundary?: number;
 	/** 上一次请求被 provider 以上下文超限拒绝、已经清理重试过；再超限就如实报错，不无限重发。 */
 	overflowRetried?: boolean;
 	/** 这一次请求因瞬时失败已重发了几次；拿到正常响应就清掉。 */
@@ -186,9 +188,22 @@ const GIVE_UP_AT = 1;
 /** 没有校准数据时按每 3 字节 1 token 估：中文一个字 3 字节，偏保守。 */
 const DEFAULT_TOKENS_PER_BYTE = 1 / 3;
 
+/**
+ * 边界折叠（Harness 设计第 7 节「边界折叠」）。边界是上一轮停下之后作者又说了一句，以及一次产生了新版本的提交：
+ * 之前读到的东西，用它的那件事已经做完了。边界之前、原文超过这么多字节的读取类结果（`replay: "read"`，同样的
+ * 参数再调一次就拿得回来，拿到的还是当前内容）在请求里只留头尾。不按「发过几次」折：模型常常一次读一个文件、
+ * 读完几个才动笔，按次数折会在动笔之前折掉先读的，逼它重读。折叠点只在边界上推进，两个边界之间请求前缀不变。
+ */
+const FOLD_BYTES = 10 * 1024;
+const FOLD_EXCERPT_CODE_POINTS = 200;
+
+function textOf(message: ToolResultMessage): string {
+	return message.content.map((part) => (part.type === "text" ? part.text : "")).join("");
+}
+
 function clearedToolResult(message: ToolResultMessage): ToolResultMessage {
 	const { details: _details, ...rest } = message;
-	const length = Array.from(message.content.map((part) => (part.type === "text" ? part.text : "")).join("")).length;
+	const length = Array.from(textOf(message)).length;
 	return {
 		...rest,
 		content: [
@@ -200,11 +215,53 @@ function clearedToolResult(message: ToolResultMessage): ToolResultMessage {
 	};
 }
 
-/** 发给模型的消息：摘要替换压缩点之前的非作者消息，清理点之前的工具结果换成占位。 */
-function projectMessages(state: LoopCheckpoint): Message[] {
-	const cleared = state.cleared ?? 0;
+/** 产生这个工具结果的调用参数：在它前面最近的那条模型回复里。 */
+function callArguments(messages: readonly Message[], index: number, toolCallId: string): string {
+	for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+		const message = messages[cursor];
+		if (message?.role !== "assistant") continue;
+		const call = message.content.find((part) => part.type === "toolCall" && part.id === toolCallId);
+		const encoded = call?.type === "toolCall" ? Array.from(JSON.stringify(call.arguments)) : [];
+		return encoded.length <= FOLD_EXCERPT_CODE_POINTS
+			? encoded.join("")
+			: `${encoded.slice(0, FOLD_EXCERPT_CODE_POINTS).join("")}…`;
+	}
+	return "";
+}
+
+function foldedToolResult(messages: readonly Message[], index: number, message: ToolResultMessage): ToolResultMessage {
+	const { details: _details, ...rest } = message;
+	const codePoints = Array.from(textOf(message));
+	const head = codePoints.slice(0, FOLD_EXCERPT_CODE_POINTS).join("");
+	const tail = codePoints.slice(-FOLD_EXCERPT_CODE_POINTS).join("");
+	return {
+		...rest,
+		content: [
+			{
+				type: "text",
+				text: `[已折叠：上一个边界（新一轮或提交）之前的 ${message.toolName} ${callArguments(messages, index, message.toolCallId)}，原文 ${codePoints.length} 字，只留头尾。要用全文就用同样的参数再调用一次，拿到的是当前内容]\n${head}\n……\n${tail}`,
+			},
+		],
+	};
+}
+
+/** 一条工具结果在请求里的样子：清理点之前换成占位，边界之前的大读取结果折成头尾，其余原样。 */
+function projectToolResult(state: LoopCheckpoint, index: number, foldable: ReadonlySet<string>): ToolResultMessage {
+	const message = state.messages[index] as ToolResultMessage;
+	if (index < (state.cleared ?? 0)) return clearedToolResult(message);
+	if (
+		index < (state.boundary ?? 0) &&
+		foldable.has(message.toolName) &&
+		Buffer.byteLength(textOf(message)) > FOLD_BYTES
+	)
+		return foldedToolResult(state.messages, index, message);
+	return message;
+}
+
+/** 发给模型的消息：摘要替换压缩点之前的非作者消息，工具结果按清理点与边界投影（projectToolResult）。 */
+function projectMessages(state: LoopCheckpoint, foldable: ReadonlySet<string>): Message[] {
 	const project = (message: Message, index: number): Message =>
-		index < cleared && message.role === "toolResult" ? clearedToolResult(message) : message;
+		message.role === "toolResult" ? projectToolResult(state, index, foldable) : message;
 	if (!state.reduction) return state.messages.map(project);
 	const through = state.reduction.throughMessage;
 	return [
@@ -273,6 +330,7 @@ export function hasUnconfirmedEffects(checkpoint: LoopCheckpoint): boolean {
 
 export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOutcome> {
 	const declarations = options.tools.map(({ name, description, parameters }) => ({ name, description, parameters }));
+	const foldable = new Set(options.tools.filter((tool) => tool.replay === "read").map((tool) => tool.name));
 	const binding = taskLoopBinding(options);
 	const state: LoopCheckpoint =
 		options.checkpoint === undefined
@@ -380,6 +438,10 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 	};
 	const pullSteering = async () => {
 		const pending = ((await options.steering?.()) ?? []).filter((item) => item.sequence > state.steeringSequence);
+		// 模型说完停下之后作者又说了一句，是一个边界；模型还在干活时的插话不是，正在用的读取结果不能折。
+		const last = state.messages.at(-1);
+		if (pending.length > 0 && last?.role === "assistant" && !last.content.some((part) => part.type === "toolCall"))
+			state.boundary = state.messages.length;
 		for (const item of pending) {
 			state.messages.push({
 				role: "user",
@@ -583,7 +645,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			}
 			const build = (): Context => ({
 				systemPrompt: options.systemPrompt,
-				messages: structuredClone(projectMessages(state)),
+				messages: structuredClone(projectMessages(state, foldable)),
 				tools: declarations,
 			});
 			let context = build();
@@ -598,7 +660,9 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 					let cleared = Math.max(state.cleared ?? 0, state.reduction?.throughMessage ?? 0);
 					while (cleared < until && (promptBytes - saved) * ratio > window * CLEAR_TO) {
 						const message = state.messages[cleared];
-						if (message?.role === "toolResult") saved += bytesOf(message) - bytesOf(clearedToolResult(message));
+						if (message?.role === "toolResult")
+							saved +=
+								bytesOf(projectToolResult(state, cleared, foldable)) - bytesOf(clearedToolResult(message));
 						cleared += 1;
 					}
 					if (cleared > (state.cleared ?? 0)) {
@@ -610,7 +674,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				if (promptBytes * ratio > window * GIVE_UP_AT) throw contextOverflowError();
 				// 压缩只压得动模型回复与工具结果，作者消息原样保留：可压的部分不到窗口的一成就不再要求，
 				// 否则开场消息本身就超线时，每次请求都要求压缩，模型每次照做，永远不往下干活。
-				const compactable = projectMessages(state)
+				const compactable = projectMessages(state, foldable)
 					.filter((message) => message.role !== "user")
 					.reduce((sum, message) => sum + bytesOf(message), 0);
 				if (
@@ -790,6 +854,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				summary: summarize(action.result),
 			});
 			state.messages.push(action.message);
+			if (action.result.contextBoundary) state.boundary = state.messages.length;
 			action.state = "delivered";
 			const fingerprint = createHash("sha256")
 				.update(JSON.stringify([action.call.name, action.call.arguments, action.message.content]))

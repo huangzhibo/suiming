@@ -2,7 +2,7 @@
 
 执行模型、恢复规则与故障验收的现行规范。执行模型是 **Session = 根 Agent**（2026-09-13 起；之前的 Conversation → Run → Task → Attempt 四层为什么去掉见第 2 节），调研与计算是设计好、尚未实现的能力面（第 8 节）。决策依据见 [ADR-0012](adr/0012-own-suiming-harness.md)，产品与领域边界见[系统架构](architecture.md)，实现进度与已知缺陷见[当前状态](current-status.md)，余下的实施切片见第 13 节。
 
-> **每条属性都要能指到验证它的代码或测试。**没实现的部分（切片 C 的折叠与边界压缩、切片 E / F）在第 14 节如实标「没有测试」，实现到哪一行就把哪一行的测试名补上，不用相邻的测试冒充。
+> **每条属性都要能指到验证它的代码或测试。**没实现的部分（切片 C 的边界压缩、切片 E / F）在第 14 节如实标「没有测试」，实现到哪一行就把哪一行的测试名补上，不用相邻的测试冒充。
 
 ## 1. 自建的是什么，不是什么
 
@@ -137,7 +137,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 | 能力 | 工具 | replay | 说明 |
 | --- | --- | --- | --- |
-| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` `read_result` | read | `read` 按行分页（默认 2000 行），按大小折叠还没做（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
+| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` `read_result` | read | `read` 按行分页（默认 2000 行），超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
 | 修改候选 | `write` `edit` `copy` `move` `delete` | reconcile（journal） | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | read / reconcile（receipt） | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | read | 模型主动压缩；系统触发的压缩见第 7 节 |
@@ -175,9 +175,11 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 - 估计值超过整个窗口：不发，报 `context_overflow`，提示开新对话或换更大窗口的模型。
 - provider 自己报超限（pi-ai `isContextOverflow`）：撤回那次响应，把能清的全清掉重试一次；清无可清或已经试过就报 `context_overflow`，不无限重发。
 
-阈值是占位值，要在真实长运行里调。不要把它改成直接删消息：作者的原话与 Agent 的动作记录是执行真源，清理只决定这一次请求带不带。改之前会话卡死的样子是：溢出 → turn 回 idle → 下一句把同一份上下文原样再发，永远溢出（`context-window.test.ts` 四条守着，见第 14 节）。它是下面「折叠」的粗版本：按位置清而不是按大小与发送次数折，占位符不带头尾摘录，取回就是重读，没有 `recall`。
+阈值是占位值，要在真实长运行里调。不要把它改成直接删消息：作者的原话与 Agent 的动作记录是执行真源，清理只决定这一次请求带不带。改之前会话卡死的样子是：溢出 → turn 回 idle → 下一句把同一份上下文原样再发，永远溢出（`context-window.test.ts` 四条守着，见第 14 节）。它与下面的边界折叠互补：折叠在边界上按大小折读取结果、留头尾；清理在窗口吃紧时按位置清所有工具结果、不留摘录。
 
-**折叠（SoL-Pi ObservationPack 的改法，未做）。**eval-022 四个 Run：137 次模型调用，`pi-context` 每次 48–492 KB，合计 30 MB；`read` 93 次，每次读的正文从此留在每一次请求里，直到模型想起来 `compact_context`（四个 Run 里调过一次）。规则：一个工具结果超过 10 KB 时，前两次请求全量发，之后在 `ready` 阶段的投影里换成占位符（头尾各 512 字节 + 原动作 id + 大小 + 取回方式）；历史消息与 checkpoint 不改。取回比 SoL-Pi 简单：`read` 的原文就在 checkout 里，占位符只说「`read path offset` 可重读」；`frame` / `write_context` / `search` / `fetch` 这类编译或抓取结果按动作 id 从 checkpoint 或对象回读（`recall` 工具，read）。代价是第三次发送时 provider 的 prompt cache 断一次；大结果 + 长会话稳赚。
+**边界折叠（2026-10-05 落地）。**eval-022 四个 Run：137 次模型调用，`pi-context` 每次 48–492 KB，合计 30 MB；`read` 93 次，每次读的正文从此留在每一次请求里，直到模型想起来 `compact_context`（四个 Run 里调过一次）。规则：**边界**之前、原文超过 10 KB 的读取类结果（`replay: "read"`）在请求投影里折成占位——工具名与参数、原文字数、头尾各 200 字，并说明「用同样的参数再调用一次，拿到的是当前内容」；消息列表与 checkpoint 不改，清理点之前的仍按上面清掉。边界有两种，记在 checkpoint 的 `boundary` 上，只往前推：模型说完停下之后作者又说了一句（新一轮；模型还在干活时的插话不算，正在用的结果不能折），以及一次产生了新版本的提交（工具结果带 `contextBoundary`；没有改动的提交不算）。
+
+原设计按发送次数折（SoL-Pi ObservationPack 的改法：前两次请求全量、第三次起换占位）。没采用：模型常常一次读一个文件、读完几个才动笔，按次数折会在动笔之前折掉先读的，逼它重读；到了边界，用它的那件事已经做完了。`recall` 也没做：可折的只有读取类结果，同样的参数重调就拿得回来，而且边界之后拿到当前内容比回读旧结果更对；委派、审稿、提交这类重调不得的结果不折。调研（切片 E）的 `fetch` 重取会变、要花网络，到时再给它回读。代价是边界上 provider 的 prompt cache 从第一处新折的结果起断一次，两个边界之间前缀不变。子任务没有边界（不接作者消息、不提交），只靠上面的窗口保护。10 KB 与头尾长度是占位值。
 
 **压缩在边界做，不在中途做（未做）。**现在只有模型主动的 `compact_context`；设计是系统也会触发，但触发点是两个天然边界而不是 token 阈值：
 
@@ -383,7 +385,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 
 | 切片 | 内容 | 状态 |
 | --- | --- | --- |
-| C | loop 与 Context | 已做：binding 按 turn、steering 只给根、turn 开始的状态行与结束对账、窗口保护（折叠的粗版本）、`write` / `edit` 带 `check`、`submit_review` 引文校验。**剩下**：按大小折叠与 `recall`、commit 后与 turn 结束后的边界压缩（第 7 节）。各项彼此独立，可以分开提交 |
+| C | loop 与 Context | 已做：binding 按 turn、steering 只给根、turn 开始的状态行与结束对账、窗口保护、边界折叠（2026-10-05；按发送次数折与 `recall` 不做，理由见第 7 节）、`write` / `edit` 带 `check`、`submit_review` 引文校验。**剩下**：commit 后与 turn 结束后的边界压缩（第 7 节）。各项彼此独立，可以分开提交 |
 | E | 调研：三个工具、Researcher profile、config、安全边界、对账项（第 8.1–8.4、8.6 节） | 未做；`harness/research/` 预计新增约 400 行 |
 | F | 计算：`run_command`（Seatbelt profile、解释器探测、超时与输出上限、折叠；第 8.5 节） | 未做；`harness/sandbox/` 预计新增约 150 行，无新依赖 |
 
@@ -420,7 +422,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 模型主动压缩 | 只改变下一次输入，原消息、动作与作者指令保留 | `agent`「Context 压缩只改变下一次输入，原消息与动作在 checkpoint 里保留」 |
 | 请求接近窗口；provider 报上下文超限 | 清掉较早的工具结果，请求不超窗口，原消息不改；清不动时请模型压缩；provider 超限时清理重试一次，放不下报 `context_overflow` | `context-window` 五条：「请求接近窗口时清掉较早的工具结果」「provider 报上下文超限时清掉较早的工具结果重试一次」「清掉工具结果后仍然偏大：请求末尾请模型先 compact_context」「作者的开场消息本身就超过压缩线：压不动就不再要求压缩」「清完仍放不下：重试一次后如实报 context_overflow」 |
 | **commit 后 / turn 结束后的系统压缩** | 摘要经 ModelCall；失败保留旧 Context；压缩后 Frame 重建 | **没有测试**（切片 C） |
-| **大结果折叠后模型取回** | 第三次请求起换占位符；`read` 重读或 `recall` 取回原文与 checkpoint 一致 | **没有测试**（切片 C） |
+| 边界之后的大读取结果 | 新一轮或产生新版本的提交之后，之前超过 10 KB 的读取结果在请求里只留头尾与重调方法；干活中途的插话、没有改动的提交不是边界；委派这类重调不得的结果不折；checkpoint 原消息不改 | `context-window`「上一轮停下之后作者再说一句：之前的大读取结果折成头尾，这一轮读的照常全文；干活中途的插话不折，原消息不改」「提交产生新版本是边界：…」；`agent`「提交产生新版本之后，之前读的大文件在请求里折成头尾；没产生新版本的提交不算边界」 |
 | `write` / `edit` 带 `check` | 写入失败不跑 Checker；写入成功后 Checker 结果与写入结果在同一观察里，检查不过也如实返回 | `agent`「write / edit 带 check: true：写完一并返回 Checker 结论，省掉紧跟着的一次 check 来回」；写入失败不跑 Checker 的分支没有单独断言 |
 | `submit_review` 引文不在锚定文件里 | 该 finding 被拒，Reviewer 收到具体哪条；报告不落库 | `host-context`「context compile 给 host 的输入按路径列出作品文件；review record 写成 review/<id>.md…」里的 `review_quote_not_found`（host 与引擎共用 `composeReviewFile`）；Source 层锚在抽取文件上可以引原作，两边都没有才拒：`agent-source`「Source 审稿锚在抽取文件上的 finding 可以引原作…」 |
 | **`fetch` 中途退出** | 有 prepared 结果复用；无则重取，内容不同存新对象并标 refetched | **没有测试**（切片 E） |

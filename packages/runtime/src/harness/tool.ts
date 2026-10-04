@@ -42,6 +42,8 @@ export interface HarnessToolResult<TDetails extends ToolDetails = ToolDetails> {
 	terminate?: boolean;
 	/** 已由当前模型生成的运行摘要；只裁剪后续输入，原消息和动作保留。 */
 	contextSummary?: string;
+	/** 这个结果是上下文的边界（提交产生了新版本）：它之前的大读取结果，之后的请求里折叠成头尾。 */
+	contextBoundary?: boolean;
 }
 
 /** 可由模型修复的参数、权限或领域拒绝；基础设施错误停止执行。 */

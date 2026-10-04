@@ -453,19 +453,24 @@ async function commit(session: HarnessSession, actionId: string, prepared: unkno
 	const input = prepared as Awaited<ReturnType<HarnessSession["prepareStageCommit"]>>;
 	try {
 		const committed = await session.commitStage(actionId);
-		return text({
-			revisionId: committed.revision.id,
-			// 作者看到的是 r7 这样的号；不给的话模型自己推，斗破运行里一直少报一位。
-			revisionLabel: revisionLabel(await session.projectPort.history(), committed.revision.id),
-			...(committed.created
-				? {
-						committed: input.changed.slice(0, MAX_COMMITTED_PATHS),
-						...(input.changed.length > MAX_COMMITTED_PATHS ? { committedCount: input.changed.length } : {}),
-					}
-				: // 候选与已提交版本一致时不产生新版本；不说清楚，模型会以为自己刚提交过。
-					{ created: false, note: "候选与当前版本一致，没有产生新版本" }),
-			...(input.ignored.length === 0 ? {} : { ignored: input.ignored }),
-		});
+		// 产生了新版本就是上下文的边界：提交之前读过的大结果，之后的请求里折成头尾（loop 的 FOLD_BYTES）。
+		const boundary = committed.created ? { contextBoundary: true } : {};
+		return {
+			...boundary,
+			...text({
+				revisionId: committed.revision.id,
+				// 作者看到的是 r7 这样的号；不给的话模型自己推，斗破运行里一直少报一位。
+				revisionLabel: revisionLabel(await session.projectPort.history(), committed.revision.id),
+				...(committed.created
+					? {
+							committed: input.changed.slice(0, MAX_COMMITTED_PATHS),
+							...(input.changed.length > MAX_COMMITTED_PATHS ? { committedCount: input.changed.length } : {}),
+						}
+					: // 候选与已提交版本一致时不产生新版本；不说清楚，模型会以为自己刚提交过。
+						{ created: false, note: "候选与当前版本一致，没有产生新版本" }),
+				...(input.ignored.length === 0 ? {} : { ignored: input.ignored }),
+			}),
+		};
 	} catch (error) {
 		requireDomain(error);
 	}
