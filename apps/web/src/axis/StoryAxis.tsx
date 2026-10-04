@@ -1,12 +1,14 @@
 import { Minus, Plus } from "lucide-react";
 import type { KeyboardEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type Book, issuePage, type ReviewReport } from "../model.js";
 import { verdictColor, verdictLabel } from "../review-verdict.js";
 import { Hint, reviewCurrencyLabel } from "../ui-bits.js";
 import {
 	type AxisModel,
+	arcHeight,
+	arcOpacity,
 	axisModel,
 	type CharacterLane,
 	type ContractLane,
@@ -172,6 +174,9 @@ export function StoryAxis({
 	onColumn(column: number | null): void;
 }) {
 	const model = useMemo(() => axisModel(book, reviews), [book, reviews]);
+	const maxArcSpan = useMemo(() => Math.max(1, ...model.arcs.map((arc) => arc.to - arc.from)), [model]);
+	// 分屏时可能同时有两条故事轴，裁剪区的 id 不能撞。
+	const arcClip = `axis-arcs-${useId().replace(/[^\w-]/g, "")}`;
 	const range = visibleRange(model, entered);
 	const beats = model.beats.slice(range.start, range.end + 1);
 	const [available, setAvailable] = useState(0);
@@ -767,32 +772,48 @@ export function StoryAxis({
 										});
 								if (row.kind === "arcs") {
 									const base = row.y + row.h - 6;
-									return model.arcs
+									const isRelated = (arc: { from: number; to: number }) =>
+										selectedIndex >= 0 && (arc.from === selectedIndex || arc.to === selectedIndex);
+									// 选中 Beat 的弧排在最后，画在最上层。
+									const visible = model.arcs
 										.filter((arc) => arc.to >= range.start && arc.from <= range.end)
-										.map((arc) => {
-											const xa = clampX(arc.from);
-											const xb = clampX(arc.to);
-											const h = Math.min(row.h - 12, 10 + Math.abs(xb - xa) * 0.35);
-											const related =
-												selectedIndex >= 0 && (arc.from === selectedIndex || arc.to === selectedIndex);
-											return (
-												<Hint
-													content={`因果依赖：${beatTitle(arc.to)} 依赖 ${beatTitle(arc.from)}，跨 ${arc.to - arc.from} 个情节`}
-													key={`${arc.from}-${arc.to}`}
-												>
-													<path
-														aria-label={`因果依赖：${beatTitle(arc.to)} 依赖 ${beatTitle(arc.from)}，跨 ${arc.to - arc.from} 个情节`}
-														d={`M${xa} ${base} C ${xa} ${base - h}, ${xb} ${base - h}, ${xb} ${base}`}
-														fill="none"
-														stroke="var(--purple)"
-														strokeWidth={related ? 2.2 : 1.3}
-														opacity={selectedIndex < 0 ? 0.55 : related ? 1 : 0.18}
-														data-arc={`${arc.from}-${arc.to}`}
-														{...press(() => openBeat(arc.to))}
-													></path>
-												</Hint>
-											);
-										});
+										.sort((a, b) => Number(isRelated(a)) - Number(isRelated(b)));
+									const opacity = arcOpacity(visible.length);
+									return (
+										<g key="arcs">
+											<clipPath id={arcClip}>
+												<rect x={LEFT} y={row.y} width={Math.max(0, columnsEnd - LEFT)} height={row.h} />
+											</clipPath>
+											{/* 进卷时，一端在卷外的弧按真实位置画、在边界裁掉，不收到边上：收到边上会像都依赖卷首那一节。 */}
+											<g clipPath={`url(#${arcClip})`}>
+												{visible.map((arc) => {
+													const xa = cx(arc.from);
+													const xb = cx(arc.to);
+													// 三次贝塞尔的顶点在控制点高度的 3/4 处，控制点抬高 4/3 让弧顶正好是 h。
+													const lift =
+														(arcHeight(arc.to - arc.from, maxArcSpan, xb - xa, row.h - 12) * 4) / 3;
+													const related = isRelated(arc);
+													return (
+														<Hint
+															content={`因果依赖：${beatTitle(arc.to)} 依赖 ${beatTitle(arc.from)}，跨 ${arc.to - arc.from} 个情节`}
+															key={`${arc.from}-${arc.to}`}
+														>
+															<path
+																aria-label={`因果依赖：${beatTitle(arc.to)} 依赖 ${beatTitle(arc.from)}，跨 ${arc.to - arc.from} 个情节`}
+																d={`M${xa} ${base} C ${xa} ${base - lift}, ${xb} ${base - lift}, ${xb} ${base}`}
+																fill="none"
+																stroke="var(--purple)"
+																strokeWidth={related ? 2 : 1}
+																opacity={selectedIndex < 0 ? opacity : related ? 1 : opacity * 0.3}
+																data-arc={`${arc.from}-${arc.to}`}
+																{...press(() => openBeat(arc.to))}
+															></path>
+														</Hint>
+													);
+												})}
+											</g>
+										</g>
+									);
 								}
 								if (row.kind === "character") {
 									const lane = row.lane;

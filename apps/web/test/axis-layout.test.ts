@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { axisModel, contractStatus, visibleRange } from "../src/axis/layout.js";
+import { arcHeight, arcOpacity, axisModel, contractStatus, visibleRange } from "../src/axis/layout.js";
 import { Book, type WorkspaceData } from "../src/model.js";
 
 const file = (
@@ -467,4 +467,23 @@ test("资源流转与 finding 密度：initial.holder 起点、changes 的 holde
 	);
 	// stale 报告的 finding 不计入密度。
 	assert.deepEqual([...model.findings.entries()], [[0, 2]]);
+});
+
+test("因果弧的高随跨度一路增高，不在中途封顶；弧越多描边越淡", () => {
+	// 斗破前 120 章 153 节、449 条 refs.beat，最长跨 123 节。原来按像素算高、60 像素封顶，
+	// 跨 14 节以上的一百多条弧顶在同一高度，叠成一条实心紫带。
+	const heights = Array.from({ length: 123 }, (_, index) => arcHeight(index + 1, 123, 10_000, 60));
+	for (let index = 1; index < heights.length; index++) assert.ok((heights[index] ?? 0) > (heights[index - 1] ?? 0));
+	assert.equal(heights.at(-1), 60);
+	// 跨度相同的弧高度相同，与列宽无关：进卷看到的和全书看到的是同一条弧。
+	assert.equal(arcHeight(5, 123, 50, 60), arcHeight(5, 123, 500, 60));
+	// 短弧至少看得见，也不高过自己的宽（窄而高的弧像刺）。
+	assert.ok(arcHeight(1, 123, 10, 60) >= 4);
+	assert.equal(arcHeight(1, 2, 8, 60), 8);
+	// 几十条以内保持原来的浓度；上百条按条数变淡，最淡也看得见。
+	assert.equal(arcOpacity(9), 0.55);
+	assert.equal(arcOpacity(50), 0.55);
+	assert.ok(arcOpacity(449) <= 0.2);
+	assert.equal(arcOpacity(100_000), 0.15);
+	for (const count of [10, 60, 100, 200, 449, 1000]) assert.ok(arcOpacity(count * 2) <= arcOpacity(count));
 });

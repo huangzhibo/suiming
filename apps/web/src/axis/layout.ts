@@ -358,6 +358,21 @@ export function visibleRange(model: AxisModel, volumeId: string | null): { start
 	return volume ? { start: volume.start, end: volume.end } : { start: 0, end: model.beats.length - 1 };
 }
 
+/**
+ * 因果弧的高：按跨度（Beat 数）占全书最长跨度的比例开平方，最长的一条顶满。只看跨度不看像素，
+ * 全书与进卷时同一条弧一样高；开平方让跨一两节的弧也看得见，长弧之间仍按跨度分出高低。
+ * 原来按像素算、60 像素封顶，斗破 449 条弧里跨 14 节以上的都顶在同一高度，叠成一条实心带。
+ * 不高过弧的宽：最长跨度很短的作品里，窄而高的弧像刺。
+ */
+export function arcHeight(span: number, maxSpan: number, width: number, room: number): number {
+	return Math.min(Math.max(4, room * Math.sqrt(span / Math.max(maxSpan, span, 1))), Math.max(4, width));
+}
+
+/** 弧的描边透明度：几十条以内不变，再多按条数的平方根变淡，否则重叠处叠成一片紫。 */
+export function arcOpacity(count: number): number {
+	return Math.min(0.55, Math.max(0.15, 4 / Math.sqrt(Math.max(count, 1))));
+}
+
 /** 承诺在某个时点的状态文字，与上下文栏一致；给了 beatTitle 就点名 Beat，作者不认序号。 */
 export function contractStatus(
 	lane: ContractLane,
