@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { compareCodeUnits } from "@suiming/story";
 import { CloudProjectService, CloudStoreError, openStoryContentFingerprint } from "../src/index.js";
 import { InMemoryCloudProjectStore } from "./in-memory-cloud.js";
 import { sampleWorkFiles } from "./sample-work.js";
@@ -34,7 +35,7 @@ test("Cloud Project application service validates import and exposes authorized 
 	assert.equal(imported.contentFingerprint, openStoryContentFingerprint(files));
 	assert.deepEqual(
 		imported.files.map((file) => file.path),
-		files.map((file) => file.path),
+		files.map((file) => file.path).sort(compareCodeUnits),
 	);
 	assert.equal((await service.project({ projectId: "cloud-project-1", actorId })).role, "owner");
 	assert.deepEqual(

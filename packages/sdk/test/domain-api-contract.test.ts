@@ -99,10 +99,15 @@ test("Open Story Package codec round-trips bytes and rejects content tampering",
 		},
 	];
 	const encoded = await encodeDomainApiOpenStoryPackage(files);
+	// 包里按路径的码元排序，与输入顺序无关：intent/ 排在 world/ 前面。
+	assert.deepEqual(
+		encoded.files.map((file) => file.path),
+		["intent/计谋的代价.md", "world/characters/黄盖.md"],
+	);
 	const decoded = await decodeDomainApiOpenStoryPackage(encoded);
 	assert.deepEqual(
 		decoded.map((file) => ({ ...file, bytes: [...file.bytes] })),
-		files.map((file) => ({ ...file, bytes: [...file.bytes] })),
+		[...files].reverse().map((file) => ({ ...file, bytes: [...file.bytes] })),
 	);
 
 	const tampered = structuredClone(encoded);

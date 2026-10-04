@@ -142,7 +142,7 @@ function materialize(entriesByKey: ReadonlyMap<string, SyncEntry>): OpenPackageF
 			mediaType: artifact.mediaType,
 			bytes: new Uint8Array(artifact.bytes),
 		})),
-	].sort((left, right) => left.path.localeCompare(right.path));
+	].sort((left, right) => compareCodeUnits(left.path, right.path));
 	try {
 		// Checker 也在这里：两侧各自合法、合起来不合法（一侧换卷、另一侧改了 index）是语义冲突，
 		// 不是调用方传错了参数。以前拦这种情况的是 path_projection_mismatch，它随投影一起没了。

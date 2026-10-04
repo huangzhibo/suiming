@@ -118,7 +118,8 @@ export async function encodeDomainApiOpenStoryPackage(
 	const value: DomainApiOpenStoryPackage = {
 		schemaVersion: 1,
 		contentFingerprint: await fingerprint(encoded),
-		files: encoded,
+		// 包里的文件按路径的 UTF-16 码元排：同一份作品不论从哪边编码，线上是同一个顺序（与 Runtime 导出一致）。
+		files: encoded.sort((left, right) => compareCodeUnits(left.path, right.path)),
 	};
 	if (!Value.Check(DomainApiOpenStoryPackageSchema, value)) {
 		throw new DomainApiCodecError("invalid_open_story_package", "Open Story Package metadata is invalid");

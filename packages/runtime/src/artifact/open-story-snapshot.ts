@@ -1,3 +1,4 @@
+import { compareCodeUnits } from "@suiming/story";
 import { ArtifactError } from "./errors.js";
 import { artifactIdentityKey, formatArtifactIdentity } from "./identity.js";
 import { type OpenPackageFile, validateOpenPackagePath } from "./open-package.js";
@@ -40,11 +41,14 @@ export function candidateFromOpenStoryFiles(
 
 /** 已提交版本的候选投影成文件：版本在提交时过了 Checker，这里不再跑一遍；接收方按不可信输入重新解析。 */
 export function openStoryFilesFromCandidate(candidate: ArtifactCandidate): OpenPackageFile[] {
-	return candidate.artifacts
-		.map((artifact) => ({
-			path: artifact.path,
-			mediaType: artifact.mediaType,
-			bytes: new Uint8Array(artifact.bytes),
-		}))
-		.sort((left, right) => left.path.localeCompare(right.path));
+	return (
+		candidate.artifacts
+			.map((artifact) => ({
+				path: artifact.path,
+				mediaType: artifact.mediaType,
+				bytes: new Uint8Array(artifact.bytes),
+			}))
+			// 按 UTF-16 码元排，与 sdk 的包编码同一顺序；localeCompare 随运行环境的语言设置变，中文文件名的先后会不一样。
+			.sort((left, right) => compareCodeUnits(left.path, right.path))
+	);
 }
