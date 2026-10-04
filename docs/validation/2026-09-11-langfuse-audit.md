@@ -88,13 +88,7 @@ CLI / TUI 统一通过有界 shutdown 导出并关闭，桌面沿用 5 秒整体
 - 观测、模型、Agent、CLI 回归覆盖字段继承与覆盖、子 Task 归属、成本 / 缓存、正常和失败退出、超时不阻断。正常业务测试继续验证提交与恢复语义。
 - Live 验证均使用 faux provider 和临时作品；没有真实模型费用、正文质量或生产长时间负载结论。现有应用需重启才能加载新代码和环境。
 
-Live Runtime 的 session 为 `conversation_211a571b-e15f-4998-970d-e5d53fbb56c8`，可在本地 Langfuse 中定位。可重复运行的合成检查脚本：
-
-```sh
-node --env-file=.env --import tsx docs/validation/langfuse-probe.ts
-```
-
-该命令会向显式配置的 Langfuse 项目写入合成观测，只输出关联 ID 和核对结果，不输出密钥、Prompt 或作品内容。
+Live Runtime 的 session 为 `conversation_211a571b-e15f-4998-970d-e5d53fbb56c8`，可在本地 Langfuse 中定位。当时另有一个合成检查脚本 `docs/validation/langfuse-probe.ts`（向显式配置的 Langfuse 项目写入合成观测，只输出关联 ID 和核对结果）；它调用的 `runAgent` / `resumeRun` 随 2026-09-13 的 Session 重构删除，脚本跑不起来，2026-10-04 删掉。现在的观测由 `telemetry` 相关测试守。
 
 
 最终验证：`npm run check` 通过；常规测试 316 项，其中 307 通过、9 项按 PostgreSQL / S3 环境门跳过、0 失败。新增 Electron OTLP 回归通过。Electron 直接连接本机 Langfuse 的完整 IPC 实测读回 5 条 observation，trace 为 `22e5e0cdda72086a9de54db4ebb4d62f`，包含 Run、Task、Model、Context、Tool。测试在读取持久 Run 完成状态后才退出；不把异步查询返回的 Promise 或 Task 完成当作整次委托完成。

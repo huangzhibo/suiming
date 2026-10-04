@@ -28,7 +28,7 @@
 | 日期 | 记录 | 内容 |
 | --- | --- | --- |
 | 09-08 | [自有 Harness 与桌面验收](2026-09-08-harness.md) | 重构后的实现证据与真实模型 smoke |
-| 09-11 | [Langfuse 接入检查](2026-09-11-langfuse-audit.md) | 桌面接入 trace 前后的检查；复现脚本是本目录顶层的 `langfuse-probe.ts` |
+| 09-11 | [Langfuse 接入检查](2026-09-11-langfuse-audit.md) | 桌面接入 trace 前后的检查（当时的复现脚本依赖已删的 Run API，2026-10-04 删除） |
 | 09-11 | [项目全面审查](2026-09-11-project-review/README.md) | 修复前的审查基线、复现脚本，修复验收在同目录 `fixes.md` |
 | 09-22 | [本地 CLI 试用检查](2026-09-22-cli-audit.md) | 43 次独立 `suim` 进程走完空目录开工到回退 |
 | 10-01 | [Harness 审查](2026-10-01-harness-review/README.md) | 对照业界做法审查 `harness/`，单轮耗时的 `bench.mts` 在同目录 |
