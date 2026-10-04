@@ -4,6 +4,8 @@ ADR-0008 决定 9 与它的验证门要求从真实长篇 Run 暴露的失败里
 
 **状态：活登记表。**当前 17 道，最近一次补题是 2026-09-06；eval-022 暂停推进之后还没有新题，差额继续从当前测试台的真实运行里补。
 
+**可执行的长程题在 `packages/runtime/test/sanguo-long-range.test.ts`**（2026-10-04 起）：在仓库里的示例三国（231 节、9 卷）上做最小改动，断言 Checker 恰好多出预期的那条诊断，进 `npm test` 与 CI。下表标「回归」的题，原来多半只有 2 节样例上的通用规则测试，声明本身在仓库外的 eval-022 里、CI 验证不了；现在 1、2 / 10、4、5、9 / 12、11 在三国上有对应的长程题（死亡、秘密提前揭示、依赖方向、期待到期、资源终止、期待顺序），另有一条断言长篇上 Writer 读到的 Design 就是正文时效的闭包。
+
 状态含义：**回归**——已有确定性测试；**待声明**——eval-022 的 Design 还没写相应硬状态或 secret，写上之后现有 Checker 就能抓；**待机制**——Story Language 或 Checker 还没有这类边界，需要先决定要不要加。
 
 ## 来源
@@ -25,7 +27,7 @@ ADR-0008 决定 9 与它的验证门要求从真实长篇 Run 暴露的失败里
 | 8 | 教令"三日内齐集"与关羽"投募四日"不能同时成立 | Claude Code 第二轮 Review minor | Beat 内时间不在硬状态里；只有跨 Beat 的展示顺序是确定性的 | 待机制（不打算加年代字段，ADR-0008 决定 3） |
 | 9 | 焚册（beat-0005）之后杜蘅带出的人没有可循的总网，后文不能再用总册索人 | eval-022 beat-0005 自然语言 | Resource `总册.consumed: true` 在 beat-0005 声明；后文再用即阻塞 | 回归（2026-09-06 声明 Resource `太平道总册`：initial holder 张角，beat-0005 `consumed: true`；后文再持有的反例 `terminal_resource_reused` 见 checker-diagnostics.test.ts） |
 | 10 | 关羽以"长生"入册后，县簿上没有"关羽"；直到旧案被翻出，官府文书里只能出现长生 | 三组正文都写了长生入册 | `secret:关羽亡命` 的 `world.revealed` 只在 beat-0069 之后为 true | 回归（与 2 同一声明：world scope 只在 beat-0069 揭示） |
-| 11 | 刘备为关羽具保后，"刘备失官"的代价在 beat-0069 必须发生，不能在更早的 Beat 被提前兑现 | 新仓 Codex 把代价写进 beat-0069 与 beat-0007 | Contract advance 顺序：三人同到太平 的 advance 出现在 beat-0069、beat-0007，顺序由 Story index 决定 | 回归（Contract advance 顺序有测试） |
+| 11 | 刘备为关羽具保后，"刘备失官"的代价在 beat-0069 必须发生，不能在更早的 Beat 被提前兑现 | 新仓 Codex 把代价写进 beat-0069 与 beat-0007 | Contract advance 顺序：三人同到太平 的 advance 出现在 beat-0069、beat-0007，顺序由 Story index 决定 | 回归（原来写「有测试」，2026-10-04 核对时一条都没有；现在是 sanguo-long-range.test.ts 的 C11：兑现之后再推进被拒） |
 | 12 | 张角焚掉总册后，各地的救济路线只在"愿意承担的人"手里；beat-0008 以后的黄巾余部不能凭总册互认 | eval-022 beat-0005 | 同 9 | 回归（同 9） |
 | 13 | beat-0068 插在 beat-0001 与 beat-0002 之间：正文续写的"真实前文"是 beat-0068 而不是 beat-0001 | Write Context 的 previous 选择 | `previousStoryBeatId` 按 Story index 顺序，不按 id 数字 | 回归（`host-context.test.ts`「Write Context 的前一节按 index 顺序取」，2026-10-04 补） |
 | 14 | 一个 Beat 的 `changes` 只能声明自然语言里已经成立的结果：beat-0004 若写 `关羽.location: 涿郡` 而正文让他当夜离开，Reviewer 有硬状态可引 | 设计规则 | 硬状态与自然语言一致性由 Reviewer 判，Checker 守时间线 | 回归（状态时间线测试） |
@@ -38,5 +40,5 @@ ADR-0008 决定 9 与它的验证门要求从真实长篇 Run 暴露的失败里
 ## 怎么把"待声明"变成回归
 
 1. 在作品的 Design 里补相应 `refs.secret`、`changes`、Resource 文件（这是作者层修改，走 `design impact` → 改文件 → `check` → `commit`）。
-2. 用同一声明在 `packages/story/test` 里写一个最小反例（例如更晚的 Beat 让已死者行动、未声明即揭示 secret），确认 Checker 阻塞。
+2. 用同一声明写一个最小反例，确认 Checker 阻塞：规则本身在 `packages/story/test`，长程的版本加进 `packages/runtime/test/sanguo-long-range.test.ts`（示例三国里有对应的长线就用它）。
 3. 题目状态改为回归，并在这里记下测试文件名。
