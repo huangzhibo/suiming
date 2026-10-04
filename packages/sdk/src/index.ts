@@ -6,5 +6,6 @@ export * from "./routes.js";
 export * from "./run-event.js";
 export * from "./schema.js";
 export * from "./suim-cli.js";
+export * from "./usage-checkpoint.js";
 
 export * from "./workspace-commands.js";

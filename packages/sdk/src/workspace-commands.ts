@@ -14,6 +14,7 @@ import {
 	thinkingLevelSchema,
 } from "./domain-schema.js";
 import { ProductEventSchema, type SessionEvent, type SessionEventBody, SessionEventSchema } from "./run-event.js";
+import { USAGE_CHECKPOINT_TOKENS } from "./usage-checkpoint.js";
 
 const id = Type.String({ minLength: 1 });
 
@@ -92,13 +93,6 @@ const attachResult: TUnsafe<SessionAttachResult> = Type.Unsafe<SessionAttachResu
 		{ additionalProperties: false },
 	),
 );
-
-/**
- * 每轮用量检查点（折算 token：未缓存输入与缓存写按一，缓存读按一成，输出按五倍）。一轮里根与子任务合计到这里，
- * 下一次请求之前停下等作者说继续；理由与 600 万的依据见 Harness 设计第 10 节。作者在设置页或 config.toml 的
- * `session.usage_checkpoint` 调；不设「关闭」：停下不丢任何进度，要整夜跑就调大。
- */
-export const USAGE_CHECKPOINT_TOKENS = { default: 6_000_000, min: 1_000_000, max: 1_000_000_000 } as const;
 
 /** 本地应用命令目录：查询是领域投影，执行交给同一个 Runtime；IPC 不定义自己的参数或结果。 */
 export const LOCAL_COMMANDS = {
