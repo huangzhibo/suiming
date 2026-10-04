@@ -57,9 +57,6 @@ export const PROPERTY_VALUE_KINDS: Readonly<Partial<Record<StateProperty, Refere
 
 export const TERMINAL_RESOURCE_PROPERTIES = ["consumed", "destroyed"] as const satisfies readonly StateProperty[];
 
-export const TRUTH_VALUES = ["true", "false", "unknown"] as const;
-export type TruthValue = (typeof TRUTH_VALUES)[number];
-
 export const STEP_ERROR_CODES = [
 	"change_outside_story",
 	"change_order_invalid",
@@ -72,10 +69,6 @@ export type StepErrorCode = (typeof STEP_ERROR_CODES)[number];
 export const REFERENCE_PATTERN =
 	// biome-ignore lint/suspicious/noControlCharactersInRegex: wire references must reject filesystem control characters at the schema boundary.
 	/^(?<kind>character|place|resource|secret):(?<id>(?!.*\.$)[^\s<>:"/\\|?*\u0000-\u001f\u007f.][^\s<>:"/\\|?*\u0000-\u001f\u007f]{0,298})$/u;
-
-export function isReferenceKind(value: string): value is ReferenceKind {
-	return (REFERENCE_KINDS as readonly string[]).includes(value);
-}
 
 export function isStateProperty(value: string): value is StateProperty {
 	return (STATE_PROPERTIES as readonly string[]).includes(value);

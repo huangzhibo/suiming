@@ -10,8 +10,6 @@ import { parseMarkdownDocument } from "./markdown.js";
  * （[Story Language source](../../../story-language/source.md)「笔记与覆盖率」）。frontmatter 记它覆盖的码点区间与
  * 当时 `material.txt` 的内容 sha；「读过哪些范围、还缺哪些」由 `sourceCoverage` 按 notes 的 span 派生。
  */
-export const SOURCE_NOTE_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,126}$";
-
 export const SourceNoteFrontmatterSchema = Type.Object(
 	{
 		/** [start, end)，原文码点区间。 */

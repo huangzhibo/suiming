@@ -47,30 +47,23 @@ export type {
 	StateValue,
 	StepErrorCode,
 	StepFailure,
-	TruthValue,
 } from "./ir/index.js";
 export {
 	BOOLEAN_STATE_PROPERTIES,
 	evaluate,
 	isBooleanStateProperty,
-	isReferenceKind,
 	isStateProperty,
 	PROFILE_VERSION,
 	PROPERTY_SUBJECT_KINDS,
 	PROPERTY_VALUE_KINDS,
 	parseStateAssignment,
-	parseStateChange,
-	parseStateProjection,
 	REFERENCE_KINDS,
 	REFERENCE_PATTERN,
 	referenceKind,
 	STATE_PROPERTIES,
 	STEP_ERROR_CODES,
 	StateAssignmentSchema,
-	StateChangeSchema,
-	StateProjectionSchema,
 	TERMINAL_RESOURCE_PROPERTIES,
-	TRUTH_VALUES,
 } from "./ir/index.js";
 export type { StateTimeline } from "./ir/timeline.js";
 export { buildStateTimeline } from "./ir/timeline.js";
@@ -170,7 +163,7 @@ export {
 	SourceDescriptorSchema,
 } from "./source.js";
 export type { SourceNote, SourceNoteFrontmatter } from "./source-note.js";
-export { parseSourceNote, SOURCE_NOTE_ID_PATTERN, SourceNoteFrontmatterSchema } from "./source-note.js";
+export { parseSourceNote, SourceNoteFrontmatterSchema } from "./source-note.js";
 export type {
 	ContractAnchor,
 	ContractEvaluationScope,

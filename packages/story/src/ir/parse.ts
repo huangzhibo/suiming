@@ -10,8 +10,8 @@ import {
 	SCOPED_STATE_PROPERTIES,
 	type StateProperty,
 } from "./profile.js";
-import { StateAssignmentSchema, StateChangeSchema, StateProjectionSchema } from "./schema.js";
-import type { StateAssignment, StateChange, StateProjection, StateValue } from "./types.js";
+import { StateAssignmentSchema } from "./schema.js";
+import type { StateAssignment, StateValue } from "./types.js";
 
 function checked<T extends TSchema>(schema: T, input: unknown, label: string): Static<T> {
 	if (!Value.Check(schema, input)) {
@@ -26,13 +26,6 @@ function asRecord(input: unknown, label: string): Record<string, unknown> {
 		throw new Error(`${label} must be an object`);
 	}
 	return input as Record<string, unknown>;
-}
-
-function asArray(input: unknown, label: string): unknown[] {
-	if (!Array.isArray(input)) {
-		throw new Error(`${label} must be an array`);
-	}
-	return input;
 }
 
 function asString(input: unknown, label: string): string {
@@ -78,12 +71,6 @@ function validateScope(scope: string): void {
 	throw new Error(`unsupported state scope: ${scope}`);
 }
 
-function requireUnique(values: readonly string[], label: string): void {
-	if (values.length !== new Set(values).size) {
-		throw new Error(`${label} must be unique`);
-	}
-}
-
 export function parseStateAssignment(input: unknown): StateAssignment {
 	checked(StateAssignmentSchema, input, "state assignment");
 	const raw = asRecord(input, "state assignment");
@@ -122,42 +109,4 @@ export function parseStateAssignment(input: unknown): StateAssignment {
 		}
 	}
 	return { subject, property, value, scope };
-}
-
-export function parseStateChange(input: unknown): StateChange {
-	checked(StateChangeSchema, input, "state change");
-	const raw = asRecord(input, "state change");
-	const change: StateChange = {
-		storyBeatId: asString(raw.story_beat_id, "story_beat_id"),
-		assignments: asArray(raw.assignments, "assignments").map(parseStateAssignment),
-	};
-	if (change.storyBeatId.length > 300) {
-		throw new Error("story_beat_id must be at most 300 characters");
-	}
-	return change;
-}
-
-export function parseStateProjection(input: unknown): StateProjection {
-	checked(StateProjectionSchema, input, "state projection");
-	const raw = asRecord(input, "state projection");
-	if (raw.profile_version !== "state-projection-p0@2") {
-		throw new Error("Input should be 'state-projection-p0@2'");
-	}
-	const initial = asArray(raw.initial, "initial").map(parseStateAssignment);
-	const changes = asArray(raw.changes, "changes").map(parseStateChange);
-	const authorizedBeatIds = asArray(raw.authorized_beat_ids, "authorized_beat_ids").map((value, index) =>
-		asString(value, `authorized_beat_ids[${index}]`),
-	);
-	const projection: StateProjection = {
-		profileVersion: "state-projection-p0@2",
-		initial,
-		changes,
-		authorizedBeatIds,
-	};
-	requireUnique(
-		projection.changes.map((change) => change.storyBeatId),
-		"changed StoryBeat IDs",
-	);
-	requireUnique(projection.authorizedBeatIds, "authorized StoryBeat IDs");
-	return projection;
 }
