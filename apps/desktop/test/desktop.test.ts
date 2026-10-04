@@ -10,11 +10,12 @@ declare const document: { documentElement: { scrollWidth: number } };
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
-import { type ElectronApplication, _electron as electron, type Locator, type Page } from "playwright";
+import type { ElectronApplication, Locator, Page } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { assertNoTooltip, collectPageErrors, launchDesktop, openGate } from "./launch.js";
 
 /** 「打开作品」走系统对话框；E2E 在主进程里把对话框换成直接返回给定目录，其余路径与真实点击相同。 */
 async function chooseDirectory(app: ElectronApplication, page: Page, path: string) {
@@ -35,16 +36,9 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	try {
 		await page.getByRole("button", { name: "发送", exact: true }).waitFor();
 		assert.equal(
@@ -200,19 +194,11 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	const project = await LocalProjectService.init({ checkoutPath: root, projectId: "desktop-story" });
 	project.close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-		timeout: 20000,
-	});
+	const app = await launchDesktop({ directory, project: root, flags: ["--hold-first-reply"], timeout: 20000 });
 	const page = await app.firstWindow();
 	// Electron 的 will-prevent-unload 负责原生确认；禁止 Playwright 再处理同一个 Chromium 通知。
 	page.on("dialog", () => undefined);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	try {
 		await page.getByRole("button", { name: "发送", exact: true }).waitFor();
 		await page.locator("[data-navigation-icons]").getByRole("button", { name: "材料", exact: true }).click();
@@ -248,6 +234,9 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.getByRole("textbox", { name: "输入消息" }).press("Meta+Enter");
 		await page.locator(".run-status").getByText("正在处理", { exact: true }).waitFor();
 		await page.reload();
+		// 重载只 attach、不重跑：回复还压在闸门后面，新页面看到的仍是这一轮在处理；放行后回复经 attach 送到。
+		await page.locator(".run-status").getByText("正在处理", { exact: true }).waitFor();
+		await openGate(app, "first-reply");
 		await page.locator(".message.assistant").filter({ hasText: "黄盖要当众挨这顿打，还是另想办法？" }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/waiting.png" });
 		const state = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
@@ -477,13 +466,7 @@ test("主进程 SIGKILL 后重开：未知请求默认 paused，显式重发接�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	const initialized = await LocalProjectService.init({ checkoutPath: root, projectId: "desktop-recovery" });
 	initialized.close();
-	const args = [
-		resolve("apps/desktop/test-dist/entry.js"),
-		`--project=${root}`,
-		`--user-data-dir=${join(directory, "app-data")}`,
-		"--recovery-test",
-	];
-	let app = await electron.launch({ args });
+	let app = await launchDesktop({ directory, project: root, flags: ["--recovery-test"] });
 	try {
 		const stdout = app.process().stdout;
 		assert.ok(stdout);
@@ -498,6 +481,7 @@ test("主进程 SIGKILL 后重开：未知请求默认 paused，显式重发接�
 			stdout.on("data", onData);
 		});
 		let page = await app.firstWindow();
+		const errors = collectPageErrors(page);
 		await page.getByRole("textbox", { name: "输入消息" }).fill("分析现有设计是否清楚");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		// 调用计数会先于请求发送更新；等 faux provider 真正接到请求后再注入进程故障。
@@ -506,8 +490,9 @@ test("主进程 SIGKILL 后重开：未知请求默认 paused，显式重发接�
 		const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
 		child.kill("SIGKILL");
 		await exited;
-		app = await electron.launch({ args: [...args, "--recovery-second"] });
+		app = await launchDesktop({ directory, project: root, flags: ["--recovery-test", "--recovery-second"] });
 		page = await app.firstWindow();
+		const reopenedErrors = collectPageErrors(page);
 		// 重开时持有进程已死：session 回 idle 记 process_restart；再发一句才会读到停在半途的请求，落进 paused。
 		await page.getByText("上次没有正常结束", { exact: true }).waitFor({ timeout: 7000 });
 		await page.getByRole("textbox", { name: "输入消息" }).fill("接着分析");
@@ -534,6 +519,7 @@ test("主进程 SIGKILL 后重开：未知请求默认 paused，显式重发接�
 		} finally {
 			opened.close();
 		}
+		assert.deepEqual([...errors, ...reopenedErrors], []);
 	} catch (error) {
 		const page = await app.firstWindow();
 		console.error("recovery UI", await page.locator("body").innerText());
@@ -552,16 +538,10 @@ test("打开没有 .suiming 的 Open Story Directory：主进程就地初始化�
 	const root = join(directory, "plain");
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-		timeout: 20000,
-	});
+	const app = await launchDesktop({ directory, project: root, timeout: 20000 });
 	try {
 		const page = await app.firstWindow();
+		const errors = collectPageErrors(page);
 		await page.getByRole("button", { name: "发送", exact: true }).waitFor();
 		const state = await page.evaluate(() => window.suiming?.invoke("workspace.show", {}));
 		assert.equal(state?.revisions.length, 1);
@@ -615,6 +595,7 @@ test("打开没有 .suiming 的 Open Story Directory：主进程就地初始化�
 		await page.locator(".design-body strong").filter({ hasText: "再写大纲" }).waitFor();
 		assert.equal((await page.locator(".design-body").innerText()).includes("# 只有意图"), false);
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/markdown-design.png" });
+		assert.deepEqual(errors, []);
 	} finally {
 		await app.close();
 		await rm(directory, { recursive: true, force: true });
@@ -634,21 +615,11 @@ test("设置页：profile 状态、provider 登录向导与断开都经主进程
 		configPath,
 		'version = 1\n[models.profiles.main]\nprovider = "deepseek"\nmodel = "deepseek-flash"\n',
 	);
-	// 设置页读的是产品配置：把两份文件指到临时目录，并去掉开发 shell 里的 SUIMING_* 覆盖与各家 API key，不碰 ~/.suiming。
-	const env = Object.fromEntries(
-		Object.entries(process.env).filter(([name]) => !/^SUIMING_|_API_KEY$|_AUTH_TOKEN$|_OAUTH_TOKEN$/.test(name)),
-	) as Record<string, string>;
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-		env: { ...env, SUIMING_CONFIG_PATH: configPath, SUIMING_AUTH_PATH: authPath },
-		timeout: 20000,
-	});
+	// 设置页读的是产品配置：launchDesktop 把这两份文件指到临时目录，并去掉开发 shell 里的 SUIMING_* 覆盖与各家 API key，不碰 ~/.suiming。
+	const app = await launchDesktop({ directory, project: root, timeout: 20000 });
 	try {
 		const page = await app.firstWindow();
+		const errors = collectPageErrors(page);
 		await page.getByRole("button", { name: "发送", exact: true }).waitFor();
 		await page.getByRole("button", { name: "设置", exact: true }).click();
 		await page.getByRole("heading", { name: "设置", exact: true }).waitFor();
@@ -679,9 +650,16 @@ test("设置页：profile 状态、provider 登录向导与断开都经主进程
 		await page.getByRole("button", { name: "对话模型", exact: true }).click();
 		await page.getByRole("button", { name: "模型设置…", exact: true }).click();
 		await page.getByRole("dialog").getByRole("heading", { name: "设置", exact: true }).waitFor();
-		// 等弹出动画结束再截图，否则截到半透明的中间帧。
-		await page.waitForTimeout(400);
+		// 等弹出动画结束再截图，否则截到半透明的中间帧；等动画本身，不按固定时长。
+		await page.getByRole("dialog").evaluate(async (element) => {
+			await Promise.all(
+				element
+					.getAnimations({ subtree: true })
+					.map((animation: { finished: Promise<unknown> }) => animation.finished.catch(() => undefined)),
+			);
+		});
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/settings-dialog.png" });
+		assert.deepEqual(errors, []);
 	} finally {
 		await app.close();
 		await rm(directory, { recursive: true, force: true });
@@ -697,17 +675,10 @@ test("导航与文件：侧栏独立、共享草稿、固定与新开、关闭�
 	await mkdir(join(root, "text"), { recursive: true });
 	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的大门，望向封存多年的火船。\n\n".repeat(80));
 	await writeFile(join(root, "AGENTS.md"), "作者的辅助笔记\n");
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	try {
 		await page.locator('.beat-row[data-page$="beat-0001.md"]').click();
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
@@ -854,17 +825,10 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
 	await writeFile(join(root, "text/beat-0001.md"), "军杖落到第三十下。\n\n".repeat(80));
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const left = page.getByRole("separator", { name: "调整左栏宽度", exact: true });
 	const right = page.getByRole("separator", { name: "调整右栏宽度", exact: true });
 	const drag = async (handle: Locator, delta: number, y = 140) => {
@@ -925,8 +889,7 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 			await aligned(side);
 			await handle.focus();
 			await handle.hover({ position: { x: 4, y: 12 } });
-			await page.waitForTimeout(500);
-			assert.equal(await page.getByRole("tooltip").count(), 0, "拖动条悬停和聚焦均不弹出提示");
+			await assertNoTooltip(page, "拖动条悬停和聚焦均不弹出提示");
 			const width = Number(await handle.getAttribute("aria-valuenow"));
 			await drag(handle, 16, 12);
 			assert.equal(Number(await handle.getAttribute("aria-valuenow")), width + (side === "left" ? 16 : -16));
@@ -1113,17 +1076,10 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "notes/reference/drafts"), { recursive: true });
 	await writeFile(join(root, "notes/reference/drafts/guide.md"), "辅助文件的阅读内容。\n");
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(8000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	// 按真实移动路径经过间隙，允许 Tooltip 的可悬停区域结束，再进入下一个触发器。
 	const hover = async (target: Locator) => {
 		await target.scrollIntoViewIfNeeded();
@@ -1171,8 +1127,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		]) {
 			assert.ok(await target.evaluate((element) => element.scrollWidth <= element.clientWidth));
 			await hover(target);
-			await page.waitForTimeout(500);
-			assert.equal(await tooltip.count(), 0, "完整名称不重复提示");
+			await assertNoTooltip(page, "完整名称不重复提示");
 		}
 		await breadcrumb.getByRole("button", { name: "赤壁之战", exact: true }).click();
 		assert.equal(await breadcrumb.innerText(), location, "父级只定位导航，不替换当前内容");
@@ -1284,8 +1239,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		await page.keyboard.press("Escape");
 		// 相同名称在窄窗口补全、放宽后关闭；根目录里的完整名称也不重复提示。
 		await page.locator('[data-file-path="outline"]').focus();
-		await page.waitForTimeout(500);
-		assert.equal(await tooltip.count(), 0);
+		await assertNoTooltip(page);
 		await page.locator(`[data-file-path="${resizeFile}"]`).click();
 		const fileName = page.getByRole("navigation", { name: "文件路径" }).locator('[aria-current="page"]');
 		assert.ok(await fileName.evaluate((element) => element.scrollWidth > element.clientWidth));
@@ -1298,12 +1252,10 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		await tooltip.waitFor({ state: "hidden" });
 		assert.ok(await fileName.evaluate((element) => element.scrollWidth <= element.clientWidth));
 		await hover(fileName);
-		await page.waitForTimeout(500);
-		assert.equal(await tooltip.count(), 0);
+		await assertNoTooltip(page);
 		// Markdown 已显示完整 URL 时不重复提示，有名称的链接仍显示目的地址。
 		await hover(page.getByText("https://example.com/plain", { exact: true }));
-		await page.waitForTimeout(500);
-		assert.equal(await tooltip.count(), 0);
+		await assertNoTooltip(page);
 		await hover(page.getByText("材料出处", { exact: true }));
 		await tooltip.filter({ hasText: "https://example.com/source" }).waitFor();
 		await button("设置").click();

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { DesktopBridge } from "@suiming/sdk";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, eventually, launchDesktop } from "./launch.js";
 
 declare const window: { suiming?: DesktopBridge };
 
@@ -16,19 +16,10 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			"--model-picker-test",
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-		env: { ...process.env, SUIMING_CONFIG_PATH: join(directory, "config.toml") },
-	});
+	const app = await launchDesktop({ directory, project: root, flags: ["--model-picker-test"] });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	try {
 		const picker = page.getByRole("button", { name: "对话模型", exact: true });
 		await picker.waitFor();
@@ -174,10 +165,12 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 		await page.getByRole("button", { name: "返回提供商", exact: true }).click();
 		const enabledSwitch = page.getByRole("switch", { name: "启用 示例提供商", exact: true });
 		await enabledSwitch.click();
-		await page.waitForFunction(
+		await eventually(
 			async () =>
-				(await window.suiming?.invoke("models.show", {}))?.providers.find((item) => item.id === "connection-test")
-					?.enabled === false,
+				(await page.evaluate(() => window.suiming?.invoke("models.show", {})))?.providers.find(
+					(item) => item.id === "connection-test",
+				)?.enabled === false,
+			"提供商的启用状态没有变成 false",
 		);
 		assert.equal(
 			(await page.evaluate(() => window.suiming?.invoke("models.show", {})))?.providers.find(
@@ -211,10 +204,12 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 		await page.keyboard.press("Escape");
 		await page.getByRole("tab", { name: /提供商/ }).click();
 		await enabledSwitch.click();
-		await page.waitForFunction(
+		await eventually(
 			async () =>
-				(await window.suiming?.invoke("models.show", {}))?.providers.find((item) => item.id === "connection-test")
-					?.enabled === true,
+				(await page.evaluate(() => window.suiming?.invoke("models.show", {})))?.providers.find(
+					(item) => item.id === "connection-test",
+				)?.enabled === true,
+			"提供商的启用状态没有变成 true",
 		);
 		await page.getByRole("tab", { name: "模型配置", exact: true }).click();
 		await form.getByRole("combobox", { name: "模型", exact: true }).click();

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, launchDesktop } from "./launch.js";
 
 test("检查结果页：按文件列出诊断，绑定失败也列全，作品改动后提示过期", { timeout: 90000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-check-desktop-"));
@@ -13,16 +13,9 @@ test("检查结果页：按文件列出诊断，绑定失败也列全，作品�
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const check = page.getByRole("button", { name: "检查", exact: true });
 	const details = page.getByRole("button", { name: "查看详情", exact: true });
 	const beat1 = join(root, "outline/story/vol-0001/beat-0001.md");

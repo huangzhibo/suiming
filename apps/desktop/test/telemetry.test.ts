@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { DesktopBridge } from "@suiming/sdk";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, launchDesktop, waitForSessionIdle } from "./launch.js";
 
 declare const window: { suiming: DesktopBridge };
 type Span = { name: string; traceId: string; attributes: { key: string; value: { stringValue?: string } }[] };
@@ -35,15 +35,11 @@ test("桌面通过主进程环境接入 OTLP，退出导出最后一批 span", {
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			"--telemetry-test",
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app")}`,
-		],
+	const app = await launchDesktop({
+		directory,
+		project: root,
+		flags: ["--telemetry-test"],
 		env: {
-			...process.env,
 			LANGFUSE_BASE_URL: `http://127.0.0.1:${address.port}`,
 			LANGFUSE_PUBLIC_KEY: "pk-test",
 			LANGFUSE_SECRET_KEY: "sk-test",
@@ -52,6 +48,7 @@ test("桌面通过主进程环境接入 OTLP，退出导出最后一批 span", {
 	let closed = false;
 	try {
 		const page = await app.firstWindow();
+		const errors = collectPageErrors(page);
 		await page.waitForFunction(() => !!window.suiming);
 		const result = await page.evaluate(() =>
 			window.suiming.invoke("session.send", {
@@ -59,20 +56,9 @@ test("桌面通过主进程环境接入 OTLP，退出导出最后一批 span", {
 				text: "Synthetic telemetry probe",
 			}),
 		);
-		const deadline = Date.now() + 10000;
-		let completed = false;
-		while (Date.now() < deadline) {
-			completed = await page.evaluate(
-				async (sessionId) =>
-					(await window.suiming.invoke("session.list", {})).sessions.some(
-						(session) => session.id === sessionId && session.status === "idle" && session.turn === 1,
-					),
-				result.sessionId,
-			);
-			if (completed) break;
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
-		assert.ok(completed, "等待整个 turn 结束后再验收退出导出");
+		// 等整个 turn 结束后再验收退出导出。
+		await waitForSessionIdle(page, result.sessionId);
+		assert.deepEqual(errors, []);
 		await app.close();
 		closed = true;
 		assert.ok(received.some((s) => s.name === "suiming.turn agent"));

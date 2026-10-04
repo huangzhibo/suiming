@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
-import { _electron as electron, type Locator } from "playwright";
+import type { Locator } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import type { WorkspaceLayout } from "../../web/src/workspace-layout.js";
+import { collectPageErrors, launchDesktop } from "./launch.js";
 
 test("统一文档：文件树准确切换设计与正文，草稿分别保存，旧文件标签恢复且错误格式可修复", {
 	timeout: 90000,
@@ -21,17 +22,10 @@ test("统一文档：文件树准确切换设计与正文，草稿分别保存�
 	const originalDesign = await readFile(join(root, design), "utf8");
 	await mkdir(join(root, "text"), { recursive: true });
 	await writeFile(join(root, prose), "原来的正文。");
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	try {
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
 		await page.getByRole("button", { name: "更多", exact: true }).click();
@@ -112,17 +106,10 @@ test("内容意图与通用分屏：空正文回退、独立导航、共享草�
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
 	await writeFile(join(root, "text/beat-0001.md"), "黄盖推开赤壁的大门。\n\n".repeat(80));
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const pane = () => page.locator('[data-pane-active="true"]');
 	const mode = async (target: Locator, name: "设计" | "正文") => {
 		const radio = target.getByRole("radio", { name, exact: true });

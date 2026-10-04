@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { DesktopBridge } from "@suiming/sdk";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, launchDesktop } from "./launch.js";
 
 declare const window: { suiming?: DesktopBridge };
 
@@ -16,18 +16,10 @@ test("连续对话：停下后追问接着同一 session、重载历史、草稿
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			"--conversation-test",
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root, flags: ["--conversation-test"] });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const input = page.getByRole("textbox", { name: "输入消息", exact: true });
 	const read = () => page.evaluate(() => window.suiming?.invoke("session.list", {}));
 	try {

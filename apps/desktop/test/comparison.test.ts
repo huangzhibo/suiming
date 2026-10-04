@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, launchDesktop } from "./launch.js";
 
 declare const document: { querySelector(selector: string): { scrollTop: number } | null };
 
@@ -27,17 +27,10 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 	await writeFile(join(root, target), committed);
 	await project.commitCheckout();
 	project.close();
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const menu = async (name: string) => {
 		await page.getByRole("button", { name: "更多", exact: true }).click();
 		await page.getByRole("menuitem", { name, exact: true }).click();

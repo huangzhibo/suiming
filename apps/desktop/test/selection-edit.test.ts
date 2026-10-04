@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { DesktopBridge } from "@suiming/sdk";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, launchDesktop } from "./launch.js";
 
 declare const window: { suiming?: DesktopBridge };
 
@@ -21,18 +21,10 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	await mkdir(join(root, "text"), { recursive: true });
 	await writeFile(join(root, "text/beat-0001.md"), "军杖落到第三十下。黄盖咬住了衣角。\n\n他一声没吭。\n");
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			"--selection-edit-test",
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root, flags: ["--selection-edit-test"] });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const body = page.locator('[data-scroll-key="body:text"]');
 	const select = (length: number) =>
 		body.evaluate((element, size) => {

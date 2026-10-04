@@ -41,6 +41,25 @@ function keepClearOfHostCursor(window: BrowserWindow): void {
 }
 app.on("browser-window-created", (_event, window) => keepClearOfHostCursor(window));
 
+/**
+ * 测试闸门：faux 回复或 IPC 回包停在这里，等测试用 `openGate`（launch.ts）放行；先放行、后到达也成立。
+ * 替代固定 sleep：计时器和界面操作赛跑，机器慢了超时，快了要测的场景根本没发生、测试照样通过（2026-10-04 改）。
+ */
+const gates = new Map<string, { opened: boolean; release?: () => void }>();
+function gate(name: string): Promise<void> {
+	const entry = gates.get(name) ?? { opened: false };
+	gates.set(name, entry);
+	return entry.opened ? Promise.resolve() : new Promise<void>((resolve) => (entry.release = resolve));
+}
+Object.assign(globalThis, {
+	openTestGate(name: string) {
+		const entry = gates.get(name) ?? { opened: false };
+		entry.opened = true;
+		entry.release?.();
+		gates.set(name, entry);
+	},
+});
+
 const modelTest = process.argv.includes("--model-picker-test");
 const provider = fauxProvider(
 	modelTest
@@ -73,7 +92,8 @@ if (process.argv.includes("--composer-test")) {
 			const result = await listener(event, request, ...args);
 			if (command.command === "session.send" && command.input.sessionId === undefined && !lostLaunch) {
 				lostLaunch = true;
-				await new Promise((resolve) => setTimeout(resolve, 1800));
+				// 回包在测试于「正在确认」期间继续输入之后才丢：放行前窗口一直在等这次发送。
+				await gate("composer-reply-lost");
 				return { ok: false, error: { code: "test_reply_lost", message: "测试：发送回包丢失" } };
 			}
 			return result;
@@ -99,7 +119,8 @@ if (process.argv.includes("--workspace-callback-test")) {
 }
 provider.setResponses([
 	async () => {
-		await new Promise((resolve) => setTimeout(resolve, 1200));
+		// 重载只 attach 那一步要在 turn 还没结束时重载：回复压在闸门后面，测试重载并看到仍在处理再放行。
+		if (process.argv.includes("--hold-first-reply")) await gate("first-reply");
 		return fauxAssistantMessage("黄盖要当众挨这顿打，还是另想办法？");
 	},
 	fauxAssistantMessage(fauxToolCall("commit", { summary: "提交设计" })),
@@ -155,7 +176,7 @@ if (process.argv.includes("--recovery-test"))
 if (process.argv.includes("--composer-test"))
 	provider.setResponses([
 		async () => {
-			await new Promise((resolve) => setTimeout(resolve, 700));
+			await gate("composer-first-reply");
 			return fauxAssistantMessage("需要让黄盖当众挨打吗？");
 		},
 		fauxAssistantMessage("对话回看测试。黄盖在军杖落下前停了一下，仍决定诈降。\n\n".repeat(120)),

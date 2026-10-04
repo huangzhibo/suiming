@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { DesktopBridge } from "@suiming/sdk";
-import { _electron as electron } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, launchDesktop, openGate } from "./launch.js";
 
 declare const window: { suiming?: DesktopBridge };
 declare const document: { querySelector(selector: string): { scrollTop: number } | null };
@@ -18,18 +18,10 @@ test("原生对话：引用与附件、IME、迟到回包及发送重试、消�
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	const original = await readFile(join(root, "outline/story/vol-0001/beat-0001.md"), "utf8");
-	const app = await electron.launch({
-		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
-			"--composer-test",
-			`--project=${root}`,
-			`--user-data-dir=${join(directory, "app-data")}`,
-		],
-	});
+	const app = await launchDesktop({ directory, project: root, flags: ["--composer-test"] });
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
+	const errors = collectPageErrors(page);
 	const input = page.getByRole("textbox", { name: "输入消息", exact: true });
 	const form = page.locator(".agent-composer");
 	try {
@@ -74,11 +66,13 @@ test("原生对话：引用与附件、IME、迟到回包及发送重试、消�
 		await input.press("Meta+Enter");
 		await form.getByText("正在确认本次发送，可以继续输入。", { exact: true }).waitFor();
 		await input.fill("发送期间继续输入的补充要求。");
+		await openGate(app, "composer-reply-lost");
 		await form.getByText("测试：发送回包丢失", { exact: true }).waitFor();
 		await page.reload();
 		await input.waitFor();
 		assert.equal(await input.inputValue(), "发送期间继续输入的补充要求。");
 		await page.getByRole("button", { name: "确认发送结果", exact: true }).click();
+		await openGate(app, "composer-first-reply");
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		assert.equal(await input.inputValue(), "发送期间继续输入的补充要求。");
 		const state = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
@@ -150,7 +144,13 @@ test("原生对话：引用与附件、IME、迟到回包及发送重试、消�
 			const extra = body?.lastElementChild?.cloneNode(true);
 			if (body && extra) body.appendChild(extra);
 		});
-		await page.waitForTimeout(100);
+		// ResizeObserver 在下一帧绘制前回调：等两帧，不按固定时长。
+		await page.evaluate(() => {
+			const frame = (
+				globalThis as unknown as { requestAnimationFrame(callback: () => void): number }
+			).requestAnimationFrame.bind(globalThis);
+			return new Promise<void>((done) => frame(() => frame(done)));
+		});
 		assert.ok(Math.abs((await viewport.evaluate((element) => element.scrollTop)) - 160) < 2);
 		await page.reload();
 		await page.locator(".message.assistant").filter({ hasText: "对话回看测试" }).waitFor();
