@@ -101,7 +101,7 @@ npm run regression:harness -- --only check-issues --trials 1   # 真实模型回
 
 - check-docs：全仓所有 .md 的相对链接必须指向存在的文件；根目录这份 AGENTS.md 不能超过 32 KiB——Codex 默认只读这么多（`project_doc_max_bytes`），多出的部分静默截掉。只在某个目录用得上的约定放进那个目录的 AGENTS.md。
 - 三份生成文件不要手改，改了真源跑对应的 `npm run generate:*`：`strategies/story-constitution.md` → `packages/story/src/constitution.ts`；`story-language/*.md` → `packages/story/src/story-language-docs.ts`；integrations/shared/suiming/SKILL.md 与 integrations/codex/agents/*.toml → `apps/cli/src/host-files.ts`。Agent 经 `story_guide` 的 `topic` 读 Story Language，`suim init --agent` 与 `suim update --agent` 把 Skill 和同一份 Story Language 写进作品仓——2026-10-02 之前只有 CLI 的 host-files 嵌了一份，Agent 只看得到字段形状，抽斗破时 Beat 写成速记、人物档写成编年、一个秘密都没声明。生成脚本读 story-language 下所有 .md，那里不能放别的 Markdown（包括 AGENTS.md）。
-- check-story-isolation：packages/story/src 禁止 import node:fs / sqlite / child_process / net / http、fastify、pg、kysely、commander、pi-ai。
+- check-story-isolation：packages/story/src 是白名单，只能 import 相对路径、`typebox`、`yaml` 与 `node:crypto`，也不能用 fetch、process、`Date.now`、无参 `new Date()`、`Math.random`；story 真要加依赖，先判断它是不是纯领域，再改脚本的白名单。
 - check-examples：`examples/` 下每部示例作品都要过 Checker（与 `suim check` 同一个判定，不要求全书写完）。Story Language 改了，示例跟着改；示例是给第一次打开的人看的，不能是检查不通过的作品。
 - check-host-integrations：要核对的命令片段由脚本从 `SUIM_CLI_COMMANDS` 生成（`cloud.*` 除外），增删 `suim` 子命令时只需让 SKILL.md 写出对应的 `suim --json <命令>`，不用改脚本；三个 host README 也要含安装路径与 smoke check。
 - check:design-system 是 `apps/web` 的 ESLint，与 biome 的分工见 [apps/web/AGENTS.md](apps/web/AGENTS.md)。
