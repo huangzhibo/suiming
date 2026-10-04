@@ -67,7 +67,7 @@ function validateBatch(
 			return changeFailure(
 				change,
 				"conflicting_assignment",
-				"one state change assigns conflicting values to the same property",
+				`同一节的 changes 给 ${assignment.subject}.${assignment.property} 写了两个不同的值`,
 				assignment,
 				previous.value,
 			);
@@ -78,19 +78,25 @@ function validateBatch(
 			return changeFailure(
 				change,
 				"dead_state_reversed",
-				"world dead state is terminal; omit the property until death occurs",
+				`${assignment.subject}.dead 是终止状态：死亡发生之前不写这一项，不要写 dead: false`,
 				assignment,
 			);
 		}
 		if (assignment.property === "dead" && valueIn(state, assignment) === true && assignment.value !== true) {
-			return changeFailure(change, "dead_state_reversed", "world dead state cannot be reversed", assignment, true);
+			return changeFailure(
+				change,
+				"dead_state_reversed",
+				`${assignment.subject} 已经死亡，不能再改回活着`,
+				assignment,
+				true,
+			);
 		}
 		const terminalProperty = (TERMINAL_RESOURCE_PROPERTIES as readonly string[]).includes(assignment.property);
 		if (terminalProperty && assignment.value === false) {
 			return changeFailure(
 				change,
 				"terminal_resource_reused",
-				"consumed or destroyed is terminal; omit the property until termination occurs",
+				`${assignment.subject}.${assignment.property} 是终止状态：发生之前不写这一项，不要写 false`,
 				assignment,
 			);
 		}
@@ -102,7 +108,7 @@ function validateBatch(
 			return changeFailure(
 				change,
 				"terminal_resource_reused",
-				"consumed or destroyed resource cannot regain a holder or location",
+				`${assignment.subject} 已经被消耗或毁掉，不能再有人持有或放在某处`,
 				assignment,
 			);
 		}
@@ -125,7 +131,7 @@ function validateBatch(
 			return changeFailure(
 				change,
 				"conflicting_assignment",
-				"one resource cannot gain a holder and a free location in the same state change",
+				`同一节里 ${location.subject} 不能既交给人持有、又放在某个地点`,
 				location,
 			);
 		}
@@ -133,7 +139,7 @@ function validateBatch(
 			return changeFailure(
 				change,
 				"conflicting_assignment",
-				"one state change cannot terminate a resource and give it a holder or location",
+				`同一节里 ${terminal.subject} 不能既被消耗或毁掉、又交给人或放在某处`,
 				holder ?? location,
 			);
 		}

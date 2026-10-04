@@ -74,7 +74,7 @@ test("C9 / C12 资源终止：黄盖的火船在第 437 节烧尽，三节之后
 			"contracts:\n  resolve: [关羽余恩报曹]",
 			"changes:\n  world:\n    黄盖火船.holder: 曹操\ncontracts:\n  resolve: [关羽余恩报曹]",
 		),
-		[`error ${B0440} consumed or destroyed resource cannot regain a holder or location`],
+		[`error ${B0440} resource:黄盖火船 已经被消耗或毁掉，不能再有人持有或放在某处`],
 	);
 });
 

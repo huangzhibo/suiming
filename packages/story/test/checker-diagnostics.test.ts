@@ -137,7 +137,8 @@ test("Checker 把硬状态失败、未闭合 Contract 与未声明 secret 一次
 	assert.equal(check.passed, false);
 	const messages = check.diagnostics.map((item) => item.message);
 	assert.equal(check.diagnostics.length, 3, messages.join("\n"));
-	assert.ok(messages.some((message) => message.includes("holder")));
+	// 同一节里火船既烧尽又交给黄盖：诊断点名是哪件物品（2026-10-04 起硬状态诊断写中文）。
+	assert.ok(messages.some((message) => message.includes("resource:火船") && message.includes("消耗或毁掉")));
 	assert.ok(messages.some((message) => message.includes("secret:连环计")));
 	assert.ok(messages.some((message) => message.includes("StoryContract 诈降")));
 });
