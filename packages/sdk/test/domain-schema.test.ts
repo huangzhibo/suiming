@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import * as domainSchema from "../src/domain-schema.js";
 import { LOCAL_COMMANDS, SUIM_CLI_COMMAND_DATA, SuimCliSessionListDataSchema } from "../src/index.js";
 
 test("session.list 在两套命令目录下是同一个 schema", () => {
@@ -58,13 +59,30 @@ test("领域对象的 schema 只定义一次", () => {
 		"reviewSummarySchema",
 		"reviewScopeSchema",
 		"reviewVerdictSchema",
+		"reviewLayerSchema",
+		"resultReferenceSchema",
+		"modelThinkingSchema",
+		"checkDiagnosticSchema",
+		"checkSummarySchema",
+		"rollbackResultSchema",
 	];
+	// 字面量联合还要按内容查：run-event.ts 曾内联重写 idle / running / paused，按名字匹配抓不到。
+	const literalUnions = owned.flatMap((name) => {
+		const schema = (domainSchema as Record<string, { anyOf?: { const?: unknown }[] }>)[name];
+		const literals = schema?.anyOf?.map((member) => member.const);
+		if (literals === undefined || !literals.every((value) => typeof value === "string")) return [];
+		const body = literals.map((value) => `Type\\.Literal\\("${value}"\\)`).join(",\\s*");
+		return [{ name, pattern: new RegExp(`Type\\.Union\\(\\[\\s*${body},?\\s*\\]`, "u") }];
+	});
+	assert.ok(literalUnions.some((union) => union.name === "sessionStatusSchema"));
 	const offenders: string[] = [];
 	for (const name of readdirSync(dir).filter((file) => file.endsWith(".ts") && file !== "domain-schema.ts")) {
 		const source = readFileSync(`${dir}${name}`, "utf8");
 		for (const schema of owned) {
 			if (new RegExp(`(const|let)\\s+${schema}\\s*=`, "u").test(source)) offenders.push(`${name}:${schema}`);
 		}
+		for (const union of literalUnions)
+			if (union.pattern.test(source)) offenders.push(`${name}:${union.name}（内联）`);
 	}
 	assert.deepEqual(offenders, []);
 });

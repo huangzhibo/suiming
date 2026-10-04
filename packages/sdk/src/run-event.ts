@@ -2,7 +2,7 @@ import { type AGUIEvent, EventSchemas, EventType } from "@ag-ui/core";
 import { type Static, type TSchema, type TUnsafe, Type } from "typebox";
 import { Value } from "typebox/value";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { executionFailureSchema, modelUsageSchema } from "./domain-schema.js";
+import { executionFailureSchema, modelUsageSchema, sessionStatusSchema } from "./domain-schema.js";
 
 export type { AGUIEvent } from "@ag-ui/core";
 export { EventType } from "@ag-ui/core";
@@ -18,7 +18,7 @@ export const ProductEventSchema: TUnsafe<AGUIEvent> = Type.Unsafe<AGUIEvent>(
 /** `suiming.session`：session 状态的确认点投影。AG-UI 的 threadId 是 sessionId，runId 是 turn id。 */
 export const SuimingSessionNoticeSchema = Type.Object(
 	{
-		status: Type.Union([Type.Literal("idle"), Type.Literal("running"), Type.Literal("paused")]),
+		status: sessionStatusSchema,
 		version: Type.Integer({ minimum: 1 }),
 		turn: Type.Integer({ minimum: 0 }),
 		pause: Type.Optional(executionFailureSchema),
