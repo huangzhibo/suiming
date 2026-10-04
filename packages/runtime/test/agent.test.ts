@@ -409,6 +409,33 @@ test("连续重复同一被拒绝动作：turn 以 run_no_progress 结束回 idl
 	}
 });
 
+test("同一动作得到同一结果连续三次，成功的也算：以 run_no_progress 结束；中间结果变了就不算", async () => {
+	// opencode 的一个子任务把同一个 grep 成功执行了 364 次、50 分钟；只认被拒的动作就拦不住它。
+	const f = await fixture();
+	try {
+		const read = () => call("read", { path: "world/characters/黄盖.md" });
+		f.provider.setResponses([read(), read(), read(), reply("不该发出：同一结果已经读了三次")]);
+		const stuck = await f.say("看看黄盖");
+		assert.equal(stuck.failure?.code, "run_no_progress");
+		assert.equal(f.provider.state.callCount, 3);
+		f.provider.setResponses([
+			read(),
+			call("edit", {
+				path: "world/characters/黄盖.md",
+				oldText: "name: 黄盖",
+				newText: "name: 黄盖\n# 重读之前改过",
+			}),
+			read(),
+			read(),
+			reply("改过之后重读，结果不同，不算重复"),
+		]);
+		const next = await f.say("改一下再看", stuck.sessionId);
+		assert.equal(next.failure, undefined);
+	} finally {
+		await f.close();
+	}
+});
+
 test("连续五次回复的动作都被拒绝、每次都不一样：同样以 run_no_progress 结束，不等它换着花样一直试", async () => {
 	const f = await fixture();
 	try {
@@ -744,7 +771,10 @@ test("执行命令只写自己改动的行：一个 turn 里整份导出与整�
 		try {
 			const id = (await f.harness.createSession()).id;
 			f.provider.setResponses([
-				...Array.from({ length: rounds }, () => call("read", { path: "intent/计谋的代价.md" })),
+				// 两个文件交替读：同一动作同一结果连续三次会被当成空转停下（run_no_progress）。
+				...Array.from({ length: rounds }, (_, index) =>
+					call("read", { path: index % 2 === 0 ? "intent/计谋的代价.md" : "world/characters/黄盖.md" }),
+				),
 				reply("读完了"),
 			]);
 			exported.mock.resetCalls();

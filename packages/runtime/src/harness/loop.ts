@@ -67,7 +67,8 @@ export interface LoopCheckpoint {
 	overflowRetried?: boolean;
 	/** 这一次请求因瞬时失败已重发了几次；拿到正常响应就清掉。 */
 	transientRetries?: number;
-	rejected?: { fingerprint: string; count: number };
+	/** 最近一个动作的指纹（工具名 + 参数 + 结果）与它连续出现的次数，成功与被拒都算。 */
+	repeated?: { fingerprint: string; count: number };
 	/** 连续几次回复里的动作全被拒绝（不论是不是同一个）；有动作成功或作者插话就清零。 */
 	rejectedStreak?: number;
 	/** 子任务连续停下却没有调用交付工具的次数，随 checkpoint 续跑保留。 */
@@ -123,8 +124,14 @@ export interface TaskLoopOutcome {
  */
 const TRANSIENT_RETRY = { maxRetries: 5, baseDelayMs: 2_000, maxDelayMs: 30_000 };
 /**
- * 进展型兜底的第二道：同一个被拒动作连续三次之外，换着花样被拒（每次参数不同）连续这么多次回复也停。
- * 一次回复里只要有一个动作成功就不算；正常的试错——改错了、读一下、再改——中间总有成功的读。
+ * 进展型兜底（Harness 设计第 4 节）。第一道：同一个动作（工具名 + 参数）得到同一个结果连续这么多次，成功的也算——
+ * 结果没变，再做一次也不会变。2026-10-04 之前只认被拒的动作，拦不住 opencode 那种把同一个 grep 成功执行 364 次的
+ * 子任务；Gemini CLI（同一调用连续 5 次）与 OpenHands（同一动作与观察 4 次、同一错误 3 次）都不分成败。
+ */
+const NO_PROGRESS_REPEATS = 3;
+/**
+ * 第二道：换着花样被拒（每次参数不同）连续这么多次回复也停。一次回复里只要有一个动作成功就不算；
+ * 正常的试错——改错了、读一下、再改——中间总有成功的读。
  */
 const NO_PROGRESS_STREAK = 5;
 function interruptedError(signal: AbortSignal | undefined): SuimingHarnessError {
@@ -361,7 +368,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			})),
 			usage: { ...state.usage },
 			...(state.reduction ? { reduction: { ...state.reduction } } : {}),
-			...(state.rejected ? { rejected: { ...state.rejected } } : {}),
+			...(state.repeated ? { repeated: { ...state.repeated } } : {}),
 			...(state.submission !== undefined ? { submission: immutableCopy(state.submission) } : {}),
 		};
 		const written = writing.then(() => options.saveCheckpoint?.(snapshot));
@@ -380,7 +387,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				timestamp: Date.now(),
 			});
 			state.steeringSequence = item.sequence;
-			delete state.rejected;
+			delete state.repeated;
 			delete state.rejectedStreak;
 			delete state.unsubmittedStops;
 			await save();
@@ -784,15 +791,13 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			});
 			state.messages.push(action.message);
 			action.state = "delivered";
-			if (action.message.isError) {
-				const fingerprint = createHash("sha256")
-					.update(JSON.stringify([action.call.name, action.call.arguments, action.message.content]))
-					.digest("hex");
-				state.rejected = {
-					fingerprint,
-					count: state.rejected?.fingerprint === fingerprint ? state.rejected.count + 1 : 1,
-				};
-			} else delete state.rejected;
+			const fingerprint = createHash("sha256")
+				.update(JSON.stringify([action.call.name, action.call.arguments, action.message.content]))
+				.digest("hex");
+			state.repeated = {
+				fingerprint,
+				count: state.repeated?.fingerprint === fingerprint ? state.repeated.count + 1 : 1,
+			};
 			await save();
 			if (action.result.terminate) {
 				const result = await finishTerminated();
@@ -828,8 +833,11 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			};
 		state.phase = "ready";
 		await save();
-		if ((state.rejected?.count ?? 0) >= 3)
-			throw new SuimingHarnessError("run_no_progress", "连续重复同一被拒绝的动作，已保留进度。请补充方向后继续。");
+		if ((state.repeated?.count ?? 0) >= NO_PROGRESS_REPEATS)
+			throw new SuimingHarnessError(
+				"run_no_progress",
+				`连续 ${NO_PROGRESS_REPEATS} 次做同一个动作、得到同一个结果，已保留进度。请补充方向后继续。`,
+			);
 		if ((state.rejectedStreak ?? 0) >= NO_PROGRESS_STREAK)
 			throw new SuimingHarnessError(
 				"run_no_progress",

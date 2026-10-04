@@ -200,14 +200,15 @@ test("清掉工具结果后仍然偏大：请求末尾请模型先 compact_conte
 		// 工具结果很小，清不出多少；占地方的是模型自己的长回复。
 		return fauxAssistantMessage([
 			{ type: "text", text: "黄盖在军杖落下前停了一下。".repeat(120) },
-			fauxToolCall("note", {}),
+			fauxToolCall("note", { n: seen.length }),
 		]);
 	};
 	provider.setResponses(Array.from({ length: 30 }, () => step));
 	const note: HarnessTool = {
 		name: "note",
 		description: "记一笔",
-		parameters: Type.Object({}, { additionalProperties: false }),
+		// 每次记的不一样：同一动作同一结果连续三次会被当成空转停下（run_no_progress）。
+		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
 		replay: "read",
 		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 		execute: async (_id, _params, _signal, _update, prepared) =>
@@ -247,13 +248,13 @@ test("作者的开场消息本身就超过压缩线：压不动就不再要求�
 			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "还没开始补全。" }));
 		}
 		notes += 1;
-		return notes <= 3 ? fauxAssistantMessage(fauxToolCall("note", {})) : fauxAssistantMessage("补完了。");
+		return notes <= 3 ? fauxAssistantMessage(fauxToolCall("note", { n: notes })) : fauxAssistantMessage("补完了。");
 	};
 	provider.setResponses(Array.from({ length: 40 }, () => step));
 	const note: HarnessTool = {
 		name: "note",
 		description: "记一笔",
-		parameters: Type.Object({}, { additionalProperties: false }),
+		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
 		replay: "read",
 		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 		execute: async (_id, _params, _signal, _update, prepared) =>
