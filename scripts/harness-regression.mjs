@@ -79,6 +79,24 @@ const HOST_FILE = /^(?:\.agents|\.claude|\.codex|\.grok)(?:\/|$)|^(?:AGENTS|CLAU
 
 const total = (changed) => Object.values(changed).reduce((sum, item) => sum + item.count, 0);
 const expect = (name, pass) => ({ name, pass: Boolean(pass) });
+/** 这一项这次没有可判的样本（比如审稿没有锚在正文上的 finding）：不算过也不算不过，汇总里单列。 */
+const untested = (name) => ({ name, pass: true, untested: true });
+/**
+ * 回复点名了「诈降」没兑现，而不只是提到诈降：诈降本身就是样例的主题，说「没有问题」也会带上这两个字
+ * （2026-10-04 测试审查发现原来的判法接近恒真）。
+ */
+const namesUnpaidContract = (reply) => /诈降/u.test(reply) && /兑现|resolve|期限|到期|deadline/iu.test(reply);
+/** 根 Agent 委派了写 beat-0001 的 writer，且有子任务完成：原来只看「有子任务完成」，任何子任务都满足。 */
+const delegatedWriter = (r) =>
+	r.actions.some((action) => action.label === "delegate" && action.target === "beat-0001" && !action.isError) &&
+	r.tasks.some((task) => task.kind === "subagent" && task.status === "completed");
+/**
+ * 模型服务出了问题的那一次不能算 Agent 退化：记成「作废」，不进通过率。原来记成未通过，要靠人看 lastFailure 才分得开，
+ * 记录里至少六次是这样重跑的。判据只看错误码与网络层的原文，不看 Agent 做了什么。
+ */
+const VOID_CODES = new Set(["model_call_failed", "model_call_unknown"]);
+const VOID_MESSAGE =
+	/fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|rate limit|too many requests|overloaded|service unavailable|bad gateway|gateway timeout|(?:status|HTTP)\D{0,3}(?:429|5\d\d)\b/iu;
 
 /**
  * 审稿引文能不能锚回正文段落。引文是否出自锚定文件，submit_review 已经确定性地校验（review-authoring 的
@@ -133,6 +151,7 @@ const TASKS = [
 		prompt: "记住一个以后都成立的设定：黄盖年过五十，左臂有旧伤，拉不开硬弓。",
 		grade: (r) => [
 			expect("写回了意图或 Design", r.summary.changed.intent.count + r.summary.changed.design.count > 0),
+			expect("写回的是这条设定", /左臂|旧伤|硬弓|五十/u.test(r.changedText)),
 		],
 	},
 	{
@@ -141,6 +160,10 @@ const TASKS = [
 		prompt: "在 beat-0002 里加上曹军巡江的船过来盘问、被黄盖拿降书应付过去的情节。改完检查并提交。",
 		grade: (r) => [
 			expect("改了 Design", r.summary.changed.design.count > 0),
+			expect(
+				"改的是 beat-0002",
+				r.summary.changed.design.paths.some((path) => path.endsWith("beat-0002.md")),
+			),
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("当前版本过 Checker", r.check.data?.passed === true),
 			expect("没有遗留未提交", r.summary.uncommitted === 0),
@@ -154,6 +177,9 @@ const TASKS = [
 			expect("写了正文", r.summary.changed.text.count > 0),
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("正文过检查", r.textCheck?.data?.passed === true),
+			expect("当前版本过 Checker", r.check.data?.passed === true),
+			expect("没有遗留未提交", r.summary.uncommitted === 0),
+			expect("取了写作依据才写正文", (r.summary.textWithoutContext?.count ?? 0) === 0),
 		],
 	},
 	{
@@ -161,13 +187,11 @@ const TASKS = [
 		prompt: "委派一个 writer 子任务写 beat-0001 的正文，写好后检查并提交。",
 		textCheck: true,
 		grade: (r) => [
-			expect(
-				"委派了子任务并完成",
-				r.tasks.some((task) => task.kind === "subagent" && task.status === "completed"),
-			),
+			expect("委派了 beat-0001 的 writer 并完成", delegatedWriter(r)),
 			expect("写了正文", r.summary.changed.text.count > 0),
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("正文过检查", r.textCheck?.data?.passed === true),
+			expect("没有遗留未提交", r.summary.uncommitted === 0),
 		],
 	},
 	{
@@ -176,7 +200,11 @@ const TASKS = [
 		prompt: "检查一下作品现在有没有问题，先不要修改。",
 		grade: (r) => [
 			expect("没有改动作品", total(r.summary.changed) === 0),
-			expect("回复点名没兑现的期待", r.reply.includes("诈降")),
+			expect(
+				"跑了 check",
+				r.actions.some((action) => action.label === "check" && !action.isError),
+			),
+			expect("回复点名诈降没兑现", namesUnpaidContract(r.reply)),
 		],
 	},
 	{
@@ -187,14 +215,12 @@ const TASKS = [
 		prompt: "委派一个 writer 子任务写 beat-0001 的正文，写好后检查并提交。",
 		textCheck: true,
 		grade: (r) => [
-			expect(
-				"委派了子任务并完成",
-				r.tasks.some((task) => task.kind === "subagent" && task.status === "completed"),
-			),
+			expect("委派了 beat-0001 的 writer 并完成", delegatedWriter(r)),
 			expect("写了正文", r.summary.changed.text.count > 0),
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("正文过检查", r.textCheck?.data?.passed === true),
-			expect("回复提到还没兑现的期待", r.reply.includes("诈降")),
+			expect("没有遗留未提交", r.summary.uncommitted === 0),
+			expect("回复点名诈降还没兑现", namesUnpaidContract(r.reply)),
 		],
 	},
 	{
@@ -207,7 +233,13 @@ const TASKS = [
 		prompt: "独立审一下 beat-0001 的正文。",
 		grade: (r) => [
 			expect("留下了审稿", r.summary.changed.review.count > 0),
-			expect("正文上的 finding 都能锚到段落", r.anchors.anchored === r.anchors.textFindings),
+			expect(
+				"审稿由独立的 Review 子任务完成",
+				r.tasks.some((task) => task.kind === "review" && task.status === "completed"),
+			),
+			r.anchors.textFindings === 0
+				? untested("正文上的 finding 都能锚到段落")
+				: expect("正文上的 finding 都能锚到段落", r.anchors.anchored === r.anchors.textFindings),
 		],
 	},
 ];
@@ -228,8 +260,11 @@ async function runTask(task, root, trial) {
 	const sent = await suim(dir, ["session", "send", task.prompt]);
 	const durationMs = Date.now() - started;
 	const session = sent.data?.session;
-	if (!sent.ok || session === undefined)
-		return { id: task.id, trial, passed: false, durationMs, error: sent.error?.message ?? "session send 失败" };
+	if (!sent.ok || session === undefined) {
+		const message = sent.error?.message ?? "session send 失败";
+		const voided = VOID_CODES.has(sent.error?.code) || VOID_MESSAGE.test(message);
+		return { id: task.id, trial, passed: false, ...(voided ? { voided: true } : {}), durationMs, error: message };
+	}
 	const events = (await suim(dir, ["session", "events", session.id])).data?.events ?? [];
 	const summary = events
 		.map((record) => record.event)
@@ -244,20 +279,43 @@ async function runTask(task, root, trial) {
 	const hostFileActions = actions
 		.filter((action) => HOST_FILE.test(action.target ?? ""))
 		.map((action) => `${action.label} ${action.target}${action.isError ? "（被拒）" : ""}`);
-	if (summary === undefined) return { id: task.id, trial, passed: false, durationMs, error: "没有 turn 结束对账事件" };
+	const voided = VOID_CODES.has(session.lastFailure?.code) || VOID_MESSAGE.test(session.lastFailure?.message ?? "");
+	if (summary === undefined)
+		return {
+			id: task.id,
+			trial,
+			passed: false,
+			...(voided ? { voided: true } : {}),
+			durationMs,
+			error: session.lastFailure
+				? `${session.lastFailure.code}：${session.lastFailure.message}`
+				: "没有 turn 结束对账事件",
+		};
+	// 写回判的是改了的意图与 Design 里有没有这条设定，只读这一轮改过的文件。
+	const changedText = (
+		await Promise.all(
+			[...summary.changed.intent.paths, ...summary.changed.design.paths].map((path) =>
+				readFile(join(dir, path), "utf8").catch(() => ""),
+			),
+		)
+	).join("\n");
 	const result = {
 		reply: sent.data.reply ?? "",
 		summary,
+		actions,
+		changedText,
 		check: await suim(dir, ["check"]),
 		textCheck: task.textCheck ? await suim(dir, ["text", "check", "beat-0001"]) : undefined,
 		tasks,
-		anchors: task.id === "review" ? await reviewAnchors(dir) : undefined,
+		// 不只 review 任务：GPT 写正文时常自发审稿，凡是留下审稿的运行都量一次引文锚定，白得样本。
+		anchors: summary.changed.review.count > 0 || task.id === "review" ? await reviewAnchors(dir) : undefined,
 	};
 	const checks = task.grade(result);
 	return {
 		id: task.id,
 		trial,
 		passed: checks.every((check) => check.pass),
+		...(voided ? { voided: true } : {}),
 		checks,
 		durationMs,
 		status: session.status,
@@ -318,8 +376,9 @@ async function worker() {
 		slots[index] = result;
 		if (out) await writeFile(out, `${JSON.stringify({ build, concurrency, results: results() }, null, 2)}\n`);
 		const failed = (result.checks ?? []).filter((check) => !check.pass).map((check) => check.name);
+		const notTested = (result.checks ?? []).filter((check) => check.untested).map((check) => check.name);
 		console.log(
-			`${result.passed ? "✔" : "✖"} ${task.id} #${trial}  ${(result.durationMs / 1000).toFixed(0)}s  $${(result.costUsd ?? 0).toFixed(4)}${result.error ? `  ${result.error}` : ""}${failed.length ? `  未通过：${failed.join("、")}` : ""}${result.lastFailure ? `  lastFailure=${result.lastFailure}` : ""}${result.hostFileActions?.length ? `  碰了 host 文件：${result.hostFileActions.join("、")}` : ""}`,
+			`${result.voided ? "⊘ 作废" : result.passed ? "✔" : "✖"} ${task.id} #${trial}  ${(result.durationMs / 1000).toFixed(0)}s  $${(result.costUsd ?? 0).toFixed(4)}${result.error ? `  ${result.error}` : ""}${failed.length ? `  未通过：${failed.join("、")}` : ""}${notTested.length ? `  未测：${notTested.join("、")}` : ""}${result.lastFailure ? `  lastFailure=${result.lastFailure}` : ""}${result.hostFileActions?.length ? `  碰了 host 文件：${result.hostFileActions.join("、")}` : ""}`,
 		);
 	}
 }
@@ -328,6 +387,10 @@ try {
 } finally {
 	await rm(root, { recursive: true, force: true });
 }
-const passed = results().filter((result) => result.passed).length;
+const counted = results().filter((result) => !result.voided);
+const passed = counted.filter((result) => result.passed).length;
+const voidedCount = results().length - counted.length;
 const cost = results().reduce((sum, result) => sum + (result.costUsd ?? 0), 0);
-console.log(`\n通过 ${passed} / ${results().length}，合计 $${cost.toFixed(4)}`);
+console.log(
+	`\n通过 ${passed} / ${counted.length}${voidedCount ? `（作废 ${voidedCount}：模型服务出错，不进通过率）` : ""}，合计 $${cost.toFixed(4)}`,
+);
