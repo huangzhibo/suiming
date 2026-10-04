@@ -1,18 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CloudProjectService } from "@suiming/runtime";
-import {
-	DOMAIN_API_ROUTES,
-	DomainApiErrorSchema,
-	encodeDomainApiOpenStoryPackage,
-	SUIMING_DOMAIN_API_VERSION,
-} from "@suiming/sdk";
+import { DOMAIN_API_ROUTES, DomainApiErrorSchema, encodeDomainApiOpenStoryPackage } from "@suiming/sdk";
 import { Value } from "typebox/value";
 import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import {
 	createBearerTokenAuthenticator,
-	createDomainApiOpenApiDocument,
 	DomainApiHandler,
 	domainApiTransportRoutes,
 	type FastifyDomainApiRouteOptions,
@@ -179,7 +173,7 @@ test("DomainApiHandler authenticates, validates and delegates Project routes to 
 	assert.equal((rejected.body as { error: { code: string } }).error.code, "content_length_mismatch");
 });
 
-test("transport route and OpenAPI projections preserve the SDK route catalog exactly", () => {
+test("transport route projection preserves the SDK route catalog exactly", () => {
 	const descriptors = domainApiTransportRoutes();
 	assert.equal(descriptors.length, Object.keys(DOMAIN_API_ROUTES).length);
 	for (const descriptor of descriptors) {
@@ -189,23 +183,6 @@ test("transport route and OpenAPI projections preserve the SDK route catalog exa
 		assert.equal(descriptor.successStatus, source.successStatus);
 		assert.equal(descriptor.schema.operationId, source.operationId);
 		assert.equal(descriptor.schema.response[source.successStatus], source.response);
-	}
-
-	const document = createDomainApiOpenApiDocument() as {
-		openapi: string;
-		info: { version: string };
-		paths: Record<string, Record<string, { operationId: string; parameters: Array<{ name: string }> }>>;
-	};
-	assert.equal(document.openapi, "3.1.0");
-	assert.equal(document.info.version, SUIMING_DOMAIN_API_VERSION);
-	for (const source of Object.values(DOMAIN_API_ROUTES)) {
-		const path = source.path.replace(/:([A-Za-z][A-Za-z0-9_]*)/gu, "{$1}");
-		const operation = document.paths[path]?.[source.method.toLowerCase()];
-		assert.equal(operation?.operationId, source.operationId);
-		assert.equal(
-			operation?.parameters.some((parameter) => parameter.name === "Idempotency-Key"),
-			source.idempotency === "required",
-		);
 	}
 });
 

@@ -22,15 +22,7 @@ import {
 	type OpenPackageFile,
 	readOpenStoryDirectory,
 } from "@suiming/runtime";
-import { parse } from "smol-toml";
-import type { Static } from "typebox";
-import { Value } from "typebox/value";
-import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
-import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
-import { HOST_IDS, installHost } from "../src/host-install.js";
 import {
-	runSuimCli,
-	SUIM_CLI_EXIT,
 	SuimCliCloudCheckoutDataSchema,
 	SuimCliCloudStatusDataSchema,
 	SuimCliCloudSyncDataSchema,
@@ -39,7 +31,6 @@ import {
 	SuimCliDiffDataSchema,
 	SuimCliErrorSchema,
 	SuimCliEventSchema,
-	type SuimCliIo,
 	SuimCliProjectStatusDataSchema,
 	SuimCliRankDataSchema,
 	SuimCliResponseSchema,
@@ -53,7 +44,14 @@ import {
 	SuimCliSourceIngestDataSchema,
 	SuimCliSuccessSchema,
 	SuimCliTextCheckDataSchema,
-} from "../src/index.js";
+} from "@suiming/sdk";
+import { parse } from "smol-toml";
+import type { Static } from "typebox";
+import { Value } from "typebox/value";
+import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
+import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { runSuimCli, SUIM_CLI_EXIT, type SuimCliIo } from "../src/cli.js";
+import { HOST_IDS, installHost } from "../src/host-install.js";
 
 interface CliHarness {
 	io: SuimCliIo;

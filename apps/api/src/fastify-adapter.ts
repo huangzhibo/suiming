@@ -1,6 +1,6 @@
 import type { DomainApiRouteName } from "@suiming/sdk";
 import type { DomainApiHandler, DomainApiHandlerResponse } from "./domain-api-handler.js";
-import { domainApiTransportRoutes } from "./openapi.js";
+import { domainApiTransportRoutes } from "./transport-routes.js";
 
 export interface FastifyDomainApiRequest {
 	headers: Readonly<Record<string, string | readonly string[] | undefined>>;

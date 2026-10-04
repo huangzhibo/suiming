@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { CloudProjectService } from "@suiming/runtime";
-import { encodeDomainApiOpenStoryPackage } from "@suiming/sdk";
+import { DOMAIN_API_ROUTES, encodeDomainApiOpenStoryPackage } from "@suiming/sdk";
 import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import {
@@ -43,12 +43,21 @@ test("real Fastify composition registers OpenAPI and the Domain API, and closes 
 	assert.equal(response.statusCode, 401);
 	assert.equal(response.json().error.code, "cloud_authentication_required");
 
+	// OpenAPI 只由 @fastify/swagger 从注册的路由生成：文档里的操作恰好是 SDK 路由目录里的那些，不多不少。
 	const document = server.swagger() as { paths: Record<string, Record<string, { operationId?: string }>> };
-	assert.equal(document.paths["/v1/projects/{projectId}"]?.get?.operationId, "project.read");
-	assert.equal(document.paths["/v1/projects/{projectId}/agent"], undefined);
-	// Cloud 只剩 Canon 与同步：没有执行、没有事件流。
-	assert.equal(document.paths["/v1/projects/{projectId}/runs/{runId}/events"], undefined);
-	assert.equal(document.paths["/v1/projects/{projectId}/runs/{runId}"], undefined);
+	const documented = Object.entries(document.paths)
+		.flatMap(([path, operations]) =>
+			Object.entries(operations).map(
+				([method, operation]) => `${method.toUpperCase()} ${path} ${operation.operationId}`,
+			),
+		)
+		.sort();
+	const catalog = Object.values(DOMAIN_API_ROUTES)
+		.map(
+			(route) => `${route.method} ${route.path.replace(/:([A-Za-z][A-Za-z0-9_]*)/gu, "{$1}")} ${route.operationId}`,
+		)
+		.sort();
+	assert.deepEqual(documented, catalog);
 
 	await server.close();
 	assert.equal(resourcesClosed, true);
