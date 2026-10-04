@@ -16,7 +16,7 @@
  * 窗口里画的光标只存在于录制时注入的页面元素里，不是产品的一部分。
  */
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -48,9 +48,13 @@ const HEIGHT = 900;
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 const data = await mkdtemp(join(tmpdir(), "suiming-capture-"));
+// 打开的是副本：没有 .suiming 的目录会被主进程就地初始化（git init、.suiming、.gitattributes），
+// 直接打开仓库里的 examples/sanguo 就在仓库里套出一个 git 仓库。
+const project = join(data, "work");
+await cp(resolve(values.work), project, { recursive: true });
 const app = await electron.launch({
 	cwd: repo,
-	args: [resolve(repo, "apps/desktop"), `--project=${resolve(values.work)}`, `--user-data-dir=${data}`],
+	args: [resolve(repo, "apps/desktop"), `--project=${project}`, `--user-data-dir=${data}`],
 });
 const frames = [];
 let recording;
