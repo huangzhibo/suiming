@@ -1,71 +1,25 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type JsonObject } from "@earendil-works/pi-ai";
+import type { fauxProvider } from "@earendil-works/pi-ai";
 import { getSystemMessageText } from "@earendil-works/pi-ai/utils/text";
-import { agentTurn } from "../src/harness/agent.js";
 import { readProjectStatus } from "../src/harness/project-status.js";
-import {
-	compileWriteContext,
-	composeReviewFile,
-	LocalProjectService,
-	ModelGateway,
-	materializeOpenStoryDirectorySnapshot,
-	SuimingHarness,
-	textCurrencies,
-} from "../src/index.js";
+import { compileWriteContext, composeReviewFile, SuimingHarness, textCurrencies } from "../src/index.js";
+import { call, fauxGateway, type Responses, reply, say, withSampleProject as withProject } from "./harness-fixtures.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
-async function fixture(): Promise<string> {
-	const root = await mkdtemp(join(tmpdir(), "suiming-engine-write-"));
-	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
-	return root;
-}
-
-function gateway(responses: Parameters<ReturnType<typeof fauxProvider>["setResponses"]>[0]): ModelGateway {
-	const provider = fauxProvider({
-		provider: "suiming-write-faux",
-		models: [{ id: "agent-model" }, { id: "writer-model" }],
-	});
-	provider.setResponses(responses);
-	const models = createModels();
-	models.setProvider(provider.provider);
-	return new ModelGateway(models, {
-		profiles: {
-			main: { provider: provider.provider.id, model: "agent-model" },
-			reviewer: { provider: provider.provider.id, model: "agent-model" },
-			writer: { provider: provider.provider.id, model: "writer-model" },
-		},
+function gateway(responses: Responses) {
+	return fauxGateway("suiming-write-faux", responses, {
+		main: "agent-model",
+		reviewer: "agent-model",
+		writer: "writer-model",
 	});
 }
 
 const beatOneText =
 	"军杖落到第三十下，黄盖咬住了衣角。他知道曹操的人就在辕门外看着，也知道这顿打少一下都不像真的。\n\n他没有喊。";
 const beatTwoText = "约定那夜，二十艘船一齐点火，借着风冲进曹营。没有人拦得住。";
-
-const call = (name: string, args: JsonObject) => fauxAssistantMessage(fauxToolCall(name, args));
-const reply = (text: string) => fauxAssistantMessage(text);
-async function withProject<T>(body: (project: LocalProjectService, checkoutPath: string) => Promise<T>): Promise<T> {
-	const checkoutPath = await fixture();
-	let project: LocalProjectService | undefined;
-	try {
-		project = await LocalProjectService.init({ checkoutPath, projectId: "project-1" });
-		return await body(project, checkoutPath);
-	} finally {
-		project?.close();
-		await rm(checkoutPath, { recursive: true, force: true });
-	}
-}
-
-/** 作者说一句话并跑完一个 turn；每次新建 session。 */
-async function say(harness: SuimingHarness, text: string) {
-	const session = await harness.createSession();
-	// 收件箱不在 Harness 的端口上（harness 只读 inbox）；测试里的 project 都是 LocalProjectService。
-	(harness.project as LocalProjectService).queueInbox(session.id, text);
-	return { sessionId: session.id, ...(await harness.turn(session.id, {}, (handle) => agentTurn(handle))) };
-}
 
 test("Agent 自己写正文并提交，不需要隔离 Writer；正文时效从提交历史派生", async () => {
 	await withProject(async (project, checkoutPath) => {

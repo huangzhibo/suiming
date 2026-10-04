@@ -1,18 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import {
-	type Context,
-	createModels,
-	fauxAssistantMessage,
-	fauxProvider,
-	fauxToolCall,
-	type JsonObject,
-} from "@earendil-works/pi-ai";
+import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { codePointCount, sliceCodePoints } from "../src/artifact/code-points.js";
-import { agentTurn } from "../src/harness/agent.js";
 import {
 	findInMaterial,
 	materialSegments,
@@ -22,39 +13,21 @@ import {
 } from "../src/harness/material.js";
 import {
 	composeReviewFile,
-	LocalProjectService,
-	ModelGateway,
-	materializeOpenStoryDirectorySnapshot,
+	type LocalProjectService,
+	type ModelGateway,
 	reviewsIn,
 	SuimingHarness,
 	sourceCoverage,
 	storyImpact,
 } from "../src/index.js";
-import { sampleWorkFiles } from "./sample-work.js";
-
-type Responses = Parameters<ReturnType<typeof fauxProvider>["setResponses"]>[0];
-
-async function fixture(): Promise<string> {
-	const root = await mkdtemp(join(tmpdir(), "suiming-engine-source-"));
-	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
-	return root;
-}
+import { call, fauxGateway, lastToolText, type Responses, reply, say, withSampleProject } from "./harness-fixtures.js";
 
 function gateway(responses: Responses): ModelGateway {
-	const provider = fauxProvider({
-		provider: "suiming-source-faux",
-		models: [{ id: "agent-model" }, { id: "reviewer-model" }, { id: "reader-model" }, { id: "extractor-model" }],
-	});
-	provider.setResponses(responses);
-	const models = createModels();
-	models.setProvider(provider.provider);
-	return new ModelGateway(models, {
-		profiles: {
-			main: { provider: provider.provider.id, model: "agent-model" },
-			reviewer: { provider: provider.provider.id, model: "reviewer-model" },
-			"source-reader": { provider: provider.provider.id, model: "reader-model" },
-			"source-extractor": { provider: provider.provider.id, model: "extractor-model" },
-		},
+	return fauxGateway("suiming-source-faux", responses, {
+		main: "agent-model",
+		reviewer: "reviewer-model",
+		"source-reader": "reader-model",
+		"source-extractor": "extractor-model",
 	});
 }
 
@@ -96,41 +69,20 @@ function passReview() {
 	);
 }
 
-async function withProject<T>(body: (project: LocalProjectService, checkoutPath: string) => Promise<T>): Promise<T> {
-	const checkoutPath = await fixture();
-	let project: LocalProjectService | undefined;
-	try {
-		project = await LocalProjectService.init({ checkoutPath, projectId: "project-1" });
-		await project.ingestSource({ sourceId: "访谈", name: "访谈.txt", original: new TextEncoder().encode(material) });
-		return await body(project, checkoutPath);
-	} finally {
-		project?.close();
-		await rm(checkoutPath, { recursive: true, force: true });
-	}
-}
-
-const call = (name: string, args: JsonObject) => fauxAssistantMessage(fauxToolCall(name, args));
-const reply = (text: string) => fauxAssistantMessage(text);
-/** 上一条工具结果的文本；faux provider 的 Context 里工具结果是 toolResult 消息。 */
-function lastToolText(context: Context): string {
-	const last = context.messages.at(-1);
-	assert.equal(last?.role, "toolResult");
-	const content = last?.content;
-	assert.ok(Array.isArray(content));
-	const body = content.find((part) => part.type === "text");
-	assert.ok(body?.type === "text");
-	return body.text;
-}
+/** 样例作品上导入一份「访谈」材料。 */
+const withProject = <T>(body: (project: LocalProjectService, checkoutPath: string) => Promise<T>) =>
+	withSampleProject(body, {
+		prepare: async (project) => {
+			await project.ingestSource({
+				sourceId: "访谈",
+				name: "访谈.txt",
+				original: new TextEncoder().encode(material),
+			});
+		},
+	});
 const note = (sha: string, span: [number, number], handoff: string) =>
 	`---\nspan: [${span[0]}, ${span[1]}]\nmaterial_sha256: ${sha}\n---\n${handoff}\n`;
 
-/** 作者说一句话并跑完一个 turn；每次新建 session。 */
-async function say(harness: SuimingHarness, text: string) {
-	const session = await harness.createSession();
-	// 收件箱不在 Harness 的端口上（harness 只读 inbox）；测试里的 project 都是 LocalProjectService。
-	(harness.project as LocalProjectService).queueInbox(session.id, text);
-	return { sessionId: session.id, ...(await harness.turn(session.id, {}, (handle) => agentTurn(handle))) };
-}
 /** Agent 自己读材料：先问覆盖率拿到材料 sha，读完把笔记写成 source/<id>/notes/1.md。 */
 function reading(): Responses {
 	return [

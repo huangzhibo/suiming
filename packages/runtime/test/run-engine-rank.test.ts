@@ -1,61 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
-import { type Context, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
-import {
-	LocalProjectService,
-	ModelGateway,
-	materializeOpenStoryDirectorySnapshot,
-	runRankExperiment,
-	SuimingHarness,
-	SuimingHarnessError,
-} from "../src/index.js";
-import { sampleWorkFiles } from "./sample-work.js";
+import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
+import { type LocalProjectService, runRankExperiment, SuimingHarness, SuimingHarnessError } from "../src/index.js";
+import { fauxGateway, type Responses, withSampleProject } from "./harness-fixtures.js";
 
-type Responses = Parameters<ReturnType<typeof fauxProvider>["setResponses"]>[0];
-
-function gateway(responses: Responses, judgeModel = "judge-model"): ModelGateway {
-	const provider = fauxProvider({
-		provider: "suiming-rank-faux",
-		models: [{ id: "agent-model" }, { id: "writer-model" }, { id: "judge-model" }],
-	});
-	provider.setResponses(responses);
-	const models = createModels();
-	models.setProvider(provider.provider);
-	return new ModelGateway(models, {
-		profiles: {
-			main: { provider: provider.provider.id, model: "agent-model" },
-			reviewer: { provider: provider.provider.id, model: "agent-model" },
-			writer: { provider: provider.provider.id, model: "writer-model" },
-			judge: { provider: provider.provider.id, model: judgeModel },
-		},
+function gateway(responses: Responses, judgeModel = "judge-model") {
+	return fauxGateway("suiming-rank-faux", responses, {
+		main: "agent-model",
+		reviewer: "agent-model",
+		writer: "writer-model",
+		judge: judgeModel,
 	});
 }
 
-async function withProject<T>(
-	body: (project: LocalProjectService) => Promise<T>,
-	extra: Record<string, string> = {},
-): Promise<T> {
-	const checkoutPath = await mkdtemp(join(tmpdir(), "suiming-engine-rank-"));
-	await materializeOpenStoryDirectorySnapshot(checkoutPath, [
-		...sampleWorkFiles(),
-		...Object.entries(extra).map(([path, text]) => ({
-			path,
-			mediaType: "text/markdown; charset=utf-8",
-			bytes: new TextEncoder().encode(text),
-		})),
-	]);
-	let project: LocalProjectService | undefined;
-	try {
-		project = await LocalProjectService.init({ checkoutPath, projectId: "rank-1" });
-		return await body(project);
-	} finally {
-		project?.close();
-		await rm(checkoutPath, { recursive: true, force: true });
-	}
-}
+const withProject = <T>(body: (project: LocalProjectService) => Promise<T>, extra: Record<string, string> = {}) =>
+	withSampleProject(body, { projectId: "rank-1", extraFiles: extra });
 
 /** 从 prompt 里读出本轮候选的盲标顺序，像评委一样只看到 甲 / 乙。 */
 function userText(context: Context): string {
