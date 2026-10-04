@@ -545,17 +545,16 @@ test("canon ref 丢了（例如 .git 被删）时 open 拒绝，不把没过 Che
 	}
 });
 
-test("Local runtime session 把审稿文件与作品变更原子提交；重开后审稿从版本快照读回并按历史判时效", async () => {
+test("审稿文件与作品变更同一次提交；重开后审稿从版本快照读回并按历史判时效", async () => {
 	const fixture = await createServiceFixture();
 	let service: LocalProjectService | undefined;
 	try {
 		service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
-		const session = await service.openRuntimeSession();
-		const memoryBase = session.memoryRevisionId;
-		const review = composeReviewFile(session.artifacts.snapshotForProject("project-1", memoryBase), {
+		const genesis = service.project().headRevisionId;
+		const review = composeReviewFile(await service.historyReader().snapshot(genesis), {
 			layer: "design",
 			scope: { kind: "book" },
-			revision: memoryBase,
+			revision: genesis,
 			draft: {
 				verdict: "pass",
 				summary: "更新后的 Design 检查通过。",
@@ -564,45 +563,22 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 				uncertainties: [],
 			},
 		});
-		session.artifacts.commit(
-			"project-1",
-			{
-				baseRevisionId: memoryBase,
-				operations: [
-					{
-						operation: "replace",
-						identity: targetArtifactIdentity("character", "黄盖"),
-						path: "world/characters/黄盖.md",
-						mediaType: "text/markdown; charset=utf-8",
-						bytes: encoder.encode(
-							"---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽，并愿意事后认下这顿打。\n",
-						),
-					},
-					{
-						operation: "create",
-						identity: targetArtifactIdentity("review", review.id),
-						path: `review/${review.id}.md`,
-						mediaType: "text/markdown; charset=utf-8",
-						bytes: encoder.encode(review.content),
-					},
-				],
-			},
-			validateStoryProjectCandidate,
+		await writeFile(
+			join(fixture.checkoutPath, "world", "characters", "黄盖.md"),
+			"---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽，并愿意事后认下这顿打。\n",
 		);
+		await mkdir(join(fixture.checkoutPath, "review"), { recursive: true });
+		await writeFile(join(fixture.checkoutPath, review.path), review.content);
 
-		const committed = await service.commitRuntimeSession(session);
+		const committed = await service.commitCheckout();
 		assert.equal(committed.created, true);
-		assert.equal(session.projectRevisionId, committed.revision.id);
-		assert.equal((await service.commitRuntimeSession(session)).created, false);
+		assert.deepEqual(committed.diff.entries.map((entry) => [entry.kind, entry.identity.kind]).sort(), [
+			["added", "review"],
+			["modified", "character"],
+		]);
+		assert.equal((await service.commitCheckout()).created, false);
 		const exported = await service.exportRevision(committed.revision.id);
 		assert.ok(exported.some((file) => file.path === review.path));
-		assert.equal(
-			decoder
-				.decode(await readFile(join(fixture.checkoutPath, "world", "characters", "黄盖.md")))
-				.includes("这顿打"),
-			true,
-		);
-		assert.equal(await readFile(join(fixture.checkoutPath, review.path), "utf8"), review.content);
 
 		service.close();
 		service = await LocalProjectService.open(fixture.checkoutPath);
@@ -612,13 +588,13 @@ test("Local runtime session 把审稿文件与作品变更原子提交；重开�
 		const restored = reviewsIn(candidate);
 		assert.deepEqual(
 			restored.map((item) => [item.id, item.file.draft.verdict, item.file.revision]),
-			[[review.id, "pass", memoryBase]],
+			[[review.id, "pass", genesis]],
 		);
-		// 审的是 memoryBase，head 多了一次 Design 修改：审稿已 stale，changed 点名是哪个文件。
+		// 审的是 genesis，head 多了一次 Design 修改：审稿已 stale，changed 点名是哪个文件。
 		assert.deepEqual(await reviewCurrency(reader, head, candidate, restored[0] as never), {
 			state: "stale",
 			changed: ["world/characters/黄盖.md"],
-			revision: memoryBase,
+			revision: genesis,
 		});
 	} finally {
 		service?.close();

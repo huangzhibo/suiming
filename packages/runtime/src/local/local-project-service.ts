@@ -18,8 +18,8 @@ import {
 	unrecognizedPaths,
 } from "../artifact/open-story-directory.js";
 import { validateOpenStoryFiles } from "../artifact/open-story-validation.js";
-import { ProjectRuntimeSession } from "../artifact/project-runtime-session.js";
-import { type IngestSourceInput, ingestSource } from "../artifact/source-ingest.js";
+import { type IngestSourceInput, sourceIngestChangeSet } from "../artifact/source-ingest.js";
+import { type InspectedSource, inspectStorySourcesCandidate } from "../artifact/source-validator.js";
 import { type InspectedStoryProject, validateStoryProjectCandidate } from "../artifact/story-design-validator.js";
 import { storyPackageCodec } from "../artifact/story-package-codec.js";
 import { type StorySearchRequest, type StorySearchResult, searchStoryCandidate } from "../artifact/story-search.js";
@@ -107,18 +107,9 @@ export interface LocalProjectCommitResult {
 	diff: LocalProjectDiff;
 }
 
-export interface LocalRuntimeSessionCommitResult {
-	created: boolean;
+export interface LocalProjectSourceIngestResult {
 	revision: ProjectRevision;
-}
-
-export type LocalProjectSourceIngestInput = Omit<
-	IngestSourceInput,
-	"artifactStore" | "projectId" | "projectRevisionId"
->;
-
-export interface LocalProjectSourceIngestResult extends LocalRuntimeSessionCommitResult {
-	source: ReturnType<typeof ingestSource>["source"];
+	source: InspectedSource;
 }
 
 export interface LocalRevisionFileSide {
@@ -640,26 +631,17 @@ export class LocalProjectService {
 		return this.#store.readSessionEvents(sessionId, afterSequence);
 	}
 
-	async openRuntimeSession(requested?: string): Promise<ProjectRuntimeSession> {
+	/** 导入原作是系统生成的 ChangeSet：要求 checkout 干净，过 Checker 才成为新版本。 */
+	async ingestSource(input: IngestSourceInput): Promise<LocalProjectSourceIngestResult> {
 		this.#requireOpen();
-		const revisionId = requested ?? (await this.refreshHead());
-		return new ProjectRuntimeSession({
-			projectId: this.projectId,
-			projectRevisionId: revisionId,
-			files: await this.#filesForRevision(revisionId),
-		});
-	}
-
-	async ingestSource(input: LocalProjectSourceIngestInput): Promise<LocalProjectSourceIngestResult> {
-		const session = await this.openRuntimeSession();
-		const ingested = ingestSource({
-			...input,
-			artifactStore: session.artifacts,
-			projectId: this.projectId,
-			projectRevisionId: session.memoryRevisionId,
-		});
-		const committed = await this.commitRuntimeSession(session);
-		return { ...committed, source: ingested.source };
+		const base = await this.#canon.snapshotForProject(this.projectId, await this.refreshHead());
+		const revision = await this.commitManagedChangeSet(sourceIngestChangeSet(base, input));
+		const source = inspectStorySourcesCandidate(
+			await this.#canon.snapshotForProject(this.projectId, revision.id),
+		).find((item) => item.sourceId === input.sourceId);
+		if (source === undefined)
+			throw new ArtifactError("source_not_found", `Source not found after ingest: ${input.sourceId}`);
+		return { revision, source };
 	}
 
 	async recoverCommittedAction(commandId: string): Promise<ProjectRevision | undefined> {
@@ -680,46 +662,6 @@ export class LocalProjectService {
 		} finally {
 			await lock.release();
 		}
-	}
-
-	async commitRuntimeSession(session: ProjectRuntimeSession): Promise<LocalRuntimeSessionCommitResult> {
-		this.#requireOpen();
-		if (session.projectId !== this.projectId) {
-			throw new ArtifactError(
-				"project_mismatch",
-				`Runtime session belongs to ${session.projectId}, not ${this.projectId}`,
-			);
-		}
-		const localBaseRevisionId = session.projectRevisionId;
-		if ((await this.refreshHead()) !== localBaseRevisionId) {
-			throw new ArtifactError(
-				"revision_conflict",
-				`Runtime session is based on ${localBaseRevisionId}; Project head has changed`,
-			);
-		}
-		const files = session.exportFiles();
-		validateOpenStoryFiles(files);
-		const next: ArtifactCandidate = {
-			baseRevisionId: localBaseRevisionId,
-			artifacts: files.map((file) => ({
-				identity: storyPackageCodec.identityForPath(file.path),
-				path: file.path,
-				mediaType: file.mediaType,
-				bytes: copyBytes(file.bytes),
-			})),
-		};
-		validateStoryProjectCandidate(next);
-		const base = await this.#canon.snapshotForProject(this.projectId, localBaseRevisionId);
-		const operations = changeOperationsBetween(base, next);
-		if (operations.length === 0) {
-			return {
-				created: false,
-				revision: await this.#canon.readProjectRevision(this.projectId, localBaseRevisionId),
-			};
-		}
-		const revision = await this.commitManagedChangeSet({ baseRevisionId: localBaseRevisionId, operations });
-		session.advanceProjectRevision(localBaseRevisionId, revision.id);
-		return { created: true, revision };
 	}
 
 	async #buildCheckoutCandidate(): Promise<BuiltCheckoutCandidate> {

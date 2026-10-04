@@ -131,8 +131,7 @@ test("委派的 writer 只能改自己的 Beat；越界写是回到它手里的�
 			assert.equal(outcome.failure, undefined);
 		}
 		assert.ok((writerPrompts[1] ?? "").includes(beatOneText), "第二个 Beat 的 Write Context 带前文");
-		const session = await project.openRuntimeSession();
-		const candidate = session.artifacts.snapshot(session.memoryRevisionId);
+		const candidate = await project.historyReader().snapshot(await project.refreshHead());
 		assert.ok(compileWriteContext(candidate, "beat-0002").text.includes(beatOneText));
 		assert.equal(await readFile(join(checkoutPath, "text/beat-0002.md"), "utf8"), beatTwoText);
 		assert.deepEqual(

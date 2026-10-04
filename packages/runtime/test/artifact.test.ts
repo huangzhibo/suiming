@@ -12,13 +12,13 @@ import {
 	exportOpenPackage,
 	InMemoryArtifactStore,
 	importOpenPackage,
-	ingestSource,
 	inspectStoryDesignCandidate,
 	inspectStorySourcesCandidate,
 	materializeOpenStoryDirectorySnapshot,
 	type OpenPackageFile,
 	OpenStoryDirectoryCache,
 	readOpenStoryDirectory,
+	sourceIngestChangeSet,
 	storyPackageCodec,
 	targetArtifactIdentity,
 	unrecognizedPaths,
@@ -529,18 +529,20 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 		validateStoryProjectCandidate,
 	);
 	const original = encoder.encode("访谈记录：黄盖先核对火船。\n");
-	const ingested = ingestSource({
-		artifactStore: store,
-		projectId: "project-1",
-		projectRevisionId: base.id,
-		sourceId: "访谈",
-		name: "访谈.txt",
-		original,
-		encoding: "utf-8",
-	});
-	assert.equal(ingested.source.state, "ingested");
-	assert.equal(ingested.source.materialCodePoints, [...decoder.decode(original)].length);
-	const candidate = store.snapshotForProject("project-1", ingested.revision.id);
+	const revision = store.commit(
+		"project-1",
+		sourceIngestChangeSet(store.snapshotForProject("project-1", base.id), {
+			sourceId: "访谈",
+			name: "访谈.txt",
+			original,
+			encoding: "utf-8",
+		}),
+		validateStoryProjectCandidate,
+	);
+	const candidate = store.snapshotForProject("project-1", revision.id);
+	const source = inspectStorySourcesCandidate(candidate).find((item) => item.sourceId === "访谈");
+	assert.equal(source?.state, "ingested");
+	assert.equal(source?.materialCodePoints, [...decoder.decode(original)].length);
 	assert.deepEqual(
 		candidate.artifacts.find(
 			(artifact) =>
@@ -563,10 +565,7 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 	);
 	assert.throws(
 		() =>
-			ingestSource({
-				artifactStore: store,
-				projectId: "project-1",
-				projectRevisionId: ingested.revision.id,
+			sourceIngestChangeSet(candidate, {
 				sourceId: "访谈",
 				name: "覆盖.txt",
 				original: encoder.encode("不能覆盖。"),
@@ -575,10 +574,7 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 	);
 	assert.throws(
 		() =>
-			ingestSource({
-				artifactStore: store,
-				projectId: "project-1",
-				projectRevisionId: ingested.revision.id,
+			sourceIngestChangeSet(candidate, {
 				sourceId: "坏编码",
 				name: "broken.txt",
 				original: new Uint8Array([0xff, 0xfe, 0xff]),
@@ -586,7 +582,7 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 			}),
 		(error: unknown) => error instanceof ArtifactError && error.code === "invalid_source_encoding",
 	);
-	assert.equal(store.headRevisionId("project-1"), ingested.revision.id);
+	assert.equal(store.headRevisionId("project-1"), revision.id);
 });
 
 test("ProjectRevision 不能跨项目读取或提交", () => {

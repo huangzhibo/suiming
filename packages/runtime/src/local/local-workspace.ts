@@ -387,13 +387,13 @@ export class LocalWorkspace implements LocalCommandClient {
 			case "workspace.context": {
 				const args = input as LocalCommandInput<"workspace.context">;
 				const task = parseHostContextTask(args.task);
-				const session = await project.openRuntimeSession(args.revisionId);
-				const candidate = session.artifacts.snapshot(session.memoryRevisionId);
+				const revisionId = args.revisionId ?? (await project.refreshHead());
+				const candidate = await project.historyReader().snapshot(revisionId);
 				if (task.kind === "design-view") {
 					const view = compileDesignViewContext(candidate, task.view);
 					return {
 						text: view.text,
-						revisionId: session.memoryRevisionId,
+						revisionId,
 						paths: view.artifacts.map((artifact) =>
 							storyPackageCodec.pathForIdentity(artifact.identity, candidate),
 						),
@@ -403,7 +403,7 @@ export class LocalWorkspace implements LocalCommandClient {
 					const context = compileWriteContext(candidate, task.storyBeatId);
 					return {
 						text: context.text,
-						revisionId: session.memoryRevisionId,
+						revisionId,
 						paths: context.artifacts.map((identity) => storyPackageCodec.pathForIdentity(identity, candidate)),
 					};
 				}

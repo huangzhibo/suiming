@@ -73,15 +73,13 @@ export {
 	openStoryFilesFromCandidate,
 } from "./artifact/open-story-snapshot.js";
 export { validateOpenStoryFiles } from "./artifact/open-story-validation.js";
-export type { ProjectRuntimeSessionOptions } from "./artifact/project-runtime-session.js";
-export { ProjectRuntimeSession } from "./artifact/project-runtime-session.js";
 export type { PublishReleaseInput, PublishReleaseResult, ReleaseStatus } from "./artifact/release-service.js";
 export { inspectRelease, publishRelease } from "./artifact/release-service.js";
 export { validateReleaseArtifactsCandidate } from "./artifact/release-validator.js";
 export { type ComposedReview, type ComposeReviewInput, composeReviewFile } from "./artifact/review-authoring.js";
 export { commitResult, revisionSummary, rollbackResult } from "./artifact/revision-summary.js";
-export type { IngestSourceInput, IngestSourceResult } from "./artifact/source-ingest.js";
-export { ingestSource, SOURCE_ENCODINGS } from "./artifact/source-ingest.js";
+export type { IngestSourceInput } from "./artifact/source-ingest.js";
+export { SOURCE_ENCODINGS, sourceIngestChangeSet } from "./artifact/source-ingest.js";
 export type { SourceMaterialView } from "./artifact/source-material.js";
 export { sourceMaterialFromCandidate } from "./artifact/source-material.js";
 export type { InspectedSource } from "./artifact/source-validator.js";
@@ -229,11 +227,9 @@ export type {
 	LocalProjectDiffSide,
 	LocalProjectPaths,
 	LocalProjectRollbackResult,
-	LocalProjectSourceIngestInput,
 	LocalProjectSourceIngestResult,
 	LocalRevisionFileChange,
 	LocalRevisionFileSide,
-	LocalRuntimeSessionCommitResult,
 } from "./local/local-project-service.js";
 export { LocalProjectService } from "./local/local-project-service.js";
 export type {

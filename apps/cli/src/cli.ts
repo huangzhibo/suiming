@@ -905,8 +905,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 		.action(async () => {
 			await execute("source.list", () =>
 				withProject(projectPath(program), async (service) => {
-					const session = await service.openRuntimeSession();
-					const candidate = session.artifacts.snapshotForProject(service.projectId, session.memoryRevisionId);
+					const candidate = await service.historyReader().snapshot(await service.refreshHead());
 					const sources = inspectStorySourcesCandidate(candidate).map((item) =>
 						sourceSummaryData(item, sourceCoverage(candidate, item.sourceId)),
 					);
