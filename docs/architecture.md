@@ -139,7 +139,7 @@ Story Search 是正式的发现能力，也是**唯一的搜索函数**：Agent 
 
 ### 6.4 执行状态与恢复
 
-只有两种实体：`Session` 是根 Agent，`Task` 是有目标和输入契约的子智能体；turn 不是实体。它们的语义、三态生命周期、inbox、lease、三种 `paused` 与按 turn 冻结的绑定见 [Harness 设计](harness-design.md)第 2–4、10 节；创作路径没有预算，只记用量（同上第 10 节）。
+只有两种实体：`Session` 是根 Agent，`Task` 是有目标和输入契约的子智能体；turn 不是实体。它们的语义、三态生命周期、inbox、lease、三种 `paused` 与按 turn 冻结的绑定见 [Harness 设计](harness-design.md)第 2–4、10 节；创作路径没有预算，只记用量，另有每轮用量检查点（同上第 10 节）。
 
 调用前保存决定与预期输入；子结果校验、写入执行对象并确认完成后，父调用才消费。大正文与报告通过引用回读（`read_result`），不让主模型转录完整结果。执行消息复用 pi-ai 类型并保存在执行存储，Langfuse 和 UI transcript 不承担恢复真源。
 

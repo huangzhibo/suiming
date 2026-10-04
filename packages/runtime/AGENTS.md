@@ -21,7 +21,7 @@
 
 ## Harness 与执行
 
-- 不要凭直觉给写作定按次的小上限：DeepSeek V4 Flash 每次只吐两三千字，一万多字的正文要 write 四五次、每次后跟一个 check（2026-09-06 按作者意见重写 beat-0004 时，当时 Writer 的 8 次上限在 submit 前耗尽，$0.037 白花）。契约里已写明可以多次 write 覆盖、check 只跑一次；也不要在工具层禁止多次 write。创作路径本来就没有预算，见 [Harness 设计](../../docs/harness-design.md)第 10 节。
+- 不要凭直觉给写作定按次的小上限：DeepSeek V4 Flash 每次只吐两三千字，一万多字的正文要 write 四五次、每次后跟一个 check（2026-09-06 按作者意见重写 beat-0004 时，当时 Writer 的 8 次上限在 submit 前耗尽，$0.037 白花）。契约里已写明可以多次 write 覆盖、check 只跑一次；也不要在工具层禁止多次 write。创作路径本来就没有按次上限（只有与次数无关的每轮用量检查点），见 [Harness 设计](../../docs/harness-design.md)第 10 节。
 - 会话开场与非 writer 子任务的初始 Context 是 `packages/runtime/src/artifact/design-frame.ts` 的 Frame（ADR-0008 决定 3，种子为空；设计视图与 rank 按 Beat 播种）：Design 超过 `DESIGN_FRAME_FULL_RENDER_CODE_POINTS`（2.4 万码点，占位值，真实长篇上实测调）才裁剪，否则全量。委派的 writer 拿的是 Write Context，不是 Frame。全书 Design Review 与 host 的 `context compile design` 仍是完整 Design，不要为了省 token 再去裁它。全书 Intent 与 world/core 作 seed 不扩散；非 Beat seed 涉及的 Beat 受 `DESIGN_FRAME_EXTRA_BEAT_CODE_POINTS` 预算，也是占位值。以后若要拿检索命中作 seeds，先滤掉常用词：长目标里的常用词会命中全书，eval-022 实测未过滤时 Frame 比全量还大（当时的过滤函数 `subjectsForSearchHits` 随固定配方失去调用点，代码随后删除）。
 - 上下文清理只改请求投影，不改 `state.messages` 与 checkpoint，阈值与步骤见 [Harness 设计](../../docs/harness-design.md)第 7 节「窗口保护」。不要把它改成直接删消息；改之前会话会卡死在同一次溢出上，`context-window.test.ts` 四条守着。
 - 没有 per-session worktree，理由与三个后果见 [Harness 设计](../../docs/harness-design.md)第 2 节，host 接入目录对模型不可见见第 6 节。改这一带时：不要为了「干净」给 `commit` 的 `ignored` 加白名单；新加 host 时 `ConfinedExecutionEnv` 的 `HOST_ADAPTER_ROOTS` 要跟上，`cli.test.ts` 核对；要并行就给 session 配可选工作目录，接口位置是 `HarnessSession.checkoutPath`。

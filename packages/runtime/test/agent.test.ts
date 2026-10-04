@@ -5,8 +5,10 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	createModels,
+	type FauxModelDefinition,
 	fauxAssistantMessage,
 	fauxProvider,
+	fauxText,
 	fauxToolCall,
 	type JsonObject,
 	Type,
@@ -30,11 +32,18 @@ import { sampleWorkFiles } from "./sample-work.js";
 
 const CHECKPOINT_MEDIA_TYPE = "application/vnd.suiming.harness-checkpoint+json";
 
-async function fixture(telemetryContext?: TelemetryContext) {
+async function fixture(
+	options: {
+		telemetryContext?: TelemetryContext;
+		models?: FauxModelDefinition[];
+		turnSpendCheckpointUsd?: number;
+	} = {},
+) {
+	const { telemetryContext } = options;
 	const root = await mkdtemp(join(tmpdir(), "suiming-agent-"));
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	const project = await LocalProjectService.init({ checkoutPath: root, projectId: "project-agent" });
-	const provider = fauxProvider({ provider: "agent-test" });
+	const provider = fauxProvider({ provider: "agent-test", ...(options.models ? { models: options.models } : {}) });
 	const alternate = fauxProvider({ provider: "agent-alternate" });
 	const models = createModels();
 	models.setProvider(provider.provider);
@@ -43,6 +52,9 @@ async function fixture(telemetryContext?: TelemetryContext) {
 	const gateway = new ModelGateway(models, { profiles: { main: profile, reviewer: profile } });
 	const harness = new SuimingHarness({
 		...(telemetryContext ? { telemetryContext } : {}),
+		...(options.turnSpendCheckpointUsd === undefined
+			? {}
+			: { turnSpendCheckpointUsd: options.turnSpendCheckpointUsd }),
 		project,
 		models: gateway,
 	});
@@ -389,6 +401,98 @@ test("连续重复同一被拒绝动作：turn 以 run_no_progress 结束回 idl
 		const next = await f.say("停止寻找不存在的工具，给出已有分析", stuck.sessionId);
 		assert.equal(next.failure, undefined);
 		assert.equal(next.session.lastFailure, undefined);
+		assert.equal(f.provider.state.callCount, 4);
+	} finally {
+		await f.close();
+	}
+});
+
+test("连续五次回复的动作都被拒绝、每次都不一样：同样以 run_no_progress 结束，不等它换着花样一直试", async () => {
+	const f = await fixture();
+	try {
+		f.provider.setResponses([
+			...["甲", "乙", "丙", "丁", "戊"].map((word) =>
+				call("edit", { path: "world/characters/黄盖.md", oldText: `不存在的原文${word}`, newText: "改过" }),
+			),
+			reply("不该发出：已经连续五次被拒"),
+		]);
+		const stuck = await f.say("改黄盖");
+		assert.equal(stuck.failure?.code, "run_no_progress");
+		assert.equal(stuck.session.status, "idle");
+		assert.equal(f.provider.state.callCount, 5);
+	} finally {
+		await f.close();
+	}
+});
+
+/** 只按输出计价，每个输出 token $0.001：一次请求花多少由回复本身的长短决定，测试里算得准。 */
+const PRICED_MODEL: FauxModelDefinition = {
+	id: "priced",
+	cost: { input: 0, output: 1_000, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+};
+/** 4 万字符的回复按 1 万个输出 token 计，约 $10。 */
+const expensive = (toolCall: ReturnType<typeof fauxToolCall>) =>
+	fauxAssistantMessage([fauxText("x".repeat(40_000)), toolCall]);
+
+test("一轮的估算花费到用量检查点：下一次请求之前停下回 idle 并说明花了多少；作者说继续就接着跑", async () => {
+	// 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92，没有任何东西停住它们。
+	const f = await fixture({ models: [PRICED_MODEL], turnSpendCheckpointUsd: 5 });
+	try {
+		f.provider.setResponses([expensive(fauxToolCall("project_status", {})), reply("不该发出的第二次请求")]);
+		const stopped = await f.say("看看作品状态，然后一直做下去");
+		assert.equal(stopped.session.status, "idle");
+		assert.equal(stopped.failure?.code, "turn_spend_checkpoint");
+		assert.match(stopped.failure?.message ?? "", /\$10\.\d{2}/u, "说清这一轮估算花了多少");
+		assert.match(stopped.failure?.message ?? "", /继续/u);
+		assert.equal(f.provider.state.callCount, 1, "到线之后一个请求也不再发");
+		f.provider.setResponses([
+			async (context) => {
+				const encoded = JSON.stringify(context.messages);
+				assert.match(encoded, /committedRevisionCount/u, "停下之前的工具结果还在消息列表里");
+				assert.match(encoded, /继续/u);
+				return reply("接着做完了");
+			},
+		]);
+		const next = await f.say("继续", stopped.sessionId);
+		assert.equal(next.failure, undefined);
+		assert.equal(next.session.lastFailure, undefined);
+		assert.equal(f.provider.state.callCount, 2);
+	} finally {
+		await f.close();
+	}
+});
+
+test("用量检查点落在子任务里：根与子任务合计；子任务不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
+	const f = await fixture({ models: [PRICED_MODEL], turnSpendCheckpointUsd: 5 });
+	try {
+		f.provider.setResponses([
+			call("delegate", { goal: "读黄盖的人物档后交付", profile: "main" }),
+			expensive(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+			reply("不该发出：子任务已到用量检查点"),
+		]);
+		const stopped = await f.say("让子任务看看黄盖");
+		assert.equal(stopped.failure?.code, "turn_spend_checkpoint");
+		assert.equal(f.provider.state.callCount, 2);
+		const [task] = f.project.loadExecutionState().tasks;
+		assert.equal(task?.status, "interrupted", "不是子任务失败：父模型收到失败会重派一个，从头再花一遍");
+		f.provider.setResponses([
+			async (context) => {
+				assert.match(JSON.stringify(context.messages), /name: 黄盖/u, "子任务停下之前读到的内容还在");
+				return call("submit_task", { summary: "黄盖的人物档读过了" });
+			},
+			async (context) => {
+				const encoded = JSON.stringify(context.messages);
+				assert.match(encoded, /黄盖的人物档读过了/u);
+				assert.match(encoded, /继续/u);
+				return reply("子任务交付了");
+			},
+		]);
+		const next = await f.say("继续", stopped.sessionId);
+		assert.equal(next.failure, undefined);
+		const tasks = f.project.loadExecutionState().tasks;
+		assert.equal(tasks.length, 1, "续跑的是同一个子任务，不是重派一个");
+		assert.equal(tasks[0]?.status, "completed");
 		assert.equal(f.provider.state.callCount, 4);
 	} finally {
 		await f.close();
@@ -1068,7 +1172,7 @@ test("委派观测归属 turn；工具 / Checker 带同一 session 关联", asyn
 	const { createOpenTelemetry } = await import("../src/index.js");
 	const exporter = new InMemorySpanExporter();
 	const telemetry = createOpenTelemetry({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
-	const f = await fixture(telemetry.context);
+	const f = await fixture({ telemetryContext: telemetry.context });
 	try {
 		f.provider.setResponses([
 			call("write", { path: "intent/计谋的代价.md", content: "每次选择都有不可逆的代价。" }),

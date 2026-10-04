@@ -25,7 +25,7 @@
 | Cloud Object | S3-compatible API；开发环境 MinIO | 大 artifact（如 Source 原文）与导出包 |
 | 界面事件 | AG-UI 标准事件 + 类型化 Suiming 扩展；已替换旧事件词汇 | 一份持久事件契约，经进程内 subscription 与桌面 IPC 消费；不长期双写两套协议 |
 | Model | `@earendil-works/pi-ai` | 多 provider 调用、tool calling、structured output 与 streaming |
-| Agent Harness | Suiming 自行实现，参考 pi-agent-core 逻辑 | 唯一模型 / 工具循环、持久动作、交接、控制与恢复；pi-agent-core 依赖已删除，没有预算（[Harness 设计](harness-design.md)第 10 节） |
+| Agent Harness | Suiming 自行实现，参考 pi-agent-core 逻辑 | 唯一模型 / 工具循环、持久动作、交接、控制与恢复；pi-agent-core 依赖已删除，没有预算，有每轮用量检查点（[Harness 设计](harness-design.md)第 10 节） |
 | Telemetry | OpenTelemetry；Langfuse 可选 | 模型与工具 trace、成本、延迟和辅助评分 |
 | Test | Node.js test runner + `tsx`；Playwright 驱动真实 Electron | 领域与恢复测试、桌面 E2E 与真实创作验收 |
 | Quality | Biome + TypeScript | 格式、lint 与类型检查 |

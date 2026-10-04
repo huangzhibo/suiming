@@ -39,7 +39,19 @@ export interface SuimingHarnessOptions {
 	/** turn / Task span 的根；模型调用 span 挂在它们下面。缺省 NOOP。 */
 	telemetryContext?: TelemetryContext;
 	now?: () => Date;
+	/** 每轮用量检查点（美元，按模型目录价估算）；缺省 TURN_SPEND_CHECKPOINT_USD。 */
+	turnSpendCheckpointUsd?: number;
 }
+
+/**
+ * 每轮用量检查点：一个 turn 里根 Agent 与它的全部子任务按模型目录价估算的花费合计到这里，下一次请求之前停下，
+ * 回 idle 并说明花了多少，作者说一句「继续」就从原处接着跑（子任务从自己的 checkpoint 续）。不是预算：不砍掉
+ * 任何产出，也不替作者判断值不值，只保证没人看着时一轮最多花掉这么多。
+ * 2026-10-04 抽三国时 5 个补全子任务在压缩里空转 19 分钟、估算 $92，没有任何东西停住它们；那个循环修掉了，
+ * 但循环长什么样事先列不全，兜底必须与循环的形状无关。$10 的依据：实测最重的合法单轮是斗破 120 章整本抽取，
+ * 387 次调用 $14.99，撞线一次；普通的写一节、审一轮都在 $1 以内。目录价为 0 的模型不触发——它不花钱。
+ */
+export const TURN_SPEND_CHECKPOINT_USD = 10;
 
 function usageAttributes(prefix: string, usage: ModelUsage): Record<string, number> {
 	return {
@@ -182,6 +194,8 @@ export class HarnessSession {
 	#telemetry: TelemetryContext;
 	#lastReply = "";
 	#revisions = 0;
+	/** 本 turn 里根与全部子任务已确认的估算花费；用量检查点看它。 */
+	#spentUsd = 0;
 	constructor(
 		engine: SuimingHarness,
 		input: {
@@ -273,6 +287,16 @@ export class HarnessSession {
 		this.events.assertWritable();
 		if (this.#signal?.aborted === true)
 			throw new SuimingHarnessError("run_interrupted", reasonText(this.#signal, "turn 已被作者打断"));
+	}
+
+	/** 每次模型请求之前：本 turn 的估算花费到了检查点就不再发。在途的请求照常收完，超出的只有它们。 */
+	#throwIfSpendCheckpoint(): void {
+		const limit = this.#engine.turnSpendCheckpointUsd;
+		if (this.#spentUsd < limit) return;
+		throw new SuimingHarnessError(
+			"turn_spend_checkpoint",
+			`这一轮按模型目录价估算已用 $${this.#spentUsd.toFixed(2)}，到了每轮 $${limit} 的用量检查点，先停在这里。进度都保留着，说一句「继续」就从原处接着做。`,
+		);
 	}
 
 	/** inbox 里还没进消息列表的作者消息。 */
@@ -457,9 +481,15 @@ export class HarnessSession {
 					}),
 			});
 		} catch (error) {
-			// 打断与持久化故障留给 turn 收口；其余是这个子任务自己的失败，记在它身上，由父模型决定下一步。
+			// 打断、用量检查点与持久化故障留给 turn 收口（turn 结束时子任务标 interrupted，续跑接着来）；
+			// 其余是这个子任务自己的失败，记在它身上，由父模型决定下一步。
 			const code = executionFailure(error).code;
-			if (code !== "run_interrupted" && !PAUSE_CODES.has(code) && this.#writable()) {
+			if (
+				code !== "run_interrupted" &&
+				code !== "turn_spend_checkpoint" &&
+				!PAUSE_CODES.has(code) &&
+				this.#writable()
+			) {
 				this.#execution.failTask({
 					commandId: `${taskId}:fail:${this.#execution.task(taskId).version}`,
 					taskId,
@@ -584,8 +614,12 @@ export class HarnessSession {
 			telemetryContext: input.telemetry,
 			onTurnStart: () => {
 				this.throwIfInterrupted();
+				this.#throwIfSpendCheckpoint();
 			},
-			onModelCall: (usage, callId) => input.recordUsage(callId, usage),
+			onModelCall: (usage, callId) => {
+				input.recordUsage(callId, usage);
+				if (Number.isFinite(usage.costUsd)) this.#spentUsd += usage.costUsd;
+			},
 			...(input.steering
 				? {
 						steering: () => this.#engine.project.readInbox(this.sessionId),
@@ -735,6 +769,7 @@ export class SuimingHarness {
 	readonly telemetry: TelemetryContext;
 	readonly #models: ModelGateway;
 	readonly now: () => Date;
+	readonly turnSpendCheckpointUsd: number;
 
 	constructor(options: SuimingHarnessOptions) {
 		this.project = options.project;
@@ -742,6 +777,7 @@ export class SuimingHarness {
 		this.telemetry = options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT;
 		this.#models = options.models;
 		this.now = options.now ?? (() => new Date());
+		this.turnSpendCheckpointUsd = options.turnSpendCheckpointUsd ?? TURN_SPEND_CHECKPOINT_USD;
 	}
 
 	bindModel(profileId: ModelProfileId, snapshot?: ModelBindingSnapshot): Promise<BoundModelProfile> {

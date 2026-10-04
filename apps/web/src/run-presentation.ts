@@ -20,7 +20,11 @@ export function sessionProblem(session: SessionSummary) {
 		},
 		action_effect_unknown: { title: "有一个动作停在半途", hint: "查看原因后继续，已保存的结果不会重复执行。" },
 		binding_mismatch: { title: "模型或工具面已变化", hint: "换回原来的模型继续，或停止后再换。" },
-		run_no_progress: { title: "需要调整方向", hint: "模型重复了相同的无效动作。在输入框补充要求后继续。" },
+		run_no_progress: { title: "需要调整方向", hint: "模型接连做了被拒绝的动作。在输入框补充要求后继续。" },
+		turn_spend_checkpoint: {
+			title: "到了这一轮的用量检查点",
+			hint: "进度与子任务都已保存。发一条消息（比如「继续」）就从原处接着做。",
+		},
 		process_restart: { title: "上次没有正常结束", hint: "进度已保存，发一条消息即可继续。" },
 		model_provider_disabled: { title: "提供商已停用", hint: "在设置中启用此提供商，或选择其他模型。已有凭据保留。" },
 		model_credentials_missing: { title: "提供商连接不可用", hint: "从输入框的模型菜单打开设置，重新连接提供商。" },

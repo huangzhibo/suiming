@@ -68,6 +68,8 @@ export interface LoopCheckpoint {
 	/** 这一次请求因瞬时失败已重发了几次；拿到正常响应就清掉。 */
 	transientRetries?: number;
 	rejected?: { fingerprint: string; count: number };
+	/** 连续几次回复里的动作全被拒绝（不论是不是同一个）；有动作成功或作者插话就清零。 */
+	rejectedStreak?: number;
 	/** 子任务连续停下却没有调用交付工具的次数，随 checkpoint 续跑保留。 */
 	unsubmittedStops?: number;
 	phase: "ready" | "model_pending" | "tools" | "settled";
@@ -120,6 +122,11 @@ export interface TaskLoopOutcome {
  * 2026-10-02 之前一次 `terminated` 就结束整个 turn，长时间的自主运行停在半路等作者说一句「继续」。
  */
 const TRANSIENT_RETRY = { maxRetries: 5, baseDelayMs: 2_000, maxDelayMs: 30_000 };
+/**
+ * 进展型兜底的第二道：同一个被拒动作连续三次之外，换着花样被拒（每次参数不同）连续这么多次回复也停。
+ * 一次回复里只要有一个动作成功就不算；正常的试错——改错了、读一下、再改——中间总有成功的读。
+ */
+const NO_PROGRESS_STREAK = 5;
 function interruptedError(signal: AbortSignal | undefined): SuimingHarnessError {
 	const reason = signal?.reason;
 	return new SuimingHarnessError(
@@ -374,6 +381,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			});
 			state.steeringSequence = item.sequence;
 			delete state.rejected;
+			delete state.rejectedStreak;
 			delete state.unsubmittedStops;
 			await save();
 			options.onSteer?.(item.text, item.sequence);
@@ -792,6 +800,9 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				continue mainLoop;
 			}
 		}
+		if (actions.length > 0 && actions.every((action) => action.message?.isError)) {
+			state.rejectedStreak = (state.rejectedStreak ?? 0) + 1;
+		} else if (actions.length > 0) delete state.rejectedStreak;
 		const steeringCount = await pullSteering();
 		if (actions.length === 0 && steeringCount === 0) {
 			if (state.turns >= options.budget.maxTurns) return finish("budget_exhausted");
@@ -819,5 +830,10 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		await save();
 		if ((state.rejected?.count ?? 0) >= 3)
 			throw new SuimingHarnessError("run_no_progress", "连续重复同一被拒绝的动作，已保留进度。请补充方向后继续。");
+		if ((state.rejectedStreak ?? 0) >= NO_PROGRESS_STREAK)
+			throw new SuimingHarnessError(
+				"run_no_progress",
+				`连续 ${NO_PROGRESS_STREAK} 次回复里的动作都被拒绝，已保留进度。请补充方向后继续。`,
+			);
 	}
 }

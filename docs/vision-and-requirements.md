@@ -94,7 +94,7 @@ Story Artifact 与 Story Language 是作品语义真源；机器 schema 必须�
 
 一个 Session 只有一个根 Agent，负责理解这一轮要解决什么、选择动作、在 checkout 上修改并阶段提交。它可以直接执行，也可以把独立任务委派给 Worker；没有固定创作顺序，计划写在消息里而不是实体，作者不需要操作 DAG。Worker 只处理 task-local 输入，不能直接提交 Canon，所有候选由 Agent 收敛。子任务结果交付成功不代表判断正确或适用于新稿，采用前仍要核对输入与正文 / 审稿时效。Session、Task 与 Worker 的准确语义见 [Harness 设计](harness-design.md)。
 
-turn 结束不表示作者的目标达成，达成与否由作者看作品定。未提交的候选留在 checkout，Agent 在回复里说明哪些改了还没提交，这一轮采用的长期结论写回作品或在回复里点名。只有结果未知、或续跑时模型与工具面和 checkpoint 对不上时才停下等作者，其余失败说明原因，作者再发一条消息就能继续。没有预算，理由与代价见 [Harness 设计](harness-design.md)第 10 节。
+turn 结束不表示作者的目标达成，达成与否由作者看作品定。未提交的候选留在 checkout，Agent 在回复里说明哪些改了还没提交，这一轮采用的长期结论写回作品或在回复里点名。只有结果未知、或续跑时模型与工具面和 checkpoint 对不上时才停下等作者，其余失败说明原因，作者再发一条消息就能继续。没有预算，只有每轮用量检查点：一轮估算花费到线就停下，作者说一句继续就接着做；理由与代价见 [Harness 设计](harness-design.md)第 10 节。
 
 host-native coding agent 的私有会话不伪装成 Suiming Session。它直接形成文件候选并通过本地提交边界接纳，因此共享 Story 正确性与版本事务，但不伪造 Suiming 的 checkpoint、trace 或恢复能力。
 

@@ -27,6 +27,13 @@ test("恢复入口由错误码决定，原因文案不改变恢复策略；pause
 	assert.equal(stuck?.unknownModelCall, false);
 	assert.equal(stuck?.paused, false);
 	assert.equal(stuck?.title, "需要调整方向");
+	const checkpoint = sessionProblem({
+		...session,
+		lastFailure: { code: "turn_spend_checkpoint", message: "这一轮按模型目录价估算已用 $10.12", retryable: false },
+	});
+	assert.equal(checkpoint?.paused, false, "检查点不是 paused：作者发一条消息就接着跑");
+	assert.equal(checkpoint?.title, "到了这一轮的用量检查点");
+	assert.equal(checkpoint?.detail, "这一轮按模型目录价估算已用 $10.12");
 	const other = sessionProblem({
 		...session,
 		lastFailure: { code: "invalid_reference", message: "未知人物引用", retryable: false },

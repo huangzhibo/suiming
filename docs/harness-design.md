@@ -103,7 +103,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 **steering 只给根 Agent。**inbox 只由根 loop 的 `ready` 阶段取走，子任务不 pull（建子任务的 loop 时 `steering: false`），作者插话不会进正在跑的 Worker。要改子任务的方向就 `interrupt`。
 
-**进展型兜底**：连续三次重复同一个被拒绝的动作（工具名 + 参数 + 拒绝内容同指纹）→ 结束本 turn 回 `idle`，`lastFailure` 记 `run_no_progress`，作者的下一条消息就是继续；不进 `paused`，因为作者要做的事就是说一句话。带交付工具（`submit_task`）的子任务另有一道收口：连续三次停下却没交付，子任务以 `task_not_submitted` 结束，失败作为工具拒绝回到父 Agent 手里。两道都不是方向闸：一个「持续产出但方向错了」的 turn 没有闸会停它，只能靠作者看到；这是已知缺陷不是设计留白，缓解手段是第 3 节的对账和第 8 节的可见性。
+**进展型兜底**：连续三次重复同一个被拒绝的动作（工具名 + 参数 + 拒绝内容同指纹），或连续五次回复里的动作全被拒绝（换着参数试，2026-10-04 加）→ 结束本 turn 回 `idle`，`lastFailure` 记 `run_no_progress`，作者的下一条消息就是继续；不进 `paused`，因为作者要做的事就是说一句话。一次回复里只要有一个动作成功就不算进第二条：正常的试错（改错了、读一下、再改）中间总有成功的读。带交付工具（`submit_task`）的子任务另有一道收口：连续三次停下却没交付，子任务以 `task_not_submitted` 结束，失败作为工具拒绝回到父 Agent 手里。循环长什么样事先列不全，这几道之外还有与形状无关的每轮用量检查点（第 10 节）。它们都不是方向闸：一个「持续产出但方向错了」的 turn 没有闸会停它，只能靠作者看到；这是已知缺陷不是设计留白，缓解手段是第 3 节的对账和第 8 节的可见性。
 
 工具参数错误、Checker 诊断（`StoryParseError`）与可修复的领域拒绝作为工具结果反馈给模型；存储损坏、写入失败、owner 失效等基础设施故障停止推进，不伪装成模型可修复的业务错误。
 
@@ -192,7 +192,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 产物位置由 Story Language 定义（[artifacts.md](../story-language/artifacts.md)）：原始资料进 `reference/materials/**`，按稳定主题维护的认识进 `reference/research/<topic-id>.md`，不按会话堆报告。二者都不是 Canon 事实：只有被选择并写进 Design 或 Intent 的结论才约束后续任务。这条与 host 侧 SKILL 里 Researcher 的契约一致（「只返回可合并的认识、分歧、适用边界、启发和来源，不替作品决定 Canon」），managed 侧随切片 E 补齐。
 
-「深度调研」不是一个特殊模式：它就是 Agent 或 Researcher 子智能体在一个 turn 里多轮 `web_search` → `fetch` → 读 → 再搜的循环，深度由模型按问题决定，与创作路径一样没有预算（第 10 节）。
+「深度调研」不是一个特殊模式：它就是 Agent 或 Researcher 子智能体在一个 turn 里多轮 `web_search` → `fetch` → 读 → 再搜的循环，深度由模型按问题决定，与创作路径一样没有预算，只受每轮用量检查点约束（第 10 节）。
 
 ### 8.2 工具
 
@@ -277,7 +277,7 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 | 结果顺序 | 按派出顺序交付，模型看到的顺序是确定的 |
 | 作者打断 | 整组共用 turn 的 signal，一起停 |
 | 基础设施故障 | 等同组停下，再抛第一个 |
-| 用量 | 没有预算，各记在自己的 Task 上 |
+| 用量 | 各记在自己的 Task 上；合计进本轮的用量检查点，到线时同组各在自己的下一次请求之前停 |
 | 写冲突 | 同一文件被两个动作写时，第二次落盘由 journal 报 `file_write_conflict` |
 | 恢复 | 停在 effect_pending 的同组动作一起 reconcile |
 
@@ -303,7 +303,11 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 **换模型**：没有单独的换绑命令，新模型随 `session.send` 的 `model`（或 `session.resume` 时的绑定）一起给，checkpoint 的 binding 在下一个 `ready` 重算；每条 `AssistantMessage` 自带实际 provider / model，归因不需要额外记录。存在 `effect_pending` 的模型调用或动作时拒绝，先处理该状态；不靠换模型跳过恢复。新绑定不带入原模型的思考档位（[对话模型选择](#对话模型选择与默认配置)）。子 Task 的绑定在它创建时冻结，跑完为止。
 
-**没有预算。**创作路径不设调用次数、token 或花费上限。曾经的 `RunBudget`（maxModelCalls / maxTotalTokens / maxCostUsd）默认就是空对象，桌面早就删了预算表单，没有一个真实 Run 设过它，Codex / Claude Code 也没有；成本闸还会误砍正常产出。留下的是**用量**：session 累计的已知 usage 与未确认调用数照常显示（`model_call_unknown` 时作者要看的就是它），在途调用可能超出估计，缺失用量不能当作已确认的零。根 Agent 与子任务的 `maxTurns` 都是 `Number.MAX_SAFE_INTEGER`，唯一的上限是 `rank-experiment.ts` 里评委的 `JUDGE_MAX_TURNS = 3`。兜底只有 `run_no_progress`、子任务的 `task_not_submitted` 与作者打断，都停不住「持续产出但方向错了」的 turn，这是有意的取舍，代价见第 4 节「进展型兜底」。**这一段是「没有预算」的完整说明，其它文档只留一句加链接。**
+**没有预算，有每轮用量检查点。**创作路径不设调用次数、token 或花费上限：曾经的 `RunBudget`（maxModelCalls / maxTotalTokens / maxCostUsd）默认就是空对象，没有一个真实 Run 设过它，按次或按量的上限还会误砍正常产出。根 Agent 与子任务的 `maxTurns` 都是 `Number.MAX_SAFE_INTEGER`，唯一的上限是 `rank-experiment.ts` 里评委的 `JUDGE_MAX_TURNS = 3`。留下的是**用量**：session 累计的已知 usage 与未确认调用数照常显示（`model_call_unknown` 时作者要看的就是它），在途调用可能超出估计，缺失用量不能当作已确认的零。
+
+**每轮用量检查点**（2026-10-04 加）：一个 turn 里根 Agent 与全部子任务按模型目录价估算的花费合计到 `TURN_SPEND_CHECKPOINT_USD`（$10），下一次请求之前停下，turn 回 `idle`，`lastFailure` 记 `turn_spend_checkpoint` 并说明花了多少。子任务不算失败（算失败的话父模型会重派一个、从头再花一遍），turn 收口时标 interrupted；作者说一句「继续」，根从原 checkpoint 续，委派动作按同一个 key 找回子任务，从子任务自己的 checkpoint 接着跑。它与预算的区别：不砍任何产出，不替作者判断值不值，只保证没人看着时一轮最多花掉这么多。起因是 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92（[验证记录](validation/2026-10-04-sanguo-example/README.md)）——那个循环当天修了，但循环长什么样事先列不全，兜底必须与形状无关。$10 的依据：实测最重的合法单轮是斗破 120 章整本抽取（387 次调用、$14.99），会撞线一次；写一节、审一轮都在 $1 以内。在途的请求照常收完，超出的只有它们（并行的同组子任务各多一次）。目录价为 0 的模型不触发，它不花钱。阈值现在只能由 `SuimingHarnessOptions.turnSpendCheckpointUsd` 改，作者能调的入口（config.toml 或设置页）还没做。
+
+兜底一共四道：`run_no_progress`（第 4 节）、子任务的 `task_not_submitted`、用量检查点与作者打断。它们都停不住「持续产出但方向错了」的 turn——检查点只封住它花多少，不判断方向，这是有意的取舍，代价见第 4 节「进展型兜底」。**这两段是「没有预算」与用量检查点的完整说明，其它文档只留一句加链接。**
 
 **`paused` 只剩三种**，都是「不问作者就不能安全继续」的情况，沿用 `ExecutionFailure` 形状，命令查询与 AG-UI 扩展共同携带：
 
@@ -313,7 +317,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 | `action_effect_unknown` | 恢复时某动作停在 `effect_pending` 且无法核对 | 查看该动作后 resume 或 interrupt |
 | `binding_mismatch` | 中途恢复时工具面 / 模型与 checkpoint 不符 | 换回原绑定 resume，或 interrupt 后在 turn 边界重绑 |
 
-其余情况都不需要作者动手：`run_no_progress` → 结束本 turn 回 `idle`（第 4 节）；`file_write_conflict` → 作为工具错误交给模型（它读到的已经是新内容，重读再改），不结束 turn；`process_restart` → 没有 `effect_pending` 时直接 `idle` 并记一句，有则落进上面三种之一。`resume` 只服务这三种，不默认重发 unknown 的请求；`send` 在 `paused` 上拒绝并带 reason。
+其余情况都不需要作者动手：`run_no_progress`、`turn_spend_checkpoint` → 结束本 turn 回 `idle`，作者的下一条消息就是继续（第 4 节与上文）；`file_write_conflict` → 作为工具错误交给模型（它读到的已经是新内容，重读再改），不结束 turn；`process_restart` → 没有 `effect_pending` 时直接 `idle` 并记一句，有则落进上面三种之一。`resume` 只服务这三种，不默认重发 unknown 的请求；`send` 在 `paused` 上拒绝并带 reason。
 
 ### 对话模型选择与默认配置
 
@@ -422,6 +426,9 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | **`run_command` 写了文件** | 结果里的改动清单与实际 diff 一致；Story 根内的进候选，之外的在 `commit` 结果里被点名跳过 | **没有测试**（切片 F） |
 | **`run_command` 中途退出** | 有结果复用；停在 effect_pending 不重跑，模型收到「结果未知」与文件差集 | **没有测试**（切片 F） |
 | 连续三次同一被拒动作 | 结束本 turn 回 `idle`，`lastFailure` 记 `run_no_progress`；下一条消息续 | `agent`「连续重复同一被拒绝动作：turn 以 run_no_progress 结束回 idle；作者下一句就能续」 |
+| 连续五次回复的动作全被拒、每次不同 | 同上 | `agent`「连续五次回复的动作都被拒绝、每次都不一样：同样以 run_no_progress 结束，不等它换着花样一直试」 |
+| 一轮估算花费到用量检查点 | 下一次请求之前停，回 `idle` 记 `turn_spend_checkpoint` 与花了多少；下一条消息从原处续 | `agent`「一轮的估算花费到用量检查点：下一次请求之前停下回 idle 并说明花了多少；作者说继续就接着跑」 |
+| 用量检查点落在子任务里 | 根与子任务合计；子任务标 interrupted 不算失败，续跑时同一个子任务从自己的 checkpoint 接着跑 | `agent`「用量检查点落在子任务里：根与子任务合计；子任务不算失败，继续时从它自己的 checkpoint 接着跑」 |
 | 一个会话里工具调用越来越多 | 每条执行命令只写自己改动的行；整份导出与整份重读执行状态的次数与工具轮数无关 | `agent`「执行命令只写自己改动的行：一个 turn 里整份导出与整份重读执行状态的次数与工具轮数无关」；单轮耗时随轮数的变化用 `docs/validation/2026-10-01-harness-review/bench.mts` 量，不做计时断言 |
 | 启动 / 恢复的初始化 I/O 失败 | 记录原因、释放 lease；checkout 不动 | `agent`「turn 开始时读取作品失败：回 idle 记一句并释放 lease，下一句直接重试」「续跑时读取权威状态失败也释放 lease，并保留 checkout 里的候选文件」 |
 | 收口等待本身卡住 | 有界返回，不把调用方挂死 | `local-session-controller`「waitForIdle 有界：请求收不了口时按时返回，不把调用方挂死」 |
@@ -441,7 +448,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 - 执行模型：Conversation / Run / Attempt 与 Run 的七态状态机、per-session worktree（`worktree.ts`、三方合并、`run_merge_conflict`、`run.diff`）、`plan` / `execute_task`（第 2 节）；对应的 SQLite 表与 eval-022 的旧 Run 和事件（第 12 节）。
 - 交付与交互：`finish` 与交付协议、`ask_author`、`read_conversation`、历史文本注入（`conversation-context.ts`）、steering 序号核对（第 3、4 节）。
 - 权限预设：scope 与 `run.design` / `run.write` 等入口、`writable()` 与 `writableRoots`、`delegate` 的 `writablePaths`、`review_scope_mismatch`（第 6、9 节）。
-- 预算与暂停：`RunBudget` 及其预留记账、`budget_exceeded`、CLI 的 `--max-*`、桌面的预算展示；`paused` 的另外五种原因（第 10 节）。
+- 预算与暂停：`RunBudget` 及其预留记账、`budget_exceeded`、CLI 的 `--max-*`、桌面的预算展示；`paused` 的另外五种原因（第 10 节）。2026-10-04 加的每轮用量检查点不是它们回来了：不砍产出、不进 `paused`，作者一句话就续。
 - 冻结与快照：`promptBinding`（systemPrompt 已在 binding hash 里）、按次 ContextSnapshot（`noteRead`、`contextArtifacts`、`suiming.context` 事件、`sessionEvidence`；改版时 eval-022 的 `evidence/contexts` 是零）、`freezeCandidate`、harness 里的临时 `ProjectRuntimeSession`（第 4、5、7 节）。
 - evidence 层：DesignCommit 与 `commit` 的 `freeze` 参数、StoryText lineage、MaterialEvidence 与 ReviewReport 的 snapshot 绑定、`record_source` / `source_notes`、Source 交付门 `requireRootMaterialEvidence`，改为从 Canon 历史派生（切片 G，见[派生状态](derived-evidence-design.md)）。作者 2026-09-12 就问过「可以去掉 DesignCommit 和血缘设计吗」；改版时 eval-022 的 Canon 里 evidence 只有 4 个 design-commit，contexts / reviews / material 全零。`read_source` 与 `formatSourceCheck`（Source 审稿的输入）留着。
 - 其它：`ExecutionInputReference` / `ExecutionResultReference` 的 kind 联合、`retry.ts` / `requests.ts`、Cloud 执行 adapter（[系统架构](architecture.md)第 9 节）、TUI（[技术栈](technology.md)「暂不引入」）。

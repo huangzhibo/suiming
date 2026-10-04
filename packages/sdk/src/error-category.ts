@@ -28,6 +28,7 @@ const OVERRIDES: Readonly<Record<string, SuimErrorCategory>> = {
 	invalid_cli_usage: "usage",
 	run_interrupted: "interrupted",
 	run_no_progress: "interrupted",
+	turn_spend_checkpoint: "interrupted",
 	model_call_unknown: "interrupted",
 	action_effect_unknown: "interrupted",
 	binding_mismatch: "interrupted",
