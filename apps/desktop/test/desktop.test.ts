@@ -13,8 +13,19 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
-import { _electron as electron, type Locator } from "playwright";
+import { type ElectronApplication, _electron as electron, type Locator, type Page } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+
+/** 「打开作品」走系统对话框；E2E 在主进程里把对话框换成直接返回给定目录，其余路径与真实点击相同。 */
+async function chooseDirectory(app: ElectronApplication, page: Page, path: string) {
+	await app.evaluate(({ dialog }, selected) => {
+		dialog.showOpenDialog = (async () => ({
+			canceled: false,
+			filePaths: [selected],
+		})) as typeof dialog.showOpenDialog;
+	}, path);
+	return page.evaluate(() => window.suiming?.chooseProject(false));
+}
 
 test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明确，回看依据与重载保留观察条件", {
 	timeout: 90000,
@@ -564,10 +575,12 @@ test("打开没有 .suiming 的 Open Story Directory：主进程就地初始化�
 		const foreign = join(directory, "not-a-story");
 		await mkdir(foreign);
 		await writeFile(join(foreign, "notes.txt"), "随手记\n");
+		// 不在最近列表里的目录不能经 openProject 直接打开（空目录会被就地建成作品）。
 		await assert.rejects(
 			page.evaluate((path) => window.suiming?.openProject(path), foreign),
-			/没有作品文件/,
+			/最近列表/,
 		);
+		await assert.rejects(chooseDirectory(app, page, foreign), /没有作品文件/);
 		await assert.rejects(readFile(join(foreign, "outline/story/index.yaml")), { code: "ENOENT" });
 		// 旧仓格式的作品：不做迁移，错误说清是哪份文件、哪一项；scaffold 补的 index.yaml 与 .suiming 都收回。
 		const legacy = join(directory, "legacy");
@@ -579,22 +592,19 @@ test("打开没有 .suiming 的 Open Story Directory：主进程就地初始化�
 		await writeFile(join(legacy, "source/source_old/source.yaml"), "schema_version: 3\nsource_id: old\ninput: {}\n");
 		await writeFile(join(legacy, "source/source_old/original.bin"), "旧材料\n");
 		await writeFile(join(legacy, "source/source_old/material.txt"), "旧材料\n");
-		await assert.rejects(
-			page.evaluate((path) => window.suiming?.openProject(path), legacy),
-			(error: Error) => {
-				assert.match(error.message, /不是当前 Story Language 格式/);
-				assert.match(error.message, /source\/source_old\/source\.yaml/);
-				assert.doesNotMatch(error.message, /Error invoking remote method/);
-				return true;
-			},
-		);
+		await assert.rejects(chooseDirectory(app, page, legacy), (error: Error) => {
+			assert.match(error.message, /不是当前 Story Language 格式/);
+			assert.match(error.message, /source\/source_old\/source\.yaml/);
+			assert.doesNotMatch(error.message, /Error invoking remote method/);
+			return true;
+		});
 		await assert.rejects(readFile(join(legacy, "outline/story/index.yaml")), { code: "ENOENT" });
 		await assert.rejects(readFile(join(legacy, ".suiming")), { code: "ENOENT" });
 		// 只有 intent 的目录：scaffold 补齐缺失的 index.yaml 后照常打开。
 		const partial = join(directory, "partial");
 		await mkdir(join(partial, "intent"), { recursive: true });
 		await writeFile(join(partial, "intent/只有意图.md"), "# 只有意图\n\n先立意图，**再写大纲**。\n");
-		assert.equal(await page.evaluate((path) => window.suiming?.openProject(path), partial), true);
+		assert.equal(await chooseDirectory(app, page, partial), true);
 		await page.getByText("只有意图", { exact: true }).first().waitFor();
 		// 图例与操作说明只在帮助模态框里常驻。
 		await page.getByRole("button", { name: "帮助", exact: true }).click();

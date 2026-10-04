@@ -312,7 +312,12 @@ export function startDesktop(
 				if (!event.senderFrame || !trusted(event.senderFrame.url)) throw new Error("Untrusted renderer");
 				return reply(async () => {
 					if (typeof path !== "string" || !path.trim()) throw new Error("缺少作品路径");
-					await openProject(resolve(path));
+					// 只开最近列表里的作品：别的目录走 chooseProject 的系统对话框。打开空目录会就地建作品，
+					// 不能让 renderer 把任意路径交给主进程去初始化。
+					const target = resolve(path);
+					if (!(await readStored()).recent.includes(target))
+						throw new Error("只能直接打开最近列表里的作品；别的目录请用「打开作品」选择");
+					await openProject(target);
 					return true;
 				});
 			});
