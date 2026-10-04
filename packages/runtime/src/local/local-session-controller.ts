@@ -13,6 +13,8 @@ export interface LocalSessionControllerOptions {
 	models: ModelGateway;
 	telemetryContext?: TelemetryContext;
 	now?: () => Date;
+	/** 每轮用量检查点；桌面与 CLI 传读 config.toml 的函数，每个 turn 开始读一次。缺省用 Runtime 的默认值。 */
+	usageCheckpoint?: () => Promise<number>;
 }
 
 interface ActiveSession {
@@ -88,6 +90,7 @@ export class LocalSessionController {
 	readonly #models: ModelGateway;
 	readonly #telemetryContext: TelemetryContext | undefined;
 	readonly #now: (() => Date) | undefined;
+	readonly #usageCheckpoint: (() => Promise<number>) | undefined;
 	readonly #active = new Map<string, ActiveSession>();
 
 	constructor(options: LocalSessionControllerOptions) {
@@ -95,6 +98,7 @@ export class LocalSessionController {
 		this.#models = options.models;
 		this.#telemetryContext = options.telemetryContext;
 		this.#now = options.now;
+		this.#usageCheckpoint = options.usageCheckpoint;
 	}
 
 	subscribe(listener: (event: ExecutionStateEvent) => void): () => void {
@@ -137,6 +141,7 @@ export class LocalSessionController {
 			models: this.#models,
 			...(this.#telemetryContext === undefined ? {} : { telemetryContext: this.#telemetryContext }),
 			...(this.#now === undefined ? {} : { now: this.#now }),
+			...(this.#usageCheckpoint === undefined ? {} : { turnUsageCheckpointTokens: this.#usageCheckpoint }),
 		});
 	}
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -91,6 +91,14 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 			);
 		});
 		assert.equal(await page.getByRole("tabpanel", { name: "任务偏好", exact: true }).isVisible(), false);
+		// 每轮用量检查点在默认模型下面：选了就写进 config.toml，下一轮开始时读。
+		const checkpoint = page.getByRole("combobox", { name: "每轮用量检查点", exact: true });
+		assert.match(await checkpoint.innerText(), /600 万（默认）/);
+		await checkpoint.click();
+		await page.getByRole("option", { name: /^2,000 万/ }).click();
+		await page.getByText("已保存，下一轮生效", { exact: true }).waitFor();
+		assert.match(await readFile(join(directory, "config.toml"), "utf8"), /usage_checkpoint = 20000000/);
+		assert.match(await checkpoint.innerText(), /2,000 万/);
 		if (process.env.SUIMING_CAPTURE_DIR)
 			await page.screenshot({
 				animations: "disabled",

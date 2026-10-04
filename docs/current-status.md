@@ -11,7 +11,7 @@
 - **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
 - **证据**：最高到「真实调用」——2026-09-16 重构后第一次完整真实对话（[基线](validation/2026-09-16-first-real-session/README.md)），以及 2026-10 起斗破前 120 章的忠实抽取与留出评测。没有任何能力达到「真实长篇」。
 
-验证（2026-10-04）：`npm run check` 通过（含示例作品 `examples/sanguo` 过 Checker）；`npm test` 402 项，397 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
+验证（2026-10-04）：`npm run check` 通过（含示例作品 `examples/sanguo` 过 Checker）；`npm test` 405 项，400 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 19 / 19。真实模型回归现有八个任务，GPT-6.1 Sol 上最近一次全套是 2026-10-04 的 24 / 24（样例已换成赤壁，[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
 
 ## 能力与证据
 
@@ -48,7 +48,7 @@
 - **发行与认证**：当前是开发构建，没有签名安装包或升级机制。设置页的登录向导接通了 pi-ai 全部 provider 的 API key / OAuth 流程（浏览器回调、设备码、手动粘贴授权码都能转述）。到「真实调用」的：API key（另经桌面 E2E）；`openai` 的 Sign in with ChatGPT——2026-10-02 登录并真实调用，10-03 凭据文件在一次真实刷新中被重写，当天 CLI 连跑多个一到两小时的运行没有一次因凭据失败。只到机制的：refresh token 作废后的失效恢复、桌面与 CLI 同时刷新，以及 `openai-codex`、Anthropic 等其余 provider 的 OAuth。订阅额度与作者自己的 Codex 共用，界面上的花费是按 API 价的估算，不是扣费。
 - **命令与 Cloud**：本地 typed IPC 命令有 SDK 目录与双向校验，但命令目录仍是三份，三个传输的适配都是手写的，理由见[系统架构](architecture.md)。Cloud 只剩 Canon 与同步，Cloud Harness host 与同等原子事件验收保持冻结；`CanonStore` 契约测试目前只有 git 一个实现在跑，Cloud 走的是自己的 store 接口与自己的测试。
 - **模型预检范围**：启动只预检实际对话模型——`session.send` 在建 session 前 bind 一次 `main` profile，未配置的专用角色不挡住讨论（有意收窄）。代价是 Agent 委派到凭据或模型有问题的 writer / reviewer / source-extractor 时，失败发生在 turn 中途、token 已经花掉，而不是创建前。按实际会用到的 profile 预检需要先知道 Agent 会不会委派，未实现。
-- **无人值守没有方向闸**：创作路径没有预算，兜底有 `run_no_progress`、每轮用量检查点与作者打断。检查点保证没人看着时一轮最多用掉约一次整本抽取的量（GPT-6.1 Sol 上约 $12），但它只封住用量、不判断方向，**停不住「持续产出但方向错了」的 turn**，只能靠作者发现（完整说明见 [Harness 设计](harness-design.md)第 10 节）。检查点的阈值作者还调不了：只有 `SuimingHarnessOptions.turnUsageCheckpointTokens` 一个入口，config.toml 与设置页都没接。带交付工具的子任务另有 `unsubmittedStops >= 3` 的收口，那不是方向闸。真正的结构性改善是让作者补充的意图能沉淀回作品，见 [AGENTS.md](../AGENTS.md) 不变量 5。
+- **无人值守没有方向闸**：创作路径没有预算，兜底有 `run_no_progress`、每轮用量检查点与作者打断。检查点保证没人看着时一轮最多用掉约一次整本抽取的量（GPT-6.1 Sol 上约 $12），但它只封住用量、不判断方向，**停不住「持续产出但方向错了」的 turn**，只能靠作者发现（完整说明见 [Harness 设计](harness-design.md)第 10 节）。检查点的阈值作者在设置页或 config.toml 的 `session.usage_checkpoint` 调。带交付工具的子任务另有 `unsubmittedStops >= 3` 的收口，那不是方向闸。真正的结构性改善是让作者补充的意图能沉淀回作品，见 [AGENTS.md](../AGENTS.md) 不变量 5。
 - **意图库还不会生长**：写回 `intent/**` 只靠 `AGENT_PROMPT` 的一句指示。2026-10-01 起每个 turn 结束有一行确定性对账（作者说了几条、意图 / Design / 正文 / 审稿各改了什么），刻意由系统算而不是让 Agent 自报；但「作者说了长期事实却没写回」仍要作者自己从「意图未改动」看出来，漏报规模要等一次有真实作者介入的长跑给出，用来定呈现形态。「什么时候该另起一页」的拆分压力还没有，写回通了也只会往单个文件追加。来由见 AGENTS.md「能力交给模型，可见性交给系统」。
 - **书一大，Source 补全就做不了**：补全子任务要带整份抽取回头查漏，《三国演义》前五十回抽成 231 节、329 个人物之后，光开场消息就超过 GPT-6.1 Sol 窗口的七成。2026-10-04 修掉了由此引起的无限压缩，但补全本身仍然放不下；[Harness 设计](harness-design.md)第 9 节写的「先按卷整合、再整书整合」还没做，补全也要跟着按卷做。
 - **只活在对话里的事实，在别处看不见**：Session 的消息列表持久、完整，但不过 Checker、没有版本、不进 Open Story Package，换一个 Session 或换 host agent 就看不见；Context 头部那句「非作品事实」只是标签，不是边界。风险判断见 [Harness 设计](harness-design.md)第 2 节。

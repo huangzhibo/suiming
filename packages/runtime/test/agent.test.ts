@@ -38,7 +38,7 @@ async function fixture(
 	options: {
 		telemetryContext?: TelemetryContext;
 		models?: FauxModelDefinition[];
-		turnUsageCheckpointTokens?: number;
+		turnUsageCheckpointTokens?: number | (() => number);
 	} = {},
 ) {
 	const { telemetryContext } = options;
@@ -501,6 +501,25 @@ test("一轮的折算用量到检查点：下一次请求之前停下回 idle，
 		assert.equal(next.failure, undefined);
 		assert.equal(next.session.lastFailure, undefined);
 		assert.equal(f.provider.state.callCount, 2);
+	} finally {
+		await f.close();
+	}
+});
+
+test("用量检查点每个 turn 开始时读一次：设置页改了，下一轮就按新值，不必重开作品", async () => {
+	let limit = 50_000;
+	const f = await fixture({ models: [PRICED_MODEL], turnUsageCheckpointTokens: () => limit });
+	try {
+		f.provider.setResponses([expensive(fauxToolCall("project_status", {})), reply("不该发出")]);
+		const stopped = await f.say("一直做下去");
+		assert.equal(stopped.failure?.code, "turn_usage_checkpoint");
+		assert.match(stopped.failure?.message ?? "", /每轮 5 万的用量检查点/u);
+		limit = 10_000_000;
+		f.provider.setResponses([expensive(fauxToolCall("project_status", {})), reply("调大之后接着做完了")]);
+		const next = await f.say("继续", stopped.sessionId);
+		assert.equal(next.failure, undefined);
+		assert.equal(next.value?.reply, "调大之后接着做完了");
+		assert.equal(f.provider.state.callCount, 3);
 	} finally {
 		await f.close();
 	}

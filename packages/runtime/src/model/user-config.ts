@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { modelThinkingSchema } from "@suiming/sdk";
+import { modelThinkingSchema, USAGE_CHECKPOINT_TOKENS } from "@suiming/sdk";
 import { parse as parseToml, TomlDate, TomlError } from "smol-toml";
 import { Value } from "typebox/value";
 import type {
@@ -57,6 +57,7 @@ interface ParsedUserConfig {
 	profiles: Partial<Record<ModelProfileId, ParsedProfile>>;
 	disabledProviders?: string[];
 	cloud?: { endpoint?: string; actorId?: string };
+	session?: { usageCheckpoint?: number };
 }
 
 export interface CloudConnectionConfig {
@@ -145,7 +146,7 @@ function optionValue(value: unknown, label: string): ModelOptionValue {
 
 /**
  * ~/.suiming/config.toml：TOML 语法交给 smol-toml，这里只校验 Suiming 认识的形状。
- * 根只有 version、models、cloud；profile 只有 provider、model、thinking、options；未知表和键直接报错，不静默忽略。
+ * 根只有 version、models、cloud、session；profile 只有 provider、model、thinking、options；未知表和键直接报错，不静默忽略。
  */
 export function parseModelRoutingToml(source: string): ParsedUserConfig {
 	let raw: unknown;
@@ -157,7 +158,7 @@ export function parseModelRoutingToml(source: string): ParsedUserConfig {
 		);
 	}
 	const root = requireTable(raw, "config.toml");
-	rejectUnknownKeys(root, ["version", "models", "cloud"], "config.toml");
+	rejectUnknownKeys(root, ["version", "models", "cloud", "session"], "config.toml");
 	const version = root.version;
 	if (typeof version !== "number" || !Number.isInteger(version)) {
 		throw configError("config.toml must declare an integer version");
@@ -172,6 +173,19 @@ export function parseModelRoutingToml(source: string): ParsedUserConfig {
 			...(table.endpoint === undefined ? {} : { endpoint: requireString(table.endpoint, "cloud.endpoint") }),
 			...(table.actor_id === undefined ? {} : { actorId: requireString(table.actor_id, "cloud.actor_id") }),
 		};
+	}
+
+	let session: ParsedUserConfig["session"];
+	if (root.session !== undefined) {
+		const table = requireTable(root.session, "session");
+		rejectUnknownKeys(table, ["usage_checkpoint"], "session");
+		const checkpoint = table.usage_checkpoint;
+		if (checkpoint !== undefined) {
+			const { min, max } = USAGE_CHECKPOINT_TOKENS;
+			if (typeof checkpoint !== "number" || !Number.isInteger(checkpoint) || checkpoint < min || checkpoint > max)
+				throw configError(`session.usage_checkpoint 须是 ${min} 到 ${max} 之间的整数（折算 token）`);
+			session = { usageCheckpoint: checkpoint };
+		}
 	}
 
 	let disabledProviders: string[] | undefined;
@@ -219,6 +233,7 @@ export function parseModelRoutingToml(source: string): ParsedUserConfig {
 		profiles,
 		...(disabledProviders === undefined ? {} : { disabledProviders }),
 		...(cloud === undefined ? {} : { cloud }),
+		...(session === undefined ? {} : { session }),
 	};
 }
 
@@ -378,4 +393,27 @@ export async function loadCloudConnectionConfig(
 		},
 		diagnostic: { configPath, configFile },
 	};
+}
+
+/**
+ * 每轮用量检查点：config.toml 的 `session.usage_checkpoint`，没写或没有配置文件时取默认值。每个 turn 开始时读一次，
+ * 设置页改了下一轮就生效，不必重开作品。
+ */
+export async function loadUsageCheckpoint(
+	options: { configPath?: string; environment?: ModelEnvironment } = {},
+): Promise<number> {
+	const environment = options.environment ?? process.env;
+	const configPath =
+		options.configPath ??
+		optionalEnvironmentValue(environment, CONFIG_PATH_ENV) ??
+		join(homedir(), ".suiming", "config.toml");
+	try {
+		return (
+			parseModelRoutingToml(await readFile(configPath, "utf8")).session?.usageCheckpoint ??
+			USAGE_CHECKPOINT_TOKENS.default
+		);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return USAGE_CHECKPOINT_TOKENS.default;
+		throw error;
+	}
 }

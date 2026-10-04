@@ -208,6 +208,7 @@ export class LocalWorkspace implements LocalCommandClient {
 					project: this.project,
 					models,
 					...(this.telemetryContext === undefined ? {} : { telemetryContext: this.telemetryContext }),
+					usageCheckpoint: () => this.#settings.usageCheckpoint(),
 				});
 				this.#unsubscribeExecution = this.#sessions.subscribe(() => this.#changed("execution"));
 				return this.#sessions;
@@ -286,6 +287,12 @@ export class LocalWorkspace implements LocalCommandClient {
 			case "models.save": {
 				await this.#settings.save(input as LocalCommandInput<"models.save">);
 				this.#modelsChanged = true;
+				this.#changed();
+				return {};
+			}
+			// 检查点每个 turn 开始时从 config.toml 读，不必重建 session controller。
+			case "models.usageCheckpoint.save": {
+				await this.#settings.saveUsageCheckpoint(input as LocalCommandInput<"models.usageCheckpoint.save">);
 				this.#changed();
 				return {};
 			}

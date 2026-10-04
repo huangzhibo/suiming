@@ -5,14 +5,14 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { AuthContext, AuthEvent, AuthPrompt, AuthType, Models } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
-import type { LocalCommandInput, LocalCommandOutput } from "@suiming/sdk";
+import { type LocalCommandInput, type LocalCommandOutput, USAGE_CHECKPOINT_TOKENS } from "@suiming/sdk";
 import { parse, stringify } from "smol-toml";
 import { MODEL_PROFILE_IDS, MODEL_PROFILE_LABELS, type ModelProfileId } from "./config.js";
 import { ModelGatewayError } from "./errors.js";
 import { JsonFileCredentialStore } from "./json-file-credential-store.js";
 import { validateProfileOptions } from "./model-options-schema.js";
 import { configuredThinking, thinkingLevels, withThinking } from "./thinking-options.js";
-import { loadModelRoutingConfig, parseModelRoutingToml } from "./user-config.js";
+import { loadModelRoutingConfig, loadUsageCheckpoint, parseModelRoutingToml } from "./user-config.js";
 
 type ShowOutput = LocalCommandOutput<"models.show">;
 type LoginStatus = LocalCommandOutput<"models.login.status">;
@@ -207,7 +207,8 @@ export class LocalModelSettings {
 
 	async show(): Promise<ShowOutput> {
 		const stored = await this.credentials.list();
-		const disabled = parseModelRoutingToml(await this.#configSource()).disabledProviders ?? [];
+		const parsedConfig = parseModelRoutingToml(await this.#configSource());
+		const disabled = parsedConfig.disabledProviders ?? [];
 		const providers = await Promise.all(
 			this.#models.getProviders().map(async (provider): Promise<ShowOutput["providers"][number]> => {
 				const apiKey = provider.auth.apiKey;
@@ -263,7 +264,39 @@ export class LocalModelSettings {
 			)
 				throw error;
 		}
-		return { profiles, providers };
+		const main = profiles.find((profile) => profile.id === "main");
+		const mainModel = main ? this.#models.getModel(main.provider, main.model) : undefined;
+		return {
+			profiles,
+			providers,
+			usageCheckpoint: {
+				tokens: parsedConfig.session?.usageCheckpoint ?? USAGE_CHECKPOINT_TOKENS.default,
+				mainInputPrice: mainModel && mainModel.cost.input > 0 ? mainModel.cost.input : null,
+			},
+		};
+	}
+
+	/** 每轮用量检查点；会话控制器在每个 turn 开始时调用。 */
+	usageCheckpoint(): Promise<number> {
+		return loadUsageCheckpoint({ configPath: this.configPath });
+	}
+
+	/** 等于默认值时从 config.toml 删掉这一项：以后默认值调整了，没改过的作者跟着变。 */
+	saveUsageCheckpoint(input: LocalCommandInput<"models.usageCheckpoint.save">): Promise<void> {
+		const write = async () => {
+			const source = await this.#configSource();
+			parseModelRoutingToml(source);
+			const document = parse(source);
+			document.session ??= {};
+			const session = document.session as Record<string, unknown>;
+			if (input.tokens === USAGE_CHECKPOINT_TOKENS.default) delete session.usage_checkpoint;
+			else session.usage_checkpoint = input.tokens;
+			if (Object.keys(session).length === 0) delete document.session;
+			await this.#writeConfig(document);
+		};
+		const result = this.#chain.then(write, write);
+		this.#chain = result.catch(() => undefined);
+		return result;
 	}
 
 	#profileState(

@@ -4,12 +4,14 @@ import { ListChecks, Plug, SlidersHorizontal } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "./bridge.js";
 import { ModelSelect, type ModelSettingsData as Settings } from "./model-catalog.js";
 import { ProviderSettings } from "./provider-settings.js";
 import { ActionButton } from "./ui-bits.js";
+import { usageCheckpointOptions } from "./usage-checkpoint.js";
 
 type Profile = LocalCommandInput<"models.save">["profile"];
 
@@ -66,6 +68,9 @@ export function ModelSettings() {
 					<p className="mt-1 text-xs text-muted-foreground">设置新对话的默认模型。对话中的临时选择独立生效。</p>
 				</div>
 				<ProfileSettings profile="main" settings={data} />
+				<div className="mt-6 border-t pt-6">
+					<UsageCheckpointSettings settings={data} />
+				</div>
 			</TabsContent>
 			<TabsContent
 				forceMount
@@ -260,5 +265,73 @@ function ProfileSettings({ profile, settings }: { profile: Profile; settings: Se
 				</p>
 			)}
 		</form>
+	);
+}
+
+/**
+ * 每轮用量检查点：一轮里 Agent 与子任务的折算用量到线就停下等作者说继续，防的是没人看着时空转烧钱（Harness 设计
+ * 第 10 节）。选了就保存，与提供商开关一样；下一轮开始时生效。
+ */
+function UsageCheckpointSettings({ settings }: { settings: Settings }) {
+	const id = useId();
+	const client = useQueryClient();
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const [saved, setSaved] = useState(false);
+	const { tokens, mainInputPrice } = settings.usageCheckpoint;
+	async function change(value: string) {
+		setBusy(true);
+		setError("");
+		setSaved(false);
+		try {
+			await invoke("models.usageCheckpoint.save", { tokens: Number(value) });
+			await client.invalidateQueries({ queryKey: ["models"] });
+			setSaved(true);
+		} catch (error) {
+			setError(error instanceof Error ? error.message : String(error));
+		} finally {
+			setBusy(false);
+		}
+	}
+	return (
+		<div>
+			<Field orientation="horizontal" className="flex-wrap items-start justify-between gap-y-3">
+				<div className="min-w-32 flex-1 pt-1">
+					<FieldLabel htmlFor={id}>每轮用量检查点</FieldLabel>
+					<p className="mt-1 max-w-56 text-xs leading-relaxed text-muted-foreground">
+						一轮对话里 Agent
+						与子任务的用量到这里就先停下，说一句「继续」接着做，进度不丢。防止没人看着时空转烧钱。
+					</p>
+				</div>
+				<div className="w-64 max-w-full">
+					<Select value={String(tokens)} disabled={busy} onValueChange={(value) => void change(value)}>
+						<SelectTrigger id={id} aria-label="每轮用量检查点" className="w-full">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectGroup>
+								{usageCheckpointOptions(tokens, mainInputPrice).map((option) => (
+									<SelectItem key={option.value} value={option.value}>
+										{option.label}
+									</SelectItem>
+								))}
+							</SelectGroup>
+						</SelectContent>
+					</Select>
+					<p className="mt-1.5 text-xs leading-relaxed text-muted-foreground" role="status">
+						{busy
+							? "正在保存…"
+							: saved
+								? "已保存，下一轮生效"
+								: "折算 token：缓存命中按一成、输出按五倍。600 万约是整本抽取一百多章的量；金额按默认模型的目录价估算。"}
+					</p>
+				</div>
+			</Field>
+			{error && (
+				<p role="alert" className="mt-2 text-xs text-destructive">
+					{error}
+				</p>
+			)}
+		</div>
 	);
 }

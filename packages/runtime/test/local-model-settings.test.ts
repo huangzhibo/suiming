@@ -5,10 +5,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { type AuthContext, createModels, fauxProvider, type OAuthCredential } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
+import { USAGE_CHECKPOINT_TOKENS } from "@suiming/sdk";
 import { JsonFileCredentialStore } from "../src/model/json-file-credential-store.js";
 import { LocalModelSettings } from "../src/model/local-model-settings.js";
 import { ModelGateway } from "../src/model/model-gateway.js";
-import { loadModelRoutingConfig, parseModelRoutingToml } from "../src/model/user-config.js";
+import { loadModelRoutingConfig, loadUsageCheckpoint, parseModelRoutingToml } from "../src/model/user-config.js";
 
 const authContext = (env: Record<string, string>): AuthContext => ({
 	env: async (name) => env[name],
@@ -318,6 +319,52 @@ test("Sign in with ChatGPT 要一个固定的安装 ID：第一次登录时生�
 		assert.equal(seen[1], seen[0], "重开设置也是同一个 ID");
 		assert.equal((await readFile(join(root, "installation-id"), "utf8")).trim(), seen[0]);
 		assert.equal((await stat(join(root, "installation-id"))).mode & 0o777, 0o600);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("每轮用量检查点：设置页读写 config.toml 的 session.usage_checkpoint，等于默认值时删掉这一项；换算用默认模型的输入单价", async () => {
+	const root = await mkdtemp(join(tmpdir(), "suiming-usage-checkpoint-"));
+	try {
+		const configPath = join(root, "config.toml");
+		await writeFile(configPath, 'version = 1\n[cloud]\nendpoint = "https://example.test"\n');
+		const settings = new LocalModelSettings({
+			configPath,
+			credentials: new JsonFileCredentialStore({ path: join(root, "auth.json") }),
+			authContext: authContext({ DEEPSEEK_API_KEY: "env-key" }),
+		});
+		assert.deepEqual((await settings.show()).usageCheckpoint, {
+			tokens: USAGE_CHECKPOINT_TOKENS.default,
+			mainInputPrice: null,
+		});
+		await settings.save({ profile: "main", provider: "deepseek", model: "deepseek-flash", options: "{}" });
+		const price = (await settings.show()).usageCheckpoint.mainInputPrice;
+		assert.ok(price !== null && price > 0, "默认模型在目录里有单价，设置页据此换算约合多少钱");
+
+		await settings.saveUsageCheckpoint({ tokens: 20_000_000 });
+		assert.equal((await settings.show()).usageCheckpoint.tokens, 20_000_000);
+		assert.equal(await settings.usageCheckpoint(), 20_000_000);
+		assert.equal(await loadUsageCheckpoint({ configPath }), 20_000_000, "CLI 读同一份配置");
+		const written = await readFile(configPath, "utf8");
+		assert.match(written, /\[session\]\s*\nusage_checkpoint = 20000000/u);
+		assert.match(written, /endpoint = "https:\/\/example\.test"/u, "别的配置段保留");
+
+		await settings.saveUsageCheckpoint({ tokens: USAGE_CHECKPOINT_TOKENS.default });
+		assert.doesNotMatch(await readFile(configPath, "utf8"), /session|usage_checkpoint/u, "回到默认值就不写");
+		assert.equal(await settings.usageCheckpoint(), USAGE_CHECKPOINT_TOKENS.default);
+		assert.equal(
+			await loadUsageCheckpoint({ configPath: join(root, "没有这个文件.toml") }),
+			USAGE_CHECKPOINT_TOKENS.default,
+		);
+
+		assert.throws(() => parseModelRoutingToml("version = 1\n[session]\nusage_checkpoint = 100\n"), {
+			code: "invalid_model_config_file",
+			message: /session\.usage_checkpoint 须是 1000000 到 1000000000 之间的整数/u,
+		});
+		assert.throws(() => parseModelRoutingToml("version = 1\n[session]\nbudget = 1\n"), {
+			code: "invalid_model_config_file",
+		});
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}

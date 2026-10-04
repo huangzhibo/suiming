@@ -306,7 +306,12 @@ export type {
 	ModelProfileConfigDiagnostic,
 	ModelRoutingConfigDiagnostic,
 } from "./model/user-config.js";
-export { loadCloudConnectionConfig, loadModelRoutingConfig, parseModelRoutingToml } from "./model/user-config.js";
+export {
+	loadCloudConnectionConfig,
+	loadModelRoutingConfig,
+	loadUsageCheckpoint,
+	parseModelRoutingToml,
+} from "./model/user-config.js";
 export type {
 	DomainApiCloudProjectStoreOptions,
 	DomainApiProjectClient,

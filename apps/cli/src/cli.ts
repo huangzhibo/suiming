@@ -25,6 +25,7 @@ import {
 	LocalProjectService,
 	LocalSessionController,
 	loadModelRoutingConfig,
+	loadUsageCheckpoint,
 	type ModelGateway,
 	notActiveInProcess,
 	parseStoryImpactSubject,
@@ -489,6 +490,11 @@ async function modelGateway(io: SuimCliIo, options: { config?: string; auth?: st
 		...(options.auth === undefined ? {} : { path: resolve(options.auth) }),
 	});
 	return createBuiltinModelGateway(loaded.config, { credentials, telemetryContext: cliTelemetry(io).context });
+}
+
+/** 每轮用量检查点从同一份 config.toml 读（`--config` 指定时读那份），每个 turn 开始读一次。 */
+function usageCheckpoint(options: { config?: string }): () => Promise<number> {
+	return () => loadUsageCheckpoint(options.config === undefined ? {} : { configPath: resolve(options.config) });
 }
 
 function cliConfigurationError(code: string, message: string): Error & { code: string } {
@@ -1097,6 +1103,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 							project: service,
 							models,
 							telemetryContext: cliTelemetry(io).context,
+							usageCheckpoint: usageCheckpoint(options),
 						});
 						const onEvent = eventWriter(io, "session.send", options.events === true);
 						const sent = await controller.send({
@@ -1148,6 +1155,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 							project: service,
 							models,
 							telemetryContext: cliTelemetry(io).context,
+							usageCheckpoint: usageCheckpoint(options),
 						});
 						const onEvent = eventWriter(io, "session.resume", options.events === true);
 						await controller.resume({

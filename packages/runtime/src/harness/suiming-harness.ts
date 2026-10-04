@@ -1,7 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
-import { EventType, type ModelChoice, retryableErrorCode, type SuimingTurnSummary } from "@suiming/sdk";
+import {
+	EventType,
+	type ModelChoice,
+	retryableErrorCode,
+	type SuimingTurnSummary,
+	USAGE_CHECKPOINT_TOKENS,
+} from "@suiming/sdk";
 import { candidateFromStoryFiles, changeOperationsBetween } from "../artifact/change-operations.js";
 import { ArtifactError } from "../artifact/errors.js";
 import { readOpenStoryDirectory, unrecognizedPaths } from "../artifact/open-story-directory.js";
@@ -39,8 +45,11 @@ export interface SuimingHarnessOptions {
 	/** turn / Task span 的根；模型调用 span 挂在它们下面。缺省 NOOP。 */
 	telemetryContext?: TelemetryContext;
 	now?: () => Date;
-	/** 每轮用量检查点（折算 token，见 weightedUsage）；缺省 TURN_USAGE_CHECKPOINT_TOKENS。 */
-	turnUsageCheckpointTokens?: number;
+	/**
+	 * 每轮用量检查点（折算 token，见 weightedUsage）；缺省 TURN_USAGE_CHECKPOINT_TOKENS。给函数时每个 turn 开始读一次，
+	 * 桌面与 CLI 传的是读 config.toml 的函数，设置页改了下一轮就生效。
+	 */
+	turnUsageCheckpointTokens?: number | (() => number | Promise<number>);
 }
 
 /**
@@ -55,7 +64,7 @@ export interface SuimingHarnessOptions {
  * 600 万的依据：折算后空转 4,620 万，最重的正常单轮（斗破整本抽取）880 万撞线一次，三国分段加整合 485 万一轮做完；
  * 在 GPT-6.1 Sol 上约 $12，DeepSeek Flash 约 $1.7，Claude Opus 约 $24。
  */
-export const TURN_USAGE_CHECKPOINT_TOKENS = 6_000_000;
+export const TURN_USAGE_CHECKPOINT_TOKENS: number = USAGE_CHECKPOINT_TOKENS.default;
 
 /** 折算用量：未缓存输入与缓存写按一，缓存读按一成，输出按五倍——主流模型目录价的大致比例，不随单价变。 */
 export function weightedUsage(usage: Pick<ModelUsage, "input" | "cacheRead" | "cacheWrite" | "output">): number {
@@ -206,6 +215,7 @@ export class HarnessSession {
 	/** 本 turn 里根与全部子任务已确认的折算用量与估算花费；用量检查点看前者，停下时两样都报。 */
 	#usageTokens = 0;
 	#spentUsd = 0;
+	readonly #usageCheckpoint: number;
 	constructor(
 		engine: SuimingHarness,
 		input: {
@@ -217,9 +227,11 @@ export class HarnessSession {
 			signal: AbortSignal | undefined;
 			retryUnknownModelCall?: boolean;
 			telemetry: TelemetryContext;
+			usageCheckpoint: number;
 		},
 	) {
 		this.#engine = engine;
+		this.#usageCheckpoint = input.usageCheckpoint;
 		this.sessionId = input.sessionId;
 		this.checkoutPath = engine.project.paths.checkoutPath;
 		this.#base = input.base;
@@ -301,7 +313,7 @@ export class HarnessSession {
 
 	/** 每次模型请求之前：本 turn 的折算用量到了检查点就不再发。在途的请求照常收完，超出的只有它们。 */
 	#throwIfUsageCheckpoint(): void {
-		const limit = this.#engine.turnUsageCheckpointTokens;
+		const limit = this.#usageCheckpoint;
 		if (this.#usageTokens < limit) return;
 		const tenThousands = (tokens: number) => Math.round(tokens / 10_000);
 		const spent = this.#spentUsd > 0 ? `，按模型目录价估算 $${this.#spentUsd.toFixed(2)}` : "";
@@ -782,7 +794,7 @@ export class SuimingHarness {
 	readonly telemetry: TelemetryContext;
 	readonly #models: ModelGateway;
 	readonly now: () => Date;
-	readonly turnUsageCheckpointTokens: number;
+	readonly #usageCheckpoint: () => number | Promise<number>;
 
 	constructor(options: SuimingHarnessOptions) {
 		this.project = options.project;
@@ -790,7 +802,8 @@ export class SuimingHarness {
 		this.telemetry = options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT;
 		this.#models = options.models;
 		this.now = options.now ?? (() => new Date());
-		this.turnUsageCheckpointTokens = options.turnUsageCheckpointTokens ?? TURN_USAGE_CHECKPOINT_TOKENS;
+		const checkpoint = options.turnUsageCheckpointTokens ?? TURN_USAGE_CHECKPOINT_TOKENS;
+		this.#usageCheckpoint = typeof checkpoint === "number" ? () => checkpoint : checkpoint;
 	}
 
 	bindModel(profileId: ModelProfileId, snapshot?: ModelBindingSnapshot): Promise<BoundModelProfile> {
@@ -972,6 +985,7 @@ export class SuimingHarness {
 						signal: options.signal,
 						retryUnknownModelCall: options.retryUnknownModelCall ?? false,
 						telemetry: span,
+						usageCheckpoint: await this.#usageCheckpoint(),
 					});
 					events.refresh();
 					start = await turnStart(session);
