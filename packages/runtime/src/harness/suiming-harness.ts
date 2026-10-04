@@ -925,6 +925,14 @@ export class SuimingHarness {
 		}
 		const lease = this.#lease();
 		const ownerId = lease.ownerId as string;
+		// 先订阅再 startTurn：RUN_STARTED 与紧随其后的状态快照由 startTurn 的命令落盘，订阅晚了它们就只在历史里，
+		// `suim session send --events` 与桌面 attach 都收不到这个 turn 的开头（2026-10-04 补测试时发现）。
+		const events = new SessionEventStream(sessionId, this.now, {
+			history: this.project.readSessionEvents(sessionId),
+			read: (after) => this.project.readSessionEvents(sessionId, after),
+			persist: (event) => this.project.appendSessionEvents([event], { sessionId, ownerId }),
+		});
+		if (options.onEvent !== undefined) events.subscribe(options.onEvent);
 		const record = execution.startTurn({
 			commandId: `${sessionId}:turn:start:${before.version}`,
 			sessionId,
@@ -934,12 +942,7 @@ export class SuimingHarness {
 			fromPaused: before.status === "paused",
 		});
 		execution.bindOwner(sessionId, ownerId);
-		const events = new SessionEventStream(sessionId, this.now, {
-			history: this.project.readSessionEvents(sessionId),
-			read: (after) => this.project.readSessionEvents(sessionId, after),
-			persist: (event) => this.project.appendSessionEvents([event], { sessionId, ownerId }),
-		});
-		if (options.onEvent !== undefined) events.subscribe(options.onEvent);
+		events.refresh();
 		const endTurn = (status: "idle" | "paused", failure?: ExecutionFailure): SessionRecord =>
 			execution.endTurn({
 				commandId: `${sessionId}:turn:end:${execution.session(sessionId).version}`,

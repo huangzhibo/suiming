@@ -38,6 +38,7 @@ import {
 	SuimCliDesignImpactDataSchema,
 	SuimCliDiffDataSchema,
 	SuimCliErrorSchema,
+	SuimCliEventSchema,
 	type SuimCliIo,
 	SuimCliProjectStatusDataSchema,
 	SuimCliRankDataSchema,
@@ -642,6 +643,39 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 		await rm(exportRoot, { recursive: true, force: true });
+	}
+});
+
+test("session send --events 在最终响应之前逐行输出 SessionEvent 信封：这个 turn 从 RUN_STARTED 起的持久事件一条不少", async () => {
+	const checkoutPath = await fixture();
+	try {
+		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
+		const cli = harness(checkoutPath, designRunGateway());
+		const exitCode = await runSuimCli(["--json", "session", "send", "--events", "让诈降的代价当场可见"], cli.io);
+		assert.equal(exitCode, SUIM_CLI_EXIT.success, cli.stdout.at(-1));
+		const lines = cli.stdout.map((chunk) => JSON.parse(chunk) as Record<string, unknown>);
+		const final = lines.at(-1) as Record<string, unknown>;
+		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, final.data));
+		const streamed = lines.slice(0, -1);
+		assert.ok(streamed.length > 0);
+		for (const line of streamed) assert.ok(Value.Check(SuimCliEventSchema, line), JSON.stringify(line));
+		const sessionId = (final.data as { session: { id: string } }).session.id;
+		const persisted = (
+			(await jsonCommand(checkoutPath, ["session", "events", sessionId])).value.data as {
+				events: { id: string; event: { type: string } }[];
+			}
+		).events;
+		// 新 session 的创建快照在 turn 之前落盘，RUN_STARTED 之后紧跟着一份新的完整快照，不必补发。
+		// 2026-10-04 补这条测试时发现 RUN_STARTED 本身也没流出来：订阅晚于 startTurn 落盘。
+		const started = persisted.findIndex((event) => event.event.type === "RUN_STARTED");
+		assert.ok(started >= 0);
+		assert.deepEqual(
+			streamed.map((line) => (line.event as { id: string }).id),
+			persisted.slice(started).map((event) => event.id),
+			"流式输出的就是这个 turn 持久化之后的事件，不多不少",
+		);
+	} finally {
+		await rm(checkoutPath, { recursive: true, force: true });
 	}
 });
 
