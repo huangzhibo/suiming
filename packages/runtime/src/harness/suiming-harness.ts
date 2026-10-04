@@ -39,19 +39,28 @@ export interface SuimingHarnessOptions {
 	/** turn / Task span 的根；模型调用 span 挂在它们下面。缺省 NOOP。 */
 	telemetryContext?: TelemetryContext;
 	now?: () => Date;
-	/** 每轮用量检查点（美元，按模型目录价估算）；缺省 TURN_SPEND_CHECKPOINT_USD。 */
-	turnSpendCheckpointUsd?: number;
+	/** 每轮用量检查点（折算 token，见 weightedUsage）；缺省 TURN_USAGE_CHECKPOINT_TOKENS。 */
+	turnUsageCheckpointTokens?: number;
 }
 
 /**
- * 每轮用量检查点：一个 turn 里根 Agent 与它的全部子任务按模型目录价估算的花费合计到这里，下一次请求之前停下，
- * 回 idle 并说明花了多少，作者说一句「继续」就从原处接着跑（子任务从自己的 checkpoint 续）。不是预算：不砍掉
- * 任何产出，也不替作者判断值不值，只保证没人看着时一轮最多花掉这么多。
- * 2026-10-04 抽三国时 5 个补全子任务在压缩里空转 19 分钟、估算 $92，没有任何东西停住它们；那个循环修掉了，
- * 但循环长什么样事先列不全，兜底必须与循环的形状无关。$10 的依据：实测最重的合法单轮是斗破 120 章整本抽取，
- * 387 次调用 $14.99，撞线一次；普通的写一节、审一轮都在 $1 以内。目录价为 0 的模型不触发——它不花钱。
+ * 每轮用量检查点：一个 turn 里根 Agent 与它的全部子任务的折算用量合计到这里，下一次请求之前停下，回 idle 并说明
+ * 用了多少，作者说一句「继续」就从原处接着跑（子任务从自己的 checkpoint 续）。不是预算：不砍掉任何产出，也不替
+ * 作者判断值不值，只保证没人看着时一轮最多用掉这么多。
+ * 2026-10-04 抽三国时 5 个补全子任务在压缩里空转 19 分钟、估算 $92，没有任何东西停住它们；那个循环修掉了，但循环
+ * 长什么样事先列不全，兜底必须与循环的形状无关。
+ * 不按美元算：同样的工作量在 DeepSeek Flash 上约是 GPT-6.1 Sol 的十分之一、在 Claude Opus 上约是两倍，一个美元数
+ * 对便宜模型等于放任空转、对贵模型又频繁打断正常工作；一轮里根、writer、reviewer 也可能是不同的模型。也不按原始
+ * token 总数算：空转 4,844 万、斗破整本抽取 3,949 万，分不开——空转几乎全是未缓存请求，正常的长任务大多命中缓存。
+ * 600 万的依据：折算后空转 4,620 万，最重的正常单轮（斗破整本抽取）880 万撞线一次，三国分段加整合 485 万一轮做完；
+ * 在 GPT-6.1 Sol 上约 $12，DeepSeek Flash 约 $1.7，Claude Opus 约 $24。
  */
-export const TURN_SPEND_CHECKPOINT_USD = 10;
+export const TURN_USAGE_CHECKPOINT_TOKENS = 6_000_000;
+
+/** 折算用量：未缓存输入与缓存写按一，缓存读按一成，输出按五倍——主流模型目录价的大致比例，不随单价变。 */
+export function weightedUsage(usage: Pick<ModelUsage, "input" | "cacheRead" | "cacheWrite" | "output">): number {
+	return usage.input + usage.cacheWrite + usage.cacheRead * 0.1 + usage.output * 5;
+}
 
 function usageAttributes(prefix: string, usage: ModelUsage): Record<string, number> {
 	return {
@@ -194,7 +203,8 @@ export class HarnessSession {
 	#telemetry: TelemetryContext;
 	#lastReply = "";
 	#revisions = 0;
-	/** 本 turn 里根与全部子任务已确认的估算花费；用量检查点看它。 */
+	/** 本 turn 里根与全部子任务已确认的折算用量与估算花费；用量检查点看前者，停下时两样都报。 */
+	#usageTokens = 0;
 	#spentUsd = 0;
 	constructor(
 		engine: SuimingHarness,
@@ -289,13 +299,15 @@ export class HarnessSession {
 			throw new SuimingHarnessError("run_interrupted", reasonText(this.#signal, "turn 已被作者打断"));
 	}
 
-	/** 每次模型请求之前：本 turn 的估算花费到了检查点就不再发。在途的请求照常收完，超出的只有它们。 */
-	#throwIfSpendCheckpoint(): void {
-		const limit = this.#engine.turnSpendCheckpointUsd;
-		if (this.#spentUsd < limit) return;
+	/** 每次模型请求之前：本 turn 的折算用量到了检查点就不再发。在途的请求照常收完，超出的只有它们。 */
+	#throwIfUsageCheckpoint(): void {
+		const limit = this.#engine.turnUsageCheckpointTokens;
+		if (this.#usageTokens < limit) return;
+		const tenThousands = (tokens: number) => Math.round(tokens / 10_000);
+		const spent = this.#spentUsd > 0 ? `，按模型目录价估算 $${this.#spentUsd.toFixed(2)}` : "";
 		throw new SuimingHarnessError(
-			"turn_spend_checkpoint",
-			`这一轮按模型目录价估算已用 $${this.#spentUsd.toFixed(2)}，到了每轮 $${limit} 的用量检查点，先停在这里。进度都保留着，说一句「继续」就从原处接着做。`,
+			"turn_usage_checkpoint",
+			`这一轮的用量折合 ${tenThousands(this.#usageTokens)} 万 token${spent}，到了每轮 ${tenThousands(limit)} 万的用量检查点，先停在这里。进度都保留着，说一句「继续」就从原处接着做。`,
 		);
 	}
 
@@ -486,7 +498,7 @@ export class HarnessSession {
 			const code = executionFailure(error).code;
 			if (
 				code !== "run_interrupted" &&
-				code !== "turn_spend_checkpoint" &&
+				code !== "turn_usage_checkpoint" &&
 				!PAUSE_CODES.has(code) &&
 				this.#writable()
 			) {
@@ -614,10 +626,11 @@ export class HarnessSession {
 			telemetryContext: input.telemetry,
 			onTurnStart: () => {
 				this.throwIfInterrupted();
-				this.#throwIfSpendCheckpoint();
+				this.#throwIfUsageCheckpoint();
 			},
 			onModelCall: (usage, callId) => {
 				input.recordUsage(callId, usage);
+				this.#usageTokens += weightedUsage(usage);
 				if (Number.isFinite(usage.costUsd)) this.#spentUsd += usage.costUsd;
 			},
 			...(input.steering
@@ -769,7 +782,7 @@ export class SuimingHarness {
 	readonly telemetry: TelemetryContext;
 	readonly #models: ModelGateway;
 	readonly now: () => Date;
-	readonly turnSpendCheckpointUsd: number;
+	readonly turnUsageCheckpointTokens: number;
 
 	constructor(options: SuimingHarnessOptions) {
 		this.project = options.project;
@@ -777,7 +790,7 @@ export class SuimingHarness {
 		this.telemetry = options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT;
 		this.#models = options.models;
 		this.now = options.now ?? (() => new Date());
-		this.turnSpendCheckpointUsd = options.turnSpendCheckpointUsd ?? TURN_SPEND_CHECKPOINT_USD;
+		this.turnUsageCheckpointTokens = options.turnUsageCheckpointTokens ?? TURN_USAGE_CHECKPOINT_TOKENS;
 	}
 
 	bindModel(profileId: ModelProfileId, snapshot?: ModelBindingSnapshot): Promise<BoundModelProfile> {

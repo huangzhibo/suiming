@@ -73,8 +73,10 @@ export {
 	type TaskHandle,
 	type TaskOutcome,
 	type TaskSpec,
+	TURN_USAGE_CHECKPOINT_TOKENS,
 	type TurnOptions,
 	type TurnOutcome,
+	weightedUsage,
 } from "./suiming-harness.js";
 export {
 	type CandidateScanner,

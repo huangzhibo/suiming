@@ -21,7 +21,7 @@ export function sessionProblem(session: SessionSummary) {
 		action_effect_unknown: { title: "有一个动作停在半途", hint: "查看原因后继续，已保存的结果不会重复执行。" },
 		binding_mismatch: { title: "模型或工具面已变化", hint: "换回原来的模型继续，或停止后再换。" },
 		run_no_progress: { title: "需要调整方向", hint: "模型接连做了被拒绝的动作。在输入框补充要求后继续。" },
-		turn_spend_checkpoint: {
+		turn_usage_checkpoint: {
 			title: "到了这一轮的用量检查点",
 			hint: "进度与子任务都已保存。发一条消息（比如「继续」）就从原处接着做。",
 		},

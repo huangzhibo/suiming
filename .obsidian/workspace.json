@@ -1,0 +1,194 @@
+{
+  "main": {
+    "id": "5d272f0b4b0d8d0b",
+    "type": "split",
+    "children": [
+      {
+        "id": "2447eab8cf2766d9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9965ddb1e050c0a9",
+            "type": "leaf",
+            "state": {
+              "type": "image",
+              "state": {
+                "file": "promo/cards/out-doupo/doupo-3-character.png"
+              },
+              "icon": "lucide-image",
+              "title": "doupo-3-character"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "872ae124cf82c4ee",
+    "type": "split",
+    "children": [
+      {
+        "id": "1736aa2af856a723",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "191d37383b010184",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "50f2c01de5078f60",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "5d943aeede212c9f",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "9727d5bcc7fb5821",
+    "type": "split",
+    "children": [
+      {
+        "id": "017c47bc3951aca1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "84373a5ae95a5928",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "promo/cards/out-doupo/doupo-3-character.png",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "反向链接"
+            }
+          },
+          {
+            "id": "57c674cc805562bc",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "promo/cards/out-doupo/doupo-3-character.png",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "出链"
+            }
+          },
+          {
+            "id": "0d86ecc1667f499d",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "457157e88db2ab7e",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "96b60868bab2f607",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "promo/cards/out-doupo/doupo-3-character.png",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "9965ddb1e050c0a9",
+  "lastOpenFiles": [
+    "promo/cards/out-doupo/doupo-2-contract.png",
+    "promo/cards/out-doupo/doupo-1-axis.png"
+  ]
+}

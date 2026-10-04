@@ -27,6 +27,8 @@ import {
 	SqliteLocalStore,
 	SuimingHarness,
 	SuimingHarnessError,
+	TURN_USAGE_CHECKPOINT_TOKENS,
+	weightedUsage,
 } from "../src/index.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
@@ -36,7 +38,7 @@ async function fixture(
 	options: {
 		telemetryContext?: TelemetryContext;
 		models?: FauxModelDefinition[];
-		turnSpendCheckpointUsd?: number;
+		turnUsageCheckpointTokens?: number;
 	} = {},
 ) {
 	const { telemetryContext } = options;
@@ -52,9 +54,9 @@ async function fixture(
 	const gateway = new ModelGateway(models, { profiles: { main: profile, reviewer: profile } });
 	const harness = new SuimingHarness({
 		...(telemetryContext ? { telemetryContext } : {}),
-		...(options.turnSpendCheckpointUsd === undefined
+		...(options.turnUsageCheckpointTokens === undefined
 			? {}
-			: { turnSpendCheckpointUsd: options.turnSpendCheckpointUsd }),
+			: { turnUsageCheckpointTokens: options.turnUsageCheckpointTokens }),
 		project,
 		models: gateway,
 	});
@@ -425,25 +427,39 @@ test("连续五次回复的动作都被拒绝、每次都不一样：同样以 r
 	}
 });
 
-/** 只按输出计价，每个输出 token $0.001：一次请求花多少由回复本身的长短决定，测试里算得准。 */
+/** 只按输出计价，每个输出 token $0.001：花费由回复本身的长短决定，测试里算得准。 */
 const PRICED_MODEL: FauxModelDefinition = {
 	id: "priced",
 	cost: { input: 0, output: 1_000, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 128_000,
 };
-/** 4 万字符的回复按 1 万个输出 token 计，约 $10。 */
+/** 4 万字符的回复按 1 万个输出 token 计：折算用量 5 万（输出按五倍），在 PRICED_MODEL 上约 $10。 */
 const expensive = (toolCall: ReturnType<typeof fauxToolCall>) =>
 	fauxAssistantMessage([fauxText("x".repeat(40_000)), toolCall]);
 
-test("一轮的估算花费到用量检查点：下一次请求之前停下回 idle 并说明花了多少；作者说继续就接着跑", async () => {
+test("折算用量分得开空转与正常的重活：缓存读按一成、输出按五倍；原始 token 总数分不开", () => {
+	// 真实运行的 token 构成（GPT-6.1 Sol）。空转几乎全是未缓存请求，正常的长任务大多命中缓存。
+	const loop = { input: 45_185_916, cacheRead: 3_117_696, cacheWrite: 0, output: 131_591 }; // 三国补全空转，$92
+	const doupo = { input: 3_387_406, cacheRead: 35_731_072, cacheWrite: 0, output: 366_577 }; // 斗破整本抽取，$14
+	const sanguo = { input: 1_595_826, cacheRead: 15_520_384, cacheWrite: 0, output: 340_998 }; // 三国分段 + 整合，$8
+	const raw = (u: typeof loop) => u.input + u.cacheRead + u.cacheWrite + u.output;
+	assert.ok(raw(loop) < raw(doupo) * 1.3, "原始 token 总数上两者差不到三成");
+	assert.ok(weightedUsage(loop) > weightedUsage(doupo) * 5, "折算之后差五倍以上");
+	assert.ok(weightedUsage(loop) > TURN_USAGE_CHECKPOINT_TOKENS * 7, "空转在检查点的七分之一处就会停");
+	assert.ok(weightedUsage(doupo) > TURN_USAGE_CHECKPOINT_TOKENS, "最重的正常单轮撞线一次");
+	assert.ok(weightedUsage(sanguo) < TURN_USAGE_CHECKPOINT_TOKENS, "三国的分段加整合一轮做完");
+});
+
+test("一轮的折算用量到检查点：下一次请求之前停下回 idle，说明用了多少、估算花了多少；作者说继续就接着跑", async () => {
 	// 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92，没有任何东西停住它们。
-	const f = await fixture({ models: [PRICED_MODEL], turnSpendCheckpointUsd: 5 });
+	const f = await fixture({ models: [PRICED_MODEL], turnUsageCheckpointTokens: 50_000 });
 	try {
 		f.provider.setResponses([expensive(fauxToolCall("project_status", {})), reply("不该发出的第二次请求")]);
 		const stopped = await f.say("看看作品状态，然后一直做下去");
 		assert.equal(stopped.session.status, "idle");
-		assert.equal(stopped.failure?.code, "turn_spend_checkpoint");
-		assert.match(stopped.failure?.message ?? "", /\$10\.\d{2}/u, "说清这一轮估算花了多少");
+		assert.equal(stopped.failure?.code, "turn_usage_checkpoint");
+		assert.match(stopped.failure?.message ?? "", /折合 \d+ 万 token/u, "说清这一轮用了多少");
+		assert.match(stopped.failure?.message ?? "", /\$10\.\d{2}/u, "也说估算花了多少");
 		assert.match(stopped.failure?.message ?? "", /继续/u);
 		assert.equal(f.provider.state.callCount, 1, "到线之后一个请求也不再发");
 		f.provider.setResponses([
@@ -463,8 +479,9 @@ test("一轮的估算花费到用量检查点：下一次请求之前停下回 i
 	}
 });
 
-test("用量检查点落在子任务里：根与子任务合计；子任务不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
-	const f = await fixture({ models: [PRICED_MODEL], turnSpendCheckpointUsd: 5 });
+test("用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
+	// 缺省的 faux 模型目录价为 0：按花费算的检查点在这里永远不触发，换成 DeepSeek 这类便宜模型也差不多。
+	const f = await fixture({ turnUsageCheckpointTokens: 50_000 });
 	try {
 		f.provider.setResponses([
 			call("delegate", { goal: "读黄盖的人物档后交付", profile: "main" }),
@@ -472,7 +489,8 @@ test("用量检查点落在子任务里：根与子任务合计；子任务不�
 			reply("不该发出：子任务已到用量检查点"),
 		]);
 		const stopped = await f.say("让子任务看看黄盖");
-		assert.equal(stopped.failure?.code, "turn_spend_checkpoint");
+		assert.equal(stopped.failure?.code, "turn_usage_checkpoint");
+		assert.doesNotMatch(stopped.failure?.message ?? "", /\$/u, "目录价为 0 就不报花费");
 		assert.equal(f.provider.state.callCount, 2);
 		const [task] = f.project.loadExecutionState().tasks;
 		assert.equal(task?.status, "interrupted", "不是子任务失败：父模型收到失败会重派一个，从头再花一遍");

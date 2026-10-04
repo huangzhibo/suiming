@@ -305,7 +305,9 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 **没有预算，有每轮用量检查点。**创作路径不设调用次数、token 或花费上限：曾经的 `RunBudget`（maxModelCalls / maxTotalTokens / maxCostUsd）默认就是空对象，没有一个真实 Run 设过它，按次或按量的上限还会误砍正常产出。根 Agent 与子任务的 `maxTurns` 都是 `Number.MAX_SAFE_INTEGER`，唯一的上限是 `rank-experiment.ts` 里评委的 `JUDGE_MAX_TURNS = 3`。留下的是**用量**：session 累计的已知 usage 与未确认调用数照常显示（`model_call_unknown` 时作者要看的就是它），在途调用可能超出估计，缺失用量不能当作已确认的零。
 
-**每轮用量检查点**（2026-10-04 加）：一个 turn 里根 Agent 与全部子任务按模型目录价估算的花费合计到 `TURN_SPEND_CHECKPOINT_USD`（$10），下一次请求之前停下，turn 回 `idle`，`lastFailure` 记 `turn_spend_checkpoint` 并说明花了多少。子任务不算失败（算失败的话父模型会重派一个、从头再花一遍），turn 收口时标 interrupted；作者说一句「继续」，根从原 checkpoint 续，委派动作按同一个 key 找回子任务，从子任务自己的 checkpoint 接着跑。它与预算的区别：不砍任何产出，不替作者判断值不值，只保证没人看着时一轮最多花掉这么多。起因是 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92（[验证记录](validation/2026-10-04-sanguo-example/README.md)）——那个循环当天修了，但循环长什么样事先列不全，兜底必须与形状无关。$10 的依据：实测最重的合法单轮是斗破 120 章整本抽取（387 次调用、$14.99），会撞线一次；写一节、审一轮都在 $1 以内。在途的请求照常收完，超出的只有它们（并行的同组子任务各多一次）。目录价为 0 的模型不触发，它不花钱。阈值现在只能由 `SuimingHarnessOptions.turnSpendCheckpointUsd` 改，作者能调的入口（config.toml 或设置页）还没做。
+**每轮用量检查点**（2026-10-04 加）：一个 turn 里根 Agent 与全部子任务的折算用量合计到 `TURN_USAGE_CHECKPOINT_TOKENS`（600 万），下一次请求之前停下，turn 回 `idle`，`lastFailure` 记 `turn_usage_checkpoint` 并说明用了多少、按目录价估算花了多少。折算用量（`weightedUsage`）是未缓存输入与缓存写按一、缓存读按一成、输出按五倍，取主流模型目录价的大致比例，不随单价变。子任务不算失败（算失败的话父模型会重派一个、从头再花一遍），turn 收口时标 interrupted；作者说一句「继续」，根从原 checkpoint 续，委派动作按同一个 key 找回子任务，从子任务自己的 checkpoint 接着跑。它与预算的区别：不砍任何产出，不替作者判断值不值，只保证没人看着时一轮最多用掉这么多。起因是 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92（[验证记录](validation/2026-10-04-sanguo-example/README.md)）——那个循环当天修了，但循环长什么样事先列不全，兜底必须与形状无关。
+
+单位为什么是折算用量。当天先做的是按美元（$10）停，作者指出不同模型成本不一样：同样一次斗破整本抽取，按目录价在 GPT-6.1 Sol 上约 $15、DeepSeek Flash 上约 $1、Claude Opus 5.5 上约 $30。一个美元数对便宜模型等于放任空转（DeepSeek 上空转要烧掉十倍于最重正常任务的量才停），对贵模型又频繁打断正常工作；一轮里根、writer、reviewer 也可能是不同模型，只有与单价无关的量能相加。原始 token 总数也不行：三国空转 4,844 万、斗破整本抽取 3,949 万，分不开——空转几乎全是未缓存请求（缓存命中 6%），正常的长任务大多命中缓存。折算之后空转 4,620 万、斗破整本抽取 880 万、三国分段加整合 485 万，差得开。600 万的依据就是这三个数：最重的正常单轮撞线一次，三国那种一轮做完，空转在七分之一处停。换成钱，在 GPT-6.1 Sol 上约 $12、DeepSeek Flash 约 $1.7、Claude Opus 约 $24，对应的是同样的工作量。在途的请求照常收完，超出的只有它们（并行的同组子任务各多一次）。阈值现在只能由 `SuimingHarnessOptions.turnUsageCheckpointTokens` 改，作者能调的入口（config.toml 或设置页）还没做。
 
 兜底一共四道：`run_no_progress`（第 4 节）、子任务的 `task_not_submitted`、用量检查点与作者打断。它们都停不住「持续产出但方向错了」的 turn——检查点只封住它花多少，不判断方向，这是有意的取舍，代价见第 4 节「进展型兜底」。**这两段是「没有预算」与用量检查点的完整说明，其它文档只留一句加链接。**
 
@@ -317,7 +319,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 | `action_effect_unknown` | 恢复时某动作停在 `effect_pending` 且无法核对 | 查看该动作后 resume 或 interrupt |
 | `binding_mismatch` | 中途恢复时工具面 / 模型与 checkpoint 不符 | 换回原绑定 resume，或 interrupt 后在 turn 边界重绑 |
 
-其余情况都不需要作者动手：`run_no_progress`、`turn_spend_checkpoint` → 结束本 turn 回 `idle`，作者的下一条消息就是继续（第 4 节与上文）；`file_write_conflict` → 作为工具错误交给模型（它读到的已经是新内容，重读再改），不结束 turn；`process_restart` → 没有 `effect_pending` 时直接 `idle` 并记一句，有则落进上面三种之一。`resume` 只服务这三种，不默认重发 unknown 的请求；`send` 在 `paused` 上拒绝并带 reason。
+其余情况都不需要作者动手：`run_no_progress`、`turn_usage_checkpoint` → 结束本 turn 回 `idle`，作者的下一条消息就是继续（第 4 节与上文）；`file_write_conflict` → 作为工具错误交给模型（它读到的已经是新内容，重读再改），不结束 turn；`process_restart` → 没有 `effect_pending` 时直接 `idle` 并记一句，有则落进上面三种之一。`resume` 只服务这三种，不默认重发 unknown 的请求；`send` 在 `paused` 上拒绝并带 reason。
 
 ### 对话模型选择与默认配置
 
@@ -427,8 +429,9 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | **`run_command` 中途退出** | 有结果复用；停在 effect_pending 不重跑，模型收到「结果未知」与文件差集 | **没有测试**（切片 F） |
 | 连续三次同一被拒动作 | 结束本 turn 回 `idle`，`lastFailure` 记 `run_no_progress`；下一条消息续 | `agent`「连续重复同一被拒绝动作：turn 以 run_no_progress 结束回 idle；作者下一句就能续」 |
 | 连续五次回复的动作全被拒、每次不同 | 同上 | `agent`「连续五次回复的动作都被拒绝、每次都不一样：同样以 run_no_progress 结束，不等它换着花样一直试」 |
-| 一轮估算花费到用量检查点 | 下一次请求之前停，回 `idle` 记 `turn_spend_checkpoint` 与花了多少；下一条消息从原处续 | `agent`「一轮的估算花费到用量检查点：下一次请求之前停下回 idle 并说明花了多少；作者说继续就接着跑」 |
-| 用量检查点落在子任务里 | 根与子任务合计；子任务标 interrupted 不算失败，续跑时同一个子任务从自己的 checkpoint 接着跑 | `agent`「用量检查点落在子任务里：根与子任务合计；子任务不算失败，继续时从它自己的 checkpoint 接着跑」 |
+| 一轮折算用量到检查点 | 下一次请求之前停，回 `idle` 记 `turn_usage_checkpoint` 与用了多少；下一条消息从原处续 | `agent`「一轮的折算用量到检查点：下一次请求之前停下回 idle，说明用了多少、估算花了多少；作者说继续就接着跑」 |
+| 用量检查点落在子任务里、模型目录价为 0 | 根与子任务合计，与单价无关；子任务标 interrupted 不算失败，续跑时同一个子任务从自己的 checkpoint 接着跑 | `agent`「用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时从它自己的 checkpoint 接着跑」 |
+| 折算口径分得开空转与正常长任务 | 三国空转、斗破整本抽取、三国分段加整合的真实 token 构成：空转超阈值七倍，最重的正常单轮撞线一次，三国一轮做完 | `agent`「折算用量分得开空转与正常的重活：缓存读按一成、输出按五倍；原始 token 总数分不开」 |
 | 一个会话里工具调用越来越多 | 每条执行命令只写自己改动的行；整份导出与整份重读执行状态的次数与工具轮数无关 | `agent`「执行命令只写自己改动的行：一个 turn 里整份导出与整份重读执行状态的次数与工具轮数无关」；单轮耗时随轮数的变化用 `docs/validation/2026-10-01-harness-review/bench.mts` 量，不做计时断言 |
 | 启动 / 恢复的初始化 I/O 失败 | 记录原因、释放 lease；checkout 不动 | `agent`「turn 开始时读取作品失败：回 idle 记一句并释放 lease，下一句直接重试」「续跑时读取权威状态失败也释放 lease，并保留 checkout 里的候选文件」 |
 | 收口等待本身卡住 | 有界返回，不把调用方挂死 | `local-session-controller`「waitForIdle 有界：请求收不了口时按时返回，不把调用方挂死」 |
