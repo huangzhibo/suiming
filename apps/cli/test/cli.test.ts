@@ -1511,6 +1511,19 @@ test("session interrupt：paused 的放弃核对回 idle；在别的进程里跑
 		const error = elsewhere.value.error as { code: string; message: string };
 		assert.equal(error.code, "session_not_active_in_process");
 		assert.match(error.message, /另一个进程/u);
+
+		// id 打错是作者正常操作会撞到的：与桌面同一个错误码，中文说明（原来是 execution_not_found 加英文）
+		for (const args of [
+			["session", "interrupt", "nope"],
+			["session", "show", "nope"],
+			["session", "events", "nope"],
+		]) {
+			const missing = await jsonCommand(checkoutPath, args);
+			assert.equal(missing.exitCode, SUIM_CLI_EXIT.notFound, args.join(" "));
+			const failure = missing.value.error as { code: string; message: string };
+			assert.equal(failure.code, "session_not_found", args.join(" "));
+			assert.match(failure.message, /找不到对话：nope/u);
+		}
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 	}

@@ -8,6 +8,7 @@ import {
 	modelProfileIdSchema,
 	modelThinkingSchema,
 	reviewSummarySchema,
+	revisionSummarySchema,
 	rollbackResultSchema,
 	sessionSummarySchema,
 	taskSummarySchema,
@@ -26,7 +27,7 @@ const file = Type.Object(
 	{ additionalProperties: false },
 );
 const session = sessionSummarySchema;
-const revision = Type.Object({ id, parentId: Type.Union([id, Type.Null()]) }, { additionalProperties: false });
+const revision = revisionSummarySchema;
 /**
  * 两侧有差别的作品文件清单，project.diff 与 revision.diff 共用。只有路径与增删改：比较页选中哪个文件，
  * 再用 workspace.file.read（带或不带 revisionId）读那一个的两侧。2026-10-02 之前这里带全部改动文件的正文，

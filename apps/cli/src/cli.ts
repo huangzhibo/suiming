@@ -332,7 +332,7 @@ function sessionTitle(service: LocalProjectService, sessionId: string): string {
 function sessionShowData(service: LocalProjectService, sessionId: string) {
 	const snapshot = service.loadExecutionEntities();
 	const session = snapshot.sessions.find((item) => item.id === sessionId);
-	if (session === undefined) throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
+	if (session === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 	return {
 		session: sessionSummary(session, sessionTitle(service, sessionId)),
 		tasks: taskSummaries(snapshot, sessionId),
@@ -343,7 +343,7 @@ function sessionShowData(service: LocalProjectService, sessionId: string) {
 function sessionTurnData(service: LocalProjectService, sessionId: string) {
 	const snapshot = service.loadExecutionEntities();
 	const session = snapshot.sessions.find((item) => item.id === sessionId);
-	if (session === undefined) throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
+	if (session === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 	const messages = productEventSnapshot(service.readSessionEvents(sessionId)).find(
 		(event) => event.type === "MESSAGES_SNAPSHOT",
 	);
@@ -1205,8 +1205,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 				withProject(projectPath(program), (service) => {
 					const snapshot = service.loadExecutionEntities();
 					const record = snapshot.sessions.find((item) => item.id === sessionId);
-					if (record === undefined)
-						throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
+					if (record === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 					// 每次 suim 调用都是新进程，不可能持有一个正在跑的 turn：那只能在跑它的进程里停，如实报错。
 					if (record.status === "running") throw notActiveInProcess(sessionId);
 					abandonPausedSession(service, sessionId);
@@ -1254,7 +1253,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 			await execute("session.events", () =>
 				withProject(projectPath(program), (service) => {
 					if (!service.loadExecutionEntities().sessions.some((session) => session.id === sessionId)) {
-						throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
+						throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 					}
 					const after = options.after ?? 0;
 					if (!Number.isInteger(after) || after < 0) {

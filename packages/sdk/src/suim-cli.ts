@@ -207,7 +207,7 @@ export const SuimCliCheckDataSchema = checkSummarySchema;
 
 /**
  * 与桌面 `project.commit` 是同一份 payload。CLI 侧曾多带一个 `diff`——那是 status 与 diff 还没
- * 分开时的便利；提交后要看改了什么，另取 `revision diff`。
+ * 分开时的便利；提交后要看改了什么，桌面用 `revision.diff`，host 的版本 id 就是 commit sha，直接 git diff。
  */
 export const SuimCliCommitDataSchema = commitResultSchema;
 
@@ -765,8 +765,9 @@ export const SuimCliSessionShowDataSchema = Type.Object(
 );
 
 /**
- * 命令目录（ADR-0009 决定 26）：每条命令绑定自己的输出 schema。CLI 输出前按它校验，
- * 测试与 host 也按它读取；Cloud Domain API 与桌面端 IPC 是同一目录的另一种传输。
+ * CLI 的命令目录：每条命令绑定自己的输出 schema。CLI 输出前按它校验，测试与 host 也按它读取。
+ * 桌面 IPC（`LOCAL_COMMANDS`）与 Cloud Domain API（`DOMAIN_API_ROUTES`）各有一份，三份共用 domain-schema
+ * 里的领域对象；为什么不合成一份见系统架构第 8 节。
  */
 export const SUIM_CLI_COMMAND_DATA = {
 	"project.init": SuimCliProjectInitDataSchema,

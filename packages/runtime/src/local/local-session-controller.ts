@@ -196,13 +196,13 @@ export class LocalSessionController {
 		const active = this.#active.get(sessionId);
 		if (active === undefined) {
 			const existing = this.#project.loadExecutionEntities().sessions.find((session) => session.id === sessionId);
-			if (existing === undefined) throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
+			if (existing === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 			if (existing.status !== "running") return existing;
 			throw notActiveInProcess(sessionId);
 		}
 		if (!active.controller.signal.aborted) active.controller.abort(new Error(reason));
 		const session = this.#project.loadExecutionEntities().sessions.find((item) => item.id === sessionId);
-		if (session === undefined) throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
+		if (session === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 		return session;
 	}
 
