@@ -1,7 +1,8 @@
-import { type AGUIEvent, EventSchemas, EventType } from "@ag-ui/core";
+import { type AGUIEvent, EventType } from "@ag-ui/core";
+import { EventSchemas } from "@ag-ui/core/schemas";
 import { type Static, type TSchema, type TUnsafe, Type } from "typebox";
 import { Value } from "typebox/value";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod/v4";
 import { executionFailureSchema, modelUsageSchema, sessionStatusSchema } from "./domain-schema.js";
 
 export type { AGUIEvent } from "@ag-ui/core";
@@ -9,11 +10,12 @@ export { EventType } from "@ag-ui/core";
 
 const nonempty = Type.String({ minLength: 1 });
 
-/** 标准字段直接来自上游；TypeBox 仅组合传输信封与 Suiming 扩展。 */
+/**
+ * 标准字段直接来自上游；TypeBox 仅组合传输信封与 Suiming 扩展。AG-UI 1.0 的 schema 用 zod v4 写，
+ * 由 zod 自带的转换生成 JSON Schema（0.0.x 时用的 zod-to-json-schema 只认 v3）。
+ */
 export const ProductEventSchema: TUnsafe<AGUIEvent> = Type.Unsafe<AGUIEvent>(
-	zodToJsonSchema(EventSchemas as unknown as Parameters<typeof zodToJsonSchema>[0], {
-		$refStrategy: "none",
-	}) as TSchema,
+	z.toJSONSchema(EventSchemas, { unrepresentable: "any" }) as TSchema,
 );
 /** `suiming.session`：session 状态的确认点投影。AG-UI 的 threadId 是 sessionId，runId 是 turn id。 */
 export const SuimingSessionNoticeSchema = Type.Object(

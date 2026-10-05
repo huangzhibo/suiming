@@ -230,7 +230,7 @@ turn 进行中可以查看尚未提交的候选，入口是状态栏的「N 个�
 | --- | --- | --- |
 | Story Artifact、派生视图、审稿、diff、版本历史 | Runtime 领域查询，桌面经 IPC，后续 Web 经 Domain API | 作品阅读、编辑、比较和准确详情 |
 | session / Task 状态 | 领域查询与状态通知 | 长对话、阶段成果和恢复位置 |
-| 消息、执行记录、tool、交互状态 | 持久 AG-UI + Suiming 扩展，经 IPC | Agent 交互 view state；TanStack AI client 管理消息，不拥有后台生命周期 |
+| 消息、执行记录、tool、交互状态 | 持久 AG-UI + Suiming 扩展，经 IPC | Agent 交互 view state；AG-UI 官方客户端 `@ag-ui/client` 管理消息，不拥有后台生命周期 |
 | 版本通知 | Suiming 类型化扩展 + 领域回读 | 告知变化并打开权威 diff |
 | 当前 route、筛选、选中对象、栏宽与滚动位置 | URL / client state | 可恢复的界面状态，不是作品或运行真源 |
 | trace 细节 | OpenTelemetry / 可选 Langfuse link | 开发和诊断入口，不复制成作者端通用观测系统 |

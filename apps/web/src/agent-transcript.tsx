@@ -1,13 +1,13 @@
 import type { SessionEvent, SuimingTurnSummary } from "@suiming/sdk";
-import { useChat } from "@tanstack/ai-react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronRight, Copy, Quote } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { invoke, ipcConnection } from "./bridge.js";
+import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
 import { messageReferences, taskKindLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
 import { Hint } from "./ui-bits.js";
+import { useConversation } from "./use-conversation.js";
 
 function MessageActions({ text, onReference }: { text: string; onReference(): void }) {
 	const [copied, setCopied] = useState(false);
@@ -213,26 +213,14 @@ export function Transcript({
 			}));
 		}
 	}, []);
-	const connection = useMemo(
-		() => ipcConnection(sessionId, onEvent, setConnectionState, history),
-		[sessionId, onEvent, history],
-	);
-	// isLoading 只在 connection.joinRun / send 路径置位，本仓的只读 attach 两者都没有，恒为 false；
-	// 流式状态取 sessionGenerating，它由 RUN_STARTED / RUN_FINISHED / RUN_ERROR 派生，subscribe 路径同样正确置位。
-	const { messages, sessionGenerating } = useChat({ threadId: sessionId, connection, live: true });
-	const rows: Row[] = messages.flatMap((message) => {
-		const text = message.parts.flatMap((part) => (part.type === "text" ? [part.content] : [])).join("");
-		if (!text || (message.metadata?.suiming?.taskKind && message.metadata.suiming.taskKind !== "agent")) return [];
-		return [
-			{
-				kind: "message" as const,
-				id: message.id,
-				sequence: order[message.id] ?? Number(message.metadata?.suiming?.sequence ?? 0),
-				role: message.role,
-				text,
-			},
-		];
-	});
+	const { messages, generating } = useConversation(sessionId, onEvent, setConnectionState, history);
+	const rows: Row[] = messages.map((message) => ({
+		kind: "message" as const,
+		id: message.id,
+		sequence: order[message.id] ?? message.sequence ?? 0,
+		role: message.role,
+		text: message.text,
+	}));
 	const latest = rows.at(-1)?.id;
 	const exported = rows
 		.map((row) => (row.kind === "message" ? `## ${row.role === "user" ? "作者" : "Suiming"}\n\n${row.text}` : ""))
@@ -281,10 +269,10 @@ export function Transcript({
 							<Markdown
 								className="msg-text"
 								content={group.text}
-								// 打开或切到一个已结束的会话要重放历史事件，重放到一半 sessionGenerating 也是真的：
+								// 打开或切到一个已结束的会话要重放历史事件，重放到一半 generating 也是真的：
 								// 最后一条消息因此按流式挂载、逐词淡入，长回复要三秒多才显示全（2026-10-05 走查，706 个词）。
 								// 是否在生成以执行库的 session 状态为准，事件流只决定流到哪里。
-								streaming={running && sessionGenerating && group.id === latest}
+								streaming={running && generating && group.id === latest}
 								links={links}
 							/>
 						)}

@@ -12,6 +12,9 @@ export interface ConfirmedStateEvent {
  *
  * AG-UI 的 threadId 是 sessionId，runId 是 turn id：一个 turn 一对 RUN_STARTED / RUN_FINISHED。
  * 模型停下回 idle 是 success；进 paused 是 interrupt，reason 带 pause 的错误码。
+ * 每个事件都落在某次运行之内：AG-UI 的官方客户端按运行生命周期校验整条流（第一条必须是 RUN_STARTED，
+ * RUN_FINISHED 之后只能接下一次 RUN_STARTED）。所以 `suiming.session` 只在运行中与运行收尾时发；
+ * 新建 session 这类运行之外的变化不发，session 列表本来就走查询。
  */
 export function executionProductEvents(before: ExecutionEntities, after: ExecutionEntities): ConfirmedStateEvent[] {
 	const events: ConfirmedStateEvent[] = [];
@@ -28,22 +31,23 @@ export function executionProductEvents(before: ExecutionEntities, after: Executi
 				id: `${turnId}:started`,
 				event: { type: EventType.RUN_STARTED, threadId: session.id, runId: turnId, metadata },
 			});
-		events.push({
-			sessionId: session.id,
-			id: `${session.id}:state:${session.version}`,
-			event: {
-				type: EventType.CUSTOM,
-				name: "suiming.session",
-				value: {
-					status: session.status,
-					version: session.version,
-					turn: session.turn,
-					...(session.pause === undefined ? {} : { pause: session.pause }),
-					...(session.lastFailure === undefined ? {} : { lastFailure: session.lastFailure }),
-					...(session.usage === undefined ? {} : { usage: session.usage }),
+		if (session.status === "running" || previous?.status === "running")
+			events.push({
+				sessionId: session.id,
+				id: `${session.id}:state:${session.version}`,
+				event: {
+					type: EventType.CUSTOM,
+					name: "suiming.session",
+					value: {
+						status: session.status,
+						version: session.version,
+						turn: session.turn,
+						...(session.pause === undefined ? {} : { pause: session.pause }),
+						...(session.lastFailure === undefined ? {} : { lastFailure: session.lastFailure }),
+						...(session.usage === undefined ? {} : { usage: session.usage }),
+					},
 				},
-			},
-		});
+			});
 		if (turnId !== undefined && previous?.status === "running" && session.status !== "running") {
 			events.push({
 				sessionId: session.id,

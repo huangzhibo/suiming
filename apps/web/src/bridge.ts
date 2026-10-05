@@ -1,4 +1,5 @@
 import type {
+	AGUIEvent,
 	DesktopBridge,
 	DesktopCommandFailure,
 	LocalCommandInput,
@@ -6,7 +7,6 @@ import type {
 	LocalCommandOutput,
 	SessionEvent,
 } from "@suiming/sdk";
-import type { SubscribeConnectionAdapter } from "@tanstack/ai-client";
 import { CommandError } from "./command-error.js";
 
 declare global {
@@ -30,84 +30,71 @@ export async function invoke<K extends LocalCommandName>(
 		throw new CommandError(error as DesktopCommandFailure);
 	}
 }
-/** 只读 attach。发送 / 继续 / 停止由显式命令负责，断线或重载不会另开一个 turn。 */
-export function ipcConnection(
+/**
+ * 只读 attach 的事件流：先是 Runtime 给的快照（包在最近一次运行里），再按持久序号补增量，断线就隔一会儿重试。
+ * 发送 / 继续 / 停止由显式命令负责，断线或重载不会另开一个 turn。`once` 读完当前的就结束（回看历史用）。
+ */
+export async function* attachEvents(
 	sessionId: string,
 	onEvent: (event: SessionEvent) => void,
-	onConnection?: (state: string) => void,
-	once = false,
-): SubscribeConnectionAdapter {
-	return {
-		async *subscribe(signal) {
-			let cursor: number | undefined;
-			while (!signal?.aborted) {
-				let batch: LocalCommandOutput<"session.attach">;
-				try {
-					batch = await invoke("session.attach", {
-						sessionId,
-						...(cursor === undefined ? {} : { afterSequence: cursor }),
-					});
-				} catch {
-					if (signal?.aborted) return;
-					onConnection?.("disconnected");
-					await new Promise<void>((resolve) => {
-						const timer = setTimeout(done, 1500);
-						function done() {
-							clearTimeout(timer);
-							signal?.removeEventListener("abort", done);
-							resolve();
-						}
-						signal?.addEventListener("abort", done, { once: true });
-						if (signal?.aborted) done();
-					});
-					continue;
-				}
-				if (signal?.aborted) return;
-				onConnection?.("ready");
-				for (const event of batch.snapshot ?? []) {
-					onEvent({
-						sessionId,
-						id: `snapshot:${batch.cursor}`,
-						sequence: batch.cursor,
-						at: new Date().toISOString(),
-						event,
-					});
-					yield event as ReturnType<SubscribeConnectionAdapter["subscribe"]> extends AsyncIterable<infer Chunk>
-						? Chunk
-						: never;
-				}
-				for (const record of batch.events) {
-					if (record.sequence <= (cursor ?? 0)) continue;
-					cursor = record.sequence;
-					onEvent(record);
-					// 两端共享上游 AG-UI schema；连接只去掉持久传输信封。
-					yield record.event as ReturnType<SubscribeConnectionAdapter["subscribe"]> extends AsyncIterable<
-						infer Chunk
-					>
-						? Chunk
-						: never;
-				}
-				cursor = batch.cursor;
-				if (once) return;
-				await new Promise<void>((resolve) => {
-					let settled = false;
-					const done = () => {
-						if (settled) return;
-						settled = true;
-						clearTimeout(timer);
-						unsubscribe();
-						signal?.removeEventListener("abort", done);
-						resolve();
-					};
-					const timer = setTimeout(done, 750);
-					const unsubscribe = bridge().onChange(done);
-					signal?.addEventListener("abort", done, { once: true });
-					if (signal?.aborted) done();
-				});
-			}
-		},
-		async send() {
-			throw new Error("请通过发送消息命令开始或继续对话");
-		},
-	};
+	onConnection: ((state: string) => void) | undefined,
+	once: boolean,
+	signal: AbortSignal,
+): AsyncGenerator<AGUIEvent> {
+	let cursor: number | undefined;
+	while (!signal.aborted) {
+		let batch: LocalCommandOutput<"session.attach">;
+		try {
+			batch = await invoke("session.attach", {
+				sessionId,
+				...(cursor === undefined ? {} : { afterSequence: cursor }),
+			});
+		} catch {
+			if (signal.aborted) return;
+			onConnection?.("disconnected");
+			await pause(signal, 1500);
+			continue;
+		}
+		if (signal.aborted) return;
+		onConnection?.("ready");
+		for (const event of batch.snapshot ?? []) {
+			onEvent({
+				sessionId,
+				id: `snapshot:${batch.cursor}`,
+				sequence: batch.cursor,
+				at: new Date().toISOString(),
+				event,
+			});
+			yield event;
+		}
+		for (const record of batch.events) {
+			if (record.sequence <= (cursor ?? 0)) continue;
+			cursor = record.sequence;
+			onEvent(record);
+			// 连接只去掉持久传输信封：两端是同一份 @ag-ui/core。
+			yield record.event;
+		}
+		cursor = batch.cursor;
+		if (once) return;
+		await pause(signal, 750, (listener) => bridge().onChange(listener));
+	}
+}
+
+/** 等到超时、作品有变化或被取消。 */
+function pause(signal: AbortSignal, ms: number, onChange?: (listener: () => void) => () => void): Promise<void> {
+	return new Promise<void>((resolve) => {
+		let settled = false;
+		const done = () => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			unsubscribe?.();
+			signal.removeEventListener("abort", done);
+			resolve();
+		};
+		const timer = setTimeout(done, ms);
+		const unsubscribe = onChange?.(done);
+		signal.addEventListener("abort", done, { once: true });
+		if (signal.aborted) done();
+	});
 }

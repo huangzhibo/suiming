@@ -224,7 +224,9 @@ test("turn 结束事件带对账：作者几条、意图 / Design / 正文各改
 		// 只讨论的 turn：本轮没改作品、没提交；未提交数是 turn 结束时 checkout 的实况。
 		f.provider.setResponses([reply("可以，先这样。")]);
 		await f.say("就这样？", id);
-		assert.deepEqual(summaries()[1]?.type === "ACTIVITY_SNAPSHOT" && summaries()[1]?.content, {
+		const second = summaries()[1];
+		assert.ok(second?.type === "ACTIVITY_SNAPSHOT");
+		assert.deepEqual(second.content, {
 			authorMessages: 1,
 			changed: { intent: none, design: none, text: none, review: none, other: none },
 			revisions: 0,
@@ -329,15 +331,12 @@ test("说完就停；同一 session 的下一句接着消息列表，新 session
 		assert.equal(second.session.inboxSequence, 2);
 		assert.equal((await f.project.history()).length, 1);
 		const events = f.project.readSessionEvents(first.sessionId);
+		const started = events.flatMap((item) => (item.event.type === "RUN_STARTED" ? [item.event] : []));
 		assert.deepEqual(
-			events.filter((item) => item.event.type === "RUN_STARTED").map((item) => item.event.threadId),
+			started.map((event) => event.threadId),
 			[first.sessionId, first.sessionId],
 		);
-		assert.equal(
-			new Set(events.filter((item) => item.event.type === "RUN_STARTED").map((item) => item.event.runId)).size,
-			2,
-			"每个 turn 一个 AG-UI runId",
-		);
+		assert.equal(new Set(started.map((event) => event.runId)).size, 2, "每个 turn 一个 AG-UI runId");
 		assert.ok(events.some((item) => JSON.stringify(item.event).includes("这个方案还有什么问题")));
 
 		f.provider.setResponses([

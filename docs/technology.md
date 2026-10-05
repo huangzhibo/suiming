@@ -15,7 +15,7 @@
 | API | Fastify + TypeBox + OpenAPI | Cloud Domain API、鉴权与类型化诊断 |
 | 工作台前端 | React 19 + Vite + TanStack Router/Query + shadcn/ui + Streamdown（Markdown 渲染，含流式）+ CodeMirror 6（源码编辑与 merge 比较） | 桌面首先实现，后续 Cloud Web 复用作品编辑与复杂视图；正文、设计文档与 Agent 消息共用一条 Markdown 管线 |
 | 基础 UI 控件 | shadcn/ui + Tailwind v4；已接入 `apps/web`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责 |
-| AI 交互客户端 | `@tanstack/ai-client` / `ai-react`；已接 typed IPC | 复用消息 view state 与流处理，不引入其服务端 loop / provider 层 |
+| AI 交互客户端 | AG-UI 官方客户端 `@ag-ui/client`（2026-10-05 起，替换 TanStack AI）；已接 typed IPC | 把 AG-UI 事件拼成消息、按运行生命周期校验整条流；只实现长连接的 `connect()`，不用它的 `run()` 与 HTTP 传输 |
 | Desktop | Electron 42；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
 | CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation 与 Cloud sync |
 | Host integrations | Codex / Claude Code / Grok 原生 instructions、Skills 与 `suim --json` | 在现有 coding-agent 产品中直接创作同一个 Local Project |
@@ -44,7 +44,9 @@ Cloud Domain API 同时服务 Web、本地同步和远程外部 Agent，不能�
 
 作者端是对话、编辑、长运行、筛选、diff 和派生视图密集的应用，不以 SEO 为主。TanStack Router 提供类型安全路由与 URL 状态，TanStack Query 管理服务端数据，Vite 保持构建和部署直接。
 
-renderer 用 `ai-client` / `ai-react` 管理对外消息与交互状态，Query 读取作品、版本、Review 和持久 session。Suiming 编写业务 activity / diff / Review 组件和 typed IPC connection adapter；启动与恢复通过唯一命令，attach 只读。客户端的 stop / retry 不决定后台生命周期，也不因客户端限制改动领域语义。
+renderer 用 `@ag-ui/client` 管理对外消息（`apps/web/src/desktop-agent.ts` 的 `DesktopAgent` 只实现 `connect()`，事件来自 IPC 的只读 attach），Query 读取作品、版本、Review 和持久 session。Suiming 编写业务 activity / diff / Review 组件和 typed IPC 事件流；启动与恢复通过唯一命令，attach 只读。客户端的 stop / retry 不决定后台生命周期，也不因客户端限制改动领域语义。
+
+**为什么从 TanStack AI 换成 `@ag-ui/client`（2026-10-05）。**TanStack AI 在本仓只用来拼消息：`useChat` 的 `send` 抛错、`isLoading` 恒为 false，它还内嵌另一份 `@ag-ui/core`（0.1.1-canary），`bridge.ts` 靠一次类型强转把两边接起来。AG-UI 的 core 与 client 到了 1.0，换过来之后全链路只剩一份协议版本，拼消息用协议自带的那份逻辑。代价是多了 RxJS 等依赖、没有官方 React 层（自己写了 `useConversation`）；以及官方客户端按运行生命周期校验整条流，Runtime 因此改成每个事件都落在某次运行之内（新建 session 不再发 `suiming.session`，没跑过的对话快照为空，`run-event-stream.test.ts` 守着）。sdk 与 web 的 AG-UI 版本要一起升。
 
 首期不采用 Next.js，也不依赖仍在演进的 TanStack Start 全栈层。未来营销站、公开 Reader 或需要 SSR 的产品入口独立评估，不能反向改变作者端 Domain API。
 
@@ -192,9 +194,9 @@ PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、�
 | LangGraph / Temporal | 显式任务结构由同一 SuimingHarness 承载，不新增通用工作流执行器 | 当前执行方向已确定，不建设替代内核 |
 | pi-agent-core Harness / Codex App Server / 完整 Agent framework | 已确定参考逻辑自行实现 SuimingHarness，不依赖或移植其他内核（[Harness 设计](harness-design.md)第 1 节） | 不作为当前设计的替代路径 |
 | TUI（曾有的 `apps/tui`，基于 `@earendil-works/pi-tui`） | 2026-09-13 删除：它是一千行的开发者控制台，产品是桌面，把 Run / Attempt 的词汇改到 Session 等于重写一遍 | 不重新评估 |
-| CopilotKit / A2UI / TanStack AI 服务端 | 已选 AG-UI 与轻量 React client，不需要额外 agent loop 或通用生成 UI 平台 | 出现现有组件与领域工具无法表达的真实交互 |
-| TanStack AI 客户端的 `/ui` 组件工厂（`createChatUI` / `toolsComponents` / `interruptsComponents`） | 未评估，不是冻结项。今天接上去收不到数据：Runtime 不发标准 `TOOL_CALL_*`，工具动作投影成 `suiming.action`；两者并存即双协议投影。`toolsComponents` 无 fallback，未注册的工具名会让该次调用在转录里消失，而工具有 18 个以上；官方要求自备全部可见组件，与 workbench-v7 的一致性验收冲突 | **已裁决：`bridge.ts` 不补成双向。**决策卡的问答往返走普通消息——模型在文本里问、停下，作者的回答是 inbox 的下一条——与 attach 无关，attach 保持只读，不变量 10 不动。因此也不需要 TanStack 的 `interrupts` 通道，自建卡片即可。剩下的唯一缺口是 `validateProductEvent` 的 CUSTOM 白名单要放行一个新事件名 |
-| MCP Apps（`ui://` 资源 → 沙箱 iframe） | 需要未装的 `@tanstack/ai-mcp` 与自托管 sandbox-proxy 页，撞全功能 MCP 冻结，也与「renderer 打不开外部窗口、链接渲染成 span」的安全模型冲突 | 全功能 MCP 解冻后另行评估 |
+| CopilotKit / A2UI / TanStack AI | 已选 AG-UI 与它的官方客户端，不需要额外 agent loop、通用生成 UI 平台或自带运行时的 React 层；TanStack AI 2026-10-05 换掉，理由见上文 | 出现现有组件与领域工具无法表达的真实交互 |
+| 通用的工具 / 中断组件工厂（TanStack AI 的 `/ui`、CopilotKit 的生成 UI 这一类） | Runtime 不发标准 `TOOL_CALL_*`，工具动作投影成 `suiming.action`，两者并存即双协议投影；这类工厂要为每个工具名注册组件，未注册的调用在转录里消失，而工具有 18 个以上，也与 workbench-v7 的一致性验收冲突 | **已裁决：attach 不补成双向。**决策卡的问答往返走普通消息——模型在文本里问、停下，作者的回答是 inbox 的下一条——与 attach 无关，attach 保持只读，不变量 10 不动。因此也不需要 AG-UI 的 interrupt 往返通道，自建卡片即可。剩下的唯一缺口是 `validateProductEvent` 的 CUSTOM 白名单要放行一个新事件名 |
+| MCP Apps（`ui://` 资源 → 沙箱 iframe） | 需要 MCP Apps 宿主与自托管 sandbox-proxy 页，撞全功能 MCP 冻结，也与「renderer 打不开外部窗口、链接渲染成 span」的安全模型冲突 | 全功能 MCP 解冻后另行评估 |
 | TanStack Start / Next.js | 作者端不需要同构全栈框架 | 独立入口出现明确 SSR/SEO 需求 |
 | pgvector / 专用向量数据库 | Story Search 是正式能力，但语义路由的存储与运行引擎尚未证明长篇收益 | 中文长篇消融证明语义召回在质量、Context 或成本上显著增益 |
 | CRDT / WebSocket | 首期不做多人同文档实时协作，单作者单写入者足够 | 多人实时编辑成为核心需求 |

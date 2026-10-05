@@ -345,7 +345,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 | `session.delete`（IPC） | 第 3 节 |
 | `rank`（CLI） | Eval 协议，见下 |
 
-**AG-UI 映射天然对上**：`threadId` = sessionId，`runId` = turn id，`RUN_STARTED` / `RUN_FINISHED` 每个 turn 一对（失败与 `paused` 也是 `RUN_FINISHED`，分别带 `result` 与 `outcome: interrupt`，不发 `RUN_ERROR`，`state-events.ts`）；此外是消息、`ACTIVITY_SNAPSHOT`（`suiming.action` / `suiming.task` / `suiming.turn`）与 `CUSTOM`（只有 `suiming.session`）。白名单在 `sdk/src/run-event.ts` 的 `validateProductEvent`。事件先持久后发布，稳定 id 补发去重；短批增量先持久再发。桌面 `sessionGenerating` 由 `RUN_STARTED` / `RUN_FINISHED` 派生。
+**AG-UI 映射天然对上**：`threadId` = sessionId，`runId` = turn id，`RUN_STARTED` / `RUN_FINISHED` 每个 turn 一对（失败与 `paused` 也是 `RUN_FINISHED`，分别带 `result` 与 `outcome: interrupt`，不发 `RUN_ERROR`，`state-events.ts`）；此外是消息、`ACTIVITY_SNAPSHOT`（`suiming.action` / `suiming.task` / `suiming.turn`）与 `CUSTOM`（只有 `suiming.session`）。白名单在 `sdk/src/run-event.ts` 的 `validateProductEvent`。事件先持久后发布，稳定 id 补发去重；短批增量先持久再发。每个事件都落在某次运行之内（新建 session 不发 `suiming.session`，没跑过的对话 attach 快照为空）：桌面用 AG-UI 官方客户端 `@ag-ui/client` 拼消息，它按运行生命周期校验整条流，不符合就整条报错（`run-event-stream.test.ts`）。桌面的「正在生成」由 `RUN_STARTED` / `RUN_FINISHED` 派生。
 
 `rank` 不是对话：它是脚本驱动的 Eval 协议（同一 Beat 多版正文匿名打乱交给隔离评委）。它用 `session.kind = "rank"`——没有 inbox、没有根 loop，由脚本创建若干 `rank.round` Task 并把汇总存为 session 结果——零新存储；不搬出 harness。
 
