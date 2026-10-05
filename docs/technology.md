@@ -14,7 +14,7 @@
 | Monorepo | npm 11 Workspaces | 少量 app/package 的直接管理；暂不引入 Turborepo/Nx |
 | API | Fastify + TypeBox + OpenAPI | Cloud Domain API、鉴权与类型化诊断 |
 | 工作台前端 | React 19 + Vite + TanStack Router/Query + shadcn/ui + Streamdown（Markdown 渲染，含流式）+ CodeMirror 6（源码编辑与 merge 比较） | 桌面首先实现，后续 Cloud Web 复用作品编辑与复杂视图；正文、设计文档与 Agent 消息共用一条 Markdown 管线 |
-| 基础 UI 控件 | shadcn/ui + Tailwind v4；已接入 `apps/web`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责 |
+| 基础 UI 控件 | shadcn/ui（底层原语是 Radix）+ Tailwind v4；已接入 `apps/web`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么暂不换成 Base UI 见下文「暂不采用」 |
 | AI 交互客户端 | AG-UI 官方客户端 `@ag-ui/client`（2026-10-05 起，替换 TanStack AI）；已接 typed IPC | 把 AG-UI 事件拼成消息、按运行生命周期校验整条流；只实现长连接的 `connect()`，不用它的 `run()` 与 HTTP 传输 |
 | Desktop | Electron 42；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
 | CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation 与 Cloud sync |
@@ -196,6 +196,7 @@ PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、�
 | TUI（曾有的 `apps/tui`，基于 `@earendil-works/pi-tui`） | 2026-09-13 删除：它是一千行的开发者控制台，产品是桌面，把 Run / Attempt 的词汇改到 Session 等于重写一遍 | 不重新评估 |
 | CopilotKit / A2UI / TanStack AI | 已选 AG-UI 与它的官方客户端，不需要额外 agent loop、通用生成 UI 平台或自带运行时的 React 层；TanStack AI 2026-10-05 换掉，理由见上文 | 出现现有组件与领域工具无法表达的真实交互 |
 | 通用的工具 / 中断组件工厂（TanStack AI 的 `/ui`、CopilotKit 的生成 UI 这一类） | Runtime 不发标准 `TOOL_CALL_*`，工具动作投影成 `suiming.action`，两者并存即双协议投影；这类工厂要为每个工具名注册组件，未注册的调用在转录里消失，而工具有 18 个以上，也与 workbench-v7 的一致性验收冲突 | **已裁决：attach 不补成双向。**决策卡的问答往返走普通消息——模型在文本里问、停下，作者的回答是 inbox 的下一条——与 attach 无关，attach 保持只读，不变量 10 不动。因此也不需要 AG-UI 的 interrupt 往返通道，自建卡片即可。剩下的唯一缺口是 `validateProductEvent` 的 CUSTOM 白名单要放行一个新事件名 |
+| Base UI（shadcn/ui 2026-07 起的默认原语，替换 Radix） | shadcn 明说 Radix 没有弃用、每个新组件两种都出、已有项目不必迁移。本仓 20 个组件带着本地修改（四个浮层刻意去掉退出动画，是 Radix 层栈下连按两次 Esc 的修复，换了要重验），组件目录外还有 17 处 `asChild`、直接用的 `Slot`、`data-[state=…]` 选择器与 `--radix-popover-trigger-width`；估计一到两天，风险在焦点与层叠，收益眼下只有 Base UI 独有的组件（Combobox、Autocomplete 等） | 三条之一：需要只有 Base UI 才有的组件（最可能是拿 Combobox 换掉 @ 引用的搜索框）；撞上 Radix 修不了的缺陷；shadcn 不再给 Radix 出新组件。换就整体换，不两套原语混用——两套焦点管理与层栈正是上面那类 Esc 问题的来源；在那之前新加组件仍用 Radix 版 |
 | MCP Apps（`ui://` 资源 → 沙箱 iframe） | 需要 MCP Apps 宿主与自托管 sandbox-proxy 页，撞全功能 MCP 冻结，也与「renderer 打不开外部窗口、链接渲染成 span」的安全模型冲突 | 全功能 MCP 解冻后另行评估 |
 | TanStack Start / Next.js | 作者端不需要同构全栈框架 | 独立入口出现明确 SSR/SEO 需求 |
 | pgvector / 专用向量数据库 | Story Search 是正式能力，但语义路由的存储与运行引擎尚未证明长篇收益 | 中文长篇消融证明语义召回在质量、Context 或成本上显著增益 |
