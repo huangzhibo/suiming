@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
 	BookOpen,
 	ChevronDown,
@@ -29,7 +29,6 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -67,7 +66,6 @@ import { HelpDialog } from "./help.js";
 import { IdsPane, SearchPane, SourcesPane, SpinePane } from "./left-pane.js";
 import { Markdown } from "./markdown.js";
 import {
-	Book,
 	backlinksFor,
 	CANDIDATE_VERSION,
 	CHECK_PAGE,
@@ -77,7 +75,6 @@ import {
 	SPINE_PAGE,
 	stripFrontmatter,
 	textPathFor,
-	type WorkspaceData,
 } from "./model.js";
 import { ModelSettings } from "./model-settings.js";
 import { NavigationModes } from "./navigation-modes.js";
@@ -92,6 +89,7 @@ import { useAutoHideScrollbars } from "./scrollbars.js";
 import { Hint, OverflowHint, ToolButton } from "./ui-bits.js";
 import { useComposerSubmit } from "./use-composer-submit.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
+import { useWorkspaceData } from "./use-workspace-data.js";
 import {
 	activeView,
 	createTab,
@@ -235,62 +233,8 @@ function WorkspaceSurface({
 	);
 	const layoutLive = useRef(layout);
 	layoutLive.current = layout;
-	const queryClient = useQueryClient();
-	const projection = useQuery({ queryKey: ["workspace"], queryFn: () => invoke("workspace.show", {}), retry: false });
-	const execution = useQuery({ queryKey: ["session-list"], queryFn: () => invoke("session.list", {}) });
-	const directory = useQuery({ queryKey: ["project-files"], queryFn: () => invoke("workspace.files", {}) });
-	const sessionsOf = useCallback(
-		(projectId: string) =>
-			execution.data?.projectId === projectId
-				? execution.data.sessions.filter((session) => session.kind === "agent")
-				: [],
-		[execution.data],
-	);
-	const shown = useMemo<WorkspaceData | undefined>(
-		() =>
-			(projection.data ? { ...projection.data, sessions: sessionsOf(projection.data.projectId) } : undefined) ??
-			(projection.isError && directory.data
-				? {
-						projectId: directory.data.projectId,
-						checkoutPath: directory.data.checkoutPath,
-						revisionId: directory.data.revisionId,
-						revisions: directory.data.revisions,
-						files: [],
-						volumes: [],
-						dirty: false,
-						sessions: sessionsOf(directory.data.projectId),
-						storyText: [],
-						storyIndexError: projection.error?.message ?? "作品正在读取，可先浏览文件。",
-					}
-				: undefined),
-		[projection.data, projection.error, projection.isError, directory.data, sessionsOf],
-	);
-	const workspace = { ...projection, data: shown };
-	const reviewsQuery = useQuery({
-		queryKey: ["reviews"],
-		queryFn: () => invoke("workspace.reviews", {}),
-		enabled: !!workspace.data,
-	});
-	const reviews = useMemo(() => reviewsQuery.data ?? [], [reviewsQuery.data]);
-	const recent = useQuery({
-		queryKey: ["recent-projects", workspace.data?.checkoutPath],
-		queryFn: () => bridge().recentProjects(),
-		enabled: !!workspace.data && !!window.suiming,
-	});
-	// Query 的结构共享让 files / volumes / revisions 在内容不变时保持引用；session 用量刷新不重建投影。
-	// biome-ignore lint/correctness/useExhaustiveDependencies: 只依赖投影用到的字段，刻意排除 runs
-	const book = useMemo(
-		() => (shown ? new Book(shown) : undefined),
-		[
-			shown?.files,
-			shown?.volumes,
-			shown?.revisions,
-			shown?.revisionId,
-			shown?.dirty,
-			shown?.projectId,
-			shown?.storyIndexError,
-		],
-	);
+	const { queryClient, projection, directory, shown, reviews, reviewsLoading, recent, book, refresh } =
+		useWorkspaceData();
 	const view = activeView(state);
 	const live = useRef(state);
 	live.current = state;
@@ -390,11 +334,6 @@ function WorkspaceSurface({
 				: kind === "artifact" || kind === "file" || kind === "diff"
 					? rawPath
 					: "";
-	const refresh = useCallback(() => {
-		// context 与被审版本的文件只读已提交版本，query key 里已含 revisionId，不随事件流刷新。
-		for (const key of ["workspace", "session-list", "project-files", "file", "reviews", "diff", "tasks", "inbox"])
-			void queryClient.invalidateQueries({ queryKey: [key] });
-	}, [queryClient]);
 	useEffect(() => {
 		if (groupId || !window.suiming) return;
 		return bridge().onChange((changes) => {
@@ -689,7 +628,7 @@ function WorkspaceSurface({
 		patch({ observation, right: true, rightMode: "state", expanded: false });
 	};
 	const quote = (label: string) =>
-		`作品引用：${editPath}\nrevision: ${workspace.data?.revisionId ?? ""}\ncontentSHA: ${saved.sha256 ?? ""}\n${label}：\n${selectedText}`;
+		`作品引用：${editPath}\nrevision: ${shown?.revisionId ?? ""}\ncontentSHA: ${saved.sha256 ?? ""}\n${label}：\n${selectedText}`;
 	const clearSelection = () => {
 		setSelectedText("");
 		setSelPara(-1);
@@ -854,7 +793,7 @@ function WorkspaceSurface({
 			</main>
 		);
 
-	if (surface === "welcome" || !workspace.data || !book)
+	if (surface === "welcome" || !shown || !book)
 		return (
 			<main className="relative h-screen bg-background px-[12vw] py-[14vh]">
 				<div className="drag absolute inset-x-0 top-0 h-12" />
@@ -898,15 +837,15 @@ function WorkspaceSurface({
 					</Button>
 				</div>
 				<p className="text-[11px] text-muted-foreground">作品保存在你的电脑上，不需要云端账号。</p>
-				{(error || workspace.error) && (
+				{(error || projection.error) && (
 					<p className="mt-2 text-[11.5px] leading-[1.7] whitespace-pre-wrap text-[#a06443]">
-						{error || workspace.error?.message}
+						{error || projection.error?.message}
 					</p>
 				)}
 			</main>
 		);
 
-	const data = workspace.data;
+	const data = shown;
 	const report = kind === "issue" ? reviews.find((item) => item.id === pageTarget(page)) : undefined;
 	const backlinks = file ? backlinksFor(book, file.path) : [];
 	const readingContent = buffer;
@@ -1523,7 +1462,7 @@ function WorkspaceSurface({
 					{kind === "issue" && !report && (
 						<div className="px-8 py-20 text-center text-muted-foreground">
 							<h2 className="mb-2 text-base font-medium">
-								{reviewsQuery.isLoading ? "正在读取审稿报告…" : "找不到这份审稿报告"}
+								{reviewsLoading ? "正在读取审稿报告…" : "找不到这份审稿报告"}
 							</h2>
 						</div>
 					)}
