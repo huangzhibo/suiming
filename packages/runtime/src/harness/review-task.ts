@@ -102,7 +102,6 @@ export function reviewTask(input: ReviewTaskInput): ReviewTaskHandle {
 	});
 	const scope = compiled.subject;
 	const spec: Omit<TaskSpec, "key" | "parent"> = {
-		kind: "review",
 		profileId: "reviewer",
 		// Reviewer 只写自己的审稿文件，作品其它部分对它只读。
 		policy: "write",

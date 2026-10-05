@@ -120,6 +120,7 @@ export const modelBindingSchema = Type.Object(
 export const taskSummarySchema = Type.Object(
 	{
 		id,
+		/** 子任务的角色，即它绑定的模型档位（writer、reviewer、judge……）；2026-10-05 之前的记录是 subagent / review / rank.round。 */
 		kind: id,
 		key: id,
 		status: id,

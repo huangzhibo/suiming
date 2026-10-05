@@ -154,7 +154,7 @@ test("SQLite 回执写入失败回滚同事务的 Task，重新加载后可以�
 				"CREATE TRIGGER fail_receipt BEFORE INSERT ON execution_command_receipts WHEN NEW.command_id = 'task' BEGIN SELECT RAISE(ABORT, 'injected write failure'); END",
 			);
 			assert.throws(
-				() => state.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "subagent", key: "a" }),
+				() => state.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "main", key: "a" }),
 				/injected write failure/u,
 			);
 			const persisted = store.loadExecutionState();
@@ -166,8 +166,7 @@ test("SQLite 回执写入失败回滚同事务的 Task，重新加载后可以�
 			injector.exec("DROP TRIGGER fail_receipt");
 			const restored = execution(reopen());
 			assert.equal(
-				restored.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "subagent", key: "a" })
-					.status,
+				restored.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "main", key: "a" }).status,
 				"running",
 			);
 		} finally {
@@ -202,7 +201,7 @@ test("SQLite 删除 session 时把子任务、inbox 与事件一起删", async (
 		createSession(state, "a");
 		store.queueInbox("session-a", "第一句");
 		state.startTurn({ commandId: "start", sessionId: "session-a", lease });
-		state.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "subagent", key: "a" });
+		state.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "main", key: "a" });
 		store.appendSessionEvents([
 			{
 				sessionId: "session-a",

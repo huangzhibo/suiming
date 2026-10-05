@@ -194,7 +194,7 @@ test("SQLite execution state 可跨进程恢复，并保留 command idempotency 
 			sessionId: "session-1",
 			lease: { ownerId: "owner-1", pid: 1, hostname: "elsewhere", acquiredAt: "2026-09-03T03:00:00.000Z" },
 		});
-		execution.addTask({ commandId: "add-task", id: "task-1", sessionId: "session-1", kind: "subagent", key: "a" });
+		execution.addTask({ commandId: "add-task", id: "task-1", sessionId: "session-1", kind: "main", key: "a" });
 		execution.recordSessionCheckpoint("checkpoint", "session-1", { kind: "object", id: "checkpoint-object" }, 1);
 		store.close();
 

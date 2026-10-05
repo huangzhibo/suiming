@@ -235,7 +235,6 @@ export async function runRankExperiment(engine: SuimingHarness, input: StartRank
 					.join("\n\n");
 				let submitted: RankRoundResult | undefined;
 				const result = await session.executeTask({
-					kind: "rank.round",
 					key: `rank.round:${round}`,
 					profileId: "judge",
 					policy: "read",

@@ -39,7 +39,7 @@ const attached: AGUIEvent[] = [
 	finished("t1"),
 	run("t2"),
 	...text("m3", "user", "第二句"),
-	{ type: EventType.SUBAGENT_STARTED, subagentRunId: "task-1", name: "subagent" },
+	{ type: EventType.SUBAGENT_STARTED, subagentRunId: "task-1", name: "writer" },
 	...text("w1", "assistant", "子任务的话", "task-1"),
 	{ type: EventType.SUBAGENT_FINISHED, subagentRunId: "task-1", outcome: { type: "success" } },
 	// 2026-10-05 之前落盘的子任务消息没有 subagentRunId，靠 metadata.suiming.taskKind 认

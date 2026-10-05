@@ -363,7 +363,6 @@ test("子任务完成后父 checkpoint 确认丢失：重启续跑只交还保�
 					const delegate = async (actionId: string) => {
 						let report: unknown;
 						const child = await handle.executeChild(parent, actionId, {
-							kind: "reviewer",
 							profileId: "reviewer",
 							policy: "read",
 							systemPrompt: "独立审查",

@@ -680,7 +680,7 @@ test("子任务的开场输入就过了压缩线：一次请求都不发，作�
 		assert.equal(f.provider.state.callCount, 2, "子任务一次请求都没发");
 		assert.deepEqual(
 			f.project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
-			[["review", "failed"]],
+			[["reviewer", "failed"]],
 		);
 	} finally {
 		await f.close();
@@ -734,11 +734,11 @@ test("子任务按 AG-UI 的 subagent 发事件：开始、完成、挂起与续
 						: [],
 			),
 			[
-				["started", first, "subagent"],
+				["started", first, "main"],
 				["finished", first, "success"],
-				["started", second, "subagent"],
+				["started", second, "main"],
 				["finished", second, "suspended"],
-				["started", second, "subagent"],
+				["started", second, "main"],
 				["finished", second, "success"],
 			],
 			"挂起的子任务在下一轮以同一个 subagentRunId 续跑",
@@ -917,7 +917,7 @@ test("Agent 按模型决定调用独立 Review，结论随工具结果直接回�
 		const tasks = f.project.loadExecutionState().tasks;
 		assert.deepEqual(
 			tasks.map((task) => [task.kind, task.status]),
-			[["review", "completed"]],
+			[["reviewer", "completed"]],
 		);
 		assert.equal(tasks[0]?.sessionId, outcome.sessionId);
 		assert.equal(tasks[0]?.parent?.taskId, undefined, "父是根 Agent");
@@ -964,7 +964,7 @@ test("Reviewer 交的引文在被审文件里找不到：拒绝回到 Reviewer �
 		assert.equal(outcome.failure, undefined);
 		assert.deepEqual(
 			f.project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
-			[["review", "completed"]],
+			[["reviewer", "completed"]],
 		);
 		const reviews = (await readdir(join(f.root, "review"))).filter((name) => name.startsWith("design-"));
 		assert.equal(reviews.length, 1);
@@ -997,7 +997,7 @@ test("委派的子任务没交付：失败回到父模型手里作为工具错�
 		assert.equal(f.provider.state.callCount, 5);
 		const tasks = f.project.loadExecutionState().tasks;
 		assert.equal(tasks.length, 1);
-		assert.equal(tasks[0]?.kind, "subagent");
+		assert.equal(tasks[0]?.kind, "main");
 		assert.equal(tasks[0]?.status, "failed");
 		assert.equal(tasks[0]?.failure?.code, "task_not_submitted");
 	} finally {
@@ -1715,7 +1715,7 @@ test("委派观测归属 turn；工具 / Checker 带同一 session 关联", asyn
 		const outcome = await f.say("观测回归");
 		const spans = exporter.getFinishedSpans();
 		const turn = spans.find((s) => s.name === "suiming.turn agent");
-		const review = spans.find((s) => s.name === "suiming.task review");
+		const review = spans.find((s) => s.name === "suiming.task reviewer");
 		assert.ok(turn);
 		assert.equal(review?.parentSpanContext?.spanId, turn.spanContext().spanId);
 		assert.equal(turn.attributes["suiming.turn.id"], outcome.session.turnId);

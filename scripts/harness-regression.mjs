@@ -87,10 +87,13 @@ const untested = (name) => ({ name, pass: true, untested: true });
  * （2026-10-04 测试审查发现原来的判法接近恒真）。
  */
 const namesUnpaidContract = (reply) => /诈降/u.test(reply) && /兑现|resolve|期限|到期|deadline/iu.test(reply);
-/** 根 Agent 委派了写 beat-0001 的 writer，且有子任务完成：原来只看「有子任务完成」，任何子任务都满足。 */
+/**
+ * 根 Agent 委派了写 beat-0001 的 writer，且写手子任务完成：原来只看「有子任务完成」，任何子任务都满足。
+ * 子任务的 kind 就是角色（2026-10-05 之前是 subagent / review / rank.round）。
+ */
 const delegatedWriter = (r) =>
 	r.actions.some((action) => action.label === "delegate" && action.target === "beat-0001" && !action.isError) &&
-	r.tasks.some((task) => task.kind === "subagent" && task.status === "completed");
+	r.tasks.some((task) => task.kind === "writer" && task.status === "completed");
 /**
  * 模型服务出了问题的那一次不能算 Agent 退化：记成「作废」，不进通过率。原来记成未通过，要靠人看 lastFailure 才分得开，
  * 记录里至少六次是这样重跑的。判据只看错误码与网络层的原文，不看 Agent 做了什么。
@@ -226,7 +229,7 @@ const TASKS = [
 			expect("留下了审稿", r.summary.changed.review.count > 0),
 			expect(
 				"审稿由独立的 Review 子任务完成",
-				r.tasks.some((task) => task.kind === "review" && task.status === "completed"),
+				r.tasks.some((task) => task.kind === "reviewer" && task.status === "completed"),
 			),
 			r.anchors.textFindings === 0
 				? untested("正文上的 finding 都能锚到段落")

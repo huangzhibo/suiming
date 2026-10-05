@@ -91,8 +91,8 @@ test("委派的 writer 只能改自己的 Beat；越界写是回到它手里的�
 		assert.deepEqual(
 			project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
 			[
-				["subagent", "completed"],
-				["subagent", "completed"],
+				["writer", "completed"],
+				["writer", "completed"],
 			],
 		);
 	});

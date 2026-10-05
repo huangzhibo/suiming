@@ -148,7 +148,7 @@ test("Source 阅读顺序由 Agent 决定；笔记是普通文件，覆盖率从
 		assert.equal(reviewed.failure, undefined);
 		assert.deepEqual(
 			project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
-			[["review", "completed"]],
+			[["reviewer", "completed"]],
 		);
 		const reviews = reviewsIn(await project.checkoutCandidate());
 		assert.equal(reviews.length, 1);

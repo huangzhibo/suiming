@@ -103,9 +103,27 @@ export function transcriptGroups<R extends TranscriptRow>(rows: readonly R[], se
 	return groups;
 }
 
+type TaskRole = LocalCommandOutput<"models.show">["profiles"][number]["id"];
+/**
+ * 子任务按角色（它绑定的模型档位）显示的中文名，与设置页的档位名一致（Runtime 的 MODEL_PROFILE_LABELS）；
+ * main 是通用委派，就叫「子任务」。按 sdk 的档位类型写成 Record，新增档位时这里编译不过。
+ */
+const TASK_ROLE_LABELS: Record<TaskRole, string> = {
+	main: "子任务",
+	writer: "正文写作",
+	reviewer: "独立审稿",
+	"source-reader": "原作阅读",
+	"source-extractor": "原作抽取",
+	judge: "评委",
+};
+/** 2026-10-05 之前的记录按建它的入口记 kind（subagent 说的是类别本身）。 */
+const LEGACY_TASK_KINDS: Record<string, string> = { subagent: "子任务", review: "独立审稿", "rank.round": "评委" };
+
 /** 子任务的中文名；子任务列表与对话里子任务的动作组共用。 */
-export const taskKindLabel = (kind: string | undefined) =>
-	kind === "review" ? "独立审稿" : kind === "subagent" || kind === undefined ? "子任务" : kind;
+export const taskRoleLabel = (kind: string | undefined) =>
+	kind === undefined
+		? "子任务"
+		: ((TASK_ROLE_LABELS as Record<string, string>)[kind] ?? LEGACY_TASK_KINDS[kind] ?? kind);
 
 /** 作者消息里接在原话后面的引用与附件（composerText 拼的），开头是这几种固定前缀之一。 */
 const REFERENCE_PREFIXES = ["作品引用：", "对话引用：", "外部文本附件："];

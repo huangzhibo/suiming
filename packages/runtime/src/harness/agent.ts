@@ -270,7 +270,6 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 						: undefined;
 		let submission: unknown;
 		const spec: Omit<TaskSpec, "key" | "parent"> = {
-			kind: "subagent",
 			profileId: params.profile,
 			policy,
 			...(writable === undefined ? {} : { writable }),

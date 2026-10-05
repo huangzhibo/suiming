@@ -295,7 +295,7 @@ test("suim --json 从 init 到 host diff、check、commit、history 与 export �
 		const shown = await jsonCommand(checkoutPath, ["session", "show", sessionId]);
 		assert.deepEqual(
 			(shown.value.data as { tasks: { kind: string }[] }).tasks.map((task) => task.kind),
-			["review"],
+			["reviewer"],
 		);
 		const reports = await jsonCommand(checkoutPath, ["review", "list"]);
 		const reviewId = (reports.value.data as { reviews: { id: string }[] }).reviews[0]?.id as string;
@@ -1445,8 +1445,8 @@ test("suim run rank：多版候选文件匿名交给评委，输出合并名次�
 		assert.deepEqual(
 			rank.tasks.map((task) => [task.kind, task.status]),
 			[
-				["rank.round", "completed"],
-				["rank.round", "completed"],
+				["judge", "completed"],
+				["judge", "completed"],
 			],
 		);
 

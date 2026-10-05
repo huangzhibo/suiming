@@ -22,7 +22,7 @@ import {
 	isSessionActive as isActive,
 	sessionStatusLabels as labels,
 	sessionProblem,
-	taskKindLabel,
+	taskRoleLabel,
 } from "./run-presentation.js";
 import { ActionButton, PanelToolbar, ToolButton } from "./ui-bits.js";
 
@@ -47,7 +47,7 @@ function TaskTree({ sessionId }: { sessionId: string }) {
 							<span
 								className={`inline-block size-1.5 flex-none rounded-full ${task.status === "completed" ? "bg-muted-foreground" : task.status === "running" ? "bg-amber" : "bg-faint"}`}
 							/>
-							<strong className="font-medium text-ink-3">{taskKindLabel(task.kind)}</strong>
+							<strong className="font-medium text-ink-3">{taskRoleLabel(task.kind)}</strong>
 							<small className="ml-auto whitespace-nowrap">
 								{{ running: "执行中", completed: "完成", failed: "失败", interrupted: "已中断" }[task.status] ??
 									task.status}

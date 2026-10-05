@@ -249,7 +249,7 @@ test("paused 的 session：interrupt 放弃核对回 idle，idle 不能 resume�
 		const execution = project.createExecutionState();
 		execution.createSession({ commandId: "s", id: "s", projectId: project.projectId });
 		execution.startTurn({ commandId: "start", sessionId: "s", lease });
-		execution.addTask({ commandId: "t", id: "t", sessionId: "s", kind: "subagent", key: "a" });
+		execution.addTask({ commandId: "t", id: "t", sessionId: "s", kind: "main", key: "a" });
 		execution.endTurn({
 			commandId: "pause",
 			sessionId: "s",

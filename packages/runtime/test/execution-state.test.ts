@@ -92,7 +92,7 @@ test("子任务只能在 running 的 turn 里建；turn 结束把还在跑的子
 				commandId: "task-early",
 				id: "task-1",
 				sessionId: "session-1",
-				kind: "subagent",
+				kind: "main",
 				key: "a",
 			}),
 		(error: unknown) => error instanceof ExecutionStateError && error.code === "invalid_execution_transition",
@@ -102,7 +102,7 @@ test("子任务只能在 running 的 turn 里建；turn 结束把还在跑的子
 		commandId: "task-1",
 		id: "task-1",
 		sessionId: "session-1",
-		kind: "subagent",
+		kind: "main",
 		key: "action-1",
 		parent: { actionId: "action-1" },
 		model: modelBinding,
@@ -114,7 +114,7 @@ test("子任务只能在 running 的 turn 里建；turn 结束把还在跑的子
 				commandId: "task-dup",
 				id: "task-2",
 				sessionId: "session-1",
-				kind: "subagent",
+				kind: "main",
 				key: "action-1",
 			}),
 		(error: unknown) => error instanceof ExecutionStateError && error.code === "execution_conflict",
@@ -160,7 +160,7 @@ test("进程恢复把持有者已死的 running session 收敛回 idle 并记一
 	const before = state();
 	createSession(before);
 	before.startTurn({ commandId: "turn-1", sessionId: "session-1", lease });
-	before.addTask({ commandId: "task-1", id: "task-1", sessionId: "session-1", kind: "subagent", key: "a" });
+	before.addTask({ commandId: "task-1", id: "task-1", sessionId: "session-1", kind: "main", key: "a" });
 	before.recordSessionCheckpoint("checkpoint-1", "session-1", { kind: "object", id: "checkpoint-object" }, 1);
 
 	const restored = new InMemoryExecutionState({
@@ -189,7 +189,7 @@ test("删除 session 带走它的子任务；turn 进行中不能删", () => {
 	const execution = state();
 	createSession(execution);
 	execution.startTurn({ commandId: "turn-1", sessionId: "session-1", lease });
-	execution.addTask({ commandId: "task-1", id: "task-1", sessionId: "session-1", kind: "subagent", key: "a" });
+	execution.addTask({ commandId: "task-1", id: "task-1", sessionId: "session-1", kind: "main", key: "a" });
 	assert.throws(
 		() => execution.deleteSession("delete-early", "session-1"),
 		(error: unknown) => error instanceof ExecutionStateError && error.code === "session_running",

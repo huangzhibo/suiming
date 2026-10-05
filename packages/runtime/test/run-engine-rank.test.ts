@@ -104,8 +104,8 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 		assert.deepEqual(
 			rounds.map((task) => [task.kind, task.status]),
 			[
-				["rank.round", "completed"],
-				["rank.round", "completed"],
+				["judge", "completed"],
+				["judge", "completed"],
 			],
 		);
 		assert.ok(rounds.every((task) => task.model?.modelProfileId === "judge"));

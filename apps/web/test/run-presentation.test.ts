@@ -4,9 +4,24 @@ import {
 	isSessionActive,
 	messageReferences,
 	sessionProblem,
+	taskRoleLabel,
 	transcriptGroups,
 	turnSummaryText,
 } from "../src/run-presentation.js";
+
+test("子任务按角色显示名称，与设置页的档位名一致；10-05 之前按入口记的旧记录照样认得", () => {
+	// 原来 kind 是 subagent / review / rank.round：三种都是子智能体，subagent 说的却是类别本身，写手、读原作、抽取都叫「子任务」。
+	assert.deepEqual(["writer", "source-extractor", "source-reader", "reviewer", "judge", "main"].map(taskRoleLabel), [
+		"正文写作",
+		"原作抽取",
+		"原作阅读",
+		"独立审稿",
+		"评委",
+		"子任务",
+	]);
+	assert.deepEqual(["subagent", "review", "rank.round"].map(taskRoleLabel), ["子任务", "独立审稿", "评委"]);
+	assert.equal(taskRoleLabel(undefined), "子任务");
+});
 
 test("恢复入口由错误码决定，原因文案不改变恢复策略；paused 与 idle 的一句话分开呈现", () => {
 	const session = {

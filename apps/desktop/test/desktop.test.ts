@@ -442,7 +442,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			const state = reopened.loadExecutionState();
 			assert.equal(state.sessions.length, 1, "追问接着同一个 session");
 			assert.equal(state.sessions[0]?.turn, 2);
-			assert.equal(state.tasks.filter((task) => task.kind === "review").length, 1);
+			assert.equal(state.tasks.filter((task) => task.kind === "reviewer").length, 1);
 			assert.equal(state.sessions[0]?.status, "idle");
 		} finally {
 			reopened.close();

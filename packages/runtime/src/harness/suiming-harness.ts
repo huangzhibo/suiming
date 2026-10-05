@@ -101,7 +101,11 @@ export interface TaskSpec {
 	/** 同一契约的稳定身份：委派用父动作 id，脚本（rank）用自己的 key。恢复按它找已完成的子任务。 */
 	key: string;
 	parent?: { taskId?: string; actionId: string };
-	kind: string;
+	/**
+	 * 子任务的角色，也就是它绑定的模型档位（writer、reviewer、source-extractor、judge……），记成 TaskRecord 的 kind、
+	 * AG-UI SUBAGENT_STARTED 的 name。2026-10-05 之前另有一维 kind（subagent / review / rank.round），按建它的入口起名，
+	 * 其中 subagent 说的是类别本身；角色能推出入口，入口推不出角色，所以只留角色。
+	 */
 	profileId: ModelProfileId;
 	policy: ConfinedEnvPolicy;
 	writable?: (logicalPath: string) => boolean;
@@ -360,7 +364,6 @@ export class HarnessSession {
 			return { stop: restored.loop.stop ?? "model_stopped", reply: "", turns: restored.loop.turns };
 		const outcome = await this.#drive({
 			loopId: this.sessionId,
-			label: "agent",
 			model,
 			env,
 			restored,
@@ -416,18 +419,20 @@ export class HarnessSession {
 		this.throwIfInterrupted();
 		const existing = this.#execution.tasksOf(this.sessionId).find((task) => task.key === spec.key);
 		if (existing !== undefined) {
-			if (existing.kind !== spec.kind || JSON.stringify(existing.parent) !== JSON.stringify(spec.parent))
+			// 10-05 之前的记录 kind 是 subagent / review / rank.round，角色在它的模型绑定里
+			const role = existing.model?.modelProfileId ?? existing.kind;
+			if (role !== spec.profileId || JSON.stringify(existing.parent) !== JSON.stringify(spec.parent))
 				throw new SuimingHarnessError("task_contract_mismatch", `Task ${spec.key} 的契约不一致`);
 			if (existing.status === "completed") return this.#engine.readTaskOutcome(existing);
 		}
 		const taskId = existing?.id ?? `task_${randomUUID()}`;
 		return telemetryContext.startSpan(
 			{
-				name: `suiming.task ${spec.kind}`,
+				name: `suiming.task ${spec.profileId}`,
 				attributes: {
 					"suiming.session.id": this.sessionId,
 					"suiming.task.id": taskId,
-					"suiming.task.kind": spec.kind,
+					"suiming.task.kind": spec.profileId,
 					"langfuse.observation.type": "agent",
 					"suiming.model.profile_id": spec.profileId,
 				},
@@ -456,7 +461,7 @@ export class HarnessSession {
 				commandId: `${this.sessionId}:task:${taskId}:add`,
 				id: taskId,
 				sessionId: this.sessionId,
-				kind: spec.kind,
+				kind: spec.profileId,
 				key: spec.key,
 				...(spec.parent === undefined ? {} : { parent: spec.parent }),
 				model: bound.snapshot,
@@ -482,7 +487,6 @@ export class HarnessSession {
 		try {
 			outcome = await this.#drive({
 				loopId: taskId,
-				label: spec.kind,
 				model,
 				env,
 				restored,
@@ -550,7 +554,7 @@ export class HarnessSession {
 		}
 		const record: TaskResultObject = {
 			schemaVersion: 4,
-			taskKind: spec.kind,
+			taskKind: spec.profileId,
 			turns: outcome.loop.turns,
 			usage: outcome.loop.usage,
 			result: value,
@@ -581,7 +585,6 @@ export class HarnessSession {
 	/** 根 Agent 与子任务共用的驱动：checkpoint、事件与用量记账都在这里。 */
 	async #drive(input: {
 		loopId: string;
-		label: string;
 		model: BoundModelProfile;
 		env: ConfinedExecutionEnv;
 		restored: HarnessCheckpoint | undefined;

@@ -441,7 +441,7 @@ test("open 只收敛持有进程已死的 running session：回 idle 记 process
 			sessionId: "session-1",
 			lease: { ownerId: "owner-1", pid: 1, hostname: "elsewhere", acquiredAt: new Date().toISOString() },
 		});
-		execution.addTask({ commandId: "task:add", id: "task-1", sessionId: "session-1", kind: "subagent", key: "a" });
+		execution.addTask({ commandId: "task:add", id: "task-1", sessionId: "session-1", kind: "main", key: "a" });
 		execution.createSession({
 			commandId: "session:create:2",
 			id: "session-2",

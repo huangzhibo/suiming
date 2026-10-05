@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
-import { messageReferences, taskKindLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
+import { messageReferences, taskRoleLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
 import { Hint } from "./ui-bits.js";
 import { useConversation } from "./use-conversation.js";
 
@@ -244,7 +244,7 @@ export function Transcript({
 	}
 	const groups = transcriptGroups(rows, sessionId);
 	const tasks = useQuery({ queryKey: ["tasks", sessionId], queryFn: () => invoke("session.tasks", { sessionId }) });
-	const taskKind = (taskId: string) => tasks.data?.find((task) => task.id === taskId)?.kind;
+	const taskRole = (taskId: string) => tasks.data?.find((task) => task.id === taskId)?.kind;
 	return (
 		<div className="transcript flex flex-col gap-3">
 			{connectionState === "loading" && !messages.length && (
@@ -290,7 +290,7 @@ export function Transcript({
 						<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
 							<ChevronRight />
 							{group.taskId
-								? `${taskKindLabel(taskKind(group.taskId))}执行了 ${group.rows.length} 项操作`
+								? `${taskRoleLabel(taskRole(group.taskId))}执行了 ${group.rows.length} 项操作`
 								: `已执行 ${group.rows.length} 项操作`}
 							{group.rows.some((item) => item.status === "failed") && " · 有操作失败"}
 						</summary>
