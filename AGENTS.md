@@ -87,7 +87,7 @@ npm link -w @suiming/cli   # 全局 suim 指向本仓；旧仓同名，只能有
 npm run dev:api      # Cloud 开发进程（只剩 Canon 与同步），读 .env
 node --import tsx apps/cli/src/bin.ts --json status    # 从源码跑 suim
 npm run test:desktop   # 构建 renderer + 真实 Electron E2E；只改测试时可直接 node --import tsx --test apps/desktop/test/desktop.test.ts
-cd apps/workbench && npx shadcn@latest add <component>   # 生成 shadcn/ui 组件到 src/components/ui，之后跑 npm run format
+cd apps/workbench && npx shadcn add <component>   # 用钉住的 shadcn 生成组件到 src/components/ui（base-vega / Base UI），之后跑 npm run format
 npm run regression:harness -- --only check --trials 1   # 真实模型回归，--only 可写任务名或分组（writer / design / check / smoke），节奏见下
 ```
 

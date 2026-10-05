@@ -8,14 +8,22 @@
 
 ## 踩坑得来的决定
 
-- `apps/workbench` 用 shadcn/ui + Tailwind v4（2026-09-08 作者决定，替代手写 CSS）。CLI 生成的组件把 `cn` 写成 `from "cn"` 并装了同名 npm 包，要改回 `@/lib/utils`；生成文件是双引号两空格，提交前跑 `npm run format`。
+- `apps/workbench` 用 shadcn/ui + Tailwind v4（2026-09-08 作者决定，替代手写 CSS），样式是 `base-vega`、原语是 Base UI（2026-10-06 由 Radix 换过来，理由见[技术栈](../../docs/technology.md)）。CLI 生成的组件把 `cn` 写成 `from "cn"` 并装了同名 npm 包，要改回 `@/lib/utils`（官方 `cn` 包是另一套类名合并引擎，没有跟着换）；生成文件是双引号两空格，提交前跑 `npm run format`。**`style.css` 里的 `@import "shadcn/tailwind.css"` 不能删**：Base UI 版组件的 `data-open`、`data-checked`、`data-horizontal` 这类变体都定义在那里，少了它这些状态样式全部静默失效（换的当天设置页竖排的标签就因此盖住了「返回提供商」）。重新生成组件不要跑 `shadcn init`，它会改写全局 token；直接 `npx shadcn add <组件> --overwrite`。
 - **外壳与文档窗格各跑各的 effect。**`WorkspaceShell`（`workspace.tsx`：标题栏、全局动作、左右栏、设置）只有一个，分屏的每一格是一个 `DocumentGroup`；两边都调 `useWorkspaceGroup`，外壳取活动的那一格。只该跑一次的 effect——订阅作品变化、恢复与保存工作区——放外壳；属于一格的——滚动恢复、正文选段、快捷键、比较页宽度——放 `DocumentGroup`。不要放进 `useWorkspaceGroup`：开两格就跑三遍。2026-10-06 之前两个角色是同一个函数，靠十来处 `if (groupId)` 让对方的 effect 空转。
 - **不要对整个文件跑 `biome check --write --unsafe`。**它按 useExhaustiveDependencies 给 effect 补依赖，而从自定义 hook 拿到的 ref（如 `useWorkspaceGroup` 返回的 `live`、`layoutLive`）它认不出，会把 `live.current.*` 补进依赖：2026-10-06 拆工作台时左栏「恢复滚动位置」因此每次滚动都重跑，三套测试全绿，是逐一比对拆分前后的依赖才发现的。只想删未用的 import 时用 `npx biome lint --only=correctness/noUnusedImports --write --unsafe <文件>`；effect 里读这类 ref 时写 biome-ignore 说明。
-- `exactOptionalPropertyTypes` 下 radix 可选 prop 需要 `?? false` 之类兜底。tsconfig 不能再写 `baseUrl`（TS 6 报废弃错误），`paths` 直接相对 tsconfig。
+- `exactOptionalPropertyTypes` 下组件库的可选 prop 有时要 `?? false` 之类兜底。tsconfig 不能再写 `baseUrl`（TS 6 报废弃错误），`paths` 直接相对 tsconfig。
 - `-webkit-app-region` 的 `drag` / `no-drag` 必须用 `@utility` 声明，`@layer components` 里的自定义类不能被 `@apply`。
 - 根字号必须保持 16px（正文字号在 body 上单独设 13px）：Tailwind / shadcn 的 `size-8`、`w-12` 都是 rem，改了根字号所有标称尺寸都会缩水，2026-09-08 曾因此把「32px 按钮」实际渲染成 26px 而不自知。
 - 按钮里的 lucide 图标用 `className` 的 `size-*`（如 `size-[17px]`）指定尺寸，不要用 `size={…}` 属性：shadcn 的 Button / Toggle 基类带 `[&_svg:not([class*='size-'])]:size-4`，属性给的尺寸会被这条 CSS 压成 16px（2026-09-08 同一天踩了两次）。
-- **会叠在别的层上的浮层组件（`popover`、`select`、`dropdown-menu`、`context-menu`）刻意去掉了退出动画**，只留打开动画：Radix 只让层栈最上面那层响应 Esc，而浮层在退出动画里仍挂在层栈顶，于是在设置框里连按两下 Esc（先关浮层、再关设置）时第二下被正在关闭的浮层吃掉，设置框关不掉（2026-09-30 查清，回归在 `model-picker.test.ts`）。重新 `shadcn add` 这几个组件会把 `data-[state=closed]:animate-out` 一组类带回来，要再删掉；顶层 Dialog 下面没有别的层，保留它的退出动画。
+- **Base UI 与 Radix 不一样、类型检查又拦不住的几处**（2026-10-06 换原语时逐个撞上，E2E 守着）：
+  - 菜单项点击用 `onClick`。Radix 的 `onSelect` 在 Base UI 里只是个合法的 HTML 属性，写了不报错、点了不响应；`DropdownMenuItem` / `ContextMenuItem` 的类型已把 `onSelect` 设成 `never`。cmdk 的 `CommandItem` 仍是 `onSelect`。
+  - 菜单的勾选项点了不收起（Base UI 默认），单选项我们在 `DropdownMenuRadioItem` 里默认收起——工作台的单选菜单都是「选一个就切过去」。
+  - `Select` 的 `SelectValue` 只显示 value，要显示标签就给 `Select` 传 `items`。
+  - `ContextMenuTrigger` 默认 `select-none`。整个工作台都是 `NavigationSurface` 的右键区域，那里覆盖成 `select-auto`，否则正文一个字都选不中。
+  - 提示不带 `role`，`TooltipContent` 自己补 `role="tooltip"`（E2E 的 `assertNoTooltip` 按它数，没有就恒真）；关上用 `data-closed:hidden` 立即消失，否则移到下一个控件时两个提示同时在屏上。聚焦只在 `:focus-visible` 时弹提示，E2E 用 `focusByKeyboard` 先按一下键再聚焦，直接 `focus()` 跟在鼠标操作后不算键盘聚焦。
+  - `Switch` 会把关联的 `<label>` 设成 `aria-labelledby`，盖过 `aria-label`；label 里是状态字（启用 / 停用）时不要用 `<label>` 包它。
+  - 视图切换 `Segmented` 用 `RadioGroup` 而不是 `ToggleGroup`：Base UI 的 ToggleGroup 只给 `aria-pressed`，互斥视图在读屏里应当是一组 radio。
+  - 菜单在点击后的下一帧才挂上，E2E 里先等第一个菜单项出现再数。
 - `@layer components` 里的行样式**带死高度**：`.tree-row` 与 `.beat-row` 都是 `h-7`（28px），只给单行用。拿它们渲染两行内容（标题 + 路径）时高度压不住，相邻行会直接叠上——`empty-page.tsx` 的「最近访问」就这么坏了很久，三套测试全绿，是作者截图发现的。复用这两个类渲染多行时要加 `h-auto`（utilities 层压得过 `@layer components` 的 `@apply`），交互样式照旧复用。这类缺陷只能靠**几何断言**守住：E2E 里量包围盒（行高、相邻行是否重叠），按 role / 文本选元素永远发现不了。
 - **全仓改名必须带上 `*.css`。**类名不过类型检查，E2E 按 role / 文本选元素也照样通过，所以 TSX 里的 `className` 改了而 `style.css` 没改时，`npm run check`、`npm test`、`npm run test:desktop` **全绿**，样式却整块失效。2026-09-13 把 `.director-composer` 改成 `agent-composer` 时漏了 CSS，输入框的 20px 圆角、边框、阴影和 `padding: 12px 16px 16px` 一起没了，看上去就是「贴着面板边」——是作者发现的，不是测试。改名脚本的文件表要列全（`*.css` / `*.json` / `*.html` 都算），改完 grep 一遍旧名确认归零。历史验收记录（如 `docs/validation/**/measurements.json` 里的 span 名）是当时的事实，不跟着改。
 - Renderer 的反向链接、身份计数、谱与邻域图都从 `workspace.show` 透传的 frontmatter 派生（`apps/workbench/src/model.ts` 的 `deriveLinks`，键名决定目标种类），没有复制 Story Language 字段表；新增 frontmatter 引用键时在 `KEY_KINDS` 补一行即可。

@@ -14,7 +14,7 @@
 | Monorepo | npm 11 Workspaces | 少量 app/package 的直接管理；暂不引入 Turborepo/Nx |
 | API | Fastify + TypeBox + OpenAPI | Cloud Domain API、鉴权与类型化诊断 |
 | 工作台前端 | React 19 + Vite + TanStack Query + shadcn/ui + Streamdown（Markdown 渲染，含流式）+ CodeMirror 6（源码编辑与 merge 比较） | 桌面首先实现，后续 Cloud Web 复用作品编辑与复杂视图；正文、设计文档与 Agent 消息共用一条 Markdown 管线 |
-| 基础 UI 控件 | shadcn/ui（底层原语是 Radix）+ Tailwind v4；已接入 `apps/workbench`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么暂不换成 Base UI 见下文「暂不采用」 |
+| 基础 UI 控件 | shadcn/ui（`base-vega` 样式，底层原语是 Base UI；2026-10-06 由 Radix 换过来）+ Tailwind v4；已接入 `apps/workbench`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护，`shadcn` 作开发依赖钉住版本并提供组件用到的 `shadcn/tailwind.css`） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么换见下文 |
 | AI 交互客户端 | AG-UI 官方客户端 `@ag-ui/client`（2026-10-05 起，替换 TanStack AI）；已接 typed IPC | 把 AG-UI 事件拼成消息、按运行生命周期校验整条流；只实现长连接的 `connect()`，不用它的 `run()` 与 HTTP 传输 |
 | Desktop | Electron 42；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
 | CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation 与 Cloud sync |
@@ -45,6 +45,8 @@ Cloud Domain API 同时服务 Web、本地同步和远程外部 Agent，不能�
 作者端是对话、编辑、长运行、筛选、diff 和派生视图密集的应用，不以 SEO 为主。TanStack Query 管理经 typed IPC 读到的领域数据，Vite 保持构建和部署直接。导航不用路由库：打开了哪些标签、每个标签的后退记录、侧栏与选中对象都在 `WorkbenchState` 里，按作品存在本机；为什么删掉 TanStack Router 见下文「暂不引入」。
 
 renderer 用 `@ag-ui/client` 管理对外消息（`apps/workbench/src/desktop-agent.ts` 的 `DesktopAgent` 只实现 `connect()`，事件来自 IPC 的只读 attach），Query 读取作品、版本、Review 和持久 session。Suiming 编写业务 activity / diff / Review 组件和 typed IPC 事件流；启动与恢复通过唯一命令，attach 只读。客户端的 stop / retry 不决定后台生命周期，也不因客户端限制改动领域语义。
+
+**为什么从 Radix 换成 Base UI（2026-10-06）。**10-05 评估时决定暂不换，三条触发条件之一是「shadcn 不再给 Radix 出新组件」。实际撞上的是它的变体：shadcn 的样式改成「原语-样式」八种（`radix-vega`、`base-vega` 等），我们 `components.json` 里的旧样式 `new-york` 不在其中，8 月的新组件在 `new-york-v4` 下取不到（CLI 报 404）。迁样式迟早要做，顺带换原语只多一份替换工作，换成 Base UI（shadcn 7 月起的默认）就不必再迁第二次。作者定的原则是适配 Base UI 的行为与界面，而不是让它逐处复刻 Radix：浮层的退出动画恢复（Radix 下为连按两次 Esc 去掉的，Base UI 没有那个层栈问题，`model-picker.test.ts` 守着）、菜单勾选项点了不收起、对话框遮罩换成浅色加模糊，都用 Base UI 的默认；只在一致性与可访问性上改：单选菜单项点了就收起（它们都是「选一个就切过去」），视图切换用 RadioGroup 保住 radio 语义，提示补 `role="tooltip"`、关上立即消失。逐项的坑记在 [apps/workbench/AGENTS.md](../apps/workbench/AGENTS.md)。`cn` 仍用本地的 clsx + tailwind-merge，没跟着换成 shadcn 9 月的官方 `cn` 包：那是换类名合并引擎，和换原语是两件事，放在一起改出了样式差异分不清是谁引起的。
 
 **为什么从 TanStack AI 换成 `@ag-ui/client`（2026-10-05）。**TanStack AI 在本仓只用来拼消息：`useChat` 的 `send` 抛错、`isLoading` 恒为 false，它还内嵌另一份 `@ag-ui/core`（0.1.1-canary），`bridge.ts` 靠一次类型强转把两边接起来。AG-UI 的 core 与 client 到了 1.0，换过来之后全链路只剩一份协议版本，拼消息用协议自带的那份逻辑。代价是多了 RxJS 等依赖、没有官方 React 层（自己写了 `useConversation`）；以及官方客户端按运行生命周期校验整条流，Runtime 因此改成每个事件都落在某次运行之内（新建 session 不再发 `suiming.session`，没跑过的对话快照为空，`run-event-stream.test.ts` 守着）。sdk 与 web 的 AG-UI 版本要一起升。
 
@@ -196,7 +198,6 @@ PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、�
 | TUI（曾有的 `apps/tui`，基于 `@earendil-works/pi-tui`） | 2026-09-13 删除：它是一千行的开发者控制台，产品是桌面，把 Run / Attempt 的词汇改到 Session 等于重写一遍 | 不重新评估 |
 | CopilotKit / A2UI / TanStack AI | 已选 AG-UI 与它的官方客户端，不需要额外 agent loop、通用生成 UI 平台或自带运行时的 React 层；TanStack AI 2026-10-05 换掉，理由见上文 | 出现现有组件与领域工具无法表达的真实交互 |
 | 通用的工具 / 中断组件工厂（TanStack AI 的 `/ui`、CopilotKit 的生成 UI 这一类） | Runtime 不发标准 `TOOL_CALL_*`，工具动作投影成 `suiming.action`，两者并存即双协议投影；这类工厂要为每个工具名注册组件，未注册的调用在转录里消失，而工具有 18 个以上，也与 workbench-v7 的一致性验收冲突 | **已裁决：attach 不补成双向。**决策卡的问答往返走普通消息——模型在文本里问、停下，作者的回答是 inbox 的下一条——与 attach 无关，attach 保持只读，不变量 10 不动。因此也不需要 AG-UI 的 interrupt 往返通道，自建卡片即可。剩下的唯一缺口是 `validateProductEvent` 的 CUSTOM 白名单要放行一个新事件名 |
-| Base UI（shadcn/ui 2026-07 起的默认原语，替换 Radix） | shadcn 明说 Radix 没有弃用、每个新组件两种都出、已有项目不必迁移。本仓 20 个组件带着本地修改（四个浮层刻意去掉退出动画，是 Radix 层栈下连按两次 Esc 的修复，换了要重验），组件目录外还有 17 处 `asChild`、直接用的 `Slot`、`data-[state=…]` 选择器与 `--radix-popover-trigger-width`；估计一到两天，风险在焦点与层叠，收益眼下只有 Base UI 独有的组件（Combobox、Autocomplete 等） | 三条之一：需要只有 Base UI 才有的组件（最可能是拿 Combobox 换掉 @ 引用的搜索框）；撞上 Radix 修不了的缺陷；shadcn 不再给 Radix 出新组件。换就整体换，不两套原语混用——两套焦点管理与层栈正是上面那类 Esc 问题的来源；在那之前新加组件仍用 Radix 版 |
 | MCP Apps（`ui://` 资源 → 沙箱 iframe） | 需要 MCP Apps 宿主与自托管 sandbox-proxy 页，撞全功能 MCP 冻结，也与「renderer 打不开外部窗口、链接渲染成 span」的安全模型冲突 | 全功能 MCP 解冻后另行评估 |
 | TanStack Router（及其他 URL 路由库） | 桌面没有地址栏，作者既看不到也不会分享 URL；工作台是多标签的，每个标签有自己的后退记录，一个 URL 与浏览器的一条全局历史装不下，导航状态于是全在 `WorkbenchState`。2026-10-05 删掉之前它只建了一个根路由、渲染整个工作台，没有别的路由，也没有别处引用 | 做 Cloud Web、作品对象要有能在浏览器里打开和分享的链接。那时的工作量在 `WorkbenchState` 与 URL 互相转换，不在路由库本身；桌面的系统链接（`suiming://`）用不着它，收到后直接调打开文档的函数 |
 | TanStack Start / Next.js | 作者端不需要同构全栈框架 | 独立入口出现明确 SSR/SEO 需求 |
