@@ -29,9 +29,9 @@ export const SuimingSessionNoticeSchema = Type.Object(
 	},
 	{ additionalProperties: false },
 );
+/** `suiming.action`：一个动作的结果。子任务的动作在事件上带 subagentRunId，内容里不再带 taskId（2026-10-05 前有）。 */
 export const SuimingActivitySchema = Type.Object(
 	{
-		taskId: nonempty,
 		label: nonempty,
 		status: Type.Union([
 			Type.Literal("running"),
@@ -41,7 +41,6 @@ export const SuimingActivitySchema = Type.Object(
 		]),
 		summary: Type.Optional(Type.String()),
 		target: Type.Optional(Type.String()),
-		resultObjectId: Type.Optional(nonempty),
 		isError: Type.Optional(Type.Boolean()),
 	},
 	{ additionalProperties: false },
@@ -112,7 +111,7 @@ export function validateProductEvent(event: AGUIEvent): void {
 		const schema =
 			event.activityType === "suiming.turn"
 				? SuimingTurnSummarySchema
-				: ["suiming.task", "suiming.action"].includes(event.activityType)
+				: event.activityType === "suiming.action"
 					? SuimingActivitySchema
 					: undefined;
 		if (schema === undefined || !Value.Check(schema, event.content))

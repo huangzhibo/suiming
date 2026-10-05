@@ -106,44 +106,50 @@ export class SessionEventStream {
 		}
 		return structuredClone(envelope);
 	}
-	appendText(messageId: string, delta: string, metadata: Record<string, unknown>): void {
+	appendText(messageId: string, delta: string, metadata: Record<string, unknown>, subagentRunId?: string): void {
 		const pending = this.#pendingText.get(messageId) ?? { text: "", flushedAt: Date.now() };
 		pending.text += delta;
 		this.#pendingText.set(messageId, pending);
-		if (pending.text.length >= 512 || Date.now() - pending.flushedAt >= 40) this.#flushText(messageId, metadata);
+		if (pending.text.length >= 512 || Date.now() - pending.flushedAt >= 40)
+			this.#flushText(messageId, metadata, subagentRunId);
 	}
-	#flushText(messageId: string, metadata: Record<string, unknown>): void {
+	#flushText(messageId: string, metadata: Record<string, unknown>, subagentRunId?: string): void {
 		const pending = this.#pendingText.get(messageId);
 		if (!pending?.text) return;
 		const previous = this.messageText(messageId);
-		this.message(messageId, previous + pending.text, false, metadata);
+		this.message(messageId, previous + pending.text, false, metadata, "assistant", subagentRunId);
 		pending.text = "";
 		pending.flushedAt = Date.now();
 	}
 	messageText(messageId: string): string {
 		return this.#texts.get(messageId) ?? "";
 	}
-	/** 已确认完整模型响应可以补齐尚未发布的文本；不依赖易丢失的 streaming callback。 */
+	/**
+	 * 已确认完整模型响应可以补齐尚未发布的文本；不依赖易丢失的 streaming callback。子任务的话带 `subagentRunId`
+	 * （就是 task id，AG-UI 的 subagent 标准写法），根 Agent 与作者的话不带。
+	 */
 	message(
 		messageId: string,
 		text: string,
 		complete: boolean,
 		metadata: Record<string, unknown>,
 		role: "assistant" | "user" = "assistant",
+		subagentRunId?: string,
 	): void {
 		const previous = this.messageText(messageId);
 		if (!text.startsWith(previous)) throw new Error(`Message ${messageId} does not match persisted prefix`);
 		if (text.length === 0) return;
-		this.emit({ type: EventType.TEXT_MESSAGE_START, messageId, role, metadata }, `${messageId}:start`);
+		const origin = subagentRunId === undefined ? {} : { subagentRunId };
+		this.emit({ type: EventType.TEXT_MESSAGE_START, messageId, role, metadata, ...origin }, `${messageId}:start`);
 		const delta = text.slice(previous.length);
 		if (delta.length > 0)
 			this.emit(
-				{ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, metadata },
+				{ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, metadata, ...origin },
 				`${messageId}:text:${previous.length}`,
 			);
 		if (complete) {
 			this.#pendingText.delete(messageId);
-			this.emit({ type: EventType.TEXT_MESSAGE_END, messageId, metadata }, `${messageId}:end`);
+			this.emit({ type: EventType.TEXT_MESSAGE_END, messageId, metadata, ...origin }, `${messageId}:end`);
 		}
 	}
 	assertWritable(): void {

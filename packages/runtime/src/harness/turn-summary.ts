@@ -78,11 +78,11 @@ export function textWrittenWithoutContext(
 	const written = new Set<string>();
 	for (const { event } of events) {
 		if (event.type !== "ACTIVITY_SNAPSHOT" || event.activityType !== "suiming.action") continue;
-		const action = event.content as { taskId?: string; label?: string; target?: string; isError?: boolean };
+		const action = event.content as { label?: string; target?: string; isError?: boolean };
 		if (action.isError === true || action.target === undefined) continue;
 		if (action.label === "write_context" || action.label === "delegate") informed.add(action.target);
 		const beat = action.label === "write" ? TEXT_PATH.exec(action.target)?.[1] : undefined;
-		if (beat !== undefined && !writerTaskIds.has(action.taskId ?? "")) written.add(beat);
+		if (beat !== undefined && !writerTaskIds.has(event.subagentRunId ?? "")) written.add(beat);
 	}
 	return [...written].filter((beat) => !informed.has(beat)).map((beat) => `text/${beat}.md`);
 }

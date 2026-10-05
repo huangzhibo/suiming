@@ -622,10 +622,11 @@ export class HarnessSession {
 			delete loop.unsubmittedStops;
 		}
 		const systemPrompt = restored?.systemPrompt ?? input.systemPrompt;
-		// 增量事件上的 sessionId / taskId（以及 state-events.ts 里 suiming.session / suiming.task 上的同类字段）
-		// 与信封、threadId 有重复，刻意保留：`suim session send --events` 把事件流原样交给 host，
-		// 仓库里没有消费者不等于没人用。
-		const metadata = { suiming: { sessionId: this.sessionId, taskId: input.loopId, taskKind: input.label } };
+		// 增量事件上的 sessionId 与信封、threadId 有重复，刻意保留：`suim session send --events` 把事件流原样交给 host，
+		// 仓库里没有消费者不等于没人用。子任务的事件带标准的 subagentRunId（就是 task id）；2026-10-05 之前用
+		// metadata.suiming.taskId / taskKind 标，根 Agent 的 taskKind 是 "agent"。
+		const metadata = { suiming: { sessionId: this.sessionId } };
+		const subagentRunId = input.loopId === this.sessionId ? undefined : input.loopId;
 		const outcome = await runTaskLoop({
 			model: input.model,
 			systemPrompt: midway ? systemPrompt : input.systemPrompt,
@@ -671,11 +672,18 @@ export class HarnessSession {
 						...(input.decorateInbox === undefined ? {} : { decorateSteering: input.decorateInbox }),
 					}
 				: {}),
-			onTextDelta: (delta, callId) => this.events.appendText(callId, delta, metadata),
+			onTextDelta: (delta, callId) => this.events.appendText(callId, delta, metadata, subagentRunId),
 			onMessage: (callId, message) => {
 				const content = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
 				const previous = this.events.durableEvent(`${callId}:start`);
-				this.events.message(callId, content, true, previous?.event.metadata ?? metadata);
+				this.events.message(
+					callId,
+					content,
+					true,
+					previous?.event.metadata ?? metadata,
+					"assistant",
+					subagentRunId,
+				);
 				if (input.steering && content) this.#lastReply = content;
 			},
 			onToolCall: (event) => {
@@ -687,8 +695,8 @@ export class HarnessSession {
 						messageId: event.actionId,
 						activityType: "suiming.action",
 						replace: true,
+						...(subagentRunId === undefined ? {} : { subagentRunId }),
 						content: {
-							taskId: input.loopId,
 							label: event.toolName,
 							status: event.isError ? "failed" : "completed",
 							summary: event.summary,

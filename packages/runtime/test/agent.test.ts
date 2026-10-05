@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { type BaseEvent, verifyEvents } from "@ag-ui/client";
 import {
 	createModels,
 	type FauxModelDefinition,
@@ -14,7 +15,10 @@ import {
 	Type,
 } from "@earendil-works/pi-ai";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
+import { EventType, type SessionEventBody } from "@suiming/sdk";
+import { from, lastValueFrom, toArray } from "rxjs";
 import { agentTurn } from "../src/harness/agent.js";
+import { productEventSnapshot } from "../src/harness/event-snapshot.js";
 import type { LoopCheckpoint } from "../src/harness/loop.js";
 import type { TurnOptions } from "../src/harness/suiming-harness.js";
 import type { HarnessTool } from "../src/harness/tool.js";
@@ -31,6 +35,7 @@ import {
 	TURN_USAGE_CHECKPOINT_TOKENS,
 	weightedUsage,
 } from "../src/index.js";
+import { assertAgUiConformance } from "./harness-fixtures.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
 const CHECKPOINT_MEDIA_TYPE = "application/vnd.suiming.harness-checkpoint+json";
@@ -80,8 +85,12 @@ async function fixture(
 			return readFile(join(root, path), "utf8");
 		},
 		async close() {
-			project.close();
-			await rm(root, { recursive: true, force: true });
+			try {
+				await assertAgUiConformance(project);
+			} finally {
+				project.close();
+				await rm(root, { recursive: true, force: true });
+			}
 		},
 	};
 }
@@ -678,6 +687,81 @@ test("子任务的开场输入就过了压缩线：一次请求都不发，作�
 	}
 });
 
+test("子任务按 AG-UI 的 subagent 发事件：开始、完成、挂起与续跑都过官方校验，在任意位置 attach 也过", async () => {
+	// 2026-10-05 之前子任务的话只靠 metadata.suiming.taskKind 标出来，状态另发一份 suiming.task 活动，都是自定义的；
+	// AG-UI 1.0 的 SUBAGENT_STARTED / FINISHED / ERROR 与 subagentRunId 就是这件事的标准写法。
+	// 校验器就是桌面用的官方客户端里的那个（verifyEvents）：不合规的流在桌面上整条报错停下。
+	const f = await fixture({ turnUsageCheckpointTokens: 50_000 });
+	try {
+		const id = (await f.harness.createSession()).id;
+		f.provider.setResponses([
+			call("delegate", { goal: "读黄盖的人物档后交付", profile: "main" }),
+			fauxAssistantMessage([fauxText("读过了"), fauxToolCall("submit_task", { summary: "黄盖读过了" })]),
+			reply("第一件做完了"),
+			call("delegate", { goal: "再读阚泽的人物档", profile: "main" }),
+			expensive(fauxToolCall("read", { path: "world/characters/阚泽.md" })),
+		]);
+		await f.say("先读黄盖", id);
+		const stopped = await f.say("再读阚泽", id);
+		assert.equal(stopped.failure?.code, "turn_usage_checkpoint");
+		f.provider.setResponses([call("submit_task", { summary: "阚泽读过了" }), reply("第二件也做完了")]);
+		const resumed = await f.say("继续", id);
+		assert.equal(resumed.failure, undefined);
+
+		const events = f.project.readSessionEvents(id).map((record) => record.event);
+		const verify = (stream: readonly SessionEventBody[]) =>
+			lastValueFrom(verifyEvents()(from(stream as BaseEvent[])).pipe(toArray()));
+		await verify(events);
+		const records = f.project.readSessionEvents(id);
+		for (let at = 0; at <= records.length; at += 1)
+			await verify([
+				...productEventSnapshot(records.slice(0, at)),
+				...records.slice(at).map((record) => record.event),
+			]);
+
+		assert.equal(f.project.loadExecutionState().tasks.length, 2, "两个子任务，第二个续跑而不是重派");
+		const [first, second] = [
+			...new Set(
+				events.flatMap((event) => (event.type === EventType.SUBAGENT_STARTED ? [event.subagentRunId] : [])),
+			),
+		];
+		assert.deepEqual(
+			events.flatMap((event) =>
+				event.type === EventType.SUBAGENT_STARTED
+					? [["started", event.subagentRunId, event.name]]
+					: event.type === EventType.SUBAGENT_FINISHED
+						? [["finished", event.subagentRunId, event.outcome?.type]]
+						: [],
+			),
+			[
+				["started", first, "subagent"],
+				["finished", first, "success"],
+				["started", second, "subagent"],
+				["finished", second, "suspended"],
+				["started", second, "subagent"],
+				["finished", second, "success"],
+			],
+			"挂起的子任务在下一轮以同一个 subagentRunId 续跑",
+		);
+		const childText = events.find(
+			(event) => event.type === EventType.TEXT_MESSAGE_START && event.subagentRunId === first,
+		);
+		assert.ok(childText, "子任务的话带着 subagentRunId");
+		assert.ok(
+			events.some((event) => event.type === EventType.ACTIVITY_SNAPSHOT && event.subagentRunId === second),
+			"子任务的动作也带着 subagentRunId",
+		);
+		assert.ok(
+			events.every(
+				(event) => !(event.type === EventType.ACTIVITY_SNAPSHOT && event.activityType === "suiming.task"),
+			),
+			"suiming.task 由标准事件取代",
+		);
+	} finally {
+		await f.close();
+	}
+});
+
 test("用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
 	// 缺省的 faux 模型目录价为 0：按花费算的检查点在这里永远不触发，换成 DeepSeek 这类便宜模型也差不多。
 	const f = await fixture({ turnUsageCheckpointTokens: 50_000 });
@@ -1199,6 +1283,54 @@ test("作者停下正在跑的子任务再说一句：根 Agent 先看到子任�
 			f.project.loadExecutionState().tasks.map((task) => task.status),
 			["interrupted"],
 		);
+	} finally {
+		await f.close();
+	}
+});
+
+test("作者在模型输出到一半时按停止：半截的话先收尾成一条完整消息，再结束这一轮", async () => {
+	// AG-UI 的官方客户端不接受「消息还没结束、运行先结束了」：RUN_FINISHED 之前每条文字消息都要有 TEXT_MESSAGE_END，
+	// 否则桌面上这个对话整条报错、打不开（2026-10-05 换官方客户端后查到）。fixture 收尾时整条流过同一个校验器。
+	const f = await fixture();
+	try {
+		const streaming = fauxProvider({ provider: "streaming", tokensPerSecond: 400, tokenSize: { min: 4, max: 4 } });
+		const models = createModels();
+		models.setProvider(streaming.provider);
+		const profile = { provider: "streaming", model: streaming.getModel().id };
+		const harness = new SuimingHarness({
+			project: f.project,
+			models: new ModelGateway(models, { profiles: { main: profile, reviewer: profile } }),
+		});
+		streaming.setResponses([reply("黄盖挨了军杖。".repeat(400))]);
+		const controller = new AbortController();
+		const replies = new Set<string>();
+		const session = await harness.createSession();
+		f.project.queueInbox(session.id, "讲讲黄盖");
+		const stopped = await harness.turn(
+			session.id,
+			{
+				signal: controller.signal,
+				onEvent: ({ event }) => {
+					if (event.type === EventType.TEXT_MESSAGE_START && event.role === "assistant")
+						replies.add(event.messageId);
+					if (event.type === EventType.TEXT_MESSAGE_CONTENT && replies.has(event.messageId))
+						controller.abort(new AuthorStop());
+				},
+			},
+			(handle) => agentTurn(handle),
+		);
+		assert.equal(stopped.session.status, "idle");
+		const events = f.project.readSessionEvents(session.id).map((record) => record.event);
+		const [reply_] = replies;
+		assert.ok(reply_, "停下之前已经流出了一段");
+		assert.ok(
+			events.some((event) => event.type === EventType.TEXT_MESSAGE_END && event.messageId === reply_),
+			"半截的话也有结束事件",
+		);
+		const ended = events.findIndex(
+			(event) => event.type === EventType.TEXT_MESSAGE_END && event.messageId === reply_,
+		);
+		assert.ok(ended < events.findIndex((event) => event.type === EventType.RUN_FINISHED), "先收尾消息，再结束这一轮");
 	} finally {
 		await f.close();
 	}

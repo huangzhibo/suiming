@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type BaseEvent, verifyEvents } from "@ag-ui/client";
 import {
 	type Context,
 	createModels,
@@ -15,7 +16,9 @@ import {
 	fauxToolCall,
 	type JsonObject,
 } from "@earendil-works/pi-ai";
+import { from, lastValueFrom, toArray } from "rxjs";
 import { agentTurn } from "../src/harness/agent.js";
+import { productEventSnapshot } from "../src/harness/event-snapshot.js";
 import {
 	LocalProjectService,
 	ModelGateway,
@@ -25,6 +28,28 @@ import {
 import { sampleWorkFiles } from "./sample-work.js";
 
 export type Responses = Parameters<ReturnType<typeof fauxProvider>["setResponses"]>[0];
+
+/**
+ * 桌面用 AG-UI 官方客户端拼消息，它按协议校验整条流（`verifyEvents`），不合规就整条报错停下、对话打不开。
+ * 每个对话的完整事件流，以及在任意位置 attach 得到的「快照 + 之后的增量」，都要过同一个校验器。
+ * Agent 测试收尾时都跑一遍，于是每条测试顺带是协议测试（2026-10-05 起）。
+ */
+export async function assertAgUiConformance(project: LocalProjectService): Promise<void> {
+	for (const session of project.loadExecutionEntities().sessions) {
+		const records = project.readSessionEvents(session.id);
+		for (let at = 0; at <= records.length; at += 1) {
+			const stream = [
+				...productEventSnapshot(records.slice(0, at)),
+				...records.slice(at).map((record) => record.event),
+			];
+			try {
+				await lastValueFrom(verifyEvents()(from(stream as BaseEvent[])).pipe(toArray()), { defaultValue: [] });
+			} catch (error) {
+				assert.fail(`对话 ${session.id} 在第 ${at} 条事件处 attach 不过 AG-UI 校验：${(error as Error).message}`);
+			}
+		}
+	}
+}
 
 /**
  * 一个 faux provider 按顺序给出 responses；profiles 是「profile → 模型 id」。模型 id 照写在调用处，因为有的测试断言
@@ -71,7 +96,9 @@ export async function withSampleProject<T>(
 	try {
 		project = await LocalProjectService.init({ checkoutPath, projectId: options.projectId ?? "project-1" });
 		await options.prepare?.(project);
-		return await body(project, checkoutPath);
+		const value = await body(project, checkoutPath);
+		await assertAgUiConformance(project);
+		return value;
 	} finally {
 		project?.close();
 		await rm(checkoutPath, { recursive: true, force: true });

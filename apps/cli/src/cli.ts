@@ -349,14 +349,14 @@ function sessionTurnData(service: LocalProjectService, sessionId: string) {
 	);
 	const reply =
 		messages?.type === "MESSAGES_SNAPSHOT"
-			? [...messages.messages]
-					.reverse()
-					.find(
-						(message) =>
-							message.role === "assistant" &&
-							typeof message.content === "string" &&
-							message.metadata?.suiming?.taskKind === "agent",
-					)
+			? [...messages.messages].reverse().find(
+					(message) =>
+						message.role === "assistant" &&
+						typeof message.content === "string" &&
+						// 根 Agent 的话：不带 AG-UI 的 subagentRunId；2026-10-05 之前的事件靠 taskKind 认
+						message.subagentRunId === undefined &&
+						(message.metadata?.suiming?.taskKind ?? "agent") === "agent",
+				)
 			: undefined;
 	return {
 		projectId: service.projectId,

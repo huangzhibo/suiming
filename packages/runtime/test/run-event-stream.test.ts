@@ -53,7 +53,7 @@ test("恢复对话保留消息与工具的原始次序，工具更新不移到�
 		messageId: "action",
 		activityType: "suiming.action",
 		replace: true,
-		content: { taskId: "agent", label: "read", status: "running" },
+		content: { label: "read", status: "running" },
 	});
 	events.message("second", "补充要求", true, { suiming: { taskKind: "agent", inboxSequence: 1 } }, "user");
 	events.emit({
@@ -61,7 +61,7 @@ test("恢复对话保留消息与工具的原始次序，工具更新不移到�
 		messageId: "action",
 		activityType: "suiming.action",
 		replace: true,
-		content: { taskId: "agent", label: "read", status: "completed" },
+		content: { label: "read", status: "completed" },
 	});
 	const durable = events.durableEventsAfter(0);
 	const original = structuredClone(durable);

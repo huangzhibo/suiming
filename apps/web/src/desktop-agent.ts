@@ -44,10 +44,14 @@ export interface ConversationMessage {
 	sequence?: number;
 }
 
-/** 对话里给作者看的消息：作者与根 Agent 的话；动作快照、子任务的话与空消息不算。 */
+/**
+ * 对话里给作者看的消息：作者与根 Agent 的话；动作快照、子任务的话（带 AG-UI 的 subagentRunId）与空消息不算。
+ * 2026-10-05 之前落盘的事件没有 subagentRunId，子任务的话靠 metadata.suiming.taskKind 认（根 Agent 是 "agent"）。
+ */
 export function conversationMessages(messages: readonly Message[]): ConversationMessage[] {
 	return messages.flatMap((message) => {
 		if (message.role !== "user" && message.role !== "assistant") return [];
+		if (message.subagentRunId !== undefined) return [];
 		const suiming = (message.metadata as { suiming?: { taskKind?: string; sequence?: number } } | undefined)?.suiming;
 		if (suiming?.taskKind && suiming.taskKind !== "agent") return [];
 		const text = typeof message.content === "string" ? message.content : "";

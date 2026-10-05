@@ -10,11 +10,14 @@ const finished = (runId: string): AGUIEvent => ({
 	runId,
 	outcome: { type: "success" },
 });
-const text = (messageId: string, role: "user" | "assistant", delta: string, taskKind = "agent"): AGUIEvent[] => [
-	{ type: EventType.TEXT_MESSAGE_START, messageId, role, metadata: { suiming: { taskKind } } },
-	{ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta },
-	{ type: EventType.TEXT_MESSAGE_END, messageId },
-];
+const text = (messageId: string, role: "user" | "assistant", delta: string, subagentRunId?: string): AGUIEvent[] => {
+	const origin = subagentRunId === undefined ? {} : { subagentRunId };
+	return [
+		{ type: EventType.TEXT_MESSAGE_START, messageId, role, metadata: { suiming: { sessionId: "s" } }, ...origin },
+		{ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, ...origin },
+		{ type: EventType.TEXT_MESSAGE_END, messageId, ...origin },
+	];
+};
 
 /** 按 Runtime 的 attach 实际给出的形状：先是包在最近一次运行里的快照，再是之后的增量（productEventSnapshot）。 */
 const attached: AGUIEvent[] = [
@@ -30,18 +33,29 @@ const attached: AGUIEvent[] = [
 		type: EventType.ACTIVITY_SNAPSHOT,
 		messageId: "a1",
 		activityType: "suiming.action",
-		content: { taskId: "s", label: "read", status: "completed" },
+		content: { label: "read", status: "completed" },
 	},
 	{ type: EventType.CUSTOM, name: "suiming.session", value: { status: "idle", version: 3, turn: 1 } },
 	finished("t1"),
 	run("t2"),
 	...text("m3", "user", "第二句"),
-	...text("w1", "assistant", "子任务的话", "subagent"),
+	{ type: EventType.SUBAGENT_STARTED, subagentRunId: "task-1", name: "subagent" },
+	...text("w1", "assistant", "子任务的话", "task-1"),
+	{ type: EventType.SUBAGENT_FINISHED, subagentRunId: "task-1", outcome: { type: "success" } },
+	// 2026-10-05 之前落盘的子任务消息没有 subagentRunId，靠 metadata.suiming.taskKind 认
+	{
+		type: EventType.TEXT_MESSAGE_START,
+		messageId: "w0",
+		role: "assistant",
+		metadata: { suiming: { taskKind: "review" } },
+	},
+	{ type: EventType.TEXT_MESSAGE_CONTENT, messageId: "w0", delta: "旧事件里审稿的话" },
+	{ type: EventType.TEXT_MESSAGE_END, messageId: "w0" },
 	{
 		type: EventType.TEXT_MESSAGE_START,
 		messageId: "m4",
 		role: "assistant",
-		metadata: { suiming: { taskKind: "agent" } },
+		metadata: { suiming: { sessionId: "s" } },
 	},
 	{ type: EventType.TEXT_MESSAGE_CONTENT, messageId: "m4", delta: "流到" },
 	{ type: EventType.TEXT_MESSAGE_CONTENT, messageId: "m4", delta: "一半" },

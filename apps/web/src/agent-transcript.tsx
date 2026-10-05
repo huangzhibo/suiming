@@ -77,7 +77,7 @@ const actionLabels: Record<string, string> = {
 type Activity = {
 	id: string;
 	sequence: number;
-	/** 执行这个动作的 loop：根 Agent 是 sessionId，子任务是它的 taskId。 */
+	/** 执行这个动作的子任务（事件上的 subagentRunId）；根 Agent 的没有，2026-10-05 之前的事件是 sessionId。 */
 	taskId?: string;
 	label: string;
 	status: string;
@@ -196,6 +196,7 @@ export function Transcript({
 			}));
 		if (event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.action") {
 			const body = event.content as {
+				/** 2026-10-05 之前落盘的事件：执行者写在内容里（根 Agent 是 sessionId），现在是事件上的 subagentRunId。 */
 				taskId?: string;
 				label: string;
 				status: string;
@@ -206,6 +207,7 @@ export function Transcript({
 				...previous,
 				[event.messageId]: {
 					...body,
+					...(event.subagentRunId === undefined ? {} : { taskId: event.subagentRunId }),
 					id: event.messageId,
 					sequence:
 						previous[event.messageId]?.sequence ?? Number(event.metadata?.suiming?.sequence ?? record.sequence),
