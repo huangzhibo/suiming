@@ -311,6 +311,7 @@ export function AgentPanel({
 						<Transcript
 							key={session.id}
 							sessionId={session.id}
+							running={session.status === "running"}
 							showLog={showLog}
 							titles={titles}
 							open={open}

@@ -44,6 +44,8 @@ test("连续对话：停下后追问接着同一 session、重载历史、草稿
 		await page.reload();
 		await page.locator(".message.assistant").filter({ hasText: "接着刚才的方案" }).waitFor();
 		assert.equal(await input.inputValue(), "这个对话的未发送草稿");
+		// 已结束的会话重放历史时不按流式渲染：2026-10-05 走查里，长回复切回来要逐词淡入三秒多才显示全
+		assert.equal(await page.locator(".message.assistant [data-sd-animate]").count(), 0, "重载后不逐词淡入");
 		await page.getByRole("button", { name: "展开为主工作面", exact: true }).click();
 		if (process.env.SUIMING_CAPTURE_DIR) {
 			await mkdir(process.env.SUIMING_CAPTURE_DIR, { recursive: true });
@@ -66,6 +68,7 @@ test("连续对话：停下后追问接着同一 session、重载历史、草稿
 			.click();
 		assert.equal(await input.inputValue(), "这个对话的未发送草稿");
 		await page.locator(".message.assistant").filter({ hasText: "接着刚才的方案" }).waitFor();
+		assert.equal(await page.locator(".message.assistant [data-sd-animate]").count(), 0, "切回已结束的会话不逐词淡入");
 		if (process.env.SUIMING_CAPTURE_DIR)
 			await page.screenshot({ path: join(process.env.SUIMING_CAPTURE_DIR, "02-sidebar.png") });
 		await input.fill("继续分析这个选择");

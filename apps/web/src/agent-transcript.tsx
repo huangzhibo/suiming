@@ -157,6 +157,7 @@ type Row =
 export function Transcript({
 	sessionId,
 	history = false,
+	running = false,
 	showLog,
 	titles,
 	open,
@@ -165,6 +166,8 @@ export function Transcript({
 }: {
 	sessionId: string;
 	history?: boolean;
+	/** 执行库里这个 session 正在跑；只有这时最后一条消息才按流式渲染。 */
+	running?: boolean;
 	showLog: boolean;
 	/** 当前作品的全部文件路径与显示标题；Agent 提到其中之一时才渲染成可打开的链接。 */
 	titles: ReadonlyMap<string, string>;
@@ -277,7 +280,10 @@ export function Transcript({
 							<Markdown
 								className="msg-text"
 								content={group.text}
-								streaming={sessionGenerating && group.id === latest}
+								// 打开或切到一个已结束的会话要重放历史事件，重放到一半 sessionGenerating 也是真的：
+								// 最后一条消息因此按流式挂载、逐词淡入，长回复要三秒多才显示全（2026-10-05 走查，706 个词）。
+								// 是否在生成以执行库的 session 状态为准，事件流只决定流到哪里。
+								streaming={running && sessionGenerating && group.id === latest}
 								links={links}
 							/>
 						)}
