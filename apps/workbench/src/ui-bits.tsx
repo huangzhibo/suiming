@@ -1,8 +1,18 @@
-import { Slot } from "radix-ui";
-import { type ComponentProps, type ReactElement, type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
+import { useRender } from "@base-ui/react/use-render";
+import {
+	type ComponentProps,
+	type HTMLAttributes,
+	type ReactElement,
+	type ReactNode,
+	type Ref,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -35,18 +45,20 @@ export function Hint({
 	content,
 	children,
 	side = "bottom",
+	ref,
 	...props
-}: Omit<ComponentProps<typeof TooltipTrigger>, "content" | "children"> & {
+}: Omit<HTMLAttributes<HTMLElement>, "content" | "children"> & {
+	ref?: Ref<HTMLElement>;
 	content?: ReactNode;
 	children: ReactElement;
 	side?: "top" | "bottom" | "left" | "right";
 }) {
-	if (!content) return <Slot.Root {...props}>{children}</Slot.Root>;
+	// 没有提示时只把外层（比如弹层的触发器）传下来的属性与 ref 并到子元素上，不多包一层。
+	const plain = useRender({ render: children, props, ref, enabled: !content });
+	if (!content) return plain;
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild {...props}>
-				{children}
-			</TooltipTrigger>
+			<TooltipTrigger ref={ref as Ref<HTMLButtonElement>} render={children} {...props} />
 			<TooltipContent side={side}>{content}</TooltipContent>
 		</Tooltip>
 	);
@@ -84,9 +96,7 @@ export function OverflowHint({
 			open={open}
 			onOpenChange={(next) => setOpen(next && !!content && overflowTargets(trigger.current).some(isClipped))}
 		>
-			<TooltipTrigger asChild ref={trigger}>
-				{children}
-			</TooltipTrigger>
+			<TooltipTrigger ref={trigger} render={children} />
 			<TooltipContent side={side}>{content}</TooltipContent>
 		</Tooltip>
 	);
@@ -178,7 +188,10 @@ export function ActionButton({
 	);
 }
 
-/** 视图切换：shadcn ToggleGroup 的单选形态，不允许取消选中。 */
+/**
+ * 视图切换：一组单选、不可取消的分段按钮。用 Base UI 的 RadioGroup 而不是 ToggleGroup：
+ * 互斥的视图在读屏里应当是一组 radio（Radix 的单选 ToggleGroup 原来就是这样），Base UI 的 ToggleGroup 只给 aria-pressed。
+ */
 export function Segmented<T extends string>({
 	value,
 	options,
@@ -191,18 +204,17 @@ export function Segmented<T extends string>({
 	className?: string;
 }) {
 	return (
-		<ToggleGroup
-			type="single"
+		<RadioGroup
 			value={value}
 			onValueChange={(next) => {
-				if (next && !options.find((option) => option.id === next)?.disabled) onChange(next as T);
+				if (typeof next === "string" && !options.find((option) => option.id === next)?.disabled)
+					onChange(next as T);
 			}}
-			spacing={1}
-			className={cn("shrink-0 rounded-md bg-muted p-0.5", className)}
+			className={cn("flex w-fit shrink-0 items-center gap-1 rounded-md bg-muted p-0.5", className)}
 		>
 			{options.map((option) => (
 				<Hint key={option.id} content={option.title}>
-					<ToggleGroupItem
+					<Radio.Root
 						value={option.id}
 						aria-disabled={option.disabled || undefined}
 						onClick={(event) => {
@@ -210,14 +222,14 @@ export function Segmented<T extends string>({
 						}}
 						aria-label={option.label}
 						aria-description={option.title}
-						className="h-[22px] gap-1.5 rounded px-2.5 text-[11.5px] text-muted-foreground hover:bg-transparent hover:text-foreground aria-disabled:cursor-default aria-disabled:opacity-50 aria-checked:bg-white aria-checked:text-foreground aria-checked:shadow-[0_1px_2px_#00000014] [&_svg:not([class*='size-'])]:size-[13px]"
+						className="inline-flex h-[22px] cursor-pointer items-center justify-center gap-1.5 rounded px-2.5 text-[11.5px] font-medium whitespace-nowrap text-muted-foreground outline-none transition-[color,box-shadow] hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-disabled:cursor-default aria-disabled:opacity-50 aria-checked:bg-white aria-checked:text-foreground aria-checked:shadow-[0_1px_2px_#00000014] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[13px]"
 					>
 						{option.icon}
 						{option.label}
-					</ToggleGroupItem>
+					</Radio.Root>
 				</Hint>
 			))}
-		</ToggleGroup>
+		</RadioGroup>
 	);
 }
 

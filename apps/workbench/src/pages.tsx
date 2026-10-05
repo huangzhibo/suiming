@@ -558,12 +558,14 @@ export function VersionPage({
 			<div className="shrink-0 px-7 pt-[22px]">
 				<div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
 					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button size="xs" variant="outline" aria-label="选择作品版本">
-								{label}
-								<ChevronDown data-icon="inline-end" />
-							</Button>
-						</DropdownMenuTrigger>
+						<DropdownMenuTrigger
+							render={
+								<Button size="xs" variant="outline" aria-label="选择作品版本">
+									{label}
+									<ChevronDown data-icon="inline-end" />
+								</Button>
+							}
+						/>
 						<DropdownMenuContent align="start">
 							<DropdownMenuRadioGroup
 								value={revisionId}

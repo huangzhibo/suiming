@@ -46,20 +46,22 @@ export function ConversationModelPicker({
 							: "切换当前对话的模型，不修改默认设置"
 					}
 				>
-					<PopoverTrigger asChild>
-						<Button
-							type="button"
-							variant="ghost"
-							size="xs"
-							className="min-w-0 max-w-[240px] shrink gap-1 text-muted-foreground"
-							disabled={disabled}
-							aria-label="对话模型"
-						>
-							<span className="truncate">{label}</span>
-							{pending && <span className="shrink-0 text-[10px]">待生效</span>}
-							<ChevronDown className="shrink-0" />
-						</Button>
-					</PopoverTrigger>
+					<PopoverTrigger
+						render={
+							<Button
+								type="button"
+								variant="ghost"
+								size="xs"
+								className="min-w-0 max-w-[240px] shrink gap-1 text-muted-foreground"
+								disabled={disabled}
+								aria-label="对话模型"
+							>
+								<span className="truncate">{label}</span>
+								{pending && <span className="shrink-0 text-[10px]">待生效</span>}
+								<ChevronDown className="shrink-0" />
+							</Button>
+						}
+					/>
 				</Hint>
 				<PopoverContent side="top" align="start" className="w-[340px] max-w-[calc(100vw-32px)] overflow-hidden p-1">
 					<p className="px-3 pt-2 text-xs text-muted-foreground">当前对话 · 不修改默认配置</p>

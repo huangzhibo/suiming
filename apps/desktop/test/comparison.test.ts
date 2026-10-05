@@ -100,6 +100,8 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		);
 		await page.getByRole("button", { name: "更多", exact: true }).click();
 		await page.getByRole("menuitemcheckbox", { name: "联动滚动", exact: true }).click();
+		// 勾选项点了不收起菜单（Base UI 的默认，连着切几个开关不用反复打开），用 Esc 关掉。
+		await page.keyboard.press("Escape");
 		await page.locator(".cm-merge-a .cm-scroller").evaluate((element) => {
 			element.scrollTop = 1200;
 		});
@@ -112,9 +114,11 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		);
 		await page.getByRole("button", { name: "更多", exact: true }).click();
 		await page.getByRole("menuitemcheckbox", { name: "仅显示差异附近内容", exact: true }).click();
+		await page.keyboard.press("Escape");
 		await page.locator(".cm-collapsedLines").first().waitFor();
 		await page.getByRole("button", { name: "更多", exact: true }).click();
 		await page.getByRole("menuitemcheckbox", { name: "仅显示差异附近内容", exact: true }).click();
+		await page.keyboard.press("Escape");
 		await page.locator(".cm-collapsedLines").first().waitFor({ state: "hidden" });
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 760));
 		await page.locator('.cm-host[data-layout="unified"]').waitFor();

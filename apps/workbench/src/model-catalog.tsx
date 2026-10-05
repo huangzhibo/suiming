@@ -93,20 +93,22 @@ export function ModelSelect({
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					type="button"
-					variant="outline"
-					id={id}
-					role="combobox"
-					aria-expanded={open}
-					aria-label="模型"
-					className="w-full min-w-0 justify-between"
-				>
-					<span className="truncate">{modelChoiceLabel(providers, selected)}</span>
-					<ChevronDown />
-				</Button>
-			</PopoverTrigger>
+			<PopoverTrigger
+				render={
+					<Button
+						type="button"
+						variant="outline"
+						id={id}
+						role="combobox"
+						aria-expanded={open}
+						aria-label="模型"
+						className="w-full min-w-0 justify-between"
+					>
+						<span className="truncate">{modelChoiceLabel(providers, selected)}</span>
+						<ChevronDown />
+					</Button>
+				}
+			/>
 			<PopoverContent align="start" className="w-[340px] min-w-64 max-w-[calc(100vw-32px)] p-0">
 				<ModelCatalog providers={providers} selected={selected} onSelect={onSelect} />
 				<ModelThinking providers={providers} selected={selected} onSelect={onSelect} />
@@ -143,8 +145,13 @@ export function ModelThinking({
 				<FieldLabel htmlFor={id}>思考强度</FieldLabel>
 				<Select
 					value={selected.thinking ?? "default"}
+					items={[
+						{ value: "default", label: "模型默认" },
+						...model.thinkingLevels.map((level) => ({ value: level, label: THINKING_LABELS[level] })),
+					]}
 					disabled={!provider?.enabled || !provider.usable}
 					onValueChange={(thinking) =>
+						thinking !== null &&
 						onSelect({ ...selected, thinking: thinking as NonNullable<ModelChoice["thinking"]> })
 					}
 				>

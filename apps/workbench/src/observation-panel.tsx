@@ -51,7 +51,9 @@ export function ObservationPanel({
 					{(allowPositionChange || !selection) && (
 						<Select
 							value={storyBeatId}
-							onValueChange={(storyBeatId) => change({ storyBeatId, phase, ...(subject ? { subject } : {}) })}
+							onValueChange={(storyBeatId) =>
+								storyBeatId !== null && change({ storyBeatId, phase, ...(subject ? { subject } : {}) })
+							}
 						>
 							<SelectTrigger
 								className="h-6 w-auto shrink-0 gap-1 border-0 bg-transparent px-1 text-xs shadow-none"
@@ -60,7 +62,7 @@ export function ObservationPanel({
 							>
 								<span>{selection ? "更换位置" : "选择位置"}</span>
 							</SelectTrigger>
-							<SelectContent position="popper" align="end" className="max-h-80 w-64">
+							<SelectContent alignItemWithTrigger={false} align="end" className="max-h-80 w-64">
 								{book.data.volumes.map((volume) => (
 									<SelectGroup key={volume.id}>
 										<SelectLabel>{volume.title}</SelectLabel>

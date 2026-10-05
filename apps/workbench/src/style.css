@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* shadcn 组件（Base UI 版）用到的 data-open / data-checked / data-horizontal 这类变体都定义在这里，少了它这些状态样式全部不生效。 */
+@import "shadcn/tailwind.css";
 /* Streamdown 的元素带 Tailwind utility 类，要让 Tailwind 扫到它的产物才会生成；路径相对本文件到根 node_modules。 */
 @source "../../../node_modules/streamdown/dist/*.js";
 

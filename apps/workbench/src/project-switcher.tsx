@@ -29,18 +29,20 @@ export function ProjectSwitcher({
 }) {
 	return (
 		<Popover open={open} onOpenChange={onOpenChange}>
-			<PopoverTrigger asChild>
-				<Hint content={checkoutPath}>
-					<button
-						type="button"
-						aria-label="切换作品"
-						className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-control-hover"
-					>
-						<ChevronsUpDown className="size-[14px] shrink-0 text-muted-foreground" />
-						<span className="truncate text-[13px] font-semibold">{workName}</span>
-					</button>
-				</Hint>
-			</PopoverTrigger>
+			<PopoverTrigger
+				render={
+					<Hint content={checkoutPath}>
+						<button
+							type="button"
+							aria-label="切换作品"
+							className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-control-hover"
+						>
+							<ChevronsUpDown className="size-[14px] shrink-0 text-muted-foreground" />
+							<span className="truncate text-[13px] font-semibold">{workName}</span>
+						</button>
+					</Hint>
+				}
+			/>
 			<PopoverContent align="start" side="top" className="w-[270px] p-1.5">
 				<div className="px-2 pt-1.5 pb-1 text-[11px] text-muted-foreground">当前作品</div>
 				<div className="flex items-center justify-between rounded-md bg-hair-2 px-2 py-[7px]">

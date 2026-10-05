@@ -59,58 +59,60 @@ export function TabStrip({
 		>
 			{tabs.map((item, index) => (
 				<ContextMenu key={item.id}>
-					<ContextMenuTrigger asChild>
-						{/* biome-ignore lint/a11y/noStaticElementInteractions: 标签本身承载关闭按钮，不能再嵌套 button */}
-						{/* biome-ignore lint/a11y/useKeyWithClickEvents: 键盘用户通过标签内的可聚焦元素与 ⌘W 操作 */}
-						<div
-							className="tab-btn"
-							data-tab-id={item.id}
-							data-active={index === active}
-							onClick={() => onActivate(index)}
-							onAuxClick={(event) => event.button === 1 && onClose(index)}
-						>
-							{item.pinned ? (
-								<Pin className="size-3 shrink-0 text-muted-foreground" />
-							) : (
-								tabIcon(book, item.location.page)
-							)}
-							{unsaved(item.location) && (
-								<span className="size-1.5 shrink-0 rounded-full bg-amber" role="img" aria-label="未保存" />
-							)}
-							<OverflowHint content={book.pageTitle(item.location.page, reviews)}>
-								<button
-									type="button"
-									className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px]"
-									aria-current={index === active ? "page" : undefined}
-									onClick={() => onActivate(index)}
-								>
-									{book.pageTitle(item.location.page, reviews)}
-								</button>
-							</OverflowHint>
-							<Hint content={"关闭标签页 · ⌘/Ctrl W"}>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-xs"
-									aria-label="关闭标签"
-									className={`size-5 shrink-0 rounded text-muted-foreground hover:text-foreground ${index === active ? "" : "hidden"}`}
-									onClick={(event) => {
-										event.stopPropagation();
-										onClose(index);
-									}}
-								>
-									<X className="size-[11px]" />
-								</Button>
-							</Hint>
-						</div>
-					</ContextMenuTrigger>
+					<ContextMenuTrigger
+						render={
+							/* biome-ignore lint/a11y/noStaticElementInteractions: 标签本身承载关闭按钮，不能再嵌套 button */
+							/* biome-ignore lint/a11y/useKeyWithClickEvents: 键盘用户通过标签内的可聚焦元素与 ⌘W 操作 */
+							<div
+								className="tab-btn"
+								data-tab-id={item.id}
+								data-active={index === active}
+								onClick={() => onActivate(index)}
+								onAuxClick={(event) => event.button === 1 && onClose(index)}
+							>
+								{item.pinned ? (
+									<Pin className="size-3 shrink-0 text-muted-foreground" />
+								) : (
+									tabIcon(book, item.location.page)
+								)}
+								{unsaved(item.location) && (
+									<span className="size-1.5 shrink-0 rounded-full bg-amber" role="img" aria-label="未保存" />
+								)}
+								<OverflowHint content={book.pageTitle(item.location.page, reviews)}>
+									<button
+										type="button"
+										className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px]"
+										aria-current={index === active ? "page" : undefined}
+										onClick={() => onActivate(index)}
+									>
+										{book.pageTitle(item.location.page, reviews)}
+									</button>
+								</OverflowHint>
+								<Hint content={"关闭标签页 · ⌘/Ctrl W"}>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-xs"
+										aria-label="关闭标签"
+										className={`size-5 shrink-0 rounded text-muted-foreground hover:text-foreground ${index === active ? "" : "hidden"}`}
+										onClick={(event) => {
+											event.stopPropagation();
+											onClose(index);
+										}}
+									>
+										<X className="size-[11px]" />
+									</Button>
+								</Hint>
+							</div>
+						}
+					/>
 					<ContextMenuContent>
 						<ContextMenuGroup>
-							<ContextMenuItem onSelect={() => onTogglePin(item.id)}>
+							<ContextMenuItem onClick={() => onTogglePin(item.id)}>
 								{item.pinned ? "取消固定标签页" : "固定标签页"}
 							</ContextMenuItem>
-							<ContextMenuItem onSelect={() => onDuplicate(item.location)}>复制标签页</ContextMenuItem>
-							<ContextMenuItem onSelect={() => onClose(index)}>关闭标签页</ContextMenuItem>
+							<ContextMenuItem onClick={() => onDuplicate(item.location)}>复制标签页</ContextMenuItem>
+							<ContextMenuItem onClick={() => onClose(index)}>关闭标签页</ContextMenuItem>
 						</ContextMenuGroup>
 					</ContextMenuContent>
 				</ContextMenu>
@@ -126,24 +128,26 @@ export function TabStrip({
 			<span className="flex-1" />
 			{tabs.length > 1 && (
 				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Hint content={"查看已打开的标签页"}>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon-xs"
-								aria-label="标签页列表"
-								className="no-drag mr-1.5 size-7 self-center text-muted-foreground"
-							>
-								<ChevronDown className="size-[14px]" />
-							</Button>
-						</Hint>
-					</DropdownMenuTrigger>
+					<DropdownMenuTrigger
+						render={
+							<Hint content={"查看已打开的标签页"}>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-xs"
+									aria-label="标签页列表"
+									className="no-drag mr-1.5 size-7 self-center text-muted-foreground"
+								>
+									<ChevronDown className="size-[14px]" />
+								</Button>
+							</Hint>
+						}
+					/>
 					<DropdownMenuContent align="end" className="max-w-[320px]">
 						{tabs.map((item, index) => (
 							<DropdownMenuItem
 								key={item.id}
-								onSelect={() => onActivate(index)}
+								onClick={() => onActivate(index)}
 								className={index === active ? "font-medium" : ""}
 							>
 								{tabIcon(book, item.location.page)}

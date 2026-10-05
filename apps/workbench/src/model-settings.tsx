@@ -58,11 +58,7 @@ export function ModelSettings() {
 				</TabsList>
 				<p className="mt-auto px-3 pt-6 text-[11px] text-muted-foreground">应用偏好 · 本机</p>
 			</aside>
-			<TabsContent
-				forceMount
-				value="models"
-				className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-[state=inactive]:hidden"
-			>
+			<TabsContent keepMounted value="models" className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-hidden:hidden">
 				<div className="mb-6">
 					<h2 className="text-base font-semibold">模型配置</h2>
 					<p className="mt-1 text-xs text-muted-foreground">设置新对话的默认模型。对话中的临时选择独立生效。</p>
@@ -72,11 +68,7 @@ export function ModelSettings() {
 					<UsageCheckpointSettings settings={data} />
 				</div>
 			</TabsContent>
-			<TabsContent
-				forceMount
-				value="tasks"
-				className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-[state=inactive]:hidden"
-			>
+			<TabsContent keepMounted value="tasks" className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-hidden:hidden">
 				<div className="mb-4">
 					<h2 className="text-base font-semibold">任务偏好</h2>
 					<p className="mt-1 text-xs text-muted-foreground">
@@ -94,9 +86,9 @@ export function ModelSettings() {
 				</div>
 			</TabsContent>
 			<TabsContent
-				forceMount
+				keepMounted
 				value="providers"
-				className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-[state=inactive]:hidden"
+				className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-hidden:hidden"
 			>
 				<ProviderSettings settings={data} />
 			</TabsContent>
@@ -309,7 +301,12 @@ function UsageCheckpointSettings({ settings }: { settings: Settings }) {
 					</p>
 				</div>
 				<div className="w-64 max-w-full">
-					<Select value={String(tokens)} disabled={busy} onValueChange={(value) => void change(value)}>
+					<Select
+						value={String(tokens)}
+						items={usageCheckpointOptions(tokens, mainInputPrice)}
+						disabled={busy}
+						onValueChange={(value) => value !== null && void change(value)}
+					>
 						<SelectTrigger id={id} aria-label="每轮用量检查点" className="w-full">
 							<SelectValue />
 						</SelectTrigger>

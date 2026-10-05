@@ -24,52 +24,57 @@ export function NavigationSurface({
 	const element = (node: EventTarget) => (node instanceof Element ? node.closest<HTMLElement>("[data-page]") : null);
 	return (
 		<ContextMenu>
-			<ContextMenuTrigger asChild>
-				<div
-					data-navigation-surface
-					className={className}
-					onClickCapture={(event) => {
-						if (
-							event.target instanceof Element &&
-							event.target.closest("[data-navigation-surface]") !== event.currentTarget
-						)
-							return;
-						gesture.current = event.metaKey || event.ctrlKey ? { newTab: true, background: !event.shiftKey } : {};
-						queueMicrotask(() => {
-							gesture.current = {};
-						});
-					}}
-					onAuxClickCapture={(event) => {
-						if (
-							event.target instanceof Element &&
-							event.target.closest("[data-navigation-surface]") !== event.currentTarget
-						)
-							return;
-						const page = element(event.target)?.dataset.page;
-						if (event.button !== 1 || !page) return;
-						event.preventDefault();
-						event.stopPropagation();
-						open(page, {}, { newTab: true, background: !event.shiftKey });
-					}}
-					onContextMenuCapture={(event) => {
-						if (
-							event.target instanceof Element &&
-							event.target.closest("[data-navigation-surface]") !== event.currentTarget
-						)
-							return;
-						if (event.target instanceof Element && event.target.closest("[data-tab-id]")) return;
-						const page = element(event.target)?.dataset.page;
-						if (page) setTarget(page);
-						else event.stopPropagation();
-					}}
-				>
-					{children}
-				</div>
-			</ContextMenuTrigger>
+			<ContextMenuTrigger
+				// 整个工作台都是这个右键区域：Base UI 默认给触发区加 select-none，会让正文连同所有文字都选不中。
+				className="select-auto"
+				render={
+					<div
+						data-navigation-surface
+						className={className}
+						onClickCapture={(event) => {
+							if (
+								event.target instanceof Element &&
+								event.target.closest("[data-navigation-surface]") !== event.currentTarget
+							)
+								return;
+							gesture.current =
+								event.metaKey || event.ctrlKey ? { newTab: true, background: !event.shiftKey } : {};
+							queueMicrotask(() => {
+								gesture.current = {};
+							});
+						}}
+						onAuxClickCapture={(event) => {
+							if (
+								event.target instanceof Element &&
+								event.target.closest("[data-navigation-surface]") !== event.currentTarget
+							)
+								return;
+							const page = element(event.target)?.dataset.page;
+							if (event.button !== 1 || !page) return;
+							event.preventDefault();
+							event.stopPropagation();
+							open(page, {}, { newTab: true, background: !event.shiftKey });
+						}}
+						onContextMenuCapture={(event) => {
+							if (
+								event.target instanceof Element &&
+								event.target.closest("[data-navigation-surface]") !== event.currentTarget
+							)
+								return;
+							if (event.target instanceof Element && event.target.closest("[data-tab-id]")) return;
+							const page = element(event.target)?.dataset.page;
+							if (page) setTarget(page);
+							else event.stopPropagation();
+						}}
+					>
+						{children}
+					</div>
+				}
+			/>
 			<ContextMenuContent>
 				<ContextMenuGroup>
-					<ContextMenuItem onSelect={() => open(target, {}, { newTab: true })}>在新标签页打开</ContextMenuItem>
-					<ContextMenuItem onSelect={() => open(target, {}, { newTab: true, background: true })}>
+					<ContextMenuItem onClick={() => open(target, {}, { newTab: true })}>在新标签页打开</ContextMenuItem>
+					<ContextMenuItem onClick={() => open(target, {}, { newTab: true, background: true })}>
 						在后台标签页打开
 					</ContextMenuItem>
 				</ContextMenuGroup>

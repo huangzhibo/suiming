@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { navigationModeNames } from "./navigation-modes.js";
 
@@ -57,14 +58,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
  * 像 Obsidian 一样从左下角的「?」打开。
  */
 export function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange(open: boolean): void }) {
+	const content = useRef<HTMLDivElement>(null);
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent
-				onOpenAutoFocus={(event) => {
-					// 阅读型对话框先聚焦内容，避免初次打开就弹出关闭按钮的 Tooltip。
-					event.preventDefault();
-					if (event.target instanceof HTMLElement) event.target.focus();
-				}}
+				// 阅读型对话框先聚焦内容，避免初次打开就弹出关闭按钮的 Tooltip。
+				ref={content}
+				initialFocus={content}
 				className="flex max-h-[82vh] max-w-[640px] flex-col gap-0 p-0 sm:max-w-[640px]"
 			>
 				<DialogHeader className="border-b border-hair px-6 py-4 text-left">

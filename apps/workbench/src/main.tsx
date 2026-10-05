@@ -12,7 +12,7 @@ if (element)
 	createRoot(element).render(
 		<React.StrictMode>
 			<QueryClientProvider client={queryClient}>
-				<TooltipProvider delayDuration={400}>
+				<TooltipProvider delay={400}>
 					<Workspace />
 				</TooltipProvider>
 			</QueryClientProvider>

@@ -72,18 +72,20 @@ export function NavigationModes({ value, onChange }: { value: SideMode; onChange
 			</div>
 			{!fits && (
 				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button
-							variant="ghost"
-							size="sm"
-							aria-label={`切换导航：${current.name}`}
-							className="no-drag h-6 min-w-0 gap-1.5 px-1.5 text-xs text-muted-foreground hover:text-sub focus-visible:text-sub"
-						>
-							<current.Icon />
-							<span className="truncate">{current.name}</span>
-							<ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-						</Button>
-					</DropdownMenuTrigger>
+					<DropdownMenuTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="sm"
+								aria-label={`切换导航：${current.name}`}
+								className="no-drag h-6 min-w-0 gap-1.5 px-1.5 text-xs text-muted-foreground hover:text-sub focus-visible:text-sub"
+							>
+								<current.Icon />
+								<span className="truncate">{current.name}</span>
+								<ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+							</Button>
+						}
+					/>
 					<DropdownMenuContent align="start" className="min-w-40">
 						<DropdownMenuRadioGroup value={value} onValueChange={(next) => onChange(next as SideMode)}>
 							{modes.map(({ id, name, Icon }) => (

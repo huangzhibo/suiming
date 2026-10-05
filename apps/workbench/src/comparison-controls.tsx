@@ -120,12 +120,14 @@ export function ComparisonBaseline({
 	if (view.diffExternal) return <span>外部文件 · 只读</span>;
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button size="xs" variant="ghost" aria-label="选择比较基线">
-					已提交 · {view.diffRevision ? book.revisionLabel(view.diffRevision) : "无版本"}
-					<ChevronDown data-icon="inline-end" />
-				</Button>
-			</DropdownMenuTrigger>
+			<DropdownMenuTrigger
+				render={
+					<Button size="xs" variant="ghost" aria-label="选择比较基线">
+						已提交 · {view.diffRevision ? book.revisionLabel(view.diffRevision) : "无版本"}
+						<ChevronDown data-icon="inline-end" />
+					</Button>
+				}
+			/>
 			<DropdownMenuContent align="start">
 				<DropdownMenuRadioGroup
 					value={view.diffRevision ?? ""}

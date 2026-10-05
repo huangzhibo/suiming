@@ -1007,6 +1007,8 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 		for (const name of ["身份", "材料", "搜索", "大纲", "文件"]) {
 			if (process.platform === "darwin") {
 				await page.getByRole("button", { name: /^切换导航：/ }).click();
+				// Base UI 的菜单在点击后的下一帧才挂上，先等它出现再数。
+				await page.getByRole("menuitemradio").first().waitFor();
 				assert.equal(await page.getByRole("menuitemradio").count(), 5);
 				await page.getByRole("menuitemradio", { name: new RegExp(`^${name}`) }).click();
 			} else await page.getByRole("button", { name, exact: true }).click();
@@ -1092,6 +1094,12 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		assert.ok(box);
 		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
 	};
+	// Base UI 只在键盘聚焦（:focus-visible）时弹提示：先按一下键切到键盘操作再聚焦，模拟键盘用户。
+	// 直接 focus() 跟在鼠标操作后面不算键盘聚焦，提示不弹，「不该有提示」的断言也会因此恒真。
+	const focusByKeyboard = async (target: Locator) => {
+		await page.keyboard.press("Shift");
+		await target.focus();
+	};
 	const tooltip = page.getByRole("tooltip");
 	const visibleTip = page.locator('[data-slot="tooltip-content"]');
 	const button = (name: string) => page.getByRole("button", { name, exact: true });
@@ -1113,7 +1121,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		assert.equal(await tooltip.count(), 1);
 		await page.keyboard.press("Escape");
 		await tooltip.waitFor({ state: "hidden" });
-		await button("提交版本").focus();
+		await focusByKeyboard(button("提交版本"));
 		await tooltip.filter({ hasText: /没有可提交的修改/ }).waitFor();
 		assert.match(await tooltip.innerText(), /没有可提交的修改/);
 		assert.equal(await button("提交版本").isDisabled(), true);
@@ -1140,7 +1148,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		await button("文件").click();
 		for (const path of ["notes", "notes/reference", "notes/reference/drafts", "notes/reference/drafts/guide.md"])
 			await page.locator(`[data-file-path="${path}"]`).click();
-		await button("定位折叠的路径").focus();
+		await focusByKeyboard(button("定位折叠的路径"));
 		await tooltip.filter({ hasText: "notes / reference / drafts / guide.md" }).waitFor();
 		await page.keyboard.press("Escape");
 		await button("后退").click();
@@ -1159,7 +1167,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		await page.locator(".cm-content").fill("还未保存的修改");
 		const before = await page.evaluate(() => window.suiming?.invoke("workspace.show", {}));
 		assert.equal(await button("提交版本").isDisabled(), true);
-		await button("提交版本").focus();
+		await focusByKeyboard(button("提交版本"));
 		await tooltip.filter({ hasText: /请先保存未保存的修改/ }).waitFor();
 		assert.match(await tooltip.innerText(), /请先保存未保存的修改/);
 		await button("提交版本").dispatchEvent("click");
@@ -1176,7 +1184,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		// 卷名是原生导航按钮，Enter / Space 都可进入；当前卷标题不再声称可以进入。
 		for (const key of ["Enter", "Space"]) {
 			const volume = page.locator('[data-volume="vol-0001"]');
-			await volume.focus();
+			await focusByKeyboard(volume);
 			await tooltip.filter({ hasText: /点击进入这一卷/ }).waitFor();
 			await page.keyboard.press(key);
 			const back = page
@@ -1192,7 +1200,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		await hover(button("放大"));
 		await tooltip.filter({ hasText: "放大故事轴" }).waitFor();
 		assert.equal(await tooltip.innerText(), "放大故事轴");
-		await page.locator('[data-beat="beat-0001"]').focus();
+		await focusByKeyboard(page.locator('[data-beat="beat-0001"]'));
 		await tooltip.filter({ hasText: /单击选择；双击打开/ }).waitFor();
 		assert.match(await tooltip.innerText(), /单击选择；双击打开/);
 		await page.keyboard.press("Escape");
@@ -1234,17 +1242,17 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 			await navMenu.click();
 			await page.getByRole("menuitemradio", { name: /^文件/ }).click();
 		}
-		await page.locator(`[data-file-path="${longFile}"]`).focus();
+		await focusByKeyboard(page.locator(`[data-file-path="${longFile}"]`));
 		await tooltip.filter({ hasText: longFile }).waitFor();
 		assert.equal(await tooltip.innerText(), longFile);
 		const box = await visibleTip.boundingBox();
 		assert.ok(box && box.width <= 320 && box.height > 40 && box.x >= 0 && box.x + box.width <= 960);
 		await page.locator(`[data-file-path="${longFile}"]`).click();
-		await page.locator('.tab-btn[data-active="true"] button').first().focus();
+		await focusByKeyboard(page.locator('.tab-btn[data-active="true"] button').first());
 		await tooltip.filter({ hasText: longFile }).waitFor();
 		await page.keyboard.press("Escape");
 		// 相同名称在窄窗口补全、放宽后关闭；根目录里的完整名称也不重复提示。
-		await page.locator('[data-file-path="outline"]').focus();
+		await focusByKeyboard(page.locator('[data-file-path="outline"]'));
 		await assertNoTooltip(page);
 		await page.locator(`[data-file-path="${resizeFile}"]`).click();
 		const fileName = page.getByRole("navigation", { name: "文件路径" }).locator('[aria-current="page"]');
@@ -1265,7 +1273,7 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		await hover(page.getByText("材料出处", { exact: true }));
 		await tooltip.filter({ hasText: "https://example.com/source" }).waitFor();
 		await button("设置").click();
-		await button("关闭对话框").focus();
+		await focusByKeyboard(button("关闭对话框"));
 		await tooltip.filter({ hasText: "关闭对话框" }).waitFor();
 		assert.equal(await tooltip.innerText(), "关闭对话框");
 		await page.keyboard.press("Escape");

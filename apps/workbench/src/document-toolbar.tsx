@@ -201,17 +201,19 @@ export function DocumentToolbar({
 									onChange={selectContent}
 								/>
 								<DropdownMenu>
-									<DropdownMenuTrigger asChild>
-										<Button
-											className="document-view-menu"
-											variant="secondary"
-											size="xs"
-											aria-label="内容视图"
-										>
-											{view.beatView === "design" ? "设计" : "正文"}
-											<ChevronDown data-icon="inline-end" />
-										</Button>
-									</DropdownMenuTrigger>
+									<DropdownMenuTrigger
+										render={
+											<Button
+												className="document-view-menu"
+												variant="secondary"
+												size="xs"
+												aria-label="内容视图"
+											>
+												{view.beatView === "design" ? "设计" : "正文"}
+												<ChevronDown data-icon="inline-end" />
+											</Button>
+										}
+									/>
 									<DropdownMenuContent align="end">
 										<DropdownMenuRadioGroup
 											value={view.beatView}
@@ -239,11 +241,13 @@ export function DocumentToolbar({
 					</>
 				)}
 				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<ToolButton label="更多" description="视图、分屏、版本与文件操作">
-							<Ellipsis />
-						</ToolButton>
-					</DropdownMenuTrigger>
+					<DropdownMenuTrigger
+						render={
+							<ToolButton label="更多" description="视图、分屏、版本与文件操作">
+								<Ellipsis />
+							</ToolButton>
+						}
+					/>
 					<DropdownMenuContent align="end" className="min-w-52">
 						{kind !== "diff" && current && editable && (
 							<>
@@ -263,24 +267,24 @@ export function DocumentToolbar({
 						{comparisonOptions}
 						<DropdownMenuGroup>
 							{beat && (
-								<DropdownMenuItem onSelect={() => split("horizontal", true)}>
+								<DropdownMenuItem onClick={() => split("horizontal", true)}>
 									并排查看设计与正文
 								</DropdownMenuItem>
 							)}
-							<DropdownMenuItem onSelect={() => split("horizontal")}>左右分屏</DropdownMenuItem>
-							<DropdownMenuItem onSelect={() => split("vertical")}>上下分屏</DropdownMenuItem>
-							{merge && <DropdownMenuItem onSelect={merge}>合并到相邻窗格</DropdownMenuItem>}
+							<DropdownMenuItem onClick={() => split("horizontal")}>左右分屏</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => split("vertical")}>上下分屏</DropdownMenuItem>
+							{merge && <DropdownMenuItem onClick={merge}>合并到相邻窗格</DropdownMenuItem>}
 						</DropdownMenuGroup>
 						{file && current && (
 							<>
 								<DropdownMenuSeparator />
 								<DropdownMenuGroup>
 									{kind !== "diff" && (
-										<DropdownMenuItem onSelect={() => diff(current)}>查看版本差异</DropdownMenuItem>
+										<DropdownMenuItem onClick={() => diff(current)}>查看版本差异</DropdownMenuItem>
 									)}
 									<DropdownMenuItem
 										disabled={!fileAvailable}
-										onSelect={() => open(versionPage(book.data.revisionId), { versionFile: current })}
+										onClick={() => open(versionPage(book.data.revisionId), { versionFile: current })}
 									>
 										查看版本记录{missing}
 									</DropdownMenuItem>
@@ -291,11 +295,11 @@ export function DocumentToolbar({
 							<>
 								<DropdownMenuSeparator />
 								<DropdownMenuGroup>
-									<DropdownMenuItem disabled={!fileAvailable} onSelect={() => locate(current)}>
+									<DropdownMenuItem disabled={!fileAvailable} onClick={() => locate(current)}>
 										在文件树中定位{missing}
 									</DropdownMenuItem>
-									<DropdownMenuItem onSelect={() => copy(current)}>复制相对路径</DropdownMenuItem>
-									<DropdownMenuItem disabled={!fileAvailable} onSelect={() => system(current)}>
+									<DropdownMenuItem onClick={() => copy(current)}>复制相对路径</DropdownMenuItem>
+									<DropdownMenuItem disabled={!fileAvailable} onClick={() => system(current)}>
 										在 Finder 中显示{missing}
 									</DropdownMenuItem>
 								</DropdownMenuGroup>

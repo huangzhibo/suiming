@@ -1,7 +1,7 @@
 import type { LocalCommandOutput } from "@suiming/sdk";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ChevronRight, Plus } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -127,7 +127,6 @@ export function ProviderSettings({ settings }: { settings: Settings }) {
 }
 
 function ProviderSwitch({ provider }: { provider: Provider }) {
-	const id = useId();
 	const client = useQueryClient();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
@@ -145,16 +144,17 @@ function ProviderSwitch({ provider }: { provider: Provider }) {
 	}
 	return (
 		<div className="flex flex-col items-end gap-1">
-			<label htmlFor={id} className="flex items-center gap-2 text-xs text-muted-foreground">
+			{/* 不用 <label>：Base UI 的 Switch 会拿关联的 label 作 aria-labelledby，名字就成了状态字「启用 / 停用」，
+			    读屏要听到的是「启用 某提供商」加上开关状态。 */}
+			<div className="flex items-center gap-2 text-xs text-muted-foreground">
 				<span>{busy ? "保存中…" : provider.enabled ? "启用" : "停用"}</span>
 				<Switch
-					id={id}
 					aria-label={`启用 ${provider.name}`}
 					checked={provider.enabled}
 					disabled={busy}
 					onCheckedChange={(enabled) => void change(enabled)}
 				/>
-			</label>
+			</div>
 			{error && (
 				<p role="alert" className="max-w-48 text-xs text-destructive">
 					{error}

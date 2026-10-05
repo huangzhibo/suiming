@@ -218,20 +218,22 @@ export function AgentComposer({
 					{attachments.map((item) => (
 						<div key={item.id} className="flex min-w-0 items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
 							<Popover>
-								<PopoverTrigger asChild>
-									<Button
-										type="button"
-										variant="ghost"
-										size="xs"
-										className="min-w-0 flex-1 justify-start"
-										aria-label="查看引用内容"
-									>
-										<FileText />
-										<span className="truncate">{item.label}</span>
-										{item.status === "reading" && <Loader2 className="animate-spin" />}
-										{item.status === "failed" && <span>读取失败</span>}
-									</Button>
-								</PopoverTrigger>
+								<PopoverTrigger
+									render={
+										<Button
+											type="button"
+											variant="ghost"
+											size="xs"
+											className="min-w-0 flex-1 justify-start"
+											aria-label="查看引用内容"
+										>
+											<FileText />
+											<span className="truncate">{item.label}</span>
+											{item.status === "reading" && <Loader2 className="animate-spin" />}
+											{item.status === "failed" && <span>读取失败</span>}
+										</Button>
+									}
+								/>
 								<PopoverContent
 									side="top"
 									align="end"
@@ -343,16 +345,18 @@ export function AgentComposer({
 				/>
 				<InputGroupAddon align="block-end">
 					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button type="button" variant="ghost" size="icon-sm" aria-label="添加内容">
-								<Plus />
-							</Button>
-						</DropdownMenuTrigger>
+						<DropdownMenuTrigger
+							render={
+								<Button type="button" variant="ghost" size="icon-sm" aria-label="添加内容">
+									<Plus />
+								</Button>
+							}
+						/>
 						<DropdownMenuContent side="top" align="start">
 							<DropdownMenuGroup>
 								<DropdownMenuItem
 									disabled={!currentPath}
-									onSelect={() => addDocument(currentPath, !!currentSelection)}
+									onClick={() => addDocument(currentPath, !!currentSelection)}
 								>
 									{currentSelection
 										? "引用当前选段"
@@ -360,12 +364,12 @@ export function AgentComposer({
 											? "引用当前文档"
 											: "引用当前文档（当前页面不是作品文件）"}
 								</DropdownMenuItem>
-								<DropdownMenuItem onSelect={openPicker}>
+								<DropdownMenuItem onClick={openPicker}>
 									选择作品文件…
 									<span className="ml-auto text-muted-foreground">@</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem
-									onSelect={() => {
+									onClick={() => {
 										replacement.current = null;
 										input.current?.click();
 									}}
@@ -419,13 +423,7 @@ export function AgentComposer({
 				</p>
 			)}
 			<Dialog open={picker} onOpenChange={setPicker}>
-				<DialogContent
-					className="[--ring:var(--resize-active)]"
-					onCloseAutoFocus={(event) => {
-						event.preventDefault();
-						textarea.current?.focus();
-					}}
-				>
+				<DialogContent className="[--ring:var(--resize-active)]" finalFocus={textarea}>
 					<DialogHeader>
 						<DialogTitle>选择作品文件</DialogTitle>
 						<DialogDescription>引用当前文件内容；已修改的内容按工作草稿发送。</DialogDescription>

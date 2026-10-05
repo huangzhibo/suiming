@@ -171,24 +171,26 @@ export function AgentPanel({
 					{expanded ? <Minimize2 /> : <Maximize2 />}
 				</ToolButton>
 				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="tool" size="tool" aria-label="对话菜单">
-							<Ellipsis />
-						</Button>
-					</DropdownMenuTrigger>
+					<DropdownMenuTrigger
+						render={
+							<Button variant="tool" size="tool" aria-label="对话菜单">
+								<Ellipsis />
+							</Button>
+						}
+					/>
 					<DropdownMenuContent align="end">
 						<DropdownMenuGroup>
 							{intents[0] && (
-								<DropdownMenuItem onSelect={() => intents[0] && open(intents[0].path)}>
+								<DropdownMenuItem onClick={() => intents[0] && open(intents[0].path)}>
 									打开创作意图
 								</DropdownMenuItem>
 							)}
-							<DropdownMenuItem onSelect={() => setShowLog(!showLog)}>
+							<DropdownMenuItem onClick={() => setShowLog(!showLog)}>
 								{showLog ? "收起执行记录" : "展开执行记录"}
 							</DropdownMenuItem>
 							<DropdownMenuItem
 								disabled={!exported || busy}
-								onSelect={() =>
+								onClick={() =>
 									action(async () => {
 										setExportNotice("");
 										if (await bridge().exportConversation(exported)) setExportNotice("对话已导出");
@@ -203,7 +205,7 @@ export function AgentPanel({
 								<DropdownMenuSeparator />
 								<DropdownMenuGroup>
 									{/* 菜单项禁用时直接写出原因：窄窗口里没有悬停提示。 */}
-									<DropdownMenuItem disabled={busy || active} onSelect={() => setConfirmDelete(true)}>
+									<DropdownMenuItem disabled={busy || active} onClick={() => setConfirmDelete(true)}>
 										{active ? "删除对话（先停止当前回复）" : "删除对话…"}
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
@@ -245,23 +247,25 @@ export function AgentPanel({
 			<ConversationViewport key={selected || "new"} position={position} onPosition={onPosition} expanded={expanded}>
 				{sessions.length > 0 && (
 					<Popover open={picker} onOpenChange={setPicker}>
-						<PopoverTrigger asChild>
-							<button
-								type="button"
-								aria-label="选择对话"
-								className="run-status flex w-full cursor-pointer items-center gap-1.5 rounded-md px-1 py-1.5 text-left text-xs text-foreground hover:bg-muted"
-							>
-								<span
-									className={`size-1.5 shrink-0 rounded-full ${session ? (session.status === "idle" ? "bg-faint" : "bg-muted-foreground") : "bg-faint"}`}
-								/>
-								<span className="min-w-0 flex-1 truncate">{session ? sessionTitle(session) : "新对话"}</span>
-								<span className="text-[11px] whitespace-nowrap text-muted-foreground">
-									{session ? (labels[session.status] ?? session.status) : `${sessions.length} 个对话`}
-								</span>
-								<ChevronDown className="size-[10px] text-muted-foreground" />
-							</button>
-						</PopoverTrigger>
-						<PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-1.5">
+						<PopoverTrigger
+							render={
+								<button
+									type="button"
+									aria-label="选择对话"
+									className="run-status flex w-full cursor-pointer items-center gap-1.5 rounded-md px-1 py-1.5 text-left text-xs text-foreground hover:bg-muted"
+								>
+									<span
+										className={`size-1.5 shrink-0 rounded-full ${session ? (session.status === "idle" ? "bg-faint" : "bg-muted-foreground") : "bg-faint"}`}
+									/>
+									<span className="min-w-0 flex-1 truncate">{session ? sessionTitle(session) : "新对话"}</span>
+									<span className="text-[11px] whitespace-nowrap text-muted-foreground">
+										{session ? (labels[session.status] ?? session.status) : `${sessions.length} 个对话`}
+									</span>
+									<ChevronDown className="size-[10px] text-muted-foreground" />
+								</button>
+							}
+						/>
+						<PopoverContent align="start" className="w-(--anchor-width) p-1.5">
 							{groups.map((group) => (
 								<div key={group.label}>
 									<div className="px-2 pt-1.5 pb-0.5 text-[11px] text-muted-foreground">{group.label}</div>
