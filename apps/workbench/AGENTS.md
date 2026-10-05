@@ -9,6 +9,8 @@
 ## 踩坑得来的决定
 
 - `apps/workbench` 用 shadcn/ui + Tailwind v4（2026-09-08 作者决定，替代手写 CSS）。CLI 生成的组件把 `cn` 写成 `from "cn"` 并装了同名 npm 包，要改回 `@/lib/utils`；生成文件是双引号两空格，提交前跑 `npm run format`。
+- **外壳与文档窗格各跑各的 effect。**`WorkspaceShell`（`workspace.tsx`：标题栏、全局动作、左右栏、设置）只有一个，分屏的每一格是一个 `DocumentGroup`；两边都调 `useWorkspaceGroup`，外壳取活动的那一格。只该跑一次的 effect——订阅作品变化、恢复与保存工作区——放外壳；属于一格的——滚动恢复、正文选段、快捷键、比较页宽度——放 `DocumentGroup`。不要放进 `useWorkspaceGroup`：开两格就跑三遍。2026-10-06 之前两个角色是同一个函数，靠十来处 `if (groupId)` 让对方的 effect 空转。
+- **不要对整个文件跑 `biome check --write --unsafe`。**它按 useExhaustiveDependencies 给 effect 补依赖，而从自定义 hook 拿到的 ref（如 `useWorkspaceGroup` 返回的 `live`、`layoutLive`）它认不出，会把 `live.current.*` 补进依赖：2026-10-06 拆工作台时左栏「恢复滚动位置」因此每次滚动都重跑，三套测试全绿，是逐一比对拆分前后的依赖才发现的。只想删未用的 import 时用 `npx biome lint --only=correctness/noUnusedImports --write --unsafe <文件>`；effect 里读这类 ref 时写 biome-ignore 说明。
 - `exactOptionalPropertyTypes` 下 radix 可选 prop 需要 `?? false` 之类兜底。tsconfig 不能再写 `baseUrl`（TS 6 报废弃错误），`paths` 直接相对 tsconfig。
 - `-webkit-app-region` 的 `drag` / `no-drag` 必须用 `@utility` 声明，`@layer components` 里的自定义类不能被 `@apply`。
 - 根字号必须保持 16px（正文字号在 body 上单独设 13px）：Tailwind / shadcn 的 `size-8`、`w-12` 都是 rem，改了根字号所有标称尺寸都会缩水，2026-09-08 曾因此把「32px 按钮」实际渲染成 26px 而不自知。
