@@ -1273,6 +1273,38 @@ test("Context 压缩只改变下一次输入，原消息与动作在 checkpoint 
 	}
 });
 
+test("根 Agent 压缩时开场快照换成压缩那一刻的：会话开始之后提交的意图在新快照里，旧快照不再发", async () => {
+	const f = await fixture();
+	try {
+		const opening = (context: { messages: readonly { role: string; content?: unknown }[] }) =>
+			JSON.stringify(context.messages.find((message) => message.role === "user")?.content);
+		f.provider.setResponses([
+			async (context) => {
+				assert.match(opening(context), /^"会话开始时的作品快照/u);
+				return call("write", { path: "intent/火攻的时机.md", content: "东南风起之前不能点火。" });
+			},
+			call("commit", { summary: "记下火攻的时机" }),
+			async (context) => {
+				assert.doesNotMatch(opening(context), /东南风起之前不能点火/u, "压缩之前开场还是会话开始时的");
+				return call("compact_context", { summary: "写了火攻的时机并提交。" });
+			},
+			async (context) => {
+				const text = opening(context);
+				assert.match(text, /^"压缩上下文时的作品快照/u);
+				assert.match(text, /东南风起之前不能点火/u, "新快照里有会话开始之后提交的意图");
+				assert.doesNotMatch(JSON.stringify(context.messages), /会话开始时的作品快照/u, "旧快照不再发");
+				assert.match(JSON.stringify(context.messages), /记下火攻的时机，再压缩/u, "作者原话照留");
+				return reply("记下了");
+			},
+		]);
+		const outcome = await f.say("记下火攻的时机，再压缩");
+		assert.equal(outcome.failure, undefined);
+		assert.equal(f.provider.state.callCount, 4);
+	} finally {
+		await f.close();
+	}
+});
+
 test("模型调用失败：turn 回 idle 记 lastFailure；已确认的文件动作保留，下一句接着提交", async () => {
 	const f = await fixture();
 	try {

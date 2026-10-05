@@ -655,8 +655,11 @@ export function submitTool<TParameters extends TSchema>(
 	};
 }
 
-/** 模型自己生成摘要，下一请求才采用；旧消息与动作记录不删除。 */
-export function compactContextTool(): HarnessTool {
+/**
+ * 模型自己生成摘要，下一请求才采用；旧消息与动作记录不删除。opening 给的话，压缩时重取一份开场快照替换会话开场那份：
+ * 根 Agent 的开场是会话开始时的作品快照，一次压缩之前通常已经提交过好几个版本。
+ */
+export function compactContextTool(opening?: () => Promise<string>): HarnessTool {
 	const parameters = Type.Object(
 		{ summary: Type.String({ minLength: 1, maxLength: 12000 }) },
 		{ additionalProperties: false },
@@ -669,6 +672,7 @@ export function compactContextTool(): HarnessTool {
 		replay: "read",
 		async prepare(params: { summary: string }) {
 			return {
+				...(opening === undefined ? {} : { contextOpening: await opening() }),
 				content: [
 					{
 						type: "text",

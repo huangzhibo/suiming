@@ -42,6 +42,8 @@ export interface HarnessToolResult<TDetails extends ToolDetails = ToolDetails> {
 	terminate?: boolean;
 	/** 已由当前模型生成的运行摘要；只裁剪后续输入，原消息和动作保留。 */
 	contextSummary?: string;
+	/** 压缩那一刻的开场快照：之后的请求里替换第一条消息（根 Agent 的会话开场快照会过时）。 */
+	contextOpening?: string;
 	/** 这个结果是上下文的边界（提交产生了新版本）：它之前的大读取结果，之后的请求里折叠成头尾。 */
 	contextBoundary?: boolean;
 }

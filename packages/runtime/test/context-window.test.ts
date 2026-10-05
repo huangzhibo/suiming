@@ -467,3 +467,70 @@ test("压缩和别的工具在同一次回复里：同一批读到的结果压�
 	);
 	assert.match(JSON.stringify(seen[0]?.messages), /读过第一段。/u, "摘要在写它的那次回复里");
 });
+
+test("刚过边界、上下文过半：新一轮的第一次请求请模型先压缩；同样大小在干活中途不请；压缩后任务开场照留", async () => {
+	// 第一轮最后一次请求与第二轮第一次请求都在窗口的六成上下（faux 口径）：中途的门槛是 70%，边界上是 50%。
+	const window = 6000;
+	const { provider, model } = await fixture(window);
+	const inbox: { sequence: number; text: string }[] = [];
+	const notes: string[] = [];
+	let checkpoint: LoopCheckpoint | undefined;
+	const note: HarnessTool = {
+		name: "note",
+		description: "记一笔",
+		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
+		replay: "read",
+		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
+		execute: async (_id, _params, _signal, _update, prepared) =>
+			prepared as { content: { type: "text"; text: string }[] },
+	};
+	const { compactContextTool } = await import("../src/harness/tools.js");
+	const run = (responses: ((context: Transcript) => Promise<ReturnType<typeof fauxAssistantMessage>>)[]) => {
+		provider.setResponses(
+			responses.map((respond) => async (context: Transcript) => {
+				const last = context.messages.at(-1);
+				const text = last?.role === "user" ? JSON.stringify(last.content) : "";
+				notes.push(text.includes("compact_context") ? text : "");
+				return respond(context);
+			}),
+		);
+		return runTaskLoop({
+			model,
+			systemPrompt: "测试",
+			...(checkpoint === undefined ? { prompt: "任务：讨论苦肉计" } : { checkpoint }),
+			tools: [note, compactContextTool()],
+			budget: { maxTurns: 30 },
+			steering: () => inbox,
+			saveCheckpoint: async (next) => {
+				checkpoint = structuredClone(next);
+			},
+		});
+	};
+	const long = (n: number) =>
+		fauxAssistantMessage([
+			{ type: "text", text: "黄盖在军杖落下前停了一下。".repeat(210) },
+			fauxToolCall("note", { n }),
+		]);
+	await run([
+		...Array.from({ length: 5 }, (_, index) => async () => long(index)),
+		async () => fauxAssistantMessage("说完了"),
+	]);
+	assert.deepEqual(notes, ["", "", "", "", "", ""], "第一轮在干活，六成不到七成，不请压缩");
+	inbox.push({ sequence: 1, text: "接着说阚泽" });
+	let after: Transcript | undefined;
+	await run([
+		async () => fauxAssistantMessage(fauxToolCall("compact_context", { summary: "讨论了黄盖受刑。" })),
+		async (context) => {
+			after = context;
+			return fauxAssistantMessage("阚泽献书");
+		},
+	]);
+	assert.match(notes[6] ?? "", /上一件事已经做完，趁现在先调用 compact_context/u, "新一轮的第一次请求请压缩");
+	assert.equal(notes[7], "", "压缩之后不再请");
+	const users = (after?.messages ?? [])
+		.filter((message) => message.role === "user")
+		.map((message) => JSON.stringify(message.content));
+	assert.match(users[0] ?? "", /任务：讨论苦肉计/u, "没有给新开场的 loop，开场照留");
+	assert.ok(users.some((text) => text.includes("接着说阚泽")));
+	assert.doesNotMatch(JSON.stringify(after?.messages), /军杖落下前停了一下/u, "压缩之前的长回复由摘要代表");
+});

@@ -358,19 +358,26 @@ function shortId(id: string): string {
 }
 
 /**
- * 根 Agent 的一个 turn。会话第一次跑时开场是作品状态与 Design Frame 的快照，之后不再重写，所以标明是
- * 「会话开始时」的；之后作者消息从 inbox 进消息列表，每条后面附一行确定性状态（当前版本、是否有新提交、
- * 候选里未提交的文件数），在取走消息的那一刻现算——turn 中途 Agent 改过或提交过，附注要跟着变。
+ * 作品快照：作品状态与 Design Frame。Frame 取已提交的作品（权威真源），未提交的候选由状态与附注点名。
+ * 会话开场取一次；之后每次压缩重取一次，替换开场那份（loop 的 reduction.opening）——永续的会话里，开场那份
+ * 到第一次压缩时通常已经落后好几个版本。
+ */
+async function workSnapshot(session: HarnessSession, when: "会话开始" | "压缩上下文"): Promise<string> {
+	const frame = designFrame(session.base, { seeds: [] });
+	const status = await readProjectStatus(session.projectPort, await session.scan());
+	return `${when}时的作品快照（不随之后的修改与提交更新；当前状态以作者消息后的系统附注与 project_status 为准）：${JSON.stringify(status)}\n\n${when}时的作品：\n${frame.text}`;
+}
+
+/**
+ * 根 Agent 的一个 turn。会话第一次跑时开场是作品快照（workSnapshot），之后不再重写，所以标明是「会话开始时」的；
+ * 之后作者消息从 inbox 进消息列表，每条后面附一行确定性状态（当前版本、是否有新提交、候选里未提交的文件数），
+ * 在取走消息的那一刻现算——turn 中途 Agent 改过或提交过，附注要跟着变。
  */
 export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcome> {
 	const project = session.projectPort;
-	// 开场 Context 是已提交的作品（权威真源），未提交的候选由附注点名——两者都取自同一次扫描。
-	const base = session.base;
-	const initial = designFrame(base, { seeds: [] });
-	const status = await readProjectStatus(project, await session.scan());
 	return session.runRoot({
 		systemPrompt: withConstitution(AGENT_PROMPT),
-		prompt: `会话开始时的作品快照（不随之后的修改与提交更新；当前状态以作者消息后的系统附注与 project_status 为准）：${JSON.stringify(status)}\n\n会话开始时的作品：\n${initial.text}`,
+		prompt: await workSnapshot(session, "会话开始"),
 		decorateInbox: async (text) => {
 			const current = await readProjectStatus(project, await session.scan(), { stale: false });
 			return `${text}\n\n[系统附注：当前版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个]`;
@@ -380,7 +387,7 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 			...fileTools(handle.env, "write", handle.scan),
 			searchTool(handle.scan),
 			impactTool(handle.scan),
-			compactContextTool(),
+			compactContextTool(() => workSnapshot(session, "压缩上下文")),
 			checkTool(handle.scan),
 			frameTool(handle.scan),
 			...sourceTools(handle, { segmentCodePoints: () => segmentCodePoints(session) }),

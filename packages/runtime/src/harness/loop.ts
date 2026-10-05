@@ -61,7 +61,13 @@ export interface LoopCheckpoint {
 	sequence: number;
 	steeringSequence: number;
 	/** 最近一次压缩：摘要就在写它的那次回复的 compact_context 调用里；throughMessage 是那一批结果之后的下标。 */
-	reduction?: { throughMessage: number; actionId: string; modelCallId: string };
+	reduction?: {
+		throughMessage: number;
+		actionId: string;
+		modelCallId: string;
+		/** 压缩那一刻的开场快照，请求里替换第一条消息（只有根 Agent 有：它的开场是作品快照，子任务的开场是任务本身）。 */
+		opening?: string;
+	};
 	/** 消息下标小于它的工具结果在请求里换成占位；原消息不改。只往前推，前缀因此在两次清理之间稳定。 */
 	cleared?: number;
 	/** 最近一个边界之后第一条消息的下标；它之前的大读取结果在请求里折成头尾（见 FOLD_BYTES）。只往前推。 */
@@ -182,6 +188,11 @@ function summarize(result: unknown): string {
 const CLEAR_AT = 0.8;
 const CLEAR_TO = 0.5;
 const COMPACT_AT = 0.7;
+/**
+ * 刚过边界（新一轮或刚提交，之后模型还没回复过）时请模型压缩的门槛。手上没有做到一半的事，压掉的不会是正在用的，
+ * 所以比中途的 COMPACT_AT 低：趁边界先压，免得做到一半撞上 70%（Harness 设计第 7 节「压缩在边界做」）。
+ */
+const BOUNDARY_COMPACT_AT = 0.5;
 /** 压缩至少要能腾出这么多窗口才值得请模型做；压不动的开场消息不能让每次请求都要求压缩。 */
 const COMPACT_MIN_GAIN = 0.1;
 /** 估计值超过整个窗口才不发：差一点的照发，真超了由 provider 的报错兜住。 */
@@ -270,8 +281,17 @@ function projectMessages(state: LoopCheckpoint, foldable: ReadonlySet<string>): 
 	if (!state.reduction) return state.messages.map(project);
 	let response = state.reduction.throughMessage - 1;
 	while (response > 0 && state.messages[response]?.role !== "assistant") response -= 1;
+	const opening = state.reduction.opening;
 	return [
-		...state.messages.slice(0, response).filter((message) => message.role === "user"),
+		...state.messages
+			.slice(0, response)
+			.flatMap((message, index): Message[] =>
+				message.role !== "user"
+					? []
+					: index === 0 && opening !== undefined
+						? [{ ...message, content: opening }]
+						: [message],
+			),
 		...state.messages.slice(response).map((message, offset) => project(message, response + offset)),
 	];
 }
@@ -678,15 +698,21 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				const compactable = projectMessages(state, foldable)
 					.filter((message) => message.role !== "user")
 					.reduce((sum, message) => sum + bytesOf(message), 0);
+				const atBoundary =
+					state.boundary !== undefined &&
+					!state.messages.slice(state.boundary).some((message) => message.role === "assistant");
 				if (
-					promptBytes * ratio > window * COMPACT_AT &&
+					promptBytes * ratio > window * (atBoundary ? BOUNDARY_COMPACT_AT : COMPACT_AT) &&
 					compactable * ratio > window * COMPACT_MIN_GAIN &&
 					declarations.some((tool) => tool.name === "compact_context")
 				) {
 					// 只加在这次请求的末尾，不进消息列表：前缀不变，压缩之后自然消失。
+					const used = Math.round(((promptBytes * ratio) / window) * 100);
 					context.messages.push({
 						role: "user",
-						content: `[系统附注：上下文已用到窗口的约 ${Math.round(((promptBytes * ratio) / window) * 100)}%，清掉较早的工具结果后仍偏大。先调用 compact_context 把已处理的过程压成摘要（保留作者要求、未完成的计划、结果引用与待验证的判断），再继续。]`,
+						content: atBoundary
+							? `[系统附注：上下文已用到窗口的约 ${used}%。上一件事已经做完，趁现在先调用 compact_context 把之前的过程压成摘要（保留作者要求、未完成的计划、结果引用与待验证的判断），再处理接下来的事。]`
+							: `[系统附注：上下文已用到窗口的约 ${used}%，清掉较早的工具结果后仍偏大。先调用 compact_context 把已处理的过程压成摘要（保留作者要求、未完成的计划、结果引用与待验证的判断），再继续。]`,
 						timestamp: Date.now(),
 					});
 					promptBytes = bytesOf(context);
@@ -895,6 +921,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				throughMessage: state.messages.length,
 				actionId: reduced.id,
 				modelCallId: call.id,
+				...(reduced.result.contextOpening === undefined ? {} : { opening: reduced.result.contextOpening }),
 			};
 		state.phase = "ready";
 		await save();
