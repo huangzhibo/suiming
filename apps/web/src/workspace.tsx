@@ -335,7 +335,9 @@ function WorkspaceSurface({
 		const title = book?.title(entry) || path;
 		return {
 			id: crypto.randomUUID(),
-			label: `${title}${selection ? " · 选段" : entry?.kind === "story-text" ? " · 正文" : entry?.kind === "story-beat" ? " · 设计" : ""}`,
+			// 与左栏、搜索、操作列表、发出后的引用标签同一个名字：Book.title 给正文带「· 正文」，设计只用节名。
+			// 原来这里再追加一次，正文引用成了「节名 · 正文 · 正文」，设计引用多出别处都没有的「· 设计」。
+			label: selection ? `${title} · 选段` : title,
 			kind: selection ? "selection" : "document",
 			status: "ready",
 			path,
