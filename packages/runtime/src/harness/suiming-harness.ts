@@ -30,7 +30,7 @@ import type { ModelProfileId } from "../model/config.js";
 import type { BoundModelProfile, ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
 import { CheckpointArchive } from "./checkpoint-archive.js";
 import { type ConfinedEnvPolicy, ConfinedExecutionEnv } from "./confined-env.js";
-import { SuimingHarnessError } from "./errors.js";
+import { AuthorStop, SuimingHarnessError } from "./errors.js";
 import { type SessionEvent, type SessionEventListener, SessionEventStream } from "./events.js";
 import {
 	hasUnconfirmedEffects,
@@ -255,6 +255,11 @@ export class HarnessSession {
 
 	get execution(): InMemoryExecutionState {
 		return this.#execution;
+	}
+
+	/** 这一轮是作者按停止打断的（不是应用退出、SIGINT 或用量检查点）。 */
+	get stoppedByAuthor(): boolean {
+		return this.#signal?.aborted === true && this.#signal.reason instanceof AuthorStop;
 	}
 
 	/** 一个角色当前绑定模型的上下文窗口（token）；拿不到时 undefined。Source 分段按它定大小。 */

@@ -3,6 +3,7 @@ import type { ModelChoice } from "@suiming/sdk";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ExecutionStateEvent, SessionRecord } from "../execution/types.js";
 import { agentTurn } from "../harness/agent.js";
+import { AuthorStop } from "../harness/errors.js";
 import type { SessionEventListener } from "../harness/events.js";
 import { SuimingHarness, type TurnOutcome } from "../harness/suiming-harness.js";
 import type { ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
@@ -191,8 +192,11 @@ export class LocalSessionController {
 		return { sessionId: input.sessionId };
 	}
 
-	/** 中止当前 turn：消息列表原样，回 idle。不在本进程跑的 session 只能由持有进程停。 */
-	interrupt(sessionId: string, reason = "作者停止了当前回复"): SessionRecord {
+	/**
+	 * 中止当前 turn：消息列表原样，回 idle。不在本进程跑的 session 只能由持有进程停。缺省是作者按停止
+	 * （`AuthorStop`：正在跑的子任务以「被作者停下」交回根 Agent）；应用退出、SIGINT 传普通 Error，下一句续跑。
+	 */
+	interrupt(sessionId: string, stop: Error = new AuthorStop()): SessionRecord {
 		const active = this.#active.get(sessionId);
 		if (active === undefined) {
 			const existing = this.#project.loadExecutionEntities().sessions.find((session) => session.id === sessionId);
@@ -200,7 +204,7 @@ export class LocalSessionController {
 			if (existing.status !== "running") return existing;
 			throw notActiveInProcess(sessionId);
 		}
-		if (!active.controller.signal.aborted) active.controller.abort(new Error(reason));
+		if (!active.controller.signal.aborted) active.controller.abort(stop);
 		const session = this.#project.loadExecutionEntities().sessions.find((item) => item.id === sessionId);
 		if (session === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
 		return session;

@@ -225,7 +225,8 @@ export class LocalWorkspace implements LocalCommandClient {
 		this.#unsubscribeExecution?.();
 		this.#unsubscribeExecution = undefined;
 		if (this.#sessions) {
-			for (const id of this.#sessions.activeSessionIds()) this.#sessions.interrupt(id, "应用退出，已请求保存进度");
+			for (const id of this.#sessions.activeSessionIds())
+				this.#sessions.interrupt(id, new Error("应用退出，已请求保存进度"));
 			await this.#sessions.waitForIdle();
 		}
 	}
@@ -521,7 +522,7 @@ export class LocalWorkspace implements LocalCommandClient {
 					return { status: settled.status };
 				}
 				if (this.#sessions?.activeSessionIds().includes(args.sessionId)) {
-					this.#sessions.interrupt(args.sessionId, "作者停止了当前回复");
+					this.#sessions.interrupt(args.sessionId);
 					// 作者在等这条命令返回，界限要短。收不了口时如实回 running，作者可以再点一次。
 					await this.#sessions.waitForIdle({ timeoutMs: CANCEL_SETTLE_TIMEOUT_MS });
 				}

@@ -96,7 +96,11 @@ function requireDomain(error: unknown): never {
 	throw error;
 }
 
-/** 子任务自己的失败回到父模型手里；打断与持久化故障继续往上抛。 */
+/**
+ * 子任务自己的失败回到父模型手里；打断与持久化故障继续往上抛。作者按停止时例外：子任务以「被作者停下」交回，
+ * 父动作在这一轮就有了结果，下一句先交给父模型、再轮到作者的新话，不先按旧目标把子任务跑完（2026-10-05 之前
+ * 下一句一到，挂着的委派先按原目标续跑完）。应用退出、SIGINT 与用量检查点照旧往上抛，下一句从子任务的 checkpoint 续。
+ */
 const CHILD_FAILURE_CODES = new Set([
 	"delegation_too_large",
 	"task_not_submitted",
@@ -104,12 +108,18 @@ const CHILD_FAILURE_CODES = new Set([
 	"model_output_truncated",
 	"run_no_progress",
 ]);
-async function childOutcome<T>(body: () => Promise<T>): Promise<T> {
+async function childOutcome<T>(session: HarnessSession, body: () => Promise<T>): Promise<T> {
 	try {
 		return await body();
 	} catch (error) {
 		if (error instanceof SuimingHarnessError && CHILD_FAILURE_CODES.has(error.code))
 			throw new ToolRejection(error.code, `子任务没有完成：${error.message}`, { cause: error });
+		if (error instanceof SuimingHarnessError && error.code === "run_interrupted" && session.stoppedByAuthor)
+			throw new ToolRejection(
+				"task_stopped_by_author",
+				"作者停下了这个子任务。它写进作品目录的改动都还在（没有提交）；作者接下来的话在后面。要接着做就再委派一次，新的子任务会看到这些文件；要改方向就按作者的新话安排。",
+				{ cause: error },
+			);
 		throw error;
 	}
 }
@@ -296,7 +306,7 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 			result: () => submission,
 			resultMediaType: "application/vnd.suiming.task-result+json",
 		};
-		const child = await childOutcome(() => session.executeChild(parent, actionId, spec));
+		const child = await childOutcome(session, () => session.executeChild(parent, actionId, spec));
 		return text({ taskId: child.taskId, result: child.result });
 	};
 	return {
@@ -332,7 +342,7 @@ function review(session: HarnessSession, parent: TaskHandle): HarnessTool<typeof
 		} catch (error) {
 			requireDomain(error);
 		}
-		const child = await childOutcome(() => session.executeChild(parent, actionId, task.spec));
+		const child = await childOutcome(session, () => session.executeChild(parent, actionId, task.spec));
 		const report = task.reportOf(child.result);
 		return text({
 			taskId: child.taskId,

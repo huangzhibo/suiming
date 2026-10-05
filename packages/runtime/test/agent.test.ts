@@ -20,6 +20,7 @@ import type { TurnOptions } from "../src/harness/suiming-harness.js";
 import type { HarnessTool } from "../src/harness/tool.js";
 import type { ExecutionStateDelta, SessionRecord } from "../src/index.js";
 import {
+	AuthorStop,
 	InMemoryExecutionState,
 	LocalProjectService,
 	ModelGateway,
@@ -1162,6 +1163,73 @@ test("interrupt：停止落在请求记为已发出、实际还没发出时，�
 		assert.equal(next.session.status, "idle", "作者自己的停止不能变成「模型请求结果待确认」");
 		assert.equal(next.value?.reply, "接着停下前的分析继续");
 		assert.equal(f.provider.state.callCount, 1, "不先重发停下前那次没发出的请求");
+	} finally {
+		await f.close();
+	}
+});
+
+test("作者停下正在跑的子任务再说一句：根 Agent 先看到子任务被停下和新的话，不先按旧目标把它跑完", async () => {
+	// 2026-10-05 审查：Harness 设计第 4 节说「要改子任务的方向就 interrupt」，实际下一条消息一到，被打断的子任务
+	// 先按旧目标续跑完，根 Agent 之后才读到新消息。作者停下一个要写十几分钟的 writer 说「换个写法」，它照旧写完。
+	const f = await fixture();
+	try {
+		const id = (await f.harness.createSession()).id;
+		const controller = new AbortController();
+		f.provider.setResponses([
+			call("delegate", { goal: "按原来的思路改黄盖的人物档", profile: "main" }),
+			async () => {
+				controller.abort(new AuthorStop());
+				return call("read", { path: "world/characters/黄盖.md" });
+			},
+			async (context) => {
+				const encoded = JSON.stringify(context.messages);
+				const stoppedAt = encoded.indexOf("作者停下了这个子任务");
+				assert.ok(stoppedAt >= 0, "委派的结果是子任务被作者停下");
+				assert.ok(stoppedAt < encoded.indexOf("改成写阚泽"), "先是停下的结果，再是作者的新话");
+				return reply("好，改写阚泽");
+			},
+		]);
+		const stopped = await f.say("改黄盖的人物档", id, { signal: controller.signal });
+		assert.equal(stopped.failure, undefined);
+		assert.equal(stopped.session.status, "idle");
+		const next = await f.say("改成写阚泽", id);
+		assert.equal(next.failure, undefined);
+		assert.equal(next.value?.reply, "好，改写阚泽");
+		assert.equal(f.provider.state.callCount, 3, "被停下的子任务没有按旧目标接着跑");
+		assert.deepEqual(
+			f.project.loadExecutionState().tasks.map((task) => task.status),
+			["interrupted"],
+		);
+	} finally {
+		await f.close();
+	}
+});
+
+test("应用退出打断的子任务不算作者停下：下一句从它自己的 checkpoint 接着跑完，再轮到根 Agent", async () => {
+	// 与上一条对照：退出应用、CLI 收到 SIGINT、用量检查点都不是作者要改方向，子任务照旧续跑，不从头再花一遍。
+	const f = await fixture();
+	try {
+		const id = (await f.harness.createSession()).id;
+		const controller = new AbortController();
+		f.provider.setResponses([
+			call("delegate", { goal: "读黄盖的人物档后交付", profile: "main" }),
+			async () => {
+				controller.abort(new Error("应用退出，已请求保存进度"));
+				return call("read", { path: "world/characters/黄盖.md" });
+			},
+			call("submit_task", { summary: "黄盖的人物档读过了" }),
+			async (context) => {
+				assert.match(JSON.stringify(context.messages), /黄盖的人物档读过了/u);
+				return reply("子任务交付了");
+			},
+		]);
+		const stopped = await f.say("读黄盖的人物档", id, { signal: controller.signal });
+		assert.equal(stopped.failure, undefined);
+		const next = await f.say("继续", id);
+		assert.equal(next.value?.reply, "子任务交付了");
+		const tasks = f.project.loadExecutionState().tasks;
+		assert.equal(tasks.length, 1, "续跑的是同一个子任务");
+		assert.equal(tasks[0]?.status, "completed");
 	} finally {
 		await f.close();
 	}

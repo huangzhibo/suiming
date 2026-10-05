@@ -102,7 +102,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 **等待不是阶段。**委派表达为 `tools` 阶段里一个停在 `effect_pending` 的动作：`executeChild` 以父动作 id 作为子 Task 的 `key` 同步 `await`；进程重启后父从 checkpoint 重放到同一次委派，按同一个 key 找到已完成的子 Task 直接读结果——恢复靠持久 key，不靠 JavaScript 栈。**作者提问不是工具**：模型在文本里问，停下，turn 结束；作者的回答是 inbox 的下一条消息。
 
-**steering 只给根 Agent。**inbox 只由根 loop 的 `ready` 阶段取走，子任务不 pull（建子任务的 loop 时 `steering: false`），作者插话不会进正在跑的 Worker。要改子任务的方向就 `interrupt`。
+**steering 只给根 Agent。**inbox 只由根 loop 的 `ready` 阶段取走，子任务不 pull（建子任务的 loop 时 `steering: false`），作者插话不会进正在跑的 Worker。要改子任务的方向就按停止：signal 带着 `AuthorStop`，正在跑的子任务以 `task_stopped_by_author` 交回父 Agent，父动作在这一轮就有了结果；下一句先交给父模型看「子任务被作者停下」、再看作者的新话，由它决定再派（新的子任务看得到前一个写进 checkout 的文件）还是改做别的。应用退出、CLI 收到 SIGINT 与用量检查点不是作者要改方向，照旧停在原处，下一句从子任务自己的 checkpoint 续跑（`agent.test.ts`「作者停下正在跑的子任务再说一句」「应用退出打断的子任务不算作者停下」）。2026-10-05 之前不分这两种：下一句一到，挂着的委派先按原目标续跑完，父 Agent 之后才读到新消息。
 
 **进展型兜底**：同一个动作得到同一个结果连续三次（工具名 + 参数 + 结果同指纹，成功的也算——结果没变，再做也不会变），或连续五次回复里的动作全被拒绝（换着参数试）→ 结束本 turn 回 `idle`，`lastFailure` 记 `run_no_progress`，作者的下一条消息就是继续；不进 `paused`，因为作者要做的事就是说一句话。一次回复里只要有一个动作成功就不算进第二条：正常的试错（改错了、读一下、再改）中间总有成功的读。带交付工具（`submit_task`）的子任务另有一道收口：连续三次停下却没交付，子任务以 `task_not_submitted` 结束，失败作为工具拒绝回到父 Agent 手里。循环长什么样事先列不全，这几道之外还有与形状无关的每轮用量检查点（第 10 节）。它们都不是方向闸：一个「持续产出但方向错了」的 turn 没有闸会停它，只能靠作者看到；这是已知缺陷不是设计留白，缓解手段是第 3 节的对账和第 8 节的可见性。
 

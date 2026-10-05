@@ -1127,7 +1127,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 								"abort",
 								() => {
 									try {
-										controller.interrupt(sent.sessionId, "Interrupted by signal");
+										controller.interrupt(sent.sessionId, new Error("Interrupted by signal"));
 									} catch {
 										// 不由本进程持有时无事可停。
 									}
@@ -1179,7 +1179,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 								"abort",
 								() => {
 									try {
-										controller.interrupt(sessionId, "Interrupted by signal");
+										controller.interrupt(sessionId, new Error("Interrupted by signal"));
 									} catch {
 										// 不由本进程持有时无事可停。
 									}

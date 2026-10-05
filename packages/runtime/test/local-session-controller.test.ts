@@ -81,7 +81,7 @@ test("waitForIdle 有界：请求收不了口时按时返回，不把调用方�
 		const sent = await controller.send({ commandId: "send-1", text: "执行到模型调用后卡在请求里" });
 		// 必须等请求真正发出去才中断：在那之前 abort 会被循环自己接住，测不到收口边界。
 		await entered;
-		controller.interrupt(sent.sessionId, "作者停止");
+		controller.interrupt(sent.sessionId);
 		// 无界版本在这里永远不返回。有界版本按时交回控制权，并如实说没收口。
 		assert.equal(await controller.waitForIdle({ timeoutMs: 50 }), "timeout");
 		assert.deepEqual(controller.activeSessionIds(), [sent.sessionId]);
@@ -122,7 +122,7 @@ test("一句话开一个 turn；同一作品同时只跑一个；interrupt 回 i
 		const queued = await controller.send({ commandId: "send-3", text: "顺便改一下大纲", sessionId: sent.sessionId });
 		assert.equal(queued.sequence, 2);
 		await running;
-		const interrupted = controller.interrupt(sent.sessionId, "作者主动停止");
+		const interrupted = controller.interrupt(sent.sessionId);
 		assert.equal(interrupted.status, "running");
 		await controller.completion(sent.sessionId);
 
