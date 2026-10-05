@@ -192,6 +192,7 @@ function WorkspaceShell() {
 			setError("本机草稿存储空间不足，请保存当前编辑后再关闭窗口。");
 		}
 	}, [layout, projectId, shown?.projectId, setError]);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: live / layoutLive 是 useWorkspaceGroup 给的 ref，读的是事件发生那一刻的值，不该让 effect 随它重跑
 	useEffect(() => {
 		if (!projectId) return;
 		const persist = () => {
@@ -217,13 +218,14 @@ function WorkspaceShell() {
 			window.removeEventListener("pagehide", persist);
 			window.removeEventListener("beforeunload", beforeUnload);
 		};
-	}, [projectId, layoutLive.current, live.current.documents]);
+	}, [projectId]);
 	const sideRef = useRef<HTMLDivElement>(null);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: live / layoutLive 是 useWorkspaceGroup 给的 ref，读的是事件发生那一刻的值，不该让 effect 随它重跑
 	useEffect(() => {
 		if (!showLeft) return;
 		for (const element of sideRef.current?.querySelectorAll<HTMLElement>("[data-side-scroll]") ?? [])
 			element.scrollTop = live.current.sidePositions[view.side]?.[element.dataset.sideScroll ?? ""] ?? 0;
-	}, [view.side, showLeft, live.current.sidePositions]);
+	}, [view.side, showLeft]);
 
 	// 加载中给一个安静的加载态，只有确实没有作品才请作者打开或新建（判定见 workspaceScreen）。
 	const surface = workspaceScreen({ show: projection.status, files: directory.status });

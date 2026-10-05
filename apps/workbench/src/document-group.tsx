@@ -174,6 +174,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	};
 	const restoredFor = useRef("");
 	const restoreKey = `${tab?.id}:${page}:${view.beatView}:${view.edit}`;
+	// biome-ignore lint/correctness/useExhaustiveDependencies: live / layoutLive 是 useWorkspaceGroup 给的 ref，读的是事件发生那一刻的值，不该让 effect 随它重跑
 	useEffect(() => {
 		if (!mainRef.current || restoredFor.current === restoreKey) return;
 		if (((kind === "artifact" || kind === "file") && primary.isLoading) || (isBeat && secondary.isLoading)) return;
@@ -190,16 +191,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			restoredFor.current = restoreKey;
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [
-		restoreKey,
-		kind,
-		primary.isLoading,
-		isBeat,
-		secondary.isLoading,
-		view.scrolls,
-		live.current.tabs,
-		live.current.active,
-	]);
+	}, [restoreKey, kind, primary.isLoading, isBeat, secondary.isLoading, view.scrolls]);
 	// 正文选择：原生选择落在段落内即形成带段号的引用。
 	useEffect(() => {
 		const onSelect = () => {
