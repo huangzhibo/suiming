@@ -1544,7 +1544,7 @@ function WorkspaceSurface({
 					<div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-lg bg-foreground py-1.5 pr-1.5 pl-3 text-xs text-[#fafafa] shadow-[0_8px_24px_#00000033]">
 						<span className="text-faint">
 							已选择 {codePoints(selectedText)} 字{selPara >= 0 ? ` · 第 ${selPara + 1} 段` : ""} ·{" "}
-							{file?.localId} · {book.headLabel}
+							{book.title(file)} · {book.headLabel}
 						</span>
 						<Input
 							aria-label="说明要怎么改"
