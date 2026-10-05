@@ -355,14 +355,7 @@ function contractLane(book: Book, file: FileEntry, ordinalOfPath: (path: string)
 		late: resolveAt === undefined ? [] : advance.filter((ordinal) => ordinal > resolveAt),
 		deadline,
 		// 全书未完待续时 book_end 不在任何一列上：最后一个 Beat 不是结局
-		deadlineIndex:
-			deadline === "book_end"
-				? book.data.openEnded
-					? -1
-					: book.order.length - 1
-				: deadline
-					? book.ordinal(deadline)
-					: -1,
+		deadlineIndex: book.deadlineIndex(deadline),
 		subjects: Array.isArray(subjects?.character)
 			? subjects.character.filter((x): x is string => typeof x === "string")
 			: [],

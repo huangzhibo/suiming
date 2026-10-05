@@ -187,9 +187,17 @@ export class Book {
 	get bookEndLabel(): string {
 		return this.data.openEnded ? "全书结束前（全书未完待续）" : "全书结束前";
 	}
+	/**
+	 * Contract 的期限落在第几个 Beat：写的 Beat id 照查；`book_end` 是最后一个 Beat，作者在 index 声明全书未完待续时
+	 * 不到期；没写或查不到是 -1。承诺页、侧栏与故事轴都用它——2026-10-05 之前这条规则在这里与 axis/layout.ts
+	 * 各写一遍，与 story 的 `evaluateContractLifecycleScope` 是同一条规则。
+	 */
+	deadlineIndex(deadline: unknown): number {
+		if (deadline === "book_end") return this.data.openEnded ? -1 : this.order.length - 1;
+		return typeof deadline === "string" ? this.ordinal(deadline) : -1;
+	}
 	contractState(contractId: string, cursorIndex: number): { label: string; opened: boolean; resolved: boolean } {
 		const contract = this.file("story-contract", contractId);
-		const deadline = typeof contract?.frontmatter.deadline === "string" ? contract.frontmatter.deadline : undefined;
 		const opens = this.links.filter((link) => link.to === contract?.path && link.key === "contracts.open");
 		const resolves = this.links.filter((link) => link.to === contract?.path && link.key === "contracts.resolve");
 		const openAt = Math.min(...opens.map((link) => this.ordinal(this.byPath.get(link.from)?.localId ?? "")));
@@ -198,15 +206,7 @@ export class Book {
 		const resolved = resolves.length > 0 && resolveAt <= cursorIndex;
 		if (!opened) return { label: "尚未建立", opened, resolved };
 		if (resolved) return { label: "已回应", opened, resolved };
-		// book_end 在最后一个 Beat 到期；作者声明全书未完待续时不到期（与故事轴 contractLane 同一条规则）
-		const deadlineIndex =
-			deadline === "book_end"
-				? this.data.openEnded
-					? -1
-					: this.order.length - 1
-				: deadline
-					? this.ordinal(deadline)
-					: -1;
+		const deadlineIndex = this.deadlineIndex(contract?.frontmatter.deadline);
 		if (deadlineIndex >= 0 && cursorIndex >= deadlineIndex) return { label: "已到期限，尚未回应", opened, resolved };
 		return { label: "等待回应", opened, resolved };
 	}
