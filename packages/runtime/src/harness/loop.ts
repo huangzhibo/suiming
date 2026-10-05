@@ -96,6 +96,8 @@ export interface TaskLoopOptions {
 	systemPrompt: string;
 	/** 第一条 user 消息；根 session 不给（第一条作者消息从 inbox 来）。 */
 	prompt?: string;
+	/** 子任务给：第一次请求的估计输入超过窗口的这个比例就不发，报 `delegation_too_large`（见 TASK_OPENING_AT）。 */
+	openingLimit?: number;
 	tools: HarnessTool[];
 	budget: TaskLoopBudget;
 	signal?: AbortSignal;
@@ -197,6 +199,13 @@ const BOUNDARY_COMPACT_AT = 0.5;
 const COMPACT_MIN_GAIN = 0.1;
 /** 估计值超过整个窗口才不发：差一点的照发，真超了由 provider 的报错兜住。 */
 const GIVE_UP_AT = 1;
+/**
+ * 子任务的第一次请求估计超过窗口的这个比例就不发，作为委派失败交回父 Agent（`delegation_too_large`）。
+ * 开场消息是父 Agent 给的输入，压缩压不动它；开场就过了压缩线，留给读写的只到清理线（0.8）前那一成。
+ * 取压缩线是按两次真实运行定的：2026-10-04 三国补全的开场超过七成，五个子任务空转 19 分钟、估算 $92；
+ * 10-03 斗破 120 章的 Source 审稿每次请求平均占 68%（含读取）照常做完。
+ */
+export const TASK_OPENING_AT = COMPACT_AT;
 /** 没有校准数据时按每 3 字节 1 token 估：中文一个字 3 字节，偏保守。 */
 const DEFAULT_TOKENS_PER_BYTE = 1 / 3;
 
@@ -674,6 +683,15 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			const window = options.model.model.contextWindow;
 			if (window > 0) {
 				const ratio = tokensPerByte(state);
+				if (
+					options.openingLimit !== undefined &&
+					state.turns === 0 &&
+					promptBytes * ratio > window * options.openingLimit
+				)
+					throw new SuimingHarnessError(
+						"delegation_too_large",
+						`开场输入约 ${Math.round((promptBytes * ratio) / 1000)}k token，占 ${options.model.model.id} 窗口的 ${Math.round(((promptBytes * ratio) / window) * 100)}%（上限 ${Math.round(options.openingLimit * 100)}%），子任务放不下、也没有读写的余地，一次请求都没发。把范围拆小再派（比如按卷）；拆不小就停下告诉作者。`,
+					);
 				if (promptBytes * ratio > window * CLEAR_AT) {
 					// 从旧到新清，清到估计值落到 CLEAR_TO 以下或清到最后一条模型回复为止。
 					const until = clearableUntil(state.messages);

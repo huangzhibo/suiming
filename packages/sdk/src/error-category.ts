@@ -70,7 +70,7 @@ const RULES: readonly [RegExp, SuimErrorCategory][] = [
 	],
 	[/_corrupt$|_integrity_error$|_store_error$/u, "internal"],
 	[
-		/^(invalid|duplicate|unsupported|unexpected|unsafe|orphan|empty|no|missing)_|_invalid$|_check_failed$|_not_extracted$|_not_current$|_incomplete$|_cycle$|_missing$/u,
+		/^(invalid|duplicate|unsupported|unexpected|unsafe|orphan|empty|no|missing)_|_invalid$|_check_failed$|_not_extracted$|_not_current$|_incomplete$|_cycle$|_missing$|_too_large$/u,
 		"validation",
 	],
 ];

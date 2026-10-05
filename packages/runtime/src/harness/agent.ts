@@ -98,6 +98,7 @@ function requireDomain(error: unknown): never {
 
 /** 子任务自己的失败回到父模型手里；打断与持久化故障继续往上抛。 */
 const CHILD_FAILURE_CODES = new Set([
+	"delegation_too_large",
 	"task_not_submitted",
 	"model_call_failed",
 	"model_output_truncated",

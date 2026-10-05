@@ -32,7 +32,13 @@ import { CheckpointArchive } from "./checkpoint-archive.js";
 import { type ConfinedEnvPolicy, ConfinedExecutionEnv } from "./confined-env.js";
 import { SuimingHarnessError } from "./errors.js";
 import { type SessionEvent, type SessionEventListener, SessionEventStream } from "./events.js";
-import { hasUnconfirmedEffects, type LoopCheckpoint, runTaskLoop, type TaskLoopOutcome } from "./loop.js";
+import {
+	hasUnconfirmedEffects,
+	type LoopCheckpoint,
+	runTaskLoop,
+	TASK_OPENING_AT,
+	type TaskLoopOutcome,
+} from "./loop.js";
 import type { HarnessProjectPort } from "./project-port.js";
 import { readProjectStatus } from "./project-status.js";
 import type { HarnessTool } from "./tool.js";
@@ -477,6 +483,7 @@ export class HarnessSession {
 				restored,
 				systemPrompt: spec.systemPrompt,
 				...(restored === undefined ? { prompt: spec.prompt } : {}),
+				openingLimit: TASK_OPENING_AT,
 				maxTurns: spec.maxTurns,
 				tools: spec.tools,
 				telemetry: span,
@@ -575,6 +582,7 @@ export class HarnessSession {
 		restored: HarnessCheckpoint | undefined;
 		systemPrompt: string;
 		prompt?: string;
+		openingLimit?: number;
 		maxTurns: number;
 		tools(handle: TaskHandle): HarnessTool[];
 		telemetry: TelemetryContext;
@@ -617,6 +625,7 @@ export class HarnessSession {
 			model: input.model,
 			systemPrompt: midway ? systemPrompt : input.systemPrompt,
 			...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+			...(input.openingLimit === undefined ? {} : { openingLimit: input.openingLimit }),
 			loopId: input.loopId,
 			retryUnknownModelCall: this.#retryUnknownModelCall,
 			...(loop === undefined ? {} : { checkpoint: loop }),

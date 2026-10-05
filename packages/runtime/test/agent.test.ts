@@ -633,6 +633,51 @@ test("没单独配置的子任务角色跟随这次对话选的模型；单独�
 	}
 });
 
+test("子任务的开场输入就过了压缩线：一次请求都不发，作为委派失败交回根 Agent，turn 照常继续", async () => {
+	// 2026-10-04 三国补全：子任务的开场消息超过 GPT-6.1 Sol 窗口的七成，五个子任务在压缩里空转 19 分钟、估算 $92。
+	// 无限压缩当天修了，但放不下的委派仍会开跑：没有读写的余地，开场就超窗时还报「请开一个新对话」掀掉整轮。
+	const f = await fixture({
+		models: [
+			{ id: "roomy", contextWindow: 1_000_000 },
+			{ id: "cramped", contextWindow: 4_000 },
+		],
+	});
+	try {
+		const models = createModels();
+		models.setProvider(f.provider.provider);
+		const id = f.provider.provider.id;
+		const harness = new SuimingHarness({
+			project: f.project,
+			models: new ModelGateway(models, {
+				profiles: { main: { provider: id, model: "roomy" }, reviewer: { provider: id, model: "cramped" } },
+			}),
+		});
+		let rejection = "";
+		f.provider.setResponses([
+			call("review", { layer: "design" }),
+			async (context) => {
+				const message = context.messages.at(-1);
+				assert.equal(message?.role, "toolResult");
+				rejection = JSON.stringify(message);
+				return reply("审稿放不下，先拆小");
+			},
+		]);
+		const session = await harness.createSession();
+		f.project.queueInbox(session.id, "审一遍设计");
+		const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+		assert.equal(outcome.failure, undefined, "不掀掉根 Agent 这一轮");
+		assert.match(rejection, /delegation_too_large/u);
+		assert.match(rejection, /拆小/u);
+		assert.equal(f.provider.state.callCount, 2, "子任务一次请求都没发");
+		assert.deepEqual(
+			f.project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
+			[["review", "failed"]],
+		);
+	} finally {
+		await f.close();
+	}
+});
+
 test("用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
 	// 缺省的 faux 模型目录价为 0：按花费算的检查点在这里永远不触发，换成 DeepSeek 这类便宜模型也差不多。
 	const f = await fixture({ turnUsageCheckpointTokens: 50_000 });
