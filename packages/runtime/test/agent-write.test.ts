@@ -196,8 +196,12 @@ test("根 Agent 的提示与工具说明：写正文先取依据、Source 抽取
 			}),
 			"写下一节",
 		);
-		assert.match(system, /写或改正文前先用 write_context 取这一节的写作依据，或委派 writer/u);
-		assert.match(system, /写或改一个 Beat 的正文前先取/u, "write_context 的说明");
+		assert.match(system, /写一节正文或成段重写前先用 write_context 取这一节的写作依据，或委派 writer/u);
+		// 2026-10-05 走查：作者选中一段要求压短，Agent 也先取了整节 7,748 字的写作依据
+		assert.match(system, /选中一两段要求就地改时，读这一节正文与情节设计就够/u);
+		// 同一次走查：模型把 Beat 设计里的叙述也叫「正文」，在产品里正文专指 StoryText
+		assert.match(system, /「正文」只指 text\/ 下的成稿/u);
+		assert.match(system, /写一个 Beat 的正文或成段重写前先取/u, "write_context 的说明");
 		assert.match(system, /writer 的 goal 就是 authorial brief/u, "delegate 的说明");
 		assert.match(system, /建议篇幅与依据/u);
 		assert.match(system, /不复述事件顺序/u);
