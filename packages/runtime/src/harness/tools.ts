@@ -407,9 +407,6 @@ const SearchSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
-/** 原文与导入记录不进 Design 检索：原文按字找走 search_source，这里只查抽取出来的 Design 与笔记。 */
-const SOURCE_INPUT_KINDS = new Set(["source-material", "source-input", "source-descriptor"]);
-
 function snippet(
 	candidate: ArtifactCandidate,
 	hit: { identity: ArtifactCandidate["artifacts"][number]["identity"]; range?: { start: number; end: number } },
@@ -433,14 +430,7 @@ export function searchTool(scan: CandidateScanner): HarnessTool<typeof SearchSch
 		parameters: SearchSchema,
 		replay: "read",
 		async execute(_toolCallId, params) {
-			const scanned = await scan();
-			const candidate =
-				params.sourceId === undefined
-					? scanned
-					: {
-							...scanned,
-							artifacts: scanned.artifacts.filter((artifact) => !SOURCE_INPUT_KINDS.has(artifact.identity.kind)),
-						};
+			const candidate = await scan();
 			const result = searchStoryCandidate(
 				candidate,
 				{ kind: "project_revision", projectRevisionId: candidate.baseRevisionId },

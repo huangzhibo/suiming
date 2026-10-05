@@ -12,7 +12,6 @@ import {
 	checkStoryText,
 	checkSummary,
 	commitResult,
-	committedReviews,
 	compileHostContext,
 	composeHostReview,
 	createBuiltinModelGateway,
@@ -36,6 +35,7 @@ import {
 	type RankRunResult,
 	ReviewDraftSchema,
 	readProjectStatus,
+	reviewSummaries,
 	reviewSummary,
 	revisionSummary,
 	rollbackResult,
@@ -756,12 +756,12 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 
 	program
 		.command("search")
-		.description("检索已提交的 Story Artifact，命中绑定到具体 revision")
+		.description("检索作品目录（含未提交的修改，与 Agent 的 search 同一份）；--revision 查某个已提交版本")
 		.argument("<query>")
 		.option("--kind <kind...>")
 		.option("--source <sourceId>")
 		.option("--limit <count>", "最多返回几条命中", (value) => Number(value))
-		.option("--revision <id>")
+		.option("--revision <id>", "查这个已提交版本，不查作品目录")
 		.action(
 			async (query: string, options: { kind?: string[]; source?: string; limit?: number; revision?: string }) => {
 				await execute("read.search", () =>
@@ -787,14 +787,19 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 	context
 		.command("compile")
 		.description(
-			"为一次任务编译按需裁剪的 Context（write:<beat-id>、design、design:state:<beat-id>:before|changes|after[:character|resource|contract:<id>]、design:character:<id>[:at:<beat-id>]、design:family:<id>、design:volume:<id>、source:read:<source-id>[:<start>:<end>]、review:design、review:text[:<beat-id>,...]、review:source:<source-id>）；输入按路径引用作品文件",
+			"为一次任务编译按需裁剪的 Context（write:<beat-id>、design、design:state:<beat-id>:before|changes|after[:character|resource|contract:<id>]、design:character:<id>[:at:<beat-id>]、design:family:<id>、design:volume:<id>、source:read:<source-id>[:<start>:<end>]、review:design、review:text[:<beat-id>,...]、review:source:<source-id>）；读作品目录（含未提交的修改，与 Agent 拿到的同一份），输入按路径引用作品文件",
 		)
 		.argument("<task>")
 		.option("--output <path>", "同时把输入文本写到这个文件")
-		.action(async (task: string, options: { output?: string }) => {
+		.option("--revision <id>", "按这个已提交版本编译，不读作品目录")
+		.action(async (task: string, options: { output?: string; revision?: string }) => {
 			await execute("context.compile", () =>
 				withProject(projectPath(program), async (service) => {
-					const compiled = await compileHostContext(service, task);
+					const compiled = await compileHostContext(
+						service,
+						task,
+						options.revision === undefined ? {} : { revisionId: options.revision },
+					);
 					let outputPath: string | undefined;
 					if (options.output !== undefined) {
 						outputPath = resolve(io.cwd(), options.output);
@@ -901,15 +906,15 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 
 	source
 		.command("list")
-		.description("列出已提交的 Source、各自的抽取状态，以及笔记覆盖了多少材料")
+		.description("列出作品目录里的 Source、各自的抽取状态，以及笔记覆盖了多少材料（含未提交的笔记）")
 		.action(async () => {
 			await execute("source.list", () =>
 				withProject(projectPath(program), async (service) => {
-					const candidate = await service.historyReader().snapshot(await service.refreshHead());
+					const candidate = await service.checkoutCandidate();
 					const sources = inspectStorySourcesCandidate(candidate).map((item) =>
 						sourceSummaryData(item, sourceCoverage(candidate, item.sourceId)),
 					);
-					return { projectId: service.projectId, revisionId: service.project().headRevisionId, sources };
+					return { projectId: service.projectId, revisionId: candidate.baseRevisionId, sources };
 				}),
 			);
 		});
@@ -917,29 +922,35 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 	const review = program.command("review").description("读取与记录审稿文件（review/<id>.md）");
 	review
 		.command("list")
-		.description("列出已提交 revision 里的审稿文件，以及每份还算不算数")
+		.description("列出作品目录里的审稿文件（含刚 record 还没提交的），以及每份对当前稿还算不算数")
 		.action(async () => {
 			await execute("review.list", () =>
 				withProject(projectPath(program), async (service) => {
-					const { revisionId, reviews } = await committedReviews(service);
-					return { projectId: service.projectId, revisionId, reviews: reviews.map((item) => item.summary) };
+					const candidate = await service.checkoutCandidate();
+					const reviews = await reviewSummaries(service.historyReader(), candidate);
+					return {
+						projectId: service.projectId,
+						revisionId: candidate.baseRevisionId,
+						reviews: reviews.map((item) => item.summary),
+					};
 				}),
 			);
 		});
 
 	review
 		.command("show")
-		.description("显示某份已提交的审稿文件与完整 ReviewDraft")
+		.description("显示作品目录里的某份审稿文件与完整 ReviewDraft")
 		.argument("<review-id>")
 		.action(async (reviewId: string) => {
 			await execute("review.show", () =>
 				withProject(projectPath(program), async (service) => {
-					const { revisionId, reviews } = await committedReviews(service);
+					const candidate = await service.checkoutCandidate();
+					const reviews = await reviewSummaries(service.historyReader(), candidate);
 					const item = reviews.find(({ review }) => review.id === reviewId);
 					if (item === undefined) throw new ArtifactError("review_not_found", reviewId);
 					return {
 						projectId: service.projectId,
-						revisionId,
+						revisionId: candidate.baseRevisionId,
 						review: { ...item.summary, draft: item.review.file.draft },
 					};
 				}),
@@ -958,7 +969,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 	review
 		.command("record")
 		.description(
-			"按已提交 revision 校验 host 产出的 ReviewDraft，写成 review/<id>.md 放进 checkout；用 `suim commit` 提交",
+			"按作品目录当前的内容校验 host 产出的 ReviewDraft（与 Agent 的审稿同一个校验器），写成 review/<id>.md 放进作品目录；用 `suim commit` 提交",
 		)
 		.argument("<draft-file>", "存放 ReviewDraft 的 JSON 文件")
 		.requiredOption("--layer <layer>", "design、source 或 text")

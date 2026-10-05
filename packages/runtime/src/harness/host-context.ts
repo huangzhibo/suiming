@@ -1,4 +1,5 @@
-import { sourceCoverage } from "../artifact/derived.js";
+import { CANDIDATE_REVISION } from "@suiming/story";
+import { type RevisionHistoryReader, sourceCoverage } from "../artifact/derived.js";
 import { designContextSelections, renderDesign } from "../artifact/design-frame.js";
 import { ArtifactError } from "../artifact/errors.js";
 import { type ComposedReview, composeReviewFile } from "../artifact/review-authoring.js";
@@ -6,7 +7,6 @@ import { storyPackageCodec } from "../artifact/story-package-codec.js";
 import type { ArtifactCandidate, ArtifactIdentity } from "../artifact/types.js";
 import { compileDesignViewContext, type DesignViewTask } from "./design-view-context.js";
 import { type MaterialSpan, materialSpan, renderSourceNotes, sourceMaterialText } from "./material.js";
-import type { HarnessProjectPort } from "./project-port.js";
 import { withConstitution } from "./prompts.js";
 import { compileReviewContext, type ReviewLayer, type ReviewScope } from "./review-context.js";
 import { compileWriteContext } from "./write-context.js";
@@ -163,11 +163,33 @@ function artifactPaths(
 	}));
 }
 
+/**
+ * host 的读命令读哪一份作品。缺省是 checkout（含未提交的修改），与 Agent 的 `write_context`、`review`、`search`
+ * 同一份候选；给 `revisionId` 读那个已提交版本。2026-10-05 之前 host 只读已提交的 head，Skill 只好让 host
+ * 「先提交再取写作依据、先提交再审」，平白多出版本，而审稿时效早已按被审文件的内容摘要判，不需要先提交。
+ */
+export interface HostContextProject {
+	historyReader(): RevisionHistoryReader;
+	checkoutCandidate(): Promise<ArtifactCandidate>;
+}
+
+async function hostCandidate(
+	project: HostContextProject,
+	revisionId: string | undefined,
+): Promise<{ revisionId: string; candidate: ArtifactCandidate }> {
+	if (revisionId !== undefined) return { revisionId, candidate: await project.historyReader().snapshot(revisionId) };
+	const candidate = await project.checkoutCandidate();
+	return { revisionId: candidate.baseRevisionId, candidate };
+}
+
 /** 按任务编译选择性 Context 交给 host agent：system prompt 与输入文本，以及它们引用的作品文件。 */
-export async function compileHostContext(project: HarnessProjectPort, taskText: string): Promise<CompiledHostContext> {
+export async function compileHostContext(
+	project: HostContextProject,
+	taskText: string,
+	options: { revisionId?: string } = {},
+): Promise<CompiledHostContext> {
 	const task = parseHostContextTask(taskText);
-	const revisionId = project.project().headRevisionId;
-	const candidate = await project.historyReader().snapshot(revisionId);
+	const { revisionId, candidate } = await hostCandidate(project, options.revisionId);
 	let systemPrompt: string;
 	let text: string;
 	let selections: { identity: ArtifactIdentity; range?: { start: number; end: number } }[];
@@ -263,13 +285,14 @@ export interface RecordHostReviewInput {
 
 /**
  * host 完成的 Review 经与 submit_review 同一个校验器（schema、范围、逐字引文）后成为一个审稿文件；
- * 写进作品目录由 CLI 负责，随作者下一次 `suim commit` 进版本。审的 revision 是当前 head。
+ * 写进作品目录由 CLI 负责，随作者下一次 `suim commit` 进版本。与 Agent 的审稿一样按 checkout 校验，
+ * `revision` 记 `candidate`，进版本后解析成它首次提交的那一版；时效按 `subjects` 里的内容摘要判。
  */
 export async function composeHostReview(
-	project: HarnessProjectPort,
+	project: HostContextProject,
 	input: RecordHostReviewInput,
 ): Promise<ComposedReview> {
-	const candidate = await project.historyReader().snapshot(project.project().headRevisionId);
+	const candidate = await project.checkoutCandidate();
 	const compiled = compileReviewContext({
 		candidate,
 		layer: input.layer,
@@ -279,7 +302,7 @@ export async function composeHostReview(
 	return composeReviewFile(candidate, {
 		layer: compiled.layer,
 		scope: compiled.subject,
-		revision: project.project().headRevisionId,
+		revision: CANDIDATE_REVISION,
 		draft: input.draft,
 		...(input.now === undefined ? {} : { now: input.now }),
 	});

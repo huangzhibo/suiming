@@ -472,7 +472,10 @@ const contextArtifactPathSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
-/** `context compile <task>`：按任务编译给 host agent 的选择性 Context；输入引用的作品文件按路径列出。 */
+/**
+ * `context compile <task>`：按任务编译给 host agent 的选择性 Context；输入引用的作品文件按路径列出。
+ * 缺省读作品目录（含未提交的修改），`revisionId` 是它的基线版本；带 `--revision` 时就是那个已提交版本。
+ */
 export const SuimCliContextCompileDataSchema = Type.Object(
 	{
 		projectId: Type.String({ minLength: 1 }),
@@ -608,7 +611,7 @@ export const SuimCliDesignImpactDataSchema = Type.Object(
 export const SuimCliReviewRecordDataSchema = Type.Object(
 	{
 		projectId: Type.String({ minLength: 1 }),
-		/** 审的版本，即当前 head。 */
+		/** 作品目录的基线版本；审的是作品目录当前的内容，审稿 frontmatter 的 revision 记 `candidate`。 */
 		revisionId: Type.String({ minLength: 1 }),
 		review: reviewSummarySchema,
 	},

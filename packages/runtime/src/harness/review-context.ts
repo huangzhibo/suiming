@@ -135,7 +135,7 @@ export function compileReviewContext(input: ReviewContextInput): CompiledReviewC
 			layer: "design",
 			subject: { kind: "book" },
 			systemPrompt: reviewerSystemPrompt("design", input.host),
-			prompt: `${input.goal === undefined ? "" : `作者目标：\n${input.goal}\n\n`}待审完整 Target Design（${input.host === "host" ? "已提交版本" : "与工作目录一致"}）：\n\n${renderDesign(candidate)}`,
+			prompt: `${input.goal === undefined ? "" : `作者目标：\n${input.goal}\n\n`}待审完整 Target Design：\n\n${renderDesign(candidate)}`,
 			artifacts: designContextSelections,
 			// Target Review 不读 Source（Skill 的审稿循环）：忠实抽取的作品里，翻得到原作就成了比「像不像原作」。
 			// review/ 要放行，submit_review 写审稿也过读权限。
@@ -156,9 +156,7 @@ export function compileReviewContext(input: ReviewContextInput): CompiledReviewC
 		if (sourceExtractionSelections(candidate, sourceId).length === 0)
 			throw new ArtifactError(
 				"source_not_extracted",
-				`Source ${sourceId} 还没有抽取（没有 source/${sourceId}/outline/story/index.yaml 等文件），没有可审的内容${
-					input.host === "host" ? "。审稿上下文按已提交版本编译：抽取写完先 suim commit，再编译 review:source" : ""
-				}`,
+				`Source ${sourceId} 还没有抽取（没有 source/${sourceId}/outline/story/index.yaml 等文件），没有可审的内容`,
 			);
 		const prefix = `source/${sourceId}/`;
 		return {

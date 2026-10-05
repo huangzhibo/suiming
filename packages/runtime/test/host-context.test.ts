@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { CANDIDATE_REVISION } from "@suiming/story";
 import {
 	compileHostContext,
 	composeHostReview,
@@ -189,7 +190,11 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 		};
 		const composed = await composeHostReview(project, input);
 		assert.match(composed.path, /^review\/text-\d{8}-\d{6}-[0-9a-f]{4}\.md$/u);
-		assert.equal(composed.file.revision, project.project().headRevisionId, "审的是当前 head");
+		assert.equal(
+			composed.file.revision,
+			CANDIDATE_REVISION,
+			"与 Agent 的审稿一样按 checkout 审，进版本后解析成首次提交的那一版",
+		);
 		assert.equal(composed.file.draft.verdict, "revise", "verdict 如实保留");
 		assert.deepEqual(composed.file.scope, { kind: "beats", storyBeatIds: ["beat-0001"] });
 
@@ -222,6 +227,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 		await project.commitCheckout();
 		const reader = project.historyReader();
 		let head = project.project().headRevisionId;
+		const reviewedAt = head;
 		let reviews = reviewsIn(await reader.snapshot(head));
 		assert.deepEqual(
 			reviews.map((item) => item.id),
@@ -230,7 +236,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 		assert.deepEqual(await reviewCurrency(reader, head, await reader.snapshot(head), reviews[0] as never), {
 			state: "current",
 			changed: [],
-			revision: composed.file.revision,
+			revision: reviewedAt,
 		});
 
 		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖当众挨了军杖。\n");
@@ -240,7 +246,7 @@ test("context compile 给 host 的输入按路径列出作品文件；review rec
 		assert.deepEqual(await reviewCurrency(reader, head, await reader.snapshot(head), reviews[0] as never), {
 			state: "stale",
 			changed: ["text/beat-0001.md"],
-			revision: composed.file.revision,
+			revision: reviewedAt,
 		});
 		assert.throws(
 			() => parseHostContextTask("nonsense"),

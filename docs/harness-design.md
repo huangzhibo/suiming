@@ -157,7 +157,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 **host 接入文件不进 Harness。**作品仓里常装着 `suim init / update --agent` 写的 Codex / Claude Code / Grok 接入文件：Skill（带一份 Story Language 副本）、`.codex/agents/*.toml`、`AGENTS.md` / `CLAUDE.md` 里的 Suiming 标记段。它们是写给有 shell、有自己子 agent 的 host 的第二套指令（跑 `suim` 命令、派 `suim_storytext_writer`），Harness 执行不了，每轮还要多付 token，所以 Harness 不加载 Skill、`AGENTS.md`、`CLAUDE.md`。
 
-- 两种执行者在同一个 checkout 上共用的是：作品文件、Checker、`commitCheckout`、写手与审稿的角色契约（`writerSystemPrompt` / `reviewerSystemPrompt` 同一份源出两个变体，host 经 `suim context compile` 取）和审稿落盘（`composeReviewFile`）。主 Agent 怎么干活各写一份：SKILL 写给 host，`AGENT_PROMPT` 与工具描述写给 Harness。
+- 两种执行者在同一个 checkout 上共用的是：作品文件、Checker、`commitCheckout`、写手与审稿的角色契约（`writerSystemPrompt` / `reviewerSystemPrompt` 同一份源出两个变体，host 经 `suim context compile` 取）和审稿落盘（`composeReviewFile`），读的也是同一份作品：host 的 `context compile`、`search`、`source list` 与 `review list` / `record` 缺省读 checkout，与 Agent 的工具一样含未提交的修改（2026-10-05 之前它们只读已提交版本，Skill 只好让 host「先提交再取写作依据、先提交再审」）。主 Agent 怎么干活各写一份：SKILL 写给 host，`AGENT_PROMPT` 与工具描述写给 Harness。
 - `.agents/` `.claude/` `.codex/` `.grok/` 对模型的文件工具与 `.git` / `.suiming` 一样不可见（`ConfinedExecutionEnv` 的 `HOST_ADAPTER_ROOTS`，按小写比），作者的文件视图照常可见（`hostAdapters: "visible"`）。理由：读了只拿到用不上的指令，改了不进版本，turn 对账只比作品文件也看不见。`list` 加回之后它们第一次出现在模型眼前，装上接入文件的回归里 Agent 读到 Skill 的两次都照它改用委派 Writer，花费约为平时的 2.5 倍（[记录](validation/2026-10-01-harness-regression/README.md)）。新加一种 host 时根表要跟上，`cli.test.ts` 按 `installHost` 实际写出的路径核对。
 - 入口文件不藏：作者可能在标记段外写了自己的东西，Agent 看得见但不自动加载，作品要长期遵守的约束在 `intent/**`。标记段只点名给 host，并告诉应用内的 Agent 不是写给它的（`host-install.ts` 的 `ENTRY_BLOCK`）；它原本叫所有读者「先读 Skill」，Agent 读到就去试，18 次里有 1 次读了两份被拒。
 

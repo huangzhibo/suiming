@@ -991,6 +991,91 @@ test("host 领域命令：text check、design impact、context compile、review 
 	}
 });
 
+test("host 的读命令读 checkout：未提交的 Design 与审稿在 context compile、search、review list 里看得见；--revision 读已提交版本", async () => {
+	// 2026-10-05 审查：host 的 search / context compile / review 原来只读已提交版本，Agent 的同名能力读 checkout。
+	// Skill 只好让 host「先提交再取写作依据、先提交再审」，平白多出版本；整合时 search --source 也找不到刚写的 Beat。
+	const checkoutPath = await fixture();
+	try {
+		const initialized = await jsonCommand(checkoutPath, ["init"]);
+		assert.equal(initialized.exitCode, SUIM_CLI_EXIT.success);
+		const head = (initialized.value.data as { headRevisionId: string }).headRevisionId;
+		const designPath = join(checkoutPath, "outline", "story", "vol-0001", "beat-0002.md");
+		await writeFile(designPath, (await readFile(designPath, "utf8")).replace("青龙牙旗", "青龙牙旗与一面白幡"));
+
+		const textOf = (result: { value: { data?: unknown } }) => (result.value.data as { text: string }).text;
+		const compiled = await jsonCommand(checkoutPath, ["context", "compile", "write:beat-0002"]);
+		assert.equal(compiled.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(compiled.value));
+		assert.equal(Value.Check(SuimCliContextCompileDataSchema, compiled.value.data), true);
+		assert.match(textOf(compiled), /一面白幡/u, "写作依据带着刚改、还没提交的 Design");
+		assert.equal((compiled.value.data as { revisionId: string }).revisionId, head, "revisionId 是 checkout 的基线");
+		const pinned = await jsonCommand(checkoutPath, ["context", "compile", "write:beat-0002", "--revision", head]);
+		assert.equal(pinned.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(pinned.value));
+		assert.doesNotMatch(textOf(pinned), /一面白幡/u, "--revision 读那个已提交版本");
+
+		const hits = async (args: string[]) =>
+			((await jsonCommand(checkoutPath, ["search", ...args])).value.data as { hits: { path: string }[] }).hits.map(
+				(hit) => hit.path,
+			);
+		assert.deepEqual(await hits(["白幡"]), ["outline/story/vol-0001/beat-0002.md"]);
+		assert.deepEqual(await hits(["白幡", "--revision", head]), []);
+		// --source 查的是抽取，与 Agent 的 search 一样不落到原文上（原文按字找用 rg 或 search_source）
+		assert.deepEqual(await hits(["准备诈降", "--source", "原作"]), []);
+
+		// 审稿按 checkout 编译、record，不必先提交；review list 立刻列出它，被审正文一改就不再 current
+		await mkdir(join(checkoutPath, "text"), { recursive: true });
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖挨完军杖，一声没吭。\n");
+		assert.match(
+			textOf(await jsonCommand(checkoutPath, ["context", "compile", "review:text:beat-0001"])),
+			/一声没吭/u,
+		);
+		const draftPath = join(checkoutPath, ".suiming", "review-draft.json");
+		await writeFile(
+			draftPath,
+			JSON.stringify({
+				verdict: "revise",
+				summary: "挨打之后只有一句。",
+				findings: [
+					{
+						severity: "minor",
+						anchor: { kind: "artifact", path: "text/beat-0001.md" },
+						issue: "挨打的分量没写出来。",
+						evidence: "黄盖挨完军杖，一声没吭。",
+						repairLayer: "text",
+					},
+				],
+				uncovered: [],
+				uncertainties: [],
+			}),
+		);
+		const recorded = await jsonCommand(checkoutPath, [
+			"review",
+			"record",
+			draftPath,
+			"--layer",
+			"text",
+			"--beat",
+			"beat-0001",
+		]);
+		assert.equal(recorded.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(recorded.value));
+		const reviewId = (recorded.value.data as { review: { id: string } }).review.id;
+		const listed = async () =>
+			(
+				(await jsonCommand(checkoutPath, ["review", "list"])).value.data as {
+					reviews: { id: string; current: boolean; changed: string[] }[];
+				}
+			).reviews.find((item) => item.id === reviewId);
+		assert.equal((await listed())?.current, true, "刚 record、还没提交的审稿也列得出来");
+		const shown = await jsonCommand(checkoutPath, ["review", "show", reviewId]);
+		assert.equal((shown.value.data as { review: { draft: { verdict: string } } }).review.draft.verdict, "revise");
+		await writeFile(join(checkoutPath, "text", "beat-0001.md"), "黄盖挨完军杖，咬着牙站起来。\n");
+		const stale = await listed();
+		assert.equal(stale?.current, false, "被审正文改了，审稿不再 current");
+		assert.deepEqual(stale?.changed, ["text/beat-0001.md"]);
+	} finally {
+		await rm(checkoutPath, { recursive: true, force: true });
+	}
+});
+
 test("suim init 从空目录开始一部作品：脚手架 Design、Intent 与 host adapter 文件，重复安装只刷新标记段", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-cli-new-"));
 	const intentPath = join(root, "intent.txt");
@@ -1247,7 +1332,7 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 			`---\nspan: [0, ${total}]\nmaterial_sha256: ${data.source.materialSha256}\n---\n黄盖备好火船后去见周瑜。\n`,
 			"utf8",
 		);
-		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
+		// 覆盖率与审稿输入都读作品目录：笔记与抽取写好就算，不必先提交（2026-10-05 之前要先 suim commit）
 		const listed = await jsonCommand(checkoutPath, ["source", "list"]);
 		const coverage = sourceOf(listed)?.coverage;
 		assert.deepEqual(coverage?.gaps, []);
@@ -1260,7 +1345,8 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 		const unextracted = await jsonCommand(checkoutPath, ["context", "compile", "review:source:访谈"]);
 		assert.equal(unextracted.exitCode, SUIM_CLI_EXIT.validation);
 		assert.equal((unextracted.value.error as { code: string }).code, "source_not_extracted");
-		assert.match((unextracted.value.error as { message: string }).message, /suim commit/u);
+		assert.match((unextracted.value.error as { message: string }).message, /还没有抽取/u);
+		assert.doesNotMatch((unextracted.value.error as { message: string }).message, /suim commit/u);
 		await mkdir(join(checkoutPath, "source", "访谈", "outline", "story", "vol-0001"), { recursive: true });
 		await writeFile(
 			join(checkoutPath, "source", "访谈", "outline", "story", "index.yaml"),
@@ -1270,9 +1356,8 @@ test("host 自己读材料：context compile source:read 给出材料 sha，笔�
 			join(checkoutPath, "source", "访谈", "outline", "story", "vol-0001", "beat-0001.md"),
 			"---\ntitle: 访旧友\n---\n黄盖拿着火船去见旧友，核对来历。\n",
 		);
-		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
 		const review = await jsonCommand(checkoutPath, ["context", "compile", "review:source:访谈"]);
-		assert.equal(review.exitCode, SUIM_CLI_EXIT.success, "读完并提交抽取后 Source Review 可编译");
+		assert.equal(review.exitCode, SUIM_CLI_EXIT.success, "读完、写好抽取就能编译 Source Review，不必先提交");
 		const reviewText = (review.value.data as { text: string }).text;
 		assert.ok(reviewText.includes("黄盖备好火船后去见周瑜。"));
 		assert.ok(reviewText.includes("黄盖拿着火船去见旧友，核对来历。"));

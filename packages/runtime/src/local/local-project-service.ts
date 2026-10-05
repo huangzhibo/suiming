@@ -512,11 +512,18 @@ export class LocalProjectService {
 		}
 	}
 
+	/** 缺省搜 checkout（含未提交的修改，与 Agent 的 `search` 同一份候选）；给 revisionId 搜那个已提交版本。 */
 	async search(request: StorySearchRequest, requested?: string): Promise<StorySearchResult> {
 		this.#requireOpen();
-		const revisionId = requested ?? (await this.refreshHead());
-		const candidate = await this.#canon.snapshotForProject(this.projectId, revisionId);
-		return searchStoryCandidate(candidate, { kind: "project_revision", projectRevisionId: revisionId }, request);
+		const candidate =
+			requested === undefined
+				? await this.checkoutCandidate()
+				: await this.#canon.snapshotForProject(this.projectId, requested);
+		return searchStoryCandidate(
+			candidate,
+			{ kind: "project_revision", projectRevisionId: candidate.baseRevisionId },
+			request,
+		);
 	}
 
 	async exportRevision(revisionId?: string): Promise<OpenPackageFile[]> {

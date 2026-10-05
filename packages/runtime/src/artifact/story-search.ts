@@ -126,6 +126,12 @@ function validateLimit(limit: number | undefined): number {
 	return limit;
 }
 
+/**
+ * 查一份 Source 时只查它的抽取：原文、原始字节与描述是输入不是抽取，按字找原文另走 `findInMaterial`
+ * （`search_source`）。2026-10-05 之前这条只写在 Agent 的 search 工具里，`suim search --source` 会落到原文上。
+ */
+const SOURCE_INPUT_KINDS = new Set(["source-material", "source-input", "source-descriptor"]);
+
 export function searchStoryCandidate(
 	candidate: ArtifactCandidate,
 	basis: StorySearchBasis,
@@ -134,12 +140,14 @@ export function searchStoryCandidate(
 	const query = request.query.trim();
 	const terms = queryTerms(query);
 	const kinds = request.kinds === undefined ? undefined : new Set(request.kinds);
+	const extractionOnly = request.namespace?.kind === "source" && kinds === undefined;
 	const hits = candidate.artifacts
 		.filter(
 			(artifact) =>
 				(request.namespace === undefined ||
 					sameArtifactNamespace(artifact.identity.namespace, request.namespace)) &&
-				(kinds === undefined || kinds.has(artifact.identity.kind)),
+				(kinds === undefined || kinds.has(artifact.identity.kind)) &&
+				!(extractionOnly && SOURCE_INPUT_KINDS.has(artifact.identity.kind)),
 		)
 		.flatMap((artifact): StorySearchHit[] => {
 			const path = artifact.path;

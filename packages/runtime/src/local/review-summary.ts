@@ -1,5 +1,11 @@
 import type { ReviewFile } from "@suiming/story";
-import { type CommittedReview, type ReviewCurrency, reviewCurrency, reviewsIn } from "../artifact/derived.js";
+import {
+	type CommittedReview,
+	type ReviewCurrency,
+	type RevisionHistoryReader,
+	reviewCurrency,
+	reviewsIn,
+} from "../artifact/derived.js";
 import type { ArtifactCandidate } from "../artifact/types.js";
 import type { LocalProjectService } from "./local-project-service.js";
 
@@ -37,9 +43,24 @@ export function reviewSummary(review: CommittedReview, currency: ReviewCurrency)
 }
 
 /**
- * head 里的审稿逐份算时效。2026-10-02 之前这段循环在桌面 IPC、CLI review list 与 review show 各写一遍。
- * 带回 head 的候选，调用方在上面再投影各自要的东西（桌面要挂回页面的 paths 与 finding 细节）。
+ * 候选里的审稿逐份算时效，基线是候选自己的 `baseRevisionId`。CLI 的 review list / show 在 checkout 上算
+ * （刚 record、还没提交的也在），桌面按它选中的已提交版本算。2026-10-02 之前这段循环在桌面 IPC、
+ * CLI review list 与 review show 各写一遍。调用方在结果上再投影各自要的东西（桌面要挂回页面的 paths 与 finding 细节）。
  */
+export async function reviewSummaries(
+	reader: RevisionHistoryReader,
+	candidate: ArtifactCandidate,
+): Promise<{ review: CommittedReview; summary: ReviewSummary }[]> {
+	const reviews: { review: CommittedReview; summary: ReviewSummary }[] = [];
+	for (const review of reviewsIn(candidate))
+		reviews.push({
+			review,
+			summary: reviewSummary(review, await reviewCurrency(reader, candidate.baseRevisionId, candidate, review)),
+		});
+	return reviews;
+}
+
+/** head 里的审稿与它们的时效；桌面的 workspace.reviews 用。 */
 export async function committedReviews(project: LocalProjectService): Promise<{
 	revisionId: string;
 	candidate: ArtifactCandidate;
@@ -48,11 +69,5 @@ export async function committedReviews(project: LocalProjectService): Promise<{
 	const revisionId = project.project().headRevisionId;
 	const reader = project.historyReader();
 	const candidate = await reader.snapshot(revisionId);
-	const reviews: { review: CommittedReview; summary: ReviewSummary }[] = [];
-	for (const review of reviewsIn(candidate))
-		reviews.push({
-			review,
-			summary: reviewSummary(review, await reviewCurrency(reader, revisionId, candidate, review)),
-		});
-	return { revisionId, candidate, reviews };
+	return { revisionId, candidate, reviews: await reviewSummaries(reader, candidate) };
 }
