@@ -1,36 +1,22 @@
-import { BookOpen, ChevronDown, ClipboardCheck, Columns2, File, Pin, Plus, Table2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuGroup,
-	ContextMenuItem,
-	ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { StoryAxis } from "./axis/StoryAxis.js";
 import { invoke } from "./bridge.js";
 import { CheckPage } from "./check-page.js";
 import type { ComparisonController, ComparisonStatus } from "./code-editor.js";
 import { ComparisonActions, ComparisonBaseline, ComparisonOptions } from "./comparison-controls.js";
-import { type ComposerAttachment, emptyComposer } from "./composer-state.js";
 import { DocumentToolbar } from "./document-toolbar.js";
 import { EmptyPage } from "./empty-page.js";
 import { Markdown } from "./markdown.js";
-import { CANDIDATE_VERSION, codePoints, pageKind, pageTarget, stripFrontmatter, textPathFor } from "./model.js";
+import { CANDIDATE_VERSION, pageTarget, stripFrontmatter, textPathFor } from "./model.js";
 import { NavigationSurface } from "./navigation-surface.js";
 import { ArtifactPage, IssuePage, VersionPage } from "./pages.js";
 import { captureReadingSelection, restoreReadingSelection } from "./reading-selection.js";
-import { Hint, OverflowHint, ToolButton } from "./ui-bits.js";
-import { useComposerSubmit } from "./use-composer-submit.js";
+import { SelectionBar } from "./selection-bar.js";
+import { TabStrip } from "./tab-strip.js";
+import { Hint } from "./ui-bits.js";
+import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
 import {
 	EMPTY_PAGE,
@@ -68,9 +54,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		notice,
 		setNotice,
 		busy,
-		composerActions,
 	} = useWorkspace();
-	const { updateComposer, onSubmitted, isCurrentProject } = composerActions;
 	const {
 		group,
 		state,
@@ -258,65 +242,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			});
 		setCloseRequest(null);
 	};
-	const quote = (label: string) =>
-		`作品引用：${editPath}\nrevision: ${shown?.revisionId ?? ""}\ncontentSHA: ${saved.sha256 ?? ""}\n${label}：\n${selectedText}`;
-	const clearSelection = () => {
-		setSelectedText("");
-		setSelPara(-1);
-		window.getSelection()?.removeAllRanges();
-	};
-	const referenceSelection = (prefillText?: string) => {
-		addReference(quote(selPara >= 0 ? `第 ${selPara + 1} 段选段` : "选段"));
-		showAgent(prefillText);
-		clearSelection();
-	};
-	// 选段就地修改：在选段栏里写一句要求，回车直接发给当前对话，不必挪到输入框再组织一遍。
-	// 走输入框同一条发送路径（先冻结、可确认、可重试）；输入框里有没发出的内容、有待确认的发送或对话暂停时
-	// 不直接发——会顶掉作者的草稿或被拒收——改为把选段和这句要求接进输入框，由作者一起发。
-	const inlineEdit = useComposerSubmit({
-		composer,
-		draftKey,
-		session: conversation,
-		updateComposer,
-		onSubmitted,
-		refresh,
-		isCurrentProject,
-	});
-	const [editRequest, setEditRequest] = useState("");
-	const requestEdit = () => {
-		const request = editRequest.trim();
-		if (!request || inlineEdit.busy) return;
-		const goal = `请修改这一段：${request}`;
-		const attachment: ComposerAttachment = {
-			id: crypto.randomUUID(),
-			label: selPara >= 0 ? `第 ${selPara + 1} 段选段` : "选段",
-			kind: "selection",
-			status: "ready",
-			content: quote(selPara >= 0 ? `第 ${selPara + 1} 段选段` : "选段"),
-		};
-		const occupied =
-			composer.goal.trim() !== "" ||
-			composer.attachments.length > 0 ||
-			composer.pending !== undefined ||
-			conversation?.status === "paused";
-		if (occupied) {
-			updateComposer(draftKey, (draft) => ({
-				...draft,
-				goal: draft.goal.trim() ? `${draft.goal.trimEnd()}\n${goal}` : goal,
-				attachments: [...draft.attachments, attachment],
-			}));
-		} else {
-			void inlineEdit.submitDraft({
-				...emptyComposer(),
-				...(composer.model ? { model: composer.model } : {}),
-				goal,
-				attachments: [attachment],
-			});
-		}
-		showAgent();
-		setEditRequest("");
-		clearSelection();
-	};
 	useEffect(() => {
 		const key = (event: KeyboardEvent) => {
 			if (
@@ -375,18 +300,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	const report = kind === "issue" ? reviews.find((item) => item.id === pageTarget(page)) : undefined;
 	const textCount = book.order.filter((id) => book.text(id)).length;
 	const dirtyCount = data.files.filter((item) => item.dirty).length;
-	const tabIcon = (tab: string) => {
-		const kind = pageKind(tab);
-		if (kind === "diff") return <Columns2 className="size-[14px] shrink-0 text-muted-foreground" />;
-		if (kind === "spine") return <Table2 className="size-[14px] shrink-0 text-muted-foreground" />;
-		if (kind === "check") return <ClipboardCheck className="size-[14px] shrink-0 text-muted-foreground" />;
-		if (
-			kind === "artifact" &&
-			(book.byPath.get(tab)?.kind === "story-beat" || book.byPath.get(tab)?.kind === "story-text")
-		)
-			return <BookOpen className="size-[14px] shrink-0 text-muted-foreground" />;
-		return <File className="size-[14px] shrink-0 text-muted-foreground" />;
-	};
 	const split = (orientation: "horizontal" | "vertical", paired = false) => {
 		setLayout((current) => {
 			let base = current;
@@ -405,123 +318,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			return splitGroup(base, group, orientation, location);
 		});
 	};
-	const tabStrip = (
-		<div
-			className="drag relative flex h-(--workbench-header-height) min-w-0 shrink-0 items-end border-b border-line bg-titlebar pl-2"
-			// 用外边距避开两侧的展开按钮；padding 仍属于 Electron 原生拖动区，会吞掉鼠标点击。外边距必须与按钮块
-			// 一样宽（左 --side-toggle-width、右 w-11）：多出来的部分露出窗格的 chrome 底色，曾经在标签左边留下一道灰条。
-			style={{
-				marginLeft: first && !showLeft ? "var(--side-toggle-width)" : undefined,
-				marginRight: last && !showRight ? 44 : undefined,
-			}}
-		>
-			{view.tabs.map((item, index) => (
-				<ContextMenu key={item.id}>
-					<ContextMenuTrigger asChild>
-						{/* biome-ignore lint/a11y/noStaticElementInteractions: 标签本身承载关闭按钮，不能再嵌套 button */}
-						{/* biome-ignore lint/a11y/useKeyWithClickEvents: 键盘用户通过标签内的可聚焦元素与 ⌘W 操作 */}
-						<div
-							className="tab-btn"
-							data-tab-id={item.id}
-							data-active={index === view.active}
-							onClick={() => activate(index)}
-							onAuxClick={(event) => event.button === 1 && closeTab(index)}
-						>
-							{item.pinned ? (
-								<Pin className="size-3 shrink-0 text-muted-foreground" />
-							) : (
-								tabIcon(item.location.page)
-							)}
-							{protectedLocation(item.location, state) && (
-								<span className="size-1.5 shrink-0 rounded-full bg-amber" role="img" aria-label="未保存" />
-							)}
-							<OverflowHint content={book.pageTitle(item.location.page, reviews)}>
-								<button
-									type="button"
-									className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px]"
-									aria-current={index === view.active ? "page" : undefined}
-									onClick={() => activate(index)}
-								>
-									{book.pageTitle(item.location.page, reviews)}
-								</button>
-							</OverflowHint>
-							<Hint content={"关闭标签页 · ⌘/Ctrl W"}>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-xs"
-									aria-label="关闭标签"
-									className={`size-5 shrink-0 rounded text-muted-foreground hover:text-foreground ${index === view.active ? "" : "hidden"}`}
-									onClick={(event) => {
-										event.stopPropagation();
-										closeTab(index);
-									}}
-								>
-									<X className="size-[11px]" />
-								</Button>
-							</Hint>
-						</div>
-					</ContextMenuTrigger>
-					<ContextMenuContent>
-						<ContextMenuGroup>
-							<ContextMenuItem
-								onSelect={() =>
-									setView((v) => ({
-										...v,
-										tabs: v.tabs.map((t) => (t.id === item.id ? { ...t, pinned: !t.pinned } : t)),
-									}))
-								}
-							>
-								{item.pinned ? "取消固定标签页" : "固定标签页"}
-							</ContextMenuItem>
-							<ContextMenuItem onSelect={() => open(item.location.page, item.location, { newTab: true })}>
-								复制标签页
-							</ContextMenuItem>
-							<ContextMenuItem onSelect={() => closeTab(index)}>关闭标签页</ContextMenuItem>
-						</ContextMenuGroup>
-					</ContextMenuContent>
-				</ContextMenu>
-			))}
-			<ToolButton
-				label="新标签页"
-				description="打开空白选择页 · ⌘/Ctrl T"
-				className="ml-1.5 self-center text-muted-foreground"
-				onClick={newTab}
-			>
-				<Plus className="size-[14px]" />
-			</ToolButton>
-			<span className="flex-1" />
-			{view.tabs.length > 1 && (
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Hint content={"查看已打开的标签页"}>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon-xs"
-								aria-label="标签页列表"
-								className="no-drag mr-1.5 size-7 self-center text-muted-foreground"
-							>
-								<ChevronDown className="size-[14px]" />
-							</Button>
-						</Hint>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="max-w-[320px]">
-						{view.tabs.map((item, index) => (
-							<DropdownMenuItem
-								key={item.id}
-								onSelect={() => activate(index)}
-								className={index === view.active ? "font-medium" : ""}
-							>
-								{tabIcon(item.location.page)}
-								<span className="truncate">{book.pageTitle(item.location.page, reviews)}</span>
-							</DropdownMenuItem>
-						))}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			)}
-		</div>
-	);
 	const documentPane = (
 		<main
 			ref={mainRef}
@@ -956,47 +752,23 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					)}
 				</div>
 			)}
-			{selectedText && kind === "artifact" && (
-				<div className="pointer-events-none absolute inset-x-0 bottom-14 z-[5] flex justify-center px-3">
-					<div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-lg bg-foreground py-1.5 pr-1.5 pl-3 text-xs text-[#fafafa] shadow-[0_8px_24px_#00000033]">
-						<span className="text-faint">
-							已选择 {codePoints(selectedText)} 字{selPara >= 0 ? ` · 第 ${selPara + 1} 段` : ""} ·{" "}
-							{book.title(file)} · {book.headLabel}
-						</span>
-						<Input
-							aria-label="说明要怎么改"
-							placeholder="说明要怎么改，回车发送"
-							value={editRequest}
-							onChange={(event) => setEditRequest(event.target.value)}
-							onKeyDown={(event) => {
-								// 中文输入法确认候选字的回车不算发送
-								if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return;
-								event.preventDefault();
-								requestEdit();
-							}}
-							className="h-6 w-56 border-white/20 bg-white/10 text-xs text-white placeholder:text-white/50"
-						/>
-						<Button size="xs" disabled={!editRequest.trim() || inlineEdit.busy} onClick={requestEdit}>
-							修改
-						</Button>
-						<Button size="xs" className="bg-ink-3 hover:bg-ink-3/90" onClick={() => referenceSelection()}>
-							询问 Agent
-						</Button>
-						<Hint content={"取消选择"}>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon-xs"
-								aria-label="取消选择"
-								className="text-faint hover:bg-white/10 hover:text-white"
-								onClick={clearSelection}
-							>
-								<X className="size-[12px]" />
-							</Button>
-						</Hint>
-					</div>
-				</div>
-			)}
+			<SelectionBar
+				visible={kind === "artifact"}
+				selectedText={selectedText}
+				selPara={selPara}
+				source={`${book.title(file)} · ${book.headLabel}`}
+				path={editPath}
+				revisionId={data.revisionId}
+				contentSHA={saved.sha256}
+				setSelectedText={setSelectedText}
+				setSelPara={setSelPara}
+				composer={composer}
+				draftKey={draftKey}
+				conversation={conversation}
+				addReference={addReference}
+				showAgent={showAgent}
+				refresh={refresh}
+			/>
 			{/* 紧凑状态栏：贴底单行 24px，窄窗按信息组换行，不遮住内容与操作。 */}
 			<div
 				className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-x-4 px-3 text-xs leading-6 whitespace-nowrap text-muted-foreground"
@@ -1026,59 +798,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			</div>
 		</main>
 	);
-	const closeDialog = (
-		<Dialog
-			open={!!closeRequest}
-			onOpenChange={(on) => {
-				if (!on) setCloseRequest(null);
-			}}
-		>
-			<DialogContent>
-				<DialogHeader>
-					<DialogTitle>保留未保存的修改？</DialogTitle>
-					<DialogDescription>这些文件还有未保存内容。保存会写入项目目录，放弃会移除共享草稿。</DialogDescription>
-				</DialogHeader>
-				<ul className="max-h-40 overflow-auto text-xs text-muted-foreground">
-					{closeRequest?.paths.map((path) => (
-						<li key={path} className="py-1 break-all">
-							{path}
-						</li>
-					))}
-				</ul>
-				<div className="flex justify-end gap-2">
-					<Button variant="ghost" disabled={busy} onClick={() => setCloseRequest(null)}>
-						取消
-					</Button>
-					<Button
-						variant="outline"
-						disabled={busy}
-						onClick={() => {
-							discard(closeRequest?.paths ?? []);
-							finishClose();
-						}}
-					>
-						放弃修改
-					</Button>
-					<Button
-						disabled={busy}
-						onClick={() =>
-							act(async () => {
-								for (const path of closeRequest?.paths ?? []) await savePath(path);
-								finishClose();
-							})
-						}
-					>
-						保存并继续
-					</Button>
-				</div>
-				{error && (
-					<p role="alert" className="text-xs text-destructive">
-						{error}
-					</p>
-				)}
-			</DialogContent>
-		</Dialog>
-	);
 	return (
 		<NavigationSurface
 			open={open}
@@ -1093,10 +812,43 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				onPointerDownCapture={() => setLayout((v) => (v.activeGroup === group ? v : { ...v, activeGroup: group }))}
 				onFocusCapture={() => setLayout((v) => (v.activeGroup === group ? v : { ...v, activeGroup: group }))}
 			>
-				{tabStrip}
+				<TabStrip
+					tabs={view.tabs}
+					active={view.active}
+					book={book}
+					reviews={reviews}
+					insetLeft={first && !showLeft}
+					insetRight={last && !showRight}
+					unsaved={(location) => protectedLocation(location, state)}
+					onActivate={activate}
+					onClose={closeTab}
+					onTogglePin={(id) =>
+						setView((v) => ({
+							...v,
+							tabs: v.tabs.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)),
+						}))
+					}
+					onDuplicate={(location) => open(location.page, location, { newTab: true })}
+					onNewTab={newTab}
+				/>
 				{documentPane}
 			</section>
-			{closeDialog}
+			<UnsavedChangesDialog
+				paths={closeRequest?.paths}
+				busy={busy}
+				error={error}
+				onCancel={() => setCloseRequest(null)}
+				onDiscard={() => {
+					discard(closeRequest?.paths ?? []);
+					finishClose();
+				}}
+				onSave={() =>
+					act(async () => {
+						for (const path of closeRequest?.paths ?? []) await savePath(path);
+						finishClose();
+					})
+				}
+			/>
 		</NavigationSurface>
 	);
 }
