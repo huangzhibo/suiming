@@ -8,7 +8,7 @@
 | [收敛方案](consolidation-plan.md) | 2026-09-12 | 概念层、命令目录、端口与 Canon 存储的七步收敛 | 同上 |
 | [Graph Engineering 适配研究](graph-engineering-assessment.md) | 2026-09-07 | 不建 graph engine 与多 agent 网络的外部研究证据 | [ADR-0011](../adr/0011-desktop-product-and-autonomous-runtime.md)、[ADR-0012](../adr/0012-own-suiming-harness.md) |
 | [AG-UI 采用评估](ag-ui-assessment.md) | 2026-09-07 | 改用 AG-UI 标准事件的选型研究与探针 | [技术栈](../technology.md)「AG-UI 与传输」 |
-| [桌面 UI / UX 与可视化重审](desktop-ux-rethink.md) | 2026-09-08 | 六模块导航与 48 个视角的讨论稿，被 v7 布局取代 | [作者工作台设计](../web-product-design.md)、[可视化设计](../visualization-design.md) |
+| [桌面 UI / UX 与可视化重审](desktop-ux-rethink.md) | 2026-09-08 | 六模块导航与 48 个视角的讨论稿，被 v7 布局取代 | [作者工作台设计](../workbench-design.md)、[可视化设计](../visualization-design.md) |
 | [工作台导航与文档交互优化](workbench-navigation-optimization.md) | 2026-09-09 | 已实施 | 作者工作台设计 3.2–3.3 |
 | [工作台视图、分屏与页面菜单](workbench-view-and-menu-proposal.md) | 2026-09-09 | 已实施 | 作者工作台设计 3.3、4.3 |
 | [工作台审查与收敛](workbench-consolidation.md) | 2026-09-10 | 代码收敛记录 | 作者工作台设计第 7 节 |

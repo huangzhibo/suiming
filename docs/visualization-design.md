@@ -4,7 +4,7 @@
 
 本文从[桌面 UI / UX 与可视化重审](history/desktop-ux-rethink.md)第 4 节的 48 个作者视角里，挑出**数据已经就绪**的那一部分，收敛成一套可实现的视图，遵守 1.1 的事实边界。实现前的[故事轴原型](design/2026-09-09-story-axis/story-axis.html)用 eval-022 的真实结构数据（只有标题、引用与锚点，不含正文）做成，是当时的设计稿。
 
-下文的「承诺」即 StoryContract，作者界面显示为「读者期待」，用语规则见[作者工作台设计](web-product-design.md) 7.2。
+下文的「承诺」即 StoryContract，作者界面显示为「读者期待」，用语规则见[作者工作台设计](workbench-design.md) 7.2。
 
 ## 1. 可视化要替作者回答什么
 

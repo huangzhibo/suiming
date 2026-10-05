@@ -28,11 +28,11 @@
 
 三条标准的证据来源必须先于评测存在：C 的确定性长程题从真实长篇创作暴露的失败中抽取，包括人物知情、资源持有、死亡不可逆、Contract 兑现与跨范围矛盾召回；R 的强基线是同模型、同 Intent 的整书或逐章直写；A 以真实作品中 Reviewer 非 pass 后的 Agent 裁决、作者否决，以及无需逐步人工接受就跑完的长运行为证据。没有题库和基线之前，任何 SOTA 声明都不成立。
 
-桌面产品还必须通过一个完整的纵向验收（清单见[作者工作台设计](web-product-design.md)第 9 节）：作者在同一工作台里从提出目标走到修改、独立 Review、介入、比较和提交；中断、退出重开、更换 model profile 都不丢已完成的工作，也不重复提交；作者无需逐条执行 CLI，也无需理解内部运行 ID。该验收证明产品闭环，不能代替 3 卷 30 Beat 的长篇与盲评证据。
+桌面产品还必须通过一个完整的纵向验收（清单见[作者工作台设计](workbench-design.md)第 9 节）：作者在同一工作台里从提出目标走到修改、独立 Review、介入、比较和提交；中断、退出重开、更换 model profile 都不丢已完成的工作，也不重复提交；作者无需逐条执行 CLI，也无需理解内部运行 ID。该验收证明产品闭环，不能代替 3 卷 30 Beat 的长篇与盲评证据。
 
 ## 3. 产品入口
 
-各入口属于同一个 Suiming 产品，共用 Story Language、Checker、版本事务和 Cloud 同步语义。**桌面端是最终核心产品和主要作者工作台。**Cloud 目前只提供可选的 Canon 存储与显式同步，远程运行、跨设备服务与 Cloud Web 是解冻后的扩展；CLI 与 coding-agent integrations 是开发者、自动化和 host-native 入口。执行模型见 [Harness 设计](harness-design.md)，交互规范见[作者工作台设计](web-product-design.md)。
+各入口属于同一个 Suiming 产品，共用 Story Language、Checker、版本事务和 Cloud 同步语义。**桌面端是最终核心产品和主要作者工作台。**Cloud 目前只提供可选的 Canon 存储与显式同步，远程运行、跨设备服务与 Cloud Web 是解冻后的扩展；CLI 与 coding-agent integrations 是开发者、自动化和 host-native 入口。执行模型见 [Harness 设计](harness-design.md)，交互规范见[作者工作台设计](workbench-design.md)。
 
 | 入口 | 主要体验 | 模型与运行方式 |
 | --- | --- | --- |
@@ -76,7 +76,7 @@ Story Artifact 与 Story Language 是作品语义真源；机器 schema 必须�
 
 文件修改在 commit 前只是候选，过了 Checker、baseRevision 核对和原子提交才成为已提交作品；作者或 host 自己做的普通 git commit 也只是候选。存储形态见[系统架构](architecture.md) 4.3。
 
-桌面编辑器与 AI 改的是同一份 checkout，界面要分清未保存 buffer、已保存候选与已提交版本。AI 运行不覆盖作者未保存的内容，也不抢走焦点与阅读位置；作者与 AI 改同一文件时，冲突在动作发生的当下报出、双方都保留，不攒到提交（规则见[作者工作台设计](web-product-design.md) 4.3）。一个持续的对话可以产生多个可回退 revision。
+桌面编辑器与 AI 改的是同一份 checkout，界面要分清未保存 buffer、已保存候选与已提交版本。AI 运行不覆盖作者未保存的内容，也不抢走焦点与阅读位置；作者与 AI 改同一文件时，冲突在动作发生的当下报出、双方都保留，不攒到提交（规则见[作者工作台设计](workbench-design.md) 4.3）。一个持续的对话可以产生多个可回退 revision。
 
 ### 4.3 开放与可移植
 

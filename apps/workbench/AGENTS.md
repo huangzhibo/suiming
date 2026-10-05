@@ -1,6 +1,6 @@
 # apps/workbench：作者工作台（renderer）
 
-改这个目录之前先读完本文。产品规则见[作者工作台设计](../../docs/web-product-design.md)与[可视化设计](../../docs/visualization-design.md)；这里只放看代码推不出来、踩过才知道的约定。全仓通用的命令、提交与测试纪律见根目录的 [AGENTS.md](../../AGENTS.md)。
+改这个目录之前先读完本文。产品规则见[作者工作台设计](../../docs/workbench-design.md)与[可视化设计](../../docs/visualization-design.md)；这里只放看代码推不出来、踩过才知道的约定。全仓通用的命令、提交与测试纪律见根目录的 [AGENTS.md](../../AGENTS.md)。
 
 ## 设计系统 lint
 
@@ -17,7 +17,7 @@
 - `@layer components` 里的行样式**带死高度**：`.tree-row` 与 `.beat-row` 都是 `h-7`（28px），只给单行用。拿它们渲染两行内容（标题 + 路径）时高度压不住，相邻行会直接叠上——`empty-page.tsx` 的「最近访问」就这么坏了很久，三套测试全绿，是作者截图发现的。复用这两个类渲染多行时要加 `h-auto`（utilities 层压得过 `@layer components` 的 `@apply`），交互样式照旧复用。这类缺陷只能靠**几何断言**守住：E2E 里量包围盒（行高、相邻行是否重叠），按 role / 文本选元素永远发现不了。
 - **全仓改名必须带上 `*.css`。**类名不过类型检查，E2E 按 role / 文本选元素也照样通过，所以 TSX 里的 `className` 改了而 `style.css` 没改时，`npm run check`、`npm test`、`npm run test:desktop` **全绿**，样式却整块失效。2026-09-13 把 `.director-composer` 改成 `agent-composer` 时漏了 CSS，输入框的 20px 圆角、边框、阴影和 `padding: 12px 16px 16px` 一起没了，看上去就是「贴着面板边」——是作者发现的，不是测试。改名脚本的文件表要列全（`*.css` / `*.json` / `*.html` 都算），改完 grep 一遍旧名确认归零。历史验收记录（如 `docs/validation/**/measurements.json` 里的 span 名）是当时的事实，不跟着改。
 - Renderer 的反向链接、身份计数、谱与邻域图都从 `workspace.show` 透传的 frontmatter 派生（`apps/workbench/src/model.ts` 的 `deriveLinks`，键名决定目标种类），没有复制 Story Language 字段表；新增 frontmatter 引用键时在 `KEY_KINDS` 补一行即可。
-- 逐段建议稿与 A / B 决策卡还没做，**但不是做不了**（以前写成「没有 Runtime 通道」，被读成了「不能做」），零件清单见[作者工作台设计](../../docs/web-product-design.md) 4.4 节「A / B 决策卡」。要做就从 Runtime 做通，**不要在 renderer 里用客户端状态伪造**。
+- 逐段建议稿与 A / B 决策卡还没做，**但不是做不了**（以前写成「没有 Runtime 通道」，被读成了「不能做」），零件清单见[作者工作台设计](../../docs/workbench-design.md) 4.4 节「A / B 决策卡」。要做就从 Runtime 做通，**不要在 renderer 里用客户端状态伪造**。
 - Markdown 渲染只有 `apps/workbench/src/markdown.tsx` 一处（Streamdown 2.x）：static 模式给阅读态与设计文档，streaming 模式只给正在流入的最后一条 Agent 消息。Streamdown 的元素自带 Tailwind utility 类，必须在 style.css 用 `@source "../../../node_modules/streamdown/dist/*.js"` 让 Tailwind 扫到（monorepo 提升到根 node_modules），否则列表 / 代码块 / 表格无样式；同时 p / h1–h3 / strong / em / a 用 `components` 换成裸元素，否则它的 utility 会压过我们 `@layer components` 里的字号行距。段号 `data-index` 在 `useLayoutEffect` 里按渲染出的 `<p>` 顺序打，不能用解析器位置：Streamdown 按块缓存，块内 position 不是全文位置。链接渲染成 span，renderer 打不开外部窗口。代码高亮 / mermaid / 数学是可选插件包（`@streamdown/code` 等），刻意没装。
 - 消息由 AG-UI 官方客户端拼（`src/desktop-agent.ts`，2026-10-05 起替换 TanStack AI）：`DesktopAgent` 只实现 `connect()`，事件来自 `bridge.ts` 的只读 attach；`run()` 直接报错，发送 / 继续 / 停止走命令。「正在生成」只看 RUN_STARTED / RUN_FINISHED / RUN_ERROR，不看客户端的 `isRunning`（长连接期间它一直为真）。官方客户端按运行生命周期校验整条流：第一条必须是 RUN_STARTED、RUN_FINISHED 之后只能接下一次 RUN_STARTED，否则整条流报错停下（控制台有 `First event must be 'RUN_STARTED'` 这类错误）；Runtime 为此让每个事件都落在某次运行之内，由 `packages/runtime/test/run-event-stream.test.ts` 守着，往 Runtime 加事件时别发在运行之外。
 - 全链路只有一份 `@ag-ui/core`（sdk 依赖它，`@ag-ui/client` 依赖同一版本）；升级时 sdk 与 web 一起升，`npm ls @ag-ui/core` 应只有一份。我们的扩展一律走 `metadata.suiming`；`metadata["@ag-ui/client"]` 是官方客户端的保留键。子任务的话与动作认事件上的 `subagentRunId`（AG-UI 的 subagent 标准），不再认 `metadata.suiming.taskKind`；后者只为读 2026-10-05 之前落盘的旧事件留着。

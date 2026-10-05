@@ -2,7 +2,7 @@
 
 日期：2026-09-07。代码基线：main / `262ee4d`。
 
-**状态：历史方案，不是现行规范。**2026-09-07 设计，2026-09-08 落地了自有 Harness、自主 Agent、AG-UI 事件与首个桌面闭环。2026-09-13 的 Session 模型推翻了其中的执行部分：第 2 节表中 Agent、Task / Attempt、agent graph 三行，3.2 的 Run worktree 与合并，第 5 节全部（Run / Task / Attempt、`completed` 的交付判定、预算），7.2 的 ID 表，以及第 9 节「ADR-0010 仍是 Proposed」（它已于 2026-09-12 Accepted）；TUI 已删除，第 6 节的 pi-ai 现为 0.99.2。3.2「自动保存成功才能显示已保存」已被[作者工作台设计](../web-product-design.md)改为手动保存；3.4 拟定的性能门槛（常用操作 p95 小于 200 ms）已移到作者工作台设计第 7 节。现行形状见 [Harness 设计](../harness-design.md)与[系统架构](../architecture.md)，桌面方向沿用 [ADR-0011](../adr/0011-desktop-product-and-autonomous-runtime.md)。
+**状态：历史方案，不是现行规范。**2026-09-07 设计，2026-09-08 落地了自有 Harness、自主 Agent、AG-UI 事件与首个桌面闭环。2026-09-13 的 Session 模型推翻了其中的执行部分：第 2 节表中 Agent、Task / Attempt、agent graph 三行，3.2 的 Run worktree 与合并，第 5 节全部（Run / Task / Attempt、`completed` 的交付判定、预算），7.2 的 ID 表，以及第 9 节「ADR-0010 仍是 Proposed」（它已于 2026-09-12 Accepted）；TUI 已删除，第 6 节的 pi-ai 现为 0.99.2。3.2「自动保存成功才能显示已保存」已被[作者工作台设计](../workbench-design.md)改为手动保存；3.4 拟定的性能门槛（常用操作 p95 小于 200 ms）已移到作者工作台设计第 7 节。现行形状见 [Harness 设计](../harness-design.md)与[系统架构](../architecture.md)，桌面方向沿用 [ADR-0011](../adr/0011-desktop-product-and-autonomous-runtime.md)。
 
 本文收敛此前关于 AG-UI、TanStack AI、Run / Task / Attempt、agent graph、Capability、Codex App Server 与 pi 的讨论，并依据当前代码确定改造边界。[AG-UI 评估](ag-ui-assessment.md)、Agent 自主性评估（已删除，原文见基线提交 `7d50f37`）与 [Graph Engineering 研究](graph-engineering-assessment.md)保留取证过程；本文保留实现缺口与迁移依据；目标规范以需求、架构和技术栈为准，实施顺序以路线图为准。
 

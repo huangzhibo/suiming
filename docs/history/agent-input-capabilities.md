@@ -1,6 +1,6 @@
 # Agent 输入能力方案
 
-状态：2026-09-10 的方案。作品引用、`＋` / `@` 作品选择器与 UTF-8 文本附件已实现（[验收](../validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](../web-product-design.md) 4.1「输入器」；语音、图片与 PDF 未排期，下文保留它们的设计边界。源码参考见 [assistant-ui 对话功能源码参考](assistant-ui-reference-review.md)。
+状态：2026-09-10 的方案。作品引用、`＋` / `@` 作品选择器与 UTF-8 文本附件已实现（[验收](../validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](../workbench-design.md) 4.1「输入器」；语音、图片与 PDF 未排期，下文保留它们的设计边界。源码参考见 [assistant-ui 对话功能源码参考](assistant-ui-reference-review.md)。
 
 ## 附件与作品的边界
 

@@ -50,7 +50,7 @@ renderer 用 `@ag-ui/client` 管理对外消息（`apps/workbench/src/desktop-ag
 
 首期不采用 Next.js，也不依赖仍在演进的 TanStack Start 全栈层。未来营销站、公开 Reader 或需要 SSR 的产品入口独立评估，不能反向改变作者端 Domain API。
 
-产品与交互真源见[作者工作台设计](web-product-design.md)，参考 Langfuse 界面模式的边界在它的第 8 节。
+产品与交互真源见[作者工作台设计](workbench-design.md)，参考 Langfuse 界面模式的边界在它的第 8 节。
 
 ### Electron 桌面与执行底座
 

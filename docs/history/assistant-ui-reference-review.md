@@ -1,6 +1,6 @@
 # assistant-ui 对话功能源码参考
 
-状态：2026-09-10 的源码研究笔记，不再维护。研究对象是 [assistant-ui](https://github.com/assistant-ui/assistant-ui) 的 `0bea0fc504a169ccb699c4c9efd2d7a29651c186` 提交（2026-09-09，`@assistant-ui/react` 0.15.18），只读了实现和测试，没有运行示例、测试或音频服务。其中的非音频交互已按 Suiming 自己的边界实现、没有引入依赖（[验收](../validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](../web-product-design.md) 4.1；语音未排期，待做边界见 [Agent 输入能力方案](agent-input-capabilities.md)。文中的 `run.launch` / `run.steer` / `run.steering` 与「委托」是当时的名字，现在分别对应 `session.send`、`session.inbox` 与「对话」。
+状态：2026-09-10 的源码研究笔记，不再维护。研究对象是 [assistant-ui](https://github.com/assistant-ui/assistant-ui) 的 `0bea0fc504a169ccb699c4c9efd2d7a29651c186` 提交（2026-09-09，`@assistant-ui/react` 0.15.18），只读了实现和测试，没有运行示例、测试或音频服务。其中的非音频交互已按 Suiming 自己的边界实现、没有引入依赖（[验收](../validation/2026-09-10-agent-composer/README.md)），现行规则见[作者工作台设计](../workbench-design.md) 4.1；语音未排期，待做边界见 [Agent 输入能力方案](agent-input-capabilities.md)。文中的 `run.launch` / `run.steer` / `run.steering` 与「委托」是当时的名字，现在分别对应 `session.send`、`session.inbox` 与「对话」。
 
 ## 结论与复用边界
 

@@ -134,7 +134,7 @@ ProjectRevision 层实现了快照、线性历史、diff、rollback、每 Run �
 | 补充意图（steering / 追问） | **必须分类** | 纠错型留执行数据；补信息型由 Agent 提议写回 Intent 或 Design，作者确认后提交。这是 A-SOTA 的结构性改善，不靠模型变强 |
 | Frame 的 seeds | **接线** | Agent 两处都传 `seeds: []`，裁剪机制形同虚设；意图结构化之后 seeds 有了来源。`subjectsForSearchHits` 与 `preferredPaths` 是这条的两个未接线半边 |
 
-对外表达按[作者工作台设计](../web-product-design.md)第 4.4 节：界面不出现 commit / branch / merge，也不画提交图。
+对外表达按[作者工作台设计](../workbench-design.md)第 4.4 节：界面不出现 commit / branch / merge，也不画提交图。
 
 ### 3.2 命令目录收敛为一套
 
@@ -386,6 +386,6 @@ seeds 接线（`subjectsForSearchHits` / `preferredPaths`）要等结构化意�
 
 - 不新增 graph engine、workflow engine、向量数据库、CRDT。
 - 不解冻 Cloud executor、Cloud Web、生产 identity / 计费、多人协作、全功能 MCP。端口化让 Cloud **可以**接，不等于本轮接。
-- 不做 git 分支 / 历史图界面。「试另一个方向」的产品形态是故事层的另一稿，见[作者工作台设计](../web-product-design.md)第 4.4 节。
+- 不做 git 分支 / 历史图界面。「试另一个方向」的产品形态是故事层的另一稿，见[作者工作台设计](../workbench-design.md)第 4.4 节。
 - 不引入 TanStack AI 的 `/ui` 组件工厂与 MCP Apps，理由与重开触发点见[技术栈](../technology.md)。
-- 不重命名 Run / Task / Attempt。它们的英文标识符是通用技术术语；中文表达按[作者工作台设计](../web-product-design.md)用白话，不造对应名词。
+- 不重命名 Run / Task / Attempt。它们的英文标识符是通用技术术语；中文表达按[作者工作台设计](../workbench-design.md)用白话，不造对应名词。

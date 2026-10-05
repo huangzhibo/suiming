@@ -8,7 +8,7 @@
 - 质量价值：[故事创作宪法](strategies/story-constitution.md)
 - Artifact 语义与开放格式：[Story Language](story-language/README.md)
 - 当前架构与运行协议：[系统架构](docs/architecture.md)
-- 作者工作台定位与交互：[作者工作台设计](docs/web-product-design.md)；作品可视化：[可视化设计](docs/visualization-design.md)
+- 作者工作台定位与交互：[作者工作台设计](docs/workbench-design.md)；作品可视化：[可视化设计](docs/visualization-design.md)
 - 执行模型与故障验收：[Harness 设计](docs/harness-design.md)；正文 / 审稿时效与 Source 覆盖率怎么派生：[派生状态设计](docs/derived-evidence-design.md)
 - 技术选择：[技术栈](docs/technology.md)
 - 当前完成度与已知缺陷：[当前状态](docs/current-status.md)
@@ -56,7 +56,7 @@ Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真
 - story package codec 是 Open Story Directory 与 Open Story Package 的共同机器边界；Story Language 保留路径必须完整 round-trip，仓库辅助文件可以共存但不得进入 artifact snapshot。Runtime 只接受当前格式；开发期旧数据直接一次性重写或丢弃，不实现 legacy codec / importer。
 - **能力交给模型，可见性交给系统。**prompt 是真手段，模型能做的事会随它变强而变好；不要为了「不依赖模型」去造闸，那会把产品做窄。判据不是「模型能不能做」，是「**没做会不会有人发现**」。**失败静默、代价延后转移**的行为要有确定性的对账或显示——不是不信任模型，是不能只有模型自己知道做没做：意图写回只有 `AGENT_PROMPT` 一句指示，模型多半做得到，但 eval-022 跑了 4 个 Run、`intent/` 一个字没改，一周没人发现；缺的是对账（这一轮作者说了几条、几条真的改了 `intent/**` 或 Design，纯算术），不是闸——2026-10-01 起每个 turn 结束都带这份对账。**一旦失守直接坏作品**的行为则必须结构性保证，与模型强弱无关：Checker 拒绝、路径越界、subagent 没有 Canon 提交权、malformed output 由 tool contract 拒绝，都属此类。
 - 新增领域实体、持久状态、协议或服务前，必须证明终局必需且现有边界无法表达。
-- UI/UX 一致性是验收要求：同层布局、同类控件、状态语义与导航行为遵循[作者工作台设计](docs/web-product-design.md)第 7 节，复用已有组件与全局 token；新增能力先融入现有交互，避免重复入口与页面私有样式。公共规则修改后检查受影响工作面。
+- UI/UX 一致性是验收要求：同层布局、同类控件、状态语义与导航行为遵循[作者工作台设计](docs/workbench-design.md)第 7 节，复用已有组件与全局 token；新增能力先融入现有交互，避免重复入口与页面私有样式。公共规则修改后检查受影响工作面。
 - 代码与文档使用自然、清晰的简体中文，避免翻译腔和 AI 味；协议与通用技术术语保持稳定英文。
 
 ## 当前阶段

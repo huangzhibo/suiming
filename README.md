@@ -195,7 +195,7 @@ Cloud（PostgreSQL / S3 上的作品存储与显式同步）目前冻结：`npm 
 - [需求与目标](docs/vision-and-requirements.md)、[故事创作宪法](strategies/story-constitution.md)
 - [Story Language](story-language/README.md)：作品的语义与目录格式
 - [系统架构](docs/architecture.md)、[Harness 设计](docs/harness-design.md)：执行模型、恢复与故障验收
-- [作者工作台设计](docs/web-product-design.md)、[可视化设计](docs/visualization-design.md)
+- [作者工作台设计](docs/workbench-design.md)、[可视化设计](docs/visualization-design.md)
 - [技术栈](docs/technology.md)
 - [当前状态](docs/current-status.md)、[实施路线图](docs/roadmap.md)
 - [ADR](docs/adr/README.md)：历史决策，不是现行规范

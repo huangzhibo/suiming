@@ -1,6 +1,6 @@
 # 实施路线图
 
-本文决定实施顺序，不定义新的领域模型。目标与边界见[需求与目标](vision-and-requirements.md)、[系统架构](architecture.md)和[作者工作台设计](web-product-design.md)，执行模型见 [Harness 设计](harness-design.md)。
+本文决定实施顺序，不定义新的领域模型。目标与边界见[需求与目标](vision-and-requirements.md)、[系统架构](architecture.md)和[作者工作台设计](workbench-design.md)，执行模型见 [Harness 设计](harness-design.md)。
 
 当前执行 S0–S5：桌面是核心产品（[ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md)），执行用自有 SuimingHarness + pi-ai（[ADR-0012](adr/0012-own-suiming-harness.md)）。不把规范更新记作源码完成。
 
@@ -36,11 +36,11 @@ S0–S4 已完成。原计划文本同第 3 节一样不再保留，这里只记
 
 | 阶段 | 交付了什么 | 现在的形状 |
 | --- | --- | --- |
-| S0 规格与视觉 | workbench-v7 导航，六类状态在真实内容上对齐 | [作者工作台设计](web-product-design.md) |
+| S0 规格与视觉 | workbench-v7 导航，六类状态在真实内容上对齐 | [作者工作台设计](workbench-design.md) |
 | S1 自有 Harness 与恢复 | 自有 loop、ModelCall / Action checkpoint、命令事务、文件 journal、持久父子交接 | [Harness 设计](harness-design.md)第 4–5 节，故障验收在第 14 节 |
 | S2 自主 Agent | 一个持续的根 Agent、原子能力、按需委派与独立 Review、Context 压缩 | [Harness 设计](harness-design.md)第 2、6–7、9 节 |
 | S3 统一交互契约 | AG-UI + 类型化扩展、持久消息、TanStack client、只读 attach、typed IPC | [系统架构](architecture.md) 6.5 |
-| S4 桌面创作闭环 | 阅读 / 修改 / Review / 作者介入 / 比较 / 提交 / 退出重开与换模型，Electron E2E 覆盖 | [作者工作台设计](web-product-design.md)第 9 节 |
+| S4 桌面创作闭环 | 阅读 / 修改 / Review / 作者介入 / 比较 / 提交 / 退出重开与换模型，Electron E2E 覆盖 | [作者工作台设计](workbench-design.md)第 9 节 |
 
 Harness 余下的切片（E：research 工具；F：`run_command`）见 [Harness 设计](harness-design.md)第 13 节；C（loop 与 Context）2026-10-05 做完。
 

@@ -181,7 +181,7 @@ Cloud Web（可选扩展，冻结）          → Domain API + 同一事件契�
 - `suim` 是唯一 executable。无子命令打印用法；`session send` 开一个 turn 并可用 `--events` 流式输出统一事件；其余命令非交互，输出前按目录校验，exit code 从错误类别派生（`sdk/src/error-category.ts` 的正则规则加少量 override，不是手抄表）。CLI 只调用 Runtime service，不直操 store。
 - 开工用 `init [path] --agent <host>`，维护接入用 `update`（发现全部已安装 host）或 `update --agent <host>`（补接或指定刷新），不暴露内部 project ID。`update` 要求作品已初始化，只更新辅助文件并保留作者模型配置；CLI 与桌面的补写结构、首次登记和失败清理共用 `LocalProjectService.initWithStarter`。见 [ADR-0013](adr/0013-cli-init-and-update.md)。
 - host-native 模式使用 host 自己的模型与工具，文件修改只是 dirty candidate，不伪装成 Suiming Session。它与 Suiming Agent 改的是同一份候选，没有交接机制，不要两边并行跑（4.3）；Harness 也不加载 host 的接入文件（[Harness 设计](harness-design.md)第 6 节）。Skill 只解释读取顺序、Story Language 与 CLI contract，安装检查与命令表对账。
-- 桌面端按[作者工作台设计](web-product-design.md)交付阅读、直接编辑、diff、证据联动与运行控制。Runtime、凭据与 session owner 在 Electron 主进程，renderer 只经有限 preload / typed IPC 访问；重载 renderer、关窗与退出时 turn 怎么收尾见 [Harness 设计](harness-design.md)第 11 节。第二个窗口或 CLI 不创建重复 Agent：running 的 Session 持有进程 lease，`session send` 走持久 inbox 并按 commandId 幂等（同上第 3 节）。
+- 桌面端按[作者工作台设计](workbench-design.md)交付阅读、直接编辑、diff、证据联动与运行控制。Runtime、凭据与 session owner 在 Electron 主进程，renderer 只经有限 preload / typed IPC 访问；重载 renderer、关窗与退出时 turn 怎么收尾见 [Harness 设计](harness-design.md)第 11 节。第二个窗口或 CLI 不创建重复 Agent：running 的 Session 持有进程 lease，`session send` 走持久 inbox 并按 commandId 幂等（同上第 3 节）。
 - 派生视图中的编辑必须转换回拥有该事实的原始 artifact，再经同一 ChangeSet 验证。默认自主模式允许 Agent 提交可回退 revision，不设逐项接受门；外部不可逆动作与权限升级另行授权。
 
 ## 9. Cloud 与显式同步
