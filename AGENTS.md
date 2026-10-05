@@ -67,7 +67,7 @@ Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真
 
 证据最高到「真实调用」：2026-09-16 重构后第一次完整真实对话存为[基线](docs/validation/2026-09-16-first-real-session/README.md)，2026-10 起开发期评估改用斗破前 120 章的忠实抽取与留出评测（[路线图](docs/roadmap.md)第 5 节）。没有完整长篇；2026-09-06 作者盲读指出的阅读质量问题仍是当前的质量结论，不能沿用更早的「不劣于 host」。
 
-本阶段是[路线图](docs/roadmap.md)的 S5：真实长篇质量、Harness 余下切片（C / E / F）、认证与发行。具体队列只在路线图第 6 节维护，完成度与已知缺陷见[当前状态](docs/current-status.md)。
+本阶段是[路线图](docs/roadmap.md)的 S5：真实长篇质量、Harness 余下切片（E / F）、认证与发行。具体队列只在路线图第 6 节维护，完成度与已知缺陷见[当前状态](docs/current-status.md)。
 
 Cloud Web、远程 Agent 产品、生产 identity / 计费、多人协作、Reader、短剧、全功能 MCP 与通用 graph engine 不进入本轮；已有 Cloud adapter 随共享契约修正，不借此扩张 Cloud。Story Language 在验证门前不承诺兼容；真实作品、revision 与作者记录迁移前备份，不随开发执行数据一起丢弃。
 
