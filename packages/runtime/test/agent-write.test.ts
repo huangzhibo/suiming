@@ -177,7 +177,7 @@ test("Agent 自己写 Beat 时，write_context 同时交付写作方法", async 
 	});
 });
 
-test("根 Agent 的提示与工具说明：写正文先取依据、Source 抽取的计划、独立的几段一起派出", async () => {
+test("根 Agent 的提示与工具说明：写正文先取依据；Source 抽取的计划不常驻，指向 source_coverage", async () => {
 	// 三处原来各跑一个 turn 只为抓同一份系统提示（2026-10-04 合并）；每条断言守的那次失败写在旁边。
 	// 2026-10-02 斗破留出评测（DeepSeek）：根 Agent 没委派 Writer、也没调 write_context，三节都凭 Frame 自己写，
 	// 再用 118 次 edit 逐句凑篇幅；beat-0025 只有原作的 0.59。AGENT_PROMPT 里对写正文一句话都没有，
@@ -208,16 +208,10 @@ test("根 Agent 的提示与工具说明：写正文先取依据、Source 抽取
 		assert.match(system, /第一节写完先读一遍正文/u);
 		assert.match(system, /不逐句 edit 凑篇幅/u);
 		assert.match(system, /不要再列成一串「不写……」/u, "brief 写发生什么，不列禁令");
-		// 10-03 重抽：能并行之后根 Agent 仍先派一个 source-reader 试水，等它读完（11 分半）才一次派出其余五个，
-		// 读原文的时间翻了一倍。Codex 与 Claude Code 都在提示里明说「能并行就一起派」，只写「会同时执行」模型不会主动这么做。
-		assert.match(system, /同一次回复里一起派出/u);
-		assert.match(system, /不要先派一段试水/u);
-		assert.match(system, /分段抽取.*整合.*补全.*统一修.*review 一轮/u);
-		// 10-03 前 12 章第三圈：一段装得下，根 Agent 派了一个不带范围的抽取，没人写笔记，只好自己把原文读一遍补覆盖
-		assert.match(system, /只有一段也这样派：笔记由它写/u);
-		// 10-03 前 24 章：根 Agent 只派了第一段，goal 里要它「说明本段引向下一段的状态」，打算串行交接
-		assert.match(system, /segments 的每一段各委派一个/u);
-		assert.match(system, /不要让前一段给后一段交代状态/u);
+		// 2026-10-05：抽取计划（约 600 字）原来常驻在 delegate 的说明里，每次根请求都带，纯讨论也带；而真正让模型
+		// 照做的是 source_coverage 给出的现成分段。计划改跟着分段走，见 agent-source.test「带号段的 source-extractor…」。
+		assert.match(system, /先调 source_coverage/u);
+		assert.doesNotMatch(system, /统一修/u, "抽取计划不常驻在根请求里");
 	});
 });
 

@@ -17,6 +17,7 @@ import {
 	SOURCE_COMPLETION_METHOD,
 	SOURCE_EXTRACTION_LANGUAGE,
 	SOURCE_EXTRACTION_METHOD,
+	SOURCE_EXTRACTION_PLAN,
 	SOURCE_READER_METHOD,
 	SOURCE_SEGMENT_METHOD,
 	STORY_TEXT_METHOD,
@@ -300,7 +301,7 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 	return {
 		name: "delegate",
 		description:
-			"按明确目标委派一个独立子智能体（writer 写一个 Beat、source-reader 读一段 Source 并写笔记、source-extractor 抽取一个 Source、main 通用）。各角色自己把产物写进文件，结果先保存再返回；普通工具操作不必委派。writer 的 goal 就是 authorial brief：作者对这一节的要求、它在全书的作用与人物弧位置、希望读者经历的压力与退出期待、建议篇幅与依据（按前文实际篇幅与场面复杂度）、哪些过程展开哪些概述、不得提前揭示的信息；不复述事件顺序、不规定台词，Design 已在它的 Write Context 里；Design 已经划好的边界不要再列成一串「不写……」交给它——它会把禁令变成旁白里的否定句。抽取一份 Source 的计划：source_coverage 的 segments 是在章标题处切好的分段（span 与 beatRange）；① 分段抽取——同一次回复里为 segments 的每一段各委派一个带这组 span 与 beatRange 的 source-extractor（只有一段也这样派：笔记由它写，根 Agent 不必自己再读一遍原文；一段时 ③④ 可省）；各段互不等待，跨段的人物、伏笔与衔接归 ② 整合，不要让前一段给后一段交代状态；② 整合——委派一个不带范围的 source-extractor；③ 补全——同一次回复里按原来的 span 与 beatRange 各委派一次，它们带着整份抽取回头读原文；④ 统一修——把补全交回的号段外改动交给一个不带范围的 source-extractor；⑤ review 一轮；⑥ 需要时提升为 Target。带 beatRange 的 source-extractor 与 source-reader 在同一次回复里同时执行，其余一次一个：独立的几段先分好，在同一次回复里一起派出，不要先派一段试水再派其余。",
+			"按明确目标委派一个独立子智能体（writer 写一个 Beat、source-reader 读一段 Source 并写笔记、source-extractor 抽取一个 Source、main 通用）。各角色自己把产物写进文件，结果先保存再返回；普通工具操作不必委派。writer 的 goal 就是 authorial brief：作者对这一节的要求、它在全书的作用与人物弧位置、希望读者经历的压力与退出期待、建议篇幅与依据（按前文实际篇幅与场面复杂度）、哪些过程展开哪些概述、不得提前揭示的信息；不复述事件顺序、不规定台词，Design 已在它的 Write Context 里；Design 已经划好的边界不要再列成一串「不写……」交给它——它会把禁令变成旁白里的否定句。抽取一份 Source 先调 source_coverage：它给出在章标题处切好的分段与照分段抽取的计划。同一次回复里的多个 source-reader、带 beatRange 的 source-extractor 同时执行，其余一次一个。",
 		parameters: DelegateSchema,
 		replay: "reconcile",
 		// 并行只给写入不重叠的：读原文各写各的笔记；分段抽取与补全各写自己号段的 Beat 与笔记。writer 不并行——
@@ -389,7 +390,10 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 			compactContextTool(() => workSnapshot(session, "压缩上下文")),
 			checkTool(handle.scan),
 			frameTool(handle.scan),
-			...sourceTools(handle, { segmentCodePoints: () => segmentCodePoints(session) }),
+			...sourceTools(handle, {
+				segmentCodePoints: () => segmentCodePoints(session),
+				extractionPlan: SOURCE_EXTRACTION_PLAN,
+			}),
 			delegation(session, handle),
 			review(session, handle),
 			{

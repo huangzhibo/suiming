@@ -45,6 +45,8 @@ export interface SourceToolOptions {
 	 * 分段抽取与补全时一段原文要和整份 Beat 一起装进上下文。拿不到窗口时不给。
 	 */
 	segmentCodePoints?: () => Promise<number | undefined>;
+	/** 根 Agent 的抽取计划，随 segments 一起给；子任务不派任务，不给。 */
+	extractionPlan?: string;
 }
 
 export function sourceTools(handle: TaskHandle, options: SourceToolOptions = {}): HarnessTool[] {
@@ -94,7 +96,7 @@ export function sourceTools(handle: TaskHandle, options: SourceToolOptions = {})
 		freezeReadTool({
 			name: "source_coverage",
 			description:
-				"查询一个 Source 的原文读到了哪些范围、还缺哪些、笔记应写的 material_sha256，以及分段抽取的现成分段 segments（在章标题处切好的 span 与不重叠的 beatRange，每段不超过 segmentCodePoints）。",
+				"查询一个 Source 的原文读到了哪些范围、还缺哪些、笔记应写的 material_sha256，以及分段抽取的现成分段 segments（在章标题处切好的 span 与不重叠的 beatRange，每段不超过 segmentCodePoints）；根 Agent 还会拿到照这些分段抽取的计划 extractionPlan。",
 			parameters: SourceSchema,
 			async execute(_id, params) {
 				try {
@@ -107,6 +109,7 @@ export function sourceTools(handle: TaskHandle, options: SourceToolOptions = {})
 						...coverage,
 						segmentCodePoints: segment,
 						segments: materialSegments(material.text, segment),
+						...(options.extractionPlan === undefined ? {} : { extractionPlan: options.extractionPlan }),
 					});
 				} catch (error) {
 					if (error instanceof ArtifactError) throw new ToolRejection(error.code, error.message, { cause: error });

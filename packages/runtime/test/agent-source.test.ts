@@ -944,9 +944,21 @@ test("带号段的 source-extractor 同一次回复里并行；不带范围的�
 		);
 		assert.equal(outcome.failure, undefined);
 		// faux 模型的窗口是 128000，分段取两成（中文约一字一 token）
-		const plan = JSON.parse(coverage) as { segmentCodePoints?: number; segments?: unknown };
+		const plan = JSON.parse(coverage) as { segmentCodePoints?: number; segments?: unknown; extractionPlan?: string };
 		assert.equal(plan.segmentCodePoints, 25600);
 		assert.deepEqual(plan.segments, [{ span: [0, total], beatRange: { from: 1, to: 9999 } }], "一段装得下就一段");
+		// 抽取计划跟着分段交给根 Agent（2026-10-05 之前常驻在 delegate 的说明里）
+		const steps = plan.extractionPlan ?? "";
+		assert.match(steps, /分段抽取.*整合.*补全.*统一修.*review 一轮/u);
+		// 10-03 重抽：能并行之后根 Agent 仍先派一个 source-reader 试水，等它读完（11 分半）才一次派出其余五个，
+		// 读原文的时间翻了一倍。Codex 与 Claude Code 都在提示里明说「能并行就一起派」，只写「会同时执行」模型不会主动这么做。
+		assert.match(steps, /同一次回复里一起派出/u);
+		assert.match(steps, /不要先派一段试水/u);
+		// 10-03 前 12 章第三圈：一段装得下，根 Agent 派了一个不带范围的抽取，没人写笔记，只好自己把原文读一遍补覆盖
+		assert.match(steps, /只有一段也这样派：笔记由它写/u);
+		// 10-03 前 24 章：根 Agent 只派了第一段，goal 里要它「说明本段引向下一段的状态」，打算串行交接
+		assert.match(steps, /segments 的每一段各委派一个/u);
+		assert.match(steps, /不要让前一段给后一段交代状态/u);
 		const tasks = project
 			.loadExecutionState()
 			.tasks.filter((task) => task.status === "completed")
