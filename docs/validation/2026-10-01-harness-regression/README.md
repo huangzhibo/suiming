@@ -280,3 +280,14 @@ Write Context 补上 world/core 与只在硬状态变化里出现的参与者（
 - **隐式写回 3 / 3**：改情节的要求里顺口带的「年过五十、左臂旧伤」三次都写回了 beat-0002 之外的文件。
 - **write-text #3**：自发审了一次稿，那条正文 finding 的引文锚不到段落（0 / 1）。submit_review 校验时引文在文件里；之后 Agent 按意见修订了正文，引文落到旧稿上的可能性最大，记作观察，不算退化。这一次还读了作品根目录的 AGENTS.md 与 CLAUDE.md（host 接入文件，读不受限、不自动加载）。
 - review 三次的正文 finding 都锚到了段落（各 1 / 1）。
+
+## 顶层审查后的修正（2026-10-05）
+
+审查后改了工具说明（删 `read_result`、抽取计划挪进 `source_coverage` 的结果、writer 的 brief 不再要篇幅依据）、子任务的模型绑定（没单独配置的角色跟随对话的模型）与 loop（子任务开场过压缩线不发请求、作者停下的子任务交回根 Agent）。分两次跑，每个任务 1 次，没有作废：
+
+| 构建 | 范围 | 结果 |
+| --- | --- | --- |
+| `6e6f962`（dist `daf3c0ddec354adf`） | 全套 6 个 | 6 / 6，$0.44；discuss 45 s、check-issues 45 s、design-edit 67 s、review 98 s、write-text 189 s、delegate-writer-issues 283 s |
+| `2a8e3ab`（dist `e13e32e96638ad61`） | writer 组 3 个 | 3 / 3，$0.26；review 84 s、write-text 181 s、delegate-writer-issues 209 s |
+
+写正文与委派写手比基线（326–398 s、336–384 s）快，与「委派前不必先取写作依据」的改动方向一致；只各跑 1 次，记作观察，不当结论。作者停下子任务的新路径与委派超窗的拦截在回归里触发不到，由 `agent.test.ts` 的 faux 测试守着。
