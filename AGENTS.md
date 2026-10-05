@@ -49,7 +49,7 @@ Story Language 与 TypeBox schema 分别是 artifact 语义和机器边界的真
 - `packages/sdk` 持有命令目录。**目前是三份而不是一份**（`SUIM_CLI_COMMANDS` / `LOCAL_COMMANDS` / `DOMAIN_API_ROUTES`），传输适配也不是生成的；已经合一的是它们共用的部分：领域对象 schema 只在 `domain-schema.ts` 定义一次，Session 摘要 / 作品状态 / Checker 结果 / revision 摘要各只有一份投影，同名命令只允许一份 payload（例外是 `project.diff` 与 `session.send` / `resume` / `interrupt`：CLI 同步跑完一轮、桌面异步回执，理由写在 `packages/sdk/test/domain-schema.test.ts`）。全量改名与自动生成刻意不做，理由见[系统架构](docs/architecture.md)——不要把这条读成「已经是一份」。只有一个 agent loop（`runTaskLoop`）、一个合并函数（`mergeOpenStoryFiles`）、一个 artifact 搜索函数（`searchStoryCandidate`；原文按字查找另走 `findInMaterial`）、一个 Review 能力实现（`harness/review-task.ts`）；审稿是 `review/<id>.md`、材料笔记是 `source/<id>/notes/<n>.md`，两者都是普通 artifact，时效与覆盖率按需从历史派生（`artifact/derived.ts`）。
 - 标准事件 schema 复用上游，Suiming 扩展用自己的 TypeBox 边界。事件带持久序号，对外消息可恢复（Cloud 的事件存储随执行 adapter 已删，解冻时按同一契约重建）；完整 Story Artifact 与 diff 不进入事件流，客户端 view state 不是运行真源。
 - Cloud 以 PostgreSQL 保存 Canon（Project、ArtifactVersion、ProjectRevision）与同步元数据，以 S3-compatible Object Storage 保存大对象；没有执行数据（见不变量 9）。本地不同构：作品版本在作品目录的 git 仓里，SQLite 与 content-addressed object directory 只承担执行数据与执行对象。详细模型 trace 通过 OpenTelemetry 发送到可替换后端。
-- Fastify + TypeBox 定义 Cloud Domain API。桌面 `apps/desktop` 的主进程持有 Runtime 与凭据，`apps/web` 的 React + Vite 工作台经 typed IPC 接入；TanStack Query 管领域查询，AG-UI 官方客户端（`@ag-ui/client`）管消息 view state，只用它拼消息，不用它的 run 与 HTTP 传输。首个真实 IPC 切片验证恢复与交互；重载 renderer 不停正在跑的 turn，明确退出应用则保存并有界结束，重开恢复。CLI 拥有 `suim` 与 machine contract。
+- Fastify + TypeBox 定义 Cloud Domain API。桌面 `apps/desktop` 的主进程持有 Runtime 与凭据，`apps/workbench` 的 React + Vite 工作台经 typed IPC 接入；TanStack Query 管领域查询，AG-UI 官方客户端（`@ag-ui/client`）管消息 view state，只用它拼消息，不用它的 run 与 HTTP 传输。首个真实 IPC 切片验证恢复与交互；重载 renderer 不停正在跑的 turn，明确退出应用则保存并有界结束，重开恢复。CLI 拥有 `suim` 与 machine contract。
 - 核心执行由 Suiming 自行实现，pi-ai 只承担模型调用与协议；Codex / Claude Code / Grok 继续作为 host-native 入口，不构建 managed 第二后端或多引擎抽象。新版 pi 已有持久 Harness，不能用旧版本占位代码作为自建理由；不宣称自建自动带来更高质量、更低成本或独占可视化能力。
 - 凭据按 provider 实际认证、额度与限制接入，删除仅凭订阅标签禁止 automation 的判断及无独立用途的配置；未验证的登录、刷新或调用方式不标为支持，不能宣称另一产品订阅可直接用于标准 API。
 - Codex / Claude Code / Grok integrations 是一等本地入口，但只是各 host 的薄 instruction / Skill / command adapter。host 可以直接修改 checkout；`suim commit` 扫描实际文件 diff 并在 Runtime 内部构造 ChangeSet，adapter 和模型都不手写 ChangeSet，也不直接读写 `.suiming`。CLI 还必须为 host 暴露 Context、Search、Source、Design impact、Review、Release 与 Cloud 等经过验证的领域能力，不能只剩通用文件命令。
@@ -87,7 +87,7 @@ npm link -w @suiming/cli   # 全局 suim 指向本仓；旧仓同名，只能有
 npm run dev:api      # Cloud 开发进程（只剩 Canon 与同步），读 .env
 node --import tsx apps/cli/src/bin.ts --json status    # 从源码跑 suim
 npm run test:desktop   # 构建 renderer + 真实 Electron E2E；只改测试时可直接 node --import tsx --test apps/desktop/test/desktop.test.ts
-cd apps/web && npx shadcn@latest add <component>   # 生成 shadcn/ui 组件到 src/components/ui，之后跑 npm run format
+cd apps/workbench && npx shadcn@latest add <component>   # 生成 shadcn/ui 组件到 src/components/ui，之后跑 npm run format
 npm run regression:harness -- --only check --trials 1   # 真实模型回归，--only 可写任务名或分组（writer / design / check / smoke），节奏见下
 ```
 
@@ -104,7 +104,7 @@ npm run regression:harness -- --only check --trials 1   # 真实模型回归，-
 - check-story-isolation：packages/story/src 是白名单，只能 import 相对路径、`typebox`、`yaml` 与 `node:crypto`，也不能用 fetch、process、`Date.now`、无参 `new Date()`、`Math.random`；story 真要加依赖，先判断它是不是纯领域，再改脚本的白名单。
 - check-examples：`examples/` 下每部示例作品都要过 Checker（与 `suim check` 同一个判定，不要求全书写完）。Story Language 改了，示例跟着改；示例是给第一次打开的人看的，不能是检查不通过的作品。
 - check-host-integrations：要核对的命令片段由脚本从 `SUIM_CLI_COMMANDS` 生成（`cloud.*` 除外），增删 `suim` 子命令时只需让 SKILL.md 写出对应的 `suim --json <命令>`，不用改脚本；三个 host README 也要含安装路径与 smoke check。
-- check:design-system 是 `apps/web` 的 ESLint，与 biome 的分工见 [apps/web/AGENTS.md](apps/web/AGENTS.md)。
+- check:design-system 是 `apps/workbench` 的 ESLint，与 biome 的分工见 [apps/workbench/AGENTS.md](apps/workbench/AGENTS.md)。
 - biome 只覆盖 apps/*/{src,test}、packages/*/{src,test}、scripts/*.mjs；tab 缩进，行宽 120。tsconfig 开了 exactOptionalPropertyTypes、noUncheckedIndexedAccess、verbatimModuleSyntax：NodeNext 相对 import 写 `.js` 后缀，类型用 `import type`，可选属性不能显式赋 undefined。
 
 ## 提交与完成规则
@@ -113,7 +113,7 @@ npm run regression:harness -- --only check --trials 1   # 真实模型回归，-
 - 每个任务先补验收测试，再更新当前状态；未经真实模型验证的能力留在「机制」等级，不写成已完成。验收与风险相称：恢复与事务用故障注入，界面用真实交互，文档修改查链接与规范一致性。
 - 完成一步后各更新一处，三份各管一样：docs/current-status.md 管能力、已知缺陷与测试数；docs/roadmap.md 第 6 节管队列；docs/changelog.md 管发生了什么。AGENTS.md「当前阶段」与 README 顶部「当前状态」引用块只写阶段级摘要并链接，只在阶段变化时改——以前要求同步四处，四份副本照样漂移了。
 - 提交信息用 `type(scope): 中文摘要`，Harness 切片字母或 ADR 编号放在结尾括号，如 `（C）`、`（ADR-0013）`。正文写为什么；删除测试时写明它守的是什么、为什么不再需要。
-- 设计原型不进生产 `apps/web`，直到视觉方向被选定；生产代码不复制 mock domain model。
+- 设计原型不进生产 `apps/workbench`，直到视觉方向被选定；生产代码不复制 mock domain model。
 - 不提交 .env、API key、Langfuse key、Local SQLite、trace payload、真实用户数据或未脱敏作品。
 - 仓库是公开的：文档不写作者所在地区、代理出口与本机路径；作品副本放在哪个目录这类维护者本机信息不进仓库。
 
@@ -134,7 +134,7 @@ npm run regression:harness -- --only check --trials 1   # 真实模型回归，-
 
 只在某个目录用得上的约定写在该目录的 AGENTS.md。Claude Code 读到那个目录里的文件时自动加载；Codex 只自动读工作目录到仓库根这一路上的 AGENTS.md，改别的目录前要自己读。
 
-- [apps/web/AGENTS.md](apps/web/AGENTS.md)：界面与设计系统 lint
+- [apps/workbench/AGENTS.md](apps/workbench/AGENTS.md)：界面与设计系统 lint
 - [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md)：主进程与 IPC、桌面 E2E
 - [packages/runtime/AGENTS.md](packages/runtime/AGENTS.md)：真实模型调用与回归、模型与凭据、Harness 与执行、Canon、目录与存储
 - [packages/cloud-postgres/AGENTS.md](packages/cloud-postgres/AGENTS.md)：Cloud schema 与默认 skip 的集成测试

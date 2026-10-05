@@ -6,7 +6,7 @@ import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { Locator } from "playwright";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
-import type { WorkspaceLayout } from "../../web/src/workspace-layout.js";
+import type { WorkspaceLayout } from "../../workbench/src/workspace-layout.js";
 import { collectPageErrors, launchDesktop } from "./launch.js";
 
 test("统一文档：文件树准确切换设计与正文，草稿分别保存，旧文件标签恢复且错误格式可修复", {

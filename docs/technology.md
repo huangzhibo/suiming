@@ -14,7 +14,7 @@
 | Monorepo | npm 11 Workspaces | 少量 app/package 的直接管理；暂不引入 Turborepo/Nx |
 | API | Fastify + TypeBox + OpenAPI | Cloud Domain API、鉴权与类型化诊断 |
 | 工作台前端 | React 19 + Vite + TanStack Query + shadcn/ui + Streamdown（Markdown 渲染，含流式）+ CodeMirror 6（源码编辑与 merge 比较） | 桌面首先实现，后续 Cloud Web 复用作品编辑与复杂视图；正文、设计文档与 Agent 消息共用一条 Markdown 管线 |
-| 基础 UI 控件 | shadcn/ui（底层原语是 Radix）+ Tailwind v4；已接入 `apps/web`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么暂不换成 Base UI 见下文「暂不采用」 |
+| 基础 UI 控件 | shadcn/ui（底层原语是 Radix）+ Tailwind v4；已接入 `apps/workbench`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么暂不换成 Base UI 见下文「暂不采用」 |
 | AI 交互客户端 | AG-UI 官方客户端 `@ag-ui/client`（2026-10-05 起，替换 TanStack AI）；已接 typed IPC | 把 AG-UI 事件拼成消息、按运行生命周期校验整条流；只实现长连接的 `connect()`，不用它的 `run()` 与 HTTP 传输 |
 | Desktop | Electron 42；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
 | CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation 与 Cloud sync |
@@ -44,7 +44,7 @@ Cloud Domain API 同时服务 Web、本地同步和远程外部 Agent，不能�
 
 作者端是对话、编辑、长运行、筛选、diff 和派生视图密集的应用，不以 SEO 为主。TanStack Query 管理经 typed IPC 读到的领域数据，Vite 保持构建和部署直接。导航不用路由库：打开了哪些标签、每个标签的后退记录、侧栏与选中对象都在 `WorkbenchState` 里，按作品存在本机；为什么删掉 TanStack Router 见下文「暂不引入」。
 
-renderer 用 `@ag-ui/client` 管理对外消息（`apps/web/src/desktop-agent.ts` 的 `DesktopAgent` 只实现 `connect()`，事件来自 IPC 的只读 attach），Query 读取作品、版本、Review 和持久 session。Suiming 编写业务 activity / diff / Review 组件和 typed IPC 事件流；启动与恢复通过唯一命令，attach 只读。客户端的 stop / retry 不决定后台生命周期，也不因客户端限制改动领域语义。
+renderer 用 `@ag-ui/client` 管理对外消息（`apps/workbench/src/desktop-agent.ts` 的 `DesktopAgent` 只实现 `connect()`，事件来自 IPC 的只读 attach），Query 读取作品、版本、Review 和持久 session。Suiming 编写业务 activity / diff / Review 组件和 typed IPC 事件流；启动与恢复通过唯一命令，attach 只读。客户端的 stop / retry 不决定后台生命周期，也不因客户端限制改动领域语义。
 
 **为什么从 TanStack AI 换成 `@ag-ui/client`（2026-10-05）。**TanStack AI 在本仓只用来拼消息：`useChat` 的 `send` 抛错、`isLoading` 恒为 false，它还内嵌另一份 `@ag-ui/core`（0.1.1-canary），`bridge.ts` 靠一次类型强转把两边接起来。AG-UI 的 core 与 client 到了 1.0，换过来之后全链路只剩一份协议版本，拼消息用协议自带的那份逻辑。代价是多了 RxJS 等依赖、没有官方 React 层（自己写了 `useConversation`）；以及官方客户端按运行生命周期校验整条流，Runtime 因此改成每个事件都落在某次运行之内（新建 session 不再发 `suiming.session`，没跑过的对话快照为空，`run-event-stream.test.ts` 守着）。sdk 与 web 的 AG-UI 版本要一起升。
 
@@ -54,7 +54,7 @@ renderer 用 `@ag-ui/client` 管理对外消息（`apps/web/src/desktop-agent.ts
 
 ### Electron 桌面与执行底座
 
-Electron 是核心作者应用；`apps/desktop` 承载主进程 / preload，`apps/web` 承载首先用于桌面的共享 React 工作台。Runtime、Local Store、凭据与 session owner 位于主进程，renderer 经受限 typed IPC 调用同一命令目录；不建立 localhost server，不把 Node Runtime 放进 renderer。CPU 密集的纯计算可移出主线程，不复制运行状态机。
+Electron 是核心作者应用；`apps/desktop` 承载主进程 / preload，`apps/workbench` 承载首先用于桌面的共享 React 工作台。Runtime、Local Store、凭据与 session owner 位于主进程，renderer 经受限 typed IPC 调用同一命令目录；不建立 localhost server，不把 Node Runtime 放进 renderer。CPU 密集的纯计算可移出主线程，不复制运行状态机。
 
 执行用自有 SuimingHarness，pi-ai 只提供模型协议（为什么自建见 [Harness 设计](harness-design.md)第 1 节）。自有 Harness 的可靠性通过本项目故障注入与实际运行验收，不从可修改性推导更优质量或更低成本。Agent 拿到的是受限文件工具，没有通用 bash 工具（[系统架构](architecture.md) 6.2）。
 

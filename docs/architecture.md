@@ -216,7 +216,7 @@ integrations/{codex,claude-code,grok}
 
 - 包的依赖边界（`packages/story` 不碰网络与数据库、`packages/runtime` deployment-neutral、Cloud adapter 只依赖 Runtime port）见 AGENTS.md「工程边界」；story 的隔离由 `scripts/check-story-isolation.mjs` 强制。
 - runtime 的 deployment-neutral 靠端口做实：`SuimingHarnessOptions.project` 的类型曾是具体类 `LocalProjectService`，那才是 Cloud 接不进来的直接原因。现在它依赖 `HarnessProjectPort`，`harness/` 对 `local/` 的 import 归零，由 `project-port.test.ts` 钉住。
-- `apps/desktop` 是主进程（Runtime、凭据、session owner），`apps/web` 是它的 renderer，也留给后续 Cloud Web 复用。
+- `apps/desktop` 是主进程（Runtime、凭据、session owner），`apps/workbench` 是它的 renderer，也留给后续 Cloud Web 复用。两者互不 import，只经 preload 挂的 `window.suiming` 通信，契约是 `@suiming/sdk` 的 `DesktopBridge`；renderer 只依赖 sdk，碰不到 Runtime 与凭据，这是分成两个目录的用处。renderer 2026-10-05 之前叫 `apps/web`：它离开桌面打不开，monorepo 里 `apps/web` 却通常是网站；也没叫 `ui`，那通常是共用组件库（将来抽出桌面与 Cloud Web 共用的组件，`packages/ui` 正是它的位置）。`workbench` 与文档里的「作者工作台」、代码里的 `WorkbenchState` 是同一个词。
 - `packages/eval` 在 M6 有真实 Dataset 后才创建，现在不存在。
 - `integrations/*` 是共用一份 Skill 的薄安装入口，内容由 `npm run generate:host-files` 生成进 `apps/cli/src/host-files.ts`。
 

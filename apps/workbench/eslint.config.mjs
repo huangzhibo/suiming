@@ -3,7 +3,7 @@ import tsParser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 
 /**
- * `@shadcn/lint` 的接线，只覆盖 `apps/web`——全仓只有它用 Tailwind v4 与 shadcn/ui。
+ * `@shadcn/lint` 的接线，只覆盖 `apps/workbench`——全仓只有它用 Tailwind v4 与 shadcn/ui。
  *
  * 通用 lint 与格式仍然全部归 biome（根 `biome.json`，覆盖 `apps/*​/src` 与 `packages/*​/src`）。
  * 这里的 ESLint **只跑设计系统规则**，不接管 biome 的任何一条：两者的规则面没有重叠，
@@ -13,7 +13,7 @@ import { defineConfig } from "eslint/config";
  * `no-inline-styles`、`no-unknown-classes`、`require-static-classes`）尚未开，选项见 https://github.com/shadcn-ui/lint/blob/main/docs/rules.md，
  * 开哪几条、允许什么，由作者定。加规则就写进下面的 `rules`。
  *
- * 组件与主题由插件自己从 `apps/web/components.json` 发现（`@/components/ui` 与 `src/style.css`），
+ * 组件与主题由插件自己从 `apps/workbench/components.json` 发现（`@/components/ui` 与 `src/style.css`），
  * 所以这里没有 `settings.shadcn`；只有在组件搬出默认位置、或要认别的 merge / variant 函数时才需要加。
  */
 export default defineConfig([

@@ -8,7 +8,7 @@
 
 状态：需要改进。委托选择器与独立状态行重复显示「正在推进」；Intent 固定卡、用量、计划、消息角色标签和展开日志挤占对话。69 项执行记录缺少对象名称，文件内容片段比当前判断更显眼。保留复制、引用和回到最新的能力是合理的，但不应让辅助控件成为阅读主线。
 
-源码证据：[AgentPanel](../../../apps/web/src/agent-panel.tsx) 分别渲染选择器、Intent 和状态行；[Transcript](../../../apps/web/src/agent-transcript.tsx) 展开后直接逐项显示 activity.summary，并因组内任一失败自动展开整组；[loop](../../../packages/runtime/src/harness/loop.ts) 的 summarize 仅截取工具输出前 200 字，不是面向作者的动作摘要。
+源码证据：[AgentPanel](../../../apps/workbench/src/agent-panel.tsx) 分别渲染选择器、Intent 和状态行；[Transcript](../../../apps/workbench/src/agent-transcript.tsx) 展开后直接逐项显示 activity.summary，并因组内任一失败自动展开整组；[loop](../../../packages/runtime/src/harness/loop.ts) 的 summarize 仅截取工具输出前 200 字，不是面向作者的动作摘要。
 
 建议：标题与状态只保留一处；创作约束、用量及执行详情放入明确命名的菜单分组；真实多步计划按需出现，避免把唯一 Agent Task 当作有用计划。连续读取按对象和动作聚合为可展开的一行，二级展示文件名称，三级才查看原始内容；失败突出失败项，不展开全部成功项。作者决策、阶段成果与最终回答优先呈现。对外进度与交付跟随作者语言，术语在必要时保留。
 

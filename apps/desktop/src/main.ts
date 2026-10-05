@@ -21,7 +21,7 @@ import { type DesktopCommandFailure, LOCAL_COMMANDS, type LocalCommandName, type
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const renderer = resolve(here, "../../web/dist/index.html");
+const renderer = resolve(here, "../../workbench/dist/index.html");
 const rendererURL = pathToFileURL(renderer).href;
 /** 主进程给窗口的回复：错误不经 Electron 的远程调用包装，窗口拿到的就是能直接展示的话。 */
 type Reply<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } };

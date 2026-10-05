@@ -179,13 +179,13 @@ contracts.resolve → 奉天子以止乱
 - 不为了画图要求作者补字段。泳道对缺失字段显示"未记录"，不显示 false。
 - 没有坐标数据时不画精确地图；地点引用不证明人物到过那里。发布章节来自 Release，不把 Beat 直接当章节。
 - 不把重排 Beat 做成拖画布：顺序改变必须经 `workspace.file.save` 与 Checker，视图只能发起命令。
-- 不做 Cloud Web 版本；视图组件写在 `apps/web`，Cloud 解冻后自然复用。
+- 不做 Cloud Web 版本；视图组件写在 `apps/workbench`，Cloud 解冻后自然复用。
 
 ## 7. 实现顺序与验收
 
 全部在 renderer 内完成，数据来自 `workspace.show` 与 `workspace.reviews` 已有投影，不需要新的 Runtime 通道。SVG 由 React 直接生成，坐标是线性映射，不引入布局库。
 
-第 1–4 步已于 2026-09-09 落地（`apps/web/src/axis/`），eval-022 上的脚本化验收见[可视化操作验收](validation/2026-09-09-visualization.md)；作者本人在自己作品上的解释负担还没验收。
+第 1–4 步已于 2026-09-09 落地（`apps/workbench/src/axis/`），eval-022 上的脚本化验收见[可视化操作验收](validation/2026-09-09-visualization.md)；作者本人在自己作品上的解释负担还没验收。
 
 1. **故事轴骨架**（替换谱页，已落地）：卷分段、Beat 列、覆盖与审稿泳道、承诺泳道、Beat 选择拖动、卷 / 全书缩放。验收：样例作品 E2E 能点 Beat 打开页面、改变轴选择不影响全书引用计数，显式查询才读取状态；eval-022 上第一卷的 Beat 列顺序是 `1 68 2 3 4 5 69 6 7`，与 index.yaml 一致。
 2. **因果弧与人物泳道**（已落地）：`refs.beat` 弧线、人物在场 / 死亡 / 秘密 / 位置、折叠与展开。验收：eval-022 上诸葛亮首次出现的卷与 Beat 与原文一致；点 beat-0039 只剩与它相关的弧。

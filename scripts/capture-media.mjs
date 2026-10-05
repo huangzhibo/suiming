@@ -2,7 +2,7 @@
  * 用真实桌面应用给一部作品截宣传图、录动图。界面改了重跑这一个脚本即可，不手工截图。
  *
  * 用法：
- *   npm run build:desktop          # 先构建：脚本驱动的是 apps/desktop 与 apps/web/dist
+ *   npm run build:desktop          # 先构建：脚本驱动的是 apps/desktop 与 apps/workbench/dist
  *   node scripts/capture-media.mjs --work <作品目录> --plan <分镜.json> --out <输出目录> [--video]
  *
  * 分镜文件写这部作品里要点的东西（名字按界面上显示的写）：

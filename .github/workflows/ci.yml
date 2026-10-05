@@ -30,7 +30,7 @@ jobs:
       # check 里的 tsc -b 会 emit dist；测试与 CLI 的跨包 import 走 dist，所以必须先 check 再 test。
       - run: npm run check
       # check 里只有 renderer 的 tsc；vite 生产构建坏了（依赖、CSS、打包配置）只有这一步看得出来。几秒钟。
-      - run: npm run build --workspace @suiming/web
+      - run: npm run build --workspace @suiming/workbench
       # 需要真实 PostgreSQL / S3 / 双进程的 5 个用例没有对应环境变量时自动跳过；
       # 另有一条读维护者本机作品副本的用例，找不到时也跳过。
       - run: npm test

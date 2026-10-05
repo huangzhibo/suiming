@@ -24,7 +24,7 @@
 | 自主 Agent：读、写、检查、委派、独立 Review、提交 | `harness/agent.ts` | 真实调用：基线里一节正文、一次审稿与按审稿修订；斗破前 120 章分段忠实抽取（并行委派、Source 审稿，[记录](validation/2026-10-03-doupo-segmented/README.md)）与留出评测的正文（[记录](validation/2026-10-03-doupo-mini/README.md)）；《三国演义》前五十回抽取到整合（[记录](validation/2026-10-04-sanguo-example/README.md)） |
 | 正文 / 审稿时效、Source 覆盖率 | `artifact/derived.ts` | 真实调用：审稿时效在基线同一场景上验过 |
 | AG-UI 事件、只读 attach、桌面 typed IPC | `sdk/run-event.ts`、`apps/desktop` | 机制与 Electron E2E |
-| 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/web` | Electron E2E（faux）与 eval-022 上的人工验收 |
+| 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/workbench` | Electron E2E（faux）与 eval-022 上的人工验收 |
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | Cloud Canon 与显式同步 | `packages/cloud-*`、`apps/api` | 机制；真实 PostgreSQL 18.6 与 MinIO 上 11 项集成测试 2026-09-30 真跑通过 |

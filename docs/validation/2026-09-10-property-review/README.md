@@ -14,7 +14,7 @@
 - 值 `true` 没有表达本节造成的故事变化；默认视图应保留作用域并给出确定性中文表达。
 - 引用呈现为按钮，承诺单独着色，非文件秘密又像不能点击的按钮，交互外观不够一致。
 
-源码依据：[Props](../../../apps/web/src/pages.tsx) 将所有属性统一渲染成行；审查时的 `propRows` 递归扁平化对象并将标量转为字符串；已替换为 [propertyRows](../../../apps/web/src/artifact-properties.ts)。问题既有样式因素，也有信息表达因素。
+源码依据：[Props](../../../apps/workbench/src/pages.tsx) 将所有属性统一渲染成行；审查时的 `propRows` 递归扁平化对象并将标量转为字符串；已替换为 [propertyRows](../../../apps/workbench/src/artifact-properties.ts)。问题既有样式因素，也有信息表达因素。
 
 ## 2. Obsidian：布局较轻，复杂值仍需解读
 

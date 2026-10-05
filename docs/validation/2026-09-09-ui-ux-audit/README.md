@@ -147,10 +147,10 @@
 
 ## 实现定位
 
-- 审稿固定顶部与证据布局：[pages.tsx](../../../apps/web/src/pages.tsx)。
-- 未发送目标与引用仅存在组件状态：[workspace.tsx](../../../apps/web/src/workspace.tsx)。
-- 展开右栏强制切回 Agent：[workspace.tsx](../../../apps/web/src/workspace.tsx)。
-- 固定左右栏尺寸：[workspace.tsx](../../../apps/web/src/workspace.tsx)；应用最小尺寸：[main.ts](../../../apps/desktop/src/main.ts)。
-- 对象搜索范围：[left-pane.tsx](../../../apps/web/src/left-pane.tsx)。
-- 引用只显示首行：[agent-panel.tsx](../../../apps/web/src/agent-panel.tsx)。
+- 审稿固定顶部与证据布局：[pages.tsx](../../../apps/workbench/src/pages.tsx)。
+- 未发送目标与引用仅存在组件状态：[workspace.tsx](../../../apps/workbench/src/workspace.tsx)。
+- 展开右栏强制切回 Agent：[workspace.tsx](../../../apps/workbench/src/workspace.tsx)。
+- 固定左右栏尺寸：[workspace.tsx](../../../apps/workbench/src/workspace.tsx)；应用最小尺寸：[main.ts](../../../apps/desktop/src/main.ts)。
+- 对象搜索范围：[left-pane.tsx](../../../apps/workbench/src/left-pane.tsx)。
+- 引用只显示首行：[agent-panel.tsx](../../../apps/workbench/src/agent-panel.tsx)。
 - 版本差异按 `story` 分类过滤：[local-workspace.ts](../../../packages/runtime/src/local/local-workspace.ts)。

@@ -25,4 +25,4 @@ Beat 的作品页与源文件页原本使用同一份内容、草稿和编辑器
 - 6 条 Electron 流程通过：统一文档、内容意图与分屏、导航与文件、悬停提示、编辑 CAS 与 typed IPC、独立版本比较。统一文档流程另补验了 YAML 文件预览、设计与正文分别保存、旧文件编辑标签重载、无效 frontmatter 修复。
 - 前端与测试类型检查、Vite 构建、相关文件 Biome、文档链接与差异空白检查通过。构建仍有既存的大 chunk 提示。
 
-实现入口：[文档导航](../../../apps/web/src/document-navigation.ts)、[工作区恢复](../../../apps/web/src/workspace-layout.ts)、[页面工具栏](../../../apps/web/src/document-toolbar.tsx)。
+实现入口：[文档导航](../../../apps/workbench/src/document-navigation.ts)、[工作区恢复](../../../apps/workbench/src/workspace-layout.ts)、[页面工具栏](../../../apps/workbench/src/document-toolbar.tsx)。

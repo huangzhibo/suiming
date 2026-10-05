@@ -23,7 +23,7 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import { parseReviewFile } from "@suiming/story";
-import { anchorParagraphs } from "../apps/web/src/anchors.ts";
+import { anchorParagraphs } from "../apps/workbench/src/anchors.ts";
 import { sampleWorkFiles } from "../packages/runtime/test/sample-work.ts";
 
 const run = promisify(execFile);
@@ -105,7 +105,7 @@ const VOID_MESSAGE =
 /**
  * 审稿引文能不能锚回正文段落。引文是否出自锚定文件，submit_review 已经确定性地校验（review-authoring 的
  * quoteMissing），这里不重复；量的是工作台要做的那一步：锚在正文上的 finding，引文能不能落到某一段
- * （与 apps/web/src/anchors.ts 同一条规则）。锚在 Design 等其它文件上的 finding 只锚文件，不计入。
+ * （与 apps/workbench/src/anchors.ts 同一条规则）。锚在 Design 等其它文件上的 finding 只锚文件，不计入。
  */
 async function reviewAnchors(dir) {
 	const files = (await readdir(join(dir, "review")).catch(() => [])).filter((name) => name.endsWith(".md"));
