@@ -83,32 +83,38 @@ type Activity = {
 	target?: string;
 	summary?: string;
 };
-/** 活动的 target 可能是路径、Beat id、检索词或结果 id；只有真实作品路径才做成可打开的链接。 */
+/**
+ * 活动的 target 可能是路径、Beat id、检索词或结果 id；只有真实作品路径才做成可打开的链接，显示作品标题，
+ * 路径放进提示。2026-10-05 之前显示路径，作者看到一列 outline/story/vol-0009/beat-0440.md，认不出是哪一节。
+ */
 function ActivityTarget({
 	target,
-	paths,
+	titles,
 	open,
 }: {
 	target: string | undefined;
-	paths: ReadonlySet<string>;
+	titles: ReadonlyMap<string, string>;
 	open(path: string): void;
 }) {
 	if (!target) return null;
-	if (!paths.has(target)) return <>{target}</>;
+	const title = titles.get(target);
+	if (title === undefined) return <>{target}</>;
 	return (
-		<button
-			type="button"
-			className="underline underline-offset-2 hover:text-foreground"
-			data-page={target}
-			onClick={(event) => {
-				// summary 自己会切换 details，打开作品不应顺带折叠这条活动。
-				event.preventDefault();
-				event.stopPropagation();
-				open(target);
-			}}
-		>
-			{target}
-		</button>
+		<Hint content={target}>
+			<button
+				type="button"
+				className="underline underline-offset-2 hover:text-foreground"
+				data-page={target}
+				onClick={(event) => {
+					// summary 自己会切换 details，打开作品不应顺带折叠这条活动。
+					event.preventDefault();
+					event.stopPropagation();
+					open(target);
+				}}
+			>
+				{title || target}
+			</button>
+		</Hint>
 	);
 }
 
@@ -121,7 +127,7 @@ export function Transcript({
 	sessionId,
 	history = false,
 	showLog,
-	paths,
+	titles,
 	open,
 	onExport,
 	onReference,
@@ -129,13 +135,13 @@ export function Transcript({
 	sessionId: string;
 	history?: boolean;
 	showLog: boolean;
-	/** 当前作品的全部文件路径；Agent 提到其中之一时才渲染成可打开的链接。 */
-	paths: ReadonlySet<string>;
+	/** 当前作品的全部文件路径与显示标题；Agent 提到其中之一时才渲染成可打开的链接。 */
+	titles: ReadonlyMap<string, string>;
 	open(path: string): void;
 	onExport(sessionId: string, text: string): void;
 	onReference(id: string, text: string): void;
 }) {
-	const links = useMemo(() => new Map([...paths].map((path) => [path, () => open(path)])), [paths, open]);
+	const links = useMemo(() => new Map([...titles.keys()].map((path) => [path, () => open(path)])), [titles, open]);
 	const [activities, setActivities] = useState<Record<string, Activity>>({});
 	const [summaries, setSummaries] = useState<Record<string, { sequence: number; summary: SuimingTurnSummary }>>({});
 	const [order, setOrder] = useState<Record<string, number>>({});
@@ -266,7 +272,7 @@ export function Transcript({
 									<span className="min-w-0 truncate">
 										{actionLabels[activity.label] ?? activity.label}
 										{activity.target ? " · " : ""}
-										<ActivityTarget target={activity.target} paths={paths} open={open} />
+										<ActivityTarget target={activity.target} titles={titles} open={open} />
 									</span>
 									<span>
 										{/* 动作只在结束时发出（suiming.action 只有 completed / failed）。 */}

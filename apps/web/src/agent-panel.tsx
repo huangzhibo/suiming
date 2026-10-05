@@ -100,7 +100,7 @@ export function AgentPanel({
 	toggleExpand,
 	...binding
 }: AgentPanelProps) {
-	const paths = useMemo(() => new Set(book.byPath.keys()), [book]);
+	const titles = useMemo(() => new Map([...book.byPath].map(([path, file]) => [path, book.title(file)])), [book]);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const [picker, setPicker] = useState(false);
@@ -312,7 +312,7 @@ export function AgentPanel({
 							key={session.id}
 							sessionId={session.id}
 							showLog={showLog}
-							paths={paths}
+							titles={titles}
 							open={open}
 							onExport={receiveExport}
 							onReference={(id, text) =>

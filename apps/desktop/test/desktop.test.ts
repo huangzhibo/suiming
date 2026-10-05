@@ -257,6 +257,11 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/workspace.png" });
 		// 活动的 target 指向真实作品路径时可直接点开。活动按连续性分组，作者回答会把它们隔成多组，所以逐组展开。
 		for (const group of await page.locator(".activities").all()) await group.locator("summary").first().click();
+		// 显示作品标题，不是路径：作者认不出 text/beat-0001.md 是哪一节。
+		assert.match(
+			await page.locator('.activities [data-page="text/beat-0001.md"]').first().innerText(),
+			/^[^/]+ · 正文$/u,
+		);
 		await page.locator('.activities [data-page="text/beat-0001.md"]').first().click();
 		// 复用当前标签打开，不新增页：后面按基线标签数断言。
 		await page.locator(".tab-btn").filter({ hasText: "beat-0001" }).first().waitFor();
