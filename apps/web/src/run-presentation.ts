@@ -105,3 +105,56 @@ export function transcriptGroups<R extends TranscriptRow>(rows: readonly R[], se
 /** 子任务的中文名；子任务列表与对话里子任务的动作组共用。 */
 export const taskKindLabel = (kind: string | undefined) =>
 	kind === "review" ? "独立审稿" : kind === "subagent" || kind === undefined ? "子任务" : kind;
+
+/** 作者消息里接在原话后面的引用与附件（composerText 拼的），开头是这几种固定前缀之一。 */
+const REFERENCE_PREFIXES = ["作品引用：", "对话引用：", "外部文本附件："];
+
+export interface MessageReference {
+	/** 给作者看的一行：作品引用用标题与选段位置，附件用文件名。 */
+	label: string;
+	/** 原样的引用内容，发给 Agent 的就是它。 */
+	content: string;
+	/** 展开时给作者看的：引用的那段文字本身，不带版本与内容 SHA 这类定位信息。 */
+	quote: string;
+}
+
+/**
+ * 把作者消息拆成原话与引用。发给 Agent 的仍是整段文本（定位要靠版本与内容 SHA），对话里只把原话当消息显示，
+ * 引用折成可展开的标签：2026-10-05 之前选段修改的消息气泡里摊着 revision 与 contentSHA 两串哈希。
+ * titleOf 把作品路径换成标题，认不出的路径原样用。
+ */
+export function messageReferences(
+	text: string,
+	titleOf: (path: string) => string | undefined,
+): { body: string; references: MessageReference[] } {
+	const starts = text.startsWith("\n") ? [] : [0];
+	const blocks: number[] = [];
+	for (const start of [...starts, ...[...text.matchAll(/\n\n/gu)].map((match) => (match.index ?? 0) + 2)])
+		if (REFERENCE_PREFIXES.some((prefix) => text.startsWith(prefix, start))) blocks.push(start);
+	if (blocks.length === 0) return { body: text, references: [] };
+	const references = blocks.map((start, index) => {
+		const next = blocks[index + 1];
+		const content = text.slice(start, next === undefined ? undefined : next - 2).trimEnd();
+		const [first = "", ...rest] = content.split("\n");
+		const prefix = REFERENCE_PREFIXES.find((item) => first.startsWith(item)) ?? "";
+		const target = first.slice(prefix.length).trim();
+		if (prefix === "作品引用：") {
+			const marker = rest.findIndex((line) => /^(第 \d+ 段选段|选段|文件内容)：$/u.test(line));
+			const part = marker < 0 ? undefined : rest[marker]?.slice(0, -1);
+			const name = titleOf(target) ?? target;
+			return {
+				label: part && part !== "文件内容" ? `${name} · ${part}` : name,
+				content,
+				quote: marker < 0 ? target : rest.slice(marker + 1).join("\n"),
+			};
+		}
+		// 对话引用与外部附件：头一段是来源说明，空行之后才是内容。
+		const gap = content.indexOf("\n\n");
+		return {
+			label: prefix === "对话引用：" ? "对话引用" : target,
+			content,
+			quote: gap < 0 ? content : content.slice(gap + 2),
+		};
+	});
+	return { body: text.slice(0, blocks[0]).trimEnd(), references };
+}

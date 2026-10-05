@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke, ipcConnection } from "./bridge.js";
 import { Markdown } from "./markdown.js";
-import { taskKindLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
+import { messageReferences, taskKindLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
 import { Hint } from "./ui-bits.js";
 
 function MessageActions({ text, onReference }: { text: string; onReference(): void }) {
@@ -115,6 +115,37 @@ function ActivityTarget({
 				{title || target}
 			</button>
 		</Hint>
+	);
+}
+
+/**
+ * 作者消息：原话照常显示，接在后面的作品引用与附件折成可展开的标签（messageReferences）。复制、引用与导出仍用整段原文，
+ * 发给 Agent 的也是整段：定位要靠里面的版本与内容 SHA，只是不该摊在作者自己的气泡里。
+ */
+function UserMessage({
+	text,
+	titles,
+	links,
+}: {
+	text: string;
+	titles: ReadonlyMap<string, string>;
+	links: ReadonlyMap<string, () => void>;
+}) {
+	const { body, references } = messageReferences(text, (path) => titles.get(path));
+	return (
+		<>
+			{body && <Markdown className="msg-text rounded-xl bg-muted px-3 py-2" content={body} links={links} />}
+			{references.map((reference) => (
+				<details key={reference.content} className="message-reference mt-1.5 text-xs text-muted-foreground">
+					<summary className="ml-auto block w-fit max-w-full cursor-pointer list-none truncate rounded-md border px-2 py-1 [&::-webkit-details-marker]:hidden">
+						{reference.label}
+					</summary>
+					<pre className="mt-1 max-h-60 overflow-auto rounded-md bg-muted px-2 py-1.5 font-sans whitespace-pre-wrap">
+						{reference.quote}
+					</pre>
+				</details>
+			))}
+		</>
 	);
 }
 
@@ -240,12 +271,16 @@ export function Transcript({
 						className={`message ${group.role} ${group.role === "user" ? "max-w-[90%] self-end" : "min-w-0"}`}
 					>
 						<div className="sr-only">{group.role === "user" ? "你" : "燧明"}</div>
-						<Markdown
-							className={group.role === "user" ? "msg-text rounded-xl bg-muted px-3 py-2" : "msg-text"}
-							content={group.text}
-							streaming={sessionGenerating && group.role !== "user" && group.id === latest}
-							links={links}
-						/>
+						{group.role === "user" ? (
+							<UserMessage text={group.text} titles={titles} links={links} />
+						) : (
+							<Markdown
+								className="msg-text"
+								content={group.text}
+								streaming={sessionGenerating && group.id === latest}
+								links={links}
+							/>
+						)}
 						<MessageActions text={group.text} onReference={() => onReference(group.id, group.text)} />
 					</article>
 				) : (

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSessionActive, sessionProblem, transcriptGroups, turnSummaryText } from "../src/run-presentation.js";
+import {
+	isSessionActive,
+	messageReferences,
+	sessionProblem,
+	transcriptGroups,
+	turnSummaryText,
+} from "../src/run-presentation.js";
 
 test("恢复入口由错误码决定，原因文案不改变恢复策略；paused 与 idle 的一句话分开呈现", () => {
 	const session = {
@@ -122,4 +128,29 @@ test("对话里的动作按执行者成组：子任务的动作不并进根 Agen
 			"summary",
 		],
 	);
+});
+
+test("作者消息里的引用折成标签：原话照常显示，选段带标题与段落位置，修订与内容 SHA 不摊在气泡里", () => {
+	const selection =
+		"作品引用：text/beat-0002.md\nrevision: aaaa\ncontentSHA: bbbb\n第 3 段选段：\n黄盖在军杖落下前停了一下。\n\n他没有回头。";
+	const file =
+		"作品引用：intent/计谋的代价.md\n基于版本：aaaa\n内容状态：已提交\n文件内容 SHA-256：cccc\n文件内容：\n全文";
+	const attachment = "外部文本附件：赤壁札记.txt\n以下为会话输入，尚未纳入作品。\n\n札记";
+	const titles = new Map([["text/beat-0002.md", "苦肉计 · 正文"]]);
+	const split = messageReferences(`请修改这一段：压短一半\n\n${selection}\n\n${file}\n\n${attachment}`, (path) =>
+		titles.get(path),
+	);
+	assert.equal(split.body, "请修改这一段：压短一半");
+	assert.deepEqual(
+		split.references.map((item) => item.label),
+		["苦肉计 · 正文 · 第 3 段选段", "intent/计谋的代价.md", "赤壁札记.txt"],
+	);
+	assert.equal(split.references[0]?.content, selection, "选段里自己的空行不切断引用");
+	assert.deepEqual(
+		split.references.map((item) => item.quote),
+		["黄盖在军杖落下前停了一下。\n\n他没有回头。", "全文", "札记"],
+		"展开时只看引用的文字，不看版本与 SHA",
+	);
+	assert.deepEqual(messageReferences("只有一句话\n\n作品之外的引号：不算", () => undefined).references, []);
+	assert.equal(messageReferences(`${selection}`, (path) => titles.get(path)).body, "", "只有引用时原话为空");
 });

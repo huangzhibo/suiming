@@ -56,6 +56,10 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 		assert.match(sent, /请修改这一段：门前先停一下再推门/);
 		assert.match(sent, /作品引用：text\/beat-0001\.md/, "带着选段的定位");
 		assert.match(sent, /军杖落到第三十下。/);
+		// 发给 Agent 的带版本与内容 SHA，作者自己的气泡里只有原话，选段折成「标题 · 第几段选段」的标签。
+		const bubble = page.locator(".message.user").first();
+		assert.doesNotMatch(await bubble.innerText(), /contentSHA|revision:/u);
+		await bubble.getByText(/ · 正文 · 第 1 段选段$/u).waitFor();
 		assert.match(await readFile(join(root, "text/beat-0001.md"), "utf8"), /军杖落下之前，黄盖抬头看了周瑜一眼。/);
 		assert.equal(await composer.inputValue(), "", "就地发送不经过输入框，也不在里面留东西");
 
