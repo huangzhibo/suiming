@@ -174,7 +174,7 @@ export function CharacterTrack({
 				<span className="font-semibold text-ink-3">被 {lane.present.length} 个情节引用</span>
 				{first !== undefined && (
 					<span>
-						首次出现 {volumeOf(first)} · {title(first)}（{model.beats[first]?.id}）
+						最早用到 {volumeOf(first)} · {title(first)}
 					</span>
 				)}
 				{lane.deadAt >= 0 && (
@@ -182,7 +182,8 @@ export function CharacterTrack({
 						✕ 死于 {volumeOf(lane.deadAt)} · {title(lane.deadAt)}
 					</span>
 				)}
-				<span>refs.character 表示实质使用，不表示出场或 POV；✕ ◆ ⌖ 来自 changes，未记录不等于没发生</span>
+				{/* 图例讲语义，不搬字段名（可视化设计 3.4）：● 是 refs.character，✕ ◆ ⌖ 是 changes。 */}
+				<span>● 是这一节的设计用到了此人，不等于出场或视角；✕ ◆ ⌖ 是设计里记下的状态变化，没记下不等于没发生</span>
 			</div>
 			<svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="人物轨迹" className="block max-w-[900px]">
 				<title>人物轨迹</title>
