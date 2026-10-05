@@ -1025,6 +1025,12 @@ test("interrupt：打断的 turn 回 idle 不记故障；消息列表与候选�
 		const outcome = await f.say("修改意图", id, { signal: controller.signal });
 		assert.equal(outcome.session.status, "idle");
 		assert.equal(outcome.failure, undefined);
+		const summary = f.project
+			.readSessionEvents(id)
+			.map((record) => record.event)
+			.findLast((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn");
+		assert.ok(summary?.type === "ACTIVITY_SNAPSHOT");
+		assert.equal((summary.content as { stopped?: boolean }).stopped, true, "停下的 turn 在对账里标出来");
 		assert.equal(outcome.session.lastFailure, undefined);
 		assert.equal(outcome.session.lease, undefined);
 		assert.match(await f.checkoutFile("intent/计谋的代价.md"), /不可逆代价/);

@@ -849,8 +849,13 @@ export class SuimingHarness {
 		this.project.createExecutionState({ now: this.now }).deleteSession(`${sessionId}:delete`, sessionId);
 	}
 
-	/** turn 结束的对账：进事件不进 prompt，在 RUN_FINISHED 之前发出（Harness 设计第 3 节）。 */
-	async #emitTurnSummary(session: HarnessSession, start: TurnStart | undefined, turnId: string): Promise<void> {
+	/** turn 结束的对账：进事件不进 prompt，在 RUN_FINISHED 之前发出（Harness 设计第 3 节）。作者停下的 turn 带 stopped。 */
+	async #emitTurnSummary(
+		session: HarnessSession,
+		start: TurnStart | undefined,
+		turnId: string,
+		stopped = false,
+	): Promise<void> {
 		if (start === undefined) return;
 		let content: SuimingTurnSummary;
 		try {
@@ -871,6 +876,7 @@ export class SuimingHarness {
 					writers,
 				),
 			});
+			if (stopped) content.stopped = true;
 		} catch {
 			// checkout 读不出来时这一轮本来就会失败，原因在 lastFailure 里，不再叠一层。
 			return;
@@ -988,10 +994,12 @@ export class SuimingHarness {
 					// 持久化已经失败的实例不能再记账；把原错误抛回，状态留给下一次 open 收敛。
 					execution.assertWritable();
 					events.assertWritable();
-					// 失败或被打断的 turn 也报这一轮改了什么；对账本身出错不能盖住原来的失败。
-					if (session !== undefined) await this.#emitTurnSummary(session, start, ownerId).catch(() => undefined);
 					const failure = executionFailure(error);
 					const interrupted = failure.code === "run_interrupted" || options.signal?.aborted === true;
+					// 失败或被打断的 turn 也报这一轮改了什么；对账本身出错不能盖住原来的失败。停下的 turn 标出来：
+					// 没有它，对话里只剩一串操作、后面没有回复，作者看不出是自己停的还是出了什么事。
+					if (session !== undefined)
+						await this.#emitTurnSummary(session, start, ownerId, interrupted).catch(() => undefined);
 					const ended = interrupted
 						? endTurn("idle")
 						: PAUSE_CODES.has(failure.code)

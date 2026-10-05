@@ -70,6 +70,8 @@ export const SuimingTurnSummarySchema = Type.Object(
 		uncommitted: Type.Integer({ minimum: 0 }),
 		/** 这一轮没取写作依据（write_context / 委派 writer）就整篇写入的正文；2026-10-03 加，更早的事件没有它。 */
 		textWithoutContext: Type.Optional(TurnChangeSchema),
+		/** 作者按了停止，这一轮停在半途；2026-10-05 加，之前停下的 turn 与说完的看起来一样。 */
+		stopped: Type.Optional(Type.Literal(true)),
 	},
 	{ additionalProperties: false },
 );

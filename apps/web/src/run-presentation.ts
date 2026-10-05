@@ -51,7 +51,8 @@ export function turnSummaryText(summary: SuimingTurnSummary): string | undefined
 	const { changed } = summary;
 	const total =
 		changed.intent.count + changed.design.count + changed.text.count + changed.review.count + changed.other.count;
-	if (total === 0 && summary.revisions === 0) return undefined;
+	// 作者停下的 turn 总要说一声，哪怕什么都没改：否则对话里只剩一串操作、后面没有回复。
+	if (total === 0 && summary.revisions === 0) return summary.stopped ? "已停止" : undefined;
 	const parts: string[] = [];
 	if (summary.authorMessages > 0) parts.push(`作者 ${summary.authorMessages} 条`);
 	parts.push(changed.intent.count === 0 ? "意图未改动" : `意图改了 ${changed.intent.count} 个文件`);
@@ -69,7 +70,7 @@ export function turnSummaryText(summary: SuimingTurnSummary): string | undefined
 			);
 	parts.push(summary.revisions === 0 ? "没有提交" : `提交了 ${summary.revisions} 个版本`);
 	if (summary.uncommitted > 0) parts.push(`还有 ${summary.uncommitted} 个文件未提交`);
-	return `本轮：${parts.join(" · ")}`;
+	return `${summary.stopped ? "已停止 · " : ""}本轮：${parts.join(" · ")}`;
 }
 
 type TranscriptRow =

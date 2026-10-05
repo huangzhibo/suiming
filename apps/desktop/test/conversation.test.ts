@@ -75,6 +75,11 @@ test("连续对话：停下后追问接着同一 session、重载历史、草稿
 		const stopped = (await read())?.sessions.find((session) => session.id === first.id);
 		assert.equal(stopped?.status, "idle", "作者的停止不是故障，回 idle");
 		assert.equal(stopped?.lastFailure, undefined);
+		// 停下的 turn 在对话里说一声：什么都没改也有「已停止」，否则只剩一串操作、后面没有回复
+		await page
+			.locator("[data-turn-summary]")
+			.filter({ hasText: /^已停止/u })
+			.waitFor();
 		await input.fill("接着说");
 		await input.press("Meta+Enter");
 		await page.locator(".message.assistant").filter({ hasText: "接着停下前的分析" }).waitFor();

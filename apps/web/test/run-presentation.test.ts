@@ -62,6 +62,17 @@ test("turn 对账：没改作品也没提交就不显示；有改动时一行说
 		uncommitted: 3,
 	};
 	assert.equal(turnSummaryText(quiet), undefined, "只讨论的 turn 不加一行噪声；未提交的候选另有入口");
+	// 作者按了停止：什么都没改也说一声，有改动时放在对账前面
+	assert.equal(turnSummaryText({ ...quiet, stopped: true }), "已停止");
+	assert.equal(
+		turnSummaryText({
+			...quiet,
+			stopped: true,
+			changed: { ...quiet.changed, text: { count: 1, paths: ["text/beat-0001.md"] } },
+			uncommitted: 1,
+		}),
+		"已停止 · 本轮：作者 1 条 · 意图未改动 · 正文改了 1 个文件 · 没有提交 · 还有 1 个文件未提交",
+	);
 	assert.equal(
 		turnSummaryText({
 			...quiet,
