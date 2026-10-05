@@ -1,5 +1,4 @@
 import {
-	ChevronsUpDown,
 	CircleHelp,
 	ClipboardCheck,
 	Clock,
@@ -13,10 +12,7 @@ import {
 	Table2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
 import { AgentPanel } from "./agent-panel.js";
 import { bridge, invoke } from "./bridge.js";
 import { checkQuery } from "./check-page.js";
@@ -31,12 +27,14 @@ import { NavigationModes } from "./navigation-modes.js";
 import { NavigationSurface } from "./navigation-surface.js";
 import { ObservationPanel } from "./observation-panel.js";
 import { PaneResizer } from "./pane-resizer.js";
+import { ProjectSwitcher } from "./project-switcher.js";
 import { BacklinksPane, EvidencePane } from "./right-pane.js";
 import { useAutoHideScrollbars } from "./scrollbars.js";
-import { Hint, OverflowHint, ToolButton } from "./ui-bits.js";
+import { ToolButton } from "./ui-bits.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
 import { createTab, EMPTY_PAGE, type ObservationSelection, pageState, type RightMode } from "./view-state.js";
+import { LoadingScreen, WelcomeScreen } from "./welcome-screen.js";
 import { type Notice, useWorkspace, WorkspaceContext } from "./workspace-context.js";
 import {
 	groupView,
@@ -229,69 +227,17 @@ function WorkspaceShell() {
 
 	// 加载中给一个安静的加载态，只有确实没有作品才请作者打开或新建（判定见 workspaceScreen）。
 	const surface = workspaceScreen({ show: projection.status, files: directory.status });
-	if (surface === "loading")
-		return (
-			<main className="grid h-screen place-items-center bg-background">
-				<div className="drag absolute inset-x-0 top-0 h-12" />
-				<div className="flex flex-col items-center gap-4">
-					<div className="grid size-[54px] place-items-center rounded-xl bg-muted font-serif text-[29px] text-foreground">
-						燧
-					</div>
-					<span className="text-xs text-muted-foreground">正在打开作品…</span>
-				</div>
-			</main>
-		);
-
+	if (surface === "loading") return <LoadingScreen />;
 	if (surface === "welcome" || !shown || !book)
 		return (
-			<main className="relative h-screen bg-background px-[12vw] py-[14vh]">
-				<div className="drag absolute inset-x-0 top-0 h-12" />
-				<div className="mb-11 grid size-[54px] place-items-center rounded-xl bg-muted font-serif text-[29px] text-foreground">
-					燧
-				</div>
-				<span className="text-[10px] font-semibold tracking-[2px] text-muted-foreground">
-					SUIMING / 长篇创作工作台
-				</span>
-				<h1 className="my-[22px] font-serif text-[51px] leading-[1.6] font-medium tracking-[3px]">
-					让你的故事，
-					<br />
-					从火种成为世界。
-				</h1>
-				<p className="text-sm leading-[2] text-muted-foreground">
-					阅读、写作、推敲人物与因果。
-					<br />
-					与专属 Agent 一起，让每一次修改都有来处。
-				</p>
-				<div className="mt-8 mb-6 flex gap-3">
-					<Button
-						size="lg"
-						onClick={() =>
-							act(async () => {
-								await bridge().chooseProject(false);
-							})
-						}
-					>
-						打开作品 ↗
-					</Button>
-					<Button
-						size="lg"
-						variant="outline"
-						onClick={() =>
-							act(async () => {
-								await bridge().chooseProject(true);
-							})
-						}
-					>
-						开始新作
-					</Button>
-				</div>
-				<p className="text-[11px] text-muted-foreground">作品保存在你的电脑上，不需要云端账号。</p>
-				{(error || projection.error) && (
-					<p className="mt-2 text-[11.5px] leading-[1.7] whitespace-pre-wrap text-[#a06443]">
-						{error || projection.error?.message}
-					</p>
-				)}
-			</main>
+			<WelcomeScreen
+				error={error || projection.error?.message}
+				onChoose={(create) =>
+					act(async () => {
+						await bridge().chooseProject(create);
+					})
+				}
+			/>
 		);
 
 	const data = shown;
@@ -522,94 +468,21 @@ function WorkspaceShell() {
 							{view.side === "search" && <SearchPane {...paneProps} query={query} setQuery={setQuery} />}
 						</div>
 						<div className="relative flex h-11 shrink-0 items-center gap-1.5 border-t border-line pr-2.5 pl-3">
-							<Popover open={libraryOpen} onOpenChange={setLibraryOpen}>
-								<PopoverTrigger asChild>
-									<Hint content={data.checkoutPath}>
-										<button
-											type="button"
-											aria-label="切换作品"
-											className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-control-hover"
-										>
-											<ChevronsUpDown className="size-[14px] shrink-0 text-muted-foreground" />
-											<span className="truncate text-[13px] font-semibold">{workName}</span>
-										</button>
-									</Hint>
-								</PopoverTrigger>
-								<PopoverContent align="start" side="top" className="w-[270px] p-1.5">
-									<div className="px-2 pt-1.5 pb-1 text-[11px] text-muted-foreground">当前作品</div>
-									<div className="flex items-center justify-between rounded-md bg-hair-2 px-2 py-[7px]">
-										<span className="min-w-0">
-											<b className="block truncate text-[13px] font-medium">{workName}</b>
-											<small className="block truncate text-[11px] text-muted-foreground">
-												{data.checkoutPath} · {book.headLabel} · 正文 {textCount}/{book.order.length}
-											</small>
-										</span>
-										<i className="shrink-0 pl-2 text-[11px] whitespace-nowrap text-primary not-italic">
-											当前
-										</i>
-									</div>
-									{recent.data?.some((item) => item.path !== data.checkoutPath) && (
-										<>
-											<div className="px-2 pt-2 pb-1 text-[11px] text-muted-foreground">最近作品</div>
-											{recent.data
-												.filter((item) => item.path !== data.checkoutPath)
-												.map((item) => (
-													<OverflowHint content={`${item.name}\n${item.path}`} key={item.path}>
-														<button
-															type="button"
-															className="flex w-full cursor-pointer flex-col rounded-md px-2 py-[7px] text-left hover:bg-muted disabled:opacity-50"
-															disabled={busy}
-															onClick={() =>
-																act(async () => {
-																	saveWorkspace(projectId, layoutLive.current);
-																	if (await bridge().openProject(item.path)) setProjectId("");
-																})
-															}
-														>
-															<b className="block max-w-full truncate text-[13px] font-medium">
-																{item.name}
-															</b>
-															<small className="block max-w-full truncate text-[11px] text-muted-foreground">
-																{item.path}
-															</small>
-														</button>
-													</OverflowHint>
-												))}
-										</>
-									)}
-									<Separator className="my-1.5" />
-									<div className="flex gap-1">
-										<Button
-											variant="outline"
-											size="sm"
-											className="flex-1"
-											disabled={busy}
-											onClick={() =>
-												act(async () => {
-													saveWorkspace(projectId, layoutLive.current);
-													if (await bridge().chooseProject(false)) setProjectId("");
-												})
-											}
-										>
-											打开作品…
-										</Button>
-										<Button
-											variant="outline"
-											size="sm"
-											className="flex-1"
-											disabled={busy}
-											onClick={() =>
-												act(async () => {
-													saveWorkspace(projectId, layoutLive.current);
-													if (await bridge().chooseProject(true)) setProjectId("");
-												})
-											}
-										>
-											新建作品
-										</Button>
-									</div>
-								</PopoverContent>
-							</Popover>
+							<ProjectSwitcher
+								open={libraryOpen}
+								onOpenChange={setLibraryOpen}
+								workName={workName}
+								checkoutPath={data.checkoutPath}
+								detail={`${book.headLabel} · 正文 ${textCount}/${book.order.length}`}
+								recent={recent.data}
+								busy={busy}
+								onSwitch={(choose) =>
+									act(async () => {
+										saveWorkspace(projectId, layoutLive.current);
+										if (await choose()) setProjectId("");
+									})
+								}
+							/>
 							<ToolButton label="帮助" side="top" on={helpOpen} onClick={() => setHelpOpen(true)}>
 								<CircleHelp />
 							</ToolButton>
