@@ -203,7 +203,12 @@ test("根 Agent 的提示与工具说明：写正文先取依据；Source 抽取
 		assert.match(system, /「正文」只指 text\/ 下的成稿/u);
 		assert.match(system, /写一个 Beat 的正文或成段重写前先取/u, "write_context 的说明");
 		assert.match(system, /writer 的 goal 就是 authorial brief/u, "delegate 的说明");
-		assert.match(system, /建议篇幅与依据/u);
+		// 2026-10-05 审查：说明要 brief 写「建议篇幅与依据（按前文实际篇幅）」，又说委派 writer 不必先取写作依据；
+		// 走查里根 Agent 于是先取了 86 KB 的写作依据再委派。前文篇幅在 writer 自己的写作依据里，brief 只写对话里才有的
+		// 东西——writer 看不到对话，作者说过却还没写回作品的话只能靠 brief 带过去。
+		assert.doesNotMatch(system, /建议篇幅与依据/u);
+		assert.match(system, /写 brief 不用先取 write_context/u);
+		assert.match(system, /作者在对话里对这一节说过、还没写回作品的要求/u);
 		assert.match(system, /不复述事件顺序/u);
 		assert.match(system, /第一节写完先读一遍正文/u);
 		assert.match(system, /不逐句 edit 凑篇幅/u);

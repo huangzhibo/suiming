@@ -312,7 +312,7 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 	return {
 		name: "delegate",
 		description:
-			"按明确目标委派一个独立子智能体（writer 写一个 Beat、source-reader 读一段 Source 并写笔记、source-extractor 抽取一个 Source、main 通用）。各角色自己把产物写进文件，结果先保存再返回；普通工具操作不必委派。writer 的 goal 就是 authorial brief：作者对这一节的要求、它在全书的作用与人物弧位置、希望读者经历的压力与退出期待、建议篇幅与依据（按前文实际篇幅与场面复杂度）、哪些过程展开哪些概述、不得提前揭示的信息；不复述事件顺序、不规定台词，Design 已在它的 Write Context 里；Design 已经划好的边界不要再列成一串「不写……」交给它——它会把禁令变成旁白里的否定句。抽取一份 Source 先调 source_coverage：它给出在章标题处切好的分段与照分段抽取的计划。同一次回复里的多个 source-reader、带 beatRange 的 source-extractor 同时执行，其余一次一个。",
+			"按明确目标委派一个独立子智能体（writer 写一个 Beat、source-reader 读一段 Source 并写笔记、source-extractor 抽取一个 Source、main 通用）。各角色自己把产物写进文件，结果先保存再返回；普通工具操作不必委派。writer 的 goal 就是 authorial brief，只写它的 Write Context 里没有的：作者在对话里对这一节说过、还没写回作品的要求（writer 看不到对话），它在全书的作用与人物弧位置，希望读者经历的压力与退出期待，哪些过程展开哪些概述，不得提前揭示的信息。写 brief 不用先取 write_context：这一节的 Design、前文与篇幅 writer 自己拿到；不复述事件顺序、不规定台词；Design 已经划好的边界不要再列成一串「不写……」交给它——它会把禁令变成旁白里的否定句。抽取一份 Source 先调 source_coverage：它给出在章标题处切好的分段与照分段抽取的计划。同一次回复里的多个 source-reader、带 beatRange 的 source-extractor 同时执行，其余一次一个。",
 		parameters: DelegateSchema,
 		replay: "reconcile",
 		// 并行只给写入不重叠的：读原文各写各的笔记；分段抽取与补全各写自己号段的 Beat 与笔记。writer 不并行——
