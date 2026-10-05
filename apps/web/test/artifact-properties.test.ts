@@ -131,3 +131,22 @@ test("回应期限显示情节标题或全书结束，未找到的引用保留�
 		{ text: "全书结束前" },
 	]);
 });
+
+test("家族关系一条一个值：人名链到人物页，名分取 role，没有 role 时说 kind 的中文；不出现 family.0.kind 这类原始键", () => {
+	const rows = properties(
+		file("character", "孙权", {
+			family: [
+				{ kind: "parent", character: "孙坚", role: "生父" },
+				{ kind: "sibling", character: "孙策" },
+			],
+		}),
+		[file("character", "孙坚")],
+	);
+	assert.deepEqual(rows, [
+		{
+			key: "family",
+			label: "家族关系",
+			values: [{ text: "孙坚（生父）", path: "character/孙坚.md" }, { text: "孙策（兄弟姐妹）" }],
+		},
+	]);
+});

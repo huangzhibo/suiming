@@ -38,6 +38,14 @@ const LABELS: Record<string, string> = {
 /** frontmatter 引用键的中文名；属性面板与「被引用」分组共用，界面上不出现 `refs.character` 这类原始键。 */
 export const propertyLabel = (key: string) => LABELS[key] ?? key;
 
+/** Character 的 family：kind 是确定性拓扑（Story Language character.md「家族事实」），role 是可选的中文名分。 */
+const FAMILY_KINDS: Record<string, string> = {
+	parent: "父母",
+	spouse: "配偶",
+	sibling: "兄弟姐妹",
+	guardian: "监护人",
+};
+
 const BOOLEAN_STATES: Record<string, [string, string]> = {
 	dead: ["已死亡", "未死亡"],
 	incapacitated: ["已失去行动能力", "未失去行动能力"],
@@ -102,6 +110,21 @@ export function propertyRows(book: Book, file: FileEntry): PropertyRow[] {
 	};
 	const walk = (keys: string[], value: unknown) => {
 		if (keys.length === 1 && ["title", "name"].includes(keys[0] ?? "") && value === book.title(file)) return;
+		// 家族关系一条一行「孙坚（生父）」式的值，人名链到人物页；不拆成 family.0.kind 这类原始键。
+		if (keys.length === 1 && keys[0] === "family" && Array.isArray(value)) {
+			rows.push({
+				key: "family",
+				label: "家族关系",
+				values: value.flatMap((link: unknown, index): PropertyValue[] => {
+					const { kind, character, role } = (link ?? {}) as Record<string, unknown>;
+					if (typeof character !== "string") return [];
+					const person = resolve(["family", String(index), "character"], character);
+					const relation = typeof role === "string" && role ? role : (FAMILY_KINDS[String(kind)] ?? String(kind));
+					return [{ ...person, text: `${person.text}（${relation}）` }];
+				}),
+			});
+			return;
+		}
 		const state = stateText(keys, value, file);
 		if (state) {
 			const group = keys[0] ?? "";
