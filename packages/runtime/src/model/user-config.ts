@@ -301,7 +301,7 @@ export async function loadModelRoutingConfig(
 		}
 	}
 
-	const resolvedProfiles = {} as Record<ModelProfileId, ModelProfileConfig>;
+	const resolvedProfiles: Partial<Record<ModelProfileId, ModelProfileConfig>> = {};
 	const diagnostics = {} as Record<ModelProfileId, ModelProfileConfigDiagnostic>;
 	for (const profileId of MODEL_PROFILE_IDS) {
 		const names = ENVIRONMENT_NAMES[profileId];
@@ -314,21 +314,20 @@ export async function loadModelRoutingConfig(
 		const thinking = external ? undefined : user?.thinking;
 
 		if (profileId !== "main" && provider.value === undefined && model.value === undefined) {
-			const fallback = resolvedProfiles.main;
-			resolvedProfiles[profileId] = {
-				provider: fallback.provider,
-				model: fallback.model,
-				...(thinking !== undefined
-					? { thinking }
-					: modelOptions.value === undefined && fallback.thinking !== undefined
-						? { thinking: fallback.thinking }
-						: {}),
-				...(modelOptions.value === undefined
-					? fallback.options === undefined
-						? {}
-						: { options: fallback.options }
-					: { options: modelOptions.value }),
-			};
+			const fallback = resolvedProfiles.main as ModelProfileConfig;
+			// 什么都没设的角色不进配置：委派时跟随对话选的模型，没有对话时由 Gateway 回落到 main
+			// （ModelGateway.followsConversation）。只设了参数或思考档位的角色算单独配置，沿用 main 的模型。
+			if (thinking !== undefined || modelOptions.value !== undefined)
+				resolvedProfiles[profileId] = {
+					provider: fallback.provider,
+					model: fallback.model,
+					...(thinking !== undefined ? { thinking } : {}),
+					...(modelOptions.value === undefined
+						? fallback.options === undefined
+							? {}
+							: { options: fallback.options }
+						: { options: modelOptions.value }),
+				};
 			diagnostics[profileId] = {
 				provider: fallback.provider,
 				model: fallback.model,
@@ -360,7 +359,7 @@ export async function loadModelRoutingConfig(
 
 	return {
 		config: {
-			profiles: resolvedProfiles,
+			profiles: resolvedProfiles as ModelRoutingConfig["profiles"],
 			...(parsed.disabledProviders === undefined ? {} : { disabledProviders: parsed.disabledProviders }),
 		},
 		diagnostic: { configPath, configFile, profiles: diagnostics },

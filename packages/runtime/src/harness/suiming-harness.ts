@@ -254,10 +254,21 @@ export class HarnessSession {
 	/** 一个角色当前绑定模型的上下文窗口（token）；拿不到时 undefined。Source 分段按它定大小。 */
 	async contextWindow(profileId: ModelProfileId): Promise<number | undefined> {
 		try {
-			return (await this.#engine.bindModel(profileId)).model.contextWindow || undefined;
+			return (await this.#bindForTask(profileId)).model.contextWindow || undefined;
 		} catch {
 			return undefined;
 		}
+	}
+
+	/**
+	 * 新子任务的模型：配置里没单独设的角色跟随这次对话的绑定（根 Agent 的模型与参数，换上自己的 profile 名），
+	 * 单独配置过的按配置绑。2026-10-05 之前一律按配置绑，没设的回落到设置页的默认模型。
+	 */
+	async #bindForTask(profileId: ModelProfileId): Promise<BoundModelProfile> {
+		const conversation = this.record.model;
+		if (conversation !== undefined && this.#engine.followsConversation(profileId))
+			return this.#engine.bindModel(profileId, { ...conversation, modelProfileId: profileId });
+		return this.#engine.bindModel(profileId);
 	}
 
 	get record(): SessionRecord {
@@ -429,7 +440,7 @@ export class HarnessSession {
 	): Promise<TaskOutcome> {
 		let task: TaskRecord;
 		if (existing === undefined) {
-			const bound = await this.#engine.bindModel(spec.profileId);
+			const bound = await this.#bindForTask(spec.profileId);
 			task = this.#execution.addTask({
 				commandId: `${this.sessionId}:task:${taskId}:add`,
 				id: taskId,
@@ -795,6 +806,10 @@ export class SuimingHarness {
 
 	bindModel(profileId: ModelProfileId, snapshot?: ModelBindingSnapshot): Promise<BoundModelProfile> {
 		return snapshot ? this.#models.bindFrozen(snapshot) : this.#models.bind(profileId);
+	}
+
+	followsConversation(profileId: ModelProfileId): boolean {
+		return this.#models.followsConversation(profileId);
 	}
 
 	/** 本进程对 session 的持有声明；别的进程打开 Project 时据此判断它不是崩溃遗留。 */

@@ -116,7 +116,7 @@ Langfuse 的 Prompt、Dataset、Experiment 和 Score 不作为 Suiming 真源。
 
 - `Model Gateway` 是 Suiming 的应用模块，负责模型选择、凭据、调用记录和失败分类；
 - 每类模型任务显式选择稳定的 `modelProfileId`；静态配置把 profile 映射到 pi `Model`、provider-specific 参数与凭据引用，不建立自动 Router 或模型配置数据库；
-- profile 是 `main`（对话用的根 Agent）、`reviewer`、`writer`、`source-reader`、`source-extractor` 与 `judge`（`model/config.ts` 的 `MODEL_PROFILE_IDS`）。只有 `main` 必须配置，其余省略时复用 `main`；各 profile 可指向不同模型，也可共享同一 provider 和凭据；Langfuse 不是模型调用前置条件；
+- profile 是 `main`（对话用的根 Agent）、`reviewer`、`writer`、`source-reader`、`source-extractor` 与 `judge`（`model/config.ts` 的 `MODEL_PROFILE_IDS`）。只有 `main` 必须配置，其余省略时跟随这次对话的模型（作者没在输入框另选时就是 `main`；`rank` 这类不在对话里的调用用 `main`）；各 profile 可指向不同模型，也可共享同一 provider 和凭据；Langfuse 不是模型调用前置条件；
 - Model Gateway 直接使用 pi 的 `Model`、`Context`、stream event 和 provider-specific options；不重新定义平行的 provider message、tool 声明或 stream event；工具 execute、动作效果与持久结果是 Suiming 的应用契约；
 - 每个 turn 冻结解析后的 provider、model、参数与工具声明（[Harness 设计](harness-design.md)第 4 节），每次模型调用从消息列表和受控工具结果构造临时 pi `Context`；只持久化恢复、计费和 Eval 所需的结果或引用，详细 trace 通过 OpenTelemetry 输出；pi Context 不是会话、任务或作品真源；
 - 工具与结果通过现有 schema、Checker 和 tool contract 校验，错误作为工具反馈供模型修正；不靠强制类型转换掩盖无效输出，也不固定只允许一次修复。恢复需要的原始消息、结果与 Context 引用先持久化；transport error 与语义错误分别处理，不能透明换模型或重复已确认副作用；
@@ -128,7 +128,7 @@ Langfuse 的 Prompt、Dataset、Experiment 和 Score 不作为 Suiming 真源。
 
 ### 本地配置与凭据
 
-本地产品以 `~/.suiming/config.toml` 作为人类可编辑的用户级配置真源，模型路由不应长期依赖项目根目录 `.env`。首期配置形态如下；`main` 以外的 profile 省略时复用 `main`：
+本地产品以 `~/.suiming/config.toml` 作为人类可编辑的用户级配置真源，模型路由不应长期依赖项目根目录 `.env`。首期配置形态如下；`main` 以外的 profile 省略时跟随对话的模型：
 
 ```toml
 version = 1
@@ -159,7 +159,7 @@ endpoint = "https://cloud.suiming.example"
 actor_id = "author-id"
 ```
 
-`main` 以外的 profile（`writer`、`reviewer`、`source-reader`、`source-extractor`、`judge`）都可省略，省略时复用 `main`。这不是自动 Router，而是按 Task kind 选择并冻结实际 profile。`thinking` 是设置页写的档位，绑定时由 Gateway 转成 provider 的 API 参数（[Harness 设计](harness-design.md)「对话模型选择与默认配置」）；provider 的原生参数也可以直接写在 `options` 里。
+`main` 以外的 profile（`writer`、`reviewer`、`source-reader`、`source-extractor`、`judge`）都可省略，省略时跟随这次对话的模型（`ModelGateway.followsConversation`；2026-10-05 之前复用 `main`，作者给一段对话另选了模型，委派出去的子任务仍用默认模型）。只设了 `options` 或 `thinking` 的算单独配置，模型沿用 `main`。这不是自动 Router，而是按 Task kind 选择并冻结实际 profile。`thinking` 是设置页写的档位，绑定时由 Gateway 转成 provider 的 API 参数（[Harness 设计](harness-design.md)「对话模型选择与默认配置」）；provider 的原生参数也可以直接写在 `options` 里。
 
 示例沿用本项目真实调用过的 provider / 模型（`deepseek-flash` 是 DeepSeek 官方 V4.1 Flash 在 pi-ai 目录里的 id；旧的 `deepseek-v4-flash` 已从官方 provider 目录消失，写它会报找不到模型），不表示已证明它的文学质量最优；模型 id 随 pi-ai 升级可能再变，以安装版本的目录为准。正式盲排实验按协议选择 `judge`，不在可复制配置中留下虚构模型名。实际可用参数以安装版本的 provider schema 为准。
 

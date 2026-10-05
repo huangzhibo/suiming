@@ -108,17 +108,29 @@ test("Cloud connection 复用 ~/.suiming/config.toml，环境变量保持更高�
 	}
 });
 
-test("用户配置省略 Reviewer 时复用 Agent，显式缺失路径给出诊断", async () => {
+test("用户配置省略的角色不进配置：委派时跟随对话的模型，没有对话时 Gateway 回落到 main；显式缺失路径给出诊断", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-model-config-"));
 	const configPath = join(root, "config.toml");
 	try {
 		await writeFile(configPath, 'version = 1\n[models.profiles.main]\nprovider = "provider-a"\nmodel = "model-a"\n');
 		const loaded = await loadModelRoutingConfig({ configPath, environment: {} });
-		assert.deepEqual(loaded.config.profiles.reviewer, loaded.config.profiles.main);
-		assert.deepEqual(loaded.config.profiles["source-reader"], loaded.config.profiles.main);
-		assert.deepEqual(loaded.config.profiles["source-extractor"], loaded.config.profiles.main);
+		// 2026-10-05 之前这里复制一份 main，Gateway 分不出哪些角色是作者单独设的，委派时一律用设置页的默认模型
+		assert.equal(loaded.config.profiles.reviewer, undefined);
+		assert.equal(loaded.config.profiles["source-reader"], undefined);
+		assert.equal(loaded.config.profiles["source-extractor"], undefined);
 		assert.equal(loaded.diagnostic.profiles.reviewer.providerSource, "main-default");
 		assert.equal(loaded.diagnostic.profiles["source-reader"].providerSource, "main-default");
+		const provider = fauxProvider({ provider: "provider-a", models: [{ id: "model-a" }] });
+		const models = createModels();
+		models.setProvider(provider.provider);
+		const gateway = new ModelGateway(models, loaded.config);
+		assert.equal(gateway.followsConversation("reviewer"), true);
+		assert.equal(gateway.followsConversation("main"), true, "main 就是对话本身");
+		assert.equal(
+			(await gateway.bind("reviewer")).snapshot.model,
+			"model-a",
+			"没有对话可跟随时（rank、预检）回落到 main",
+		);
 		await assert.rejects(
 			() => loadModelRoutingConfig({ configPath: join(root, "missing.toml"), environment: {} }),
 			(error: unknown) => error instanceof ModelGatewayError && error.code === "model_config_not_found",
@@ -169,9 +181,9 @@ test("环境配置允许其它 profile 复用 Agent，也允许逐个独立覆�
 				SUIMING_MAIN_MODEL_OPTIONS: '{"temperature":0.4}',
 			},
 		});
-		assert.deepEqual(shared.config.profiles.reviewer, shared.config.profiles.main);
-		assert.deepEqual(shared.config.profiles["source-reader"], shared.config.profiles.main);
-		assert.deepEqual(shared.config.profiles["source-extractor"], shared.config.profiles.main);
+		assert.equal(shared.config.profiles.reviewer, undefined, "没设的角色跟随对话，不复制 main");
+		assert.equal(shared.config.profiles["source-reader"], undefined);
+		assert.equal(shared.config.profiles["source-extractor"], undefined);
 		assert.equal(shared.diagnostic.profiles.writer.providerSource, "main-default");
 
 		const separate = await loadModelRoutingConfig({
@@ -192,7 +204,7 @@ test("环境配置允许其它 profile 复用 Agent，也允许逐个独立覆�
 			model: "model-b",
 			options: { maxTokens: 4096 },
 		});
-		assert.deepEqual(separate.config.profiles["source-reader"], separate.config.profiles.main);
+		assert.equal(separate.config.profiles["source-reader"], undefined);
 		assert.deepEqual(separate.config.profiles["source-extractor"], {
 			provider: "provider-d",
 			model: "model-d",

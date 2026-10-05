@@ -219,6 +219,11 @@ function ProfileSettings({ profile, settings }: { profile: Profile; settings: Se
 						当前使用环境变量配置；保存的偏好在移除环境覆盖后生效。
 					</p>
 				)}
+				{current?.source === "main-default" && (
+					<p className="mt-3 text-xs text-muted-foreground">
+						还没单独设置：跟随这次对话所选的模型。在这里保存后改用固定的模型。
+					</p>
+				)}
 				{value.model && !definition && (
 					<p className="mt-3 text-xs text-destructive">当前模型不在目录中，请重新选择。</p>
 				)}

@@ -241,14 +241,24 @@ export interface ModelGatewayOptions {
 export class ModelGateway {
 	readonly #models: Models;
 	readonly #config: NormalizedModelRoutingConfig;
+	readonly #configured: ReadonlySet<string>;
 	readonly #telemetryContext: TelemetryContext;
 	readonly routingVersion: string;
 
 	constructor(models: Models, config: ModelRoutingConfig, options: ModelGatewayOptions = {}) {
 		this.#models = models;
+		this.#configured = new Set(Object.keys(config.profiles));
 		this.#config = normalizeConfig(config);
 		this.#telemetryContext = options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT;
 		this.routingVersion = routingVersion(this.#config);
+	}
+
+	/**
+	 * 这个角色委派时是否跟随对话的模型：`main` 就是对话本身，其它角色在配置里没单独设时也跟随。
+	 * 2026-10-05 之前没配的角色回落到配置里的 main，作者给一段对话另选了模型，委派出去的子任务仍用默认模型。
+	 */
+	followsConversation(profileId: ModelProfileId): boolean {
+		return profileId === "main" || !this.#configured.has(profileId);
 	}
 
 	async bind(profileId: ModelProfileId, choice?: ModelChoice): Promise<BoundModelProfile> {

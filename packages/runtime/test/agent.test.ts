@@ -600,6 +600,39 @@ test("用量检查点每个 turn 开始时读一次：设置页改了，下一�
 	}
 });
 
+test("没单独配置的子任务角色跟随这次对话选的模型；单独配置过的照旧用自己的", async () => {
+	// 2026-10-05 审查：没配的角色原来回落到设置页的默认模型。作者把一段对话换成别的模型，委派出去的 writer
+	// 仍用默认模型和它那份额度；启动预检也只查了对话用的模型，委派时才撞上凭据问题。
+	const f = await fixture();
+	try {
+		const chosen = { provider: f.alternate.provider.id, model: f.alternate.getModel().id };
+		const session = await f.harness.createSession({ model: chosen });
+		f.alternate.setResponses([
+			call("delegate", { goal: "写这一节", profile: "writer", storyBeatId: "beat-0001" }),
+			call("submit_task", { summary: "写好了" }),
+			call("delegate", { goal: "读黄盖的人物档", profile: "main" }),
+			call("submit_task", { summary: "读过了" }),
+			call("review", { layer: "design" }),
+			reply("都做完了"),
+		]);
+		f.provider.setResponses([
+			call("submit_review", { verdict: "pass", summary: "没问题", findings: [], uncovered: [], uncertainties: [] }),
+		]);
+		const outcome = await f.say("写第一节，再审一遍设计", session.id);
+		assert.equal(outcome.failure, undefined);
+		const providerOf = new Map(
+			f.project.loadExecutionState().tasks.map((task) => [task.model?.modelProfileId, task.model?.provider]),
+		);
+		assert.deepEqual(Object.fromEntries(providerOf), {
+			writer: chosen.provider,
+			main: chosen.provider,
+			reviewer: f.provider.provider.id,
+		});
+	} finally {
+		await f.close();
+	}
+});
+
 test("用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
 	// 缺省的 faux 模型目录价为 0：按花费算的检查点在这里永远不触发，换成 DeepSeek 这类便宜模型也差不多。
 	const f = await fixture({ turnUsageCheckpointTokens: 50_000 });
