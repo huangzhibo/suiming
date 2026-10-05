@@ -65,6 +65,7 @@ const actionLabels: Record<string, string> = {
 	review: "独立审稿",
 	write_context: "读取写作依据",
 	delegate: "派出子任务",
+	// 2026-10-05 删掉的工具，旧对话的动作记录里还有
 	read_result: "读取子任务结果",
 	read_source: "读原作",
 	source_coverage: "查看原作读到哪里",

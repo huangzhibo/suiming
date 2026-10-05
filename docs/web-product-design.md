@@ -168,7 +168,7 @@ turn 进行中可以查看尚未提交的候选，入口是状态栏的「N 个�
 
 #### A / B 决策卡
 
-针对一段给出两个改法让作者选，还没做，但不是做不了。零件都在：`delegate` 派两个 writer profile 的子任务；Task 结果本来就存成执行对象，由 `read_result` 回读；`anchors.ts` 的 `paragraphSpans` / `anchorParagraphs` 已能把引文锚到段落，审稿 finding 就是这么定位的；比较视图的 `revertControls: "a-to-b"` 就是逐块采纳。问答往返不需要专门的通道：模型在文本里提问、停下，turn 结束，作者的回答是 inbox 里的下一条消息（模型停下时 inbox 已有新消息，就在同一个 turn 里接着跑）。
+针对一段给出两个改法让作者选，还没做，但不是做不了。零件都在：`delegate` 派两个 writer profile 的子任务；Task 结果本来就存成执行对象（两版改法放在那里，回读工具到时候再加，2026-10-05 删掉的 `read_result` 就是这个形状）；`anchors.ts` 的 `paragraphSpans` / `anchorParagraphs` 已能把引文锚到段落，审稿 finding 就是这么定位的；比较视图的 `revertControls: "a-to-b"` 就是逐块采纳。问答往返不需要专门的通道：模型在文本里提问、停下，turn 结束，作者的回答是 inbox 里的下一条消息（模型停下时 inbox 已有新消息，就在同一个 turn 里接着跑）。
 
 唯一的缺口是一个事件名：`validateProductEvent` 的 CUSTOM 白名单只放行 `suiming.session`，这道闸是我们自己设的。`bridge.ts` 不需要改成双向，问答走命令不走 attach，不变量 10 不动。要做就从 Runtime 做通，不要在 renderer 里用客户端状态伪造。
 

@@ -295,7 +295,7 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 			resultMediaType: "application/vnd.suiming.task-result+json",
 		};
 		const child = await childOutcome(() => session.executeChild(parent, actionId, spec));
-		return text({ taskId: child.taskId, resultObjectId: child.resultObjectId, result: child.result });
+		return text({ taskId: child.taskId, result: child.result });
 	};
 	return {
 		name: "delegate",
@@ -334,7 +334,6 @@ function review(session: HarnessSession, parent: TaskHandle): HarnessTool<typeof
 		const report = task.reportOf(child.result);
 		return text({
 			taskId: child.taskId,
-			resultObjectId: child.resultObjectId,
 			reviewId: report.id,
 			reviewPath: report.path,
 			verdict: report.verdict,
@@ -344,7 +343,7 @@ function review(session: HarnessSession, parent: TaskHandle): HarnessTool<typeof
 	return {
 		name: "review",
 		description:
-			"委派独立 Reviewer 审查当前候选与范围；审稿写成 review/<id>.md（随下一次 commit 进版本），完整交付可用 read_result 回读。",
+			"委派独立 Reviewer 审查当前候选与范围；审稿写成 review/<id>.md（随下一次 commit 进版本），逐条意见在那个文件里。",
 		parameters: ReviewSchema,
 		replay: "reconcile",
 		prepare: async () => ({}),
@@ -408,22 +407,6 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 					} catch (error) {
 						requireDomain(error);
 					}
-				},
-				async execute(_id, _params, _signal, _update, prepared) {
-					return prepared as ReturnType<typeof text>;
-				},
-			},
-			{
-				name: "read_result",
-				description: "回读本 session 的完整子任务交付；传 delegate / review 返回的 resultObjectId。",
-				parameters: Type.Object({ resultObjectId: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
-				replay: "read",
-				async prepare(params: { resultObjectId: string }) {
-					const task = session.execution
-						.tasksOf(session.sessionId)
-						.find((task) => task.result?.id === params.resultObjectId);
-					if (!task) throw new ToolRejection("task_result_not_found", params.resultObjectId);
-					return text(new TextDecoder().decode((await project.readExecutionObject(params.resultObjectId)).bytes));
 				},
 				async execute(_id, _params, _signal, _update, prepared) {
 					return prepared as ReturnType<typeof text>;

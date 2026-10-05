@@ -141,7 +141,7 @@ Story Search 是正式的发现能力，也是 artifact 检索的**唯一函数*
 
 只有两种实体：`Session` 是根 Agent，`Task` 是有目标和输入契约的子智能体；turn 不是实体。它们的语义、三态生命周期、inbox、lease、三种 `paused` 与按 turn 冻结的绑定见 [Harness 设计](harness-design.md)第 2–4、10 节；创作路径没有预算，只记用量，另有每轮用量检查点（同上第 10 节）。
 
-调用前保存决定与预期输入；子结果校验、写入执行对象并确认完成后，父调用才消费。大正文与报告通过引用回读（`read_result`），不让主模型转录完整结果。执行消息复用 pi-ai 类型并保存在执行存储，Langfuse 和 UI transcript 不承担恢复真源。
+调用前保存决定与预期输入；子结果校验、写入执行对象并确认完成后，父调用才消费。子任务把正文、审稿这类大交付物写成作品文件，交回父 Agent 的只有路径与一句结论，不让主模型转录完整结果。执行消息复用 pi-ai 类型并保存在执行存储，Langfuse 和 UI transcript 不承担恢复真源。
 
 Local SQLite 使用版本检查、幂等 command receipt 与 owner / lease 边界，以每次领取的唯一 ownerId 作 fencing，拒绝旧 owner 的迟到确认（`local-project-regressions.test.ts`「执行状态按行保存：另一进程新增的 session 不被抹掉，版本落后的写入报告冲突」）。作品事务与对应 receipt 同事务确认，文件系统用 journal 恢复。外部模型请求在崩溃时可能结果未知，不承诺 exactly-once。提交 fence 只覆盖单次事务，不能使后续 turn 永久失去中断能力。Cloud 没有执行（第 9 节），不能把 Local 故障验收记为 Cloud 引擎验收。
 

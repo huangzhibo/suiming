@@ -720,7 +720,8 @@ test("Agent 直接修改与阶段提交，不强制 Review 或子任务；不属
 	}
 });
 
-test("Agent 按模型决定调用独立 Review，经持久引用取得报告后提交", async () => {
+test("Agent 按模型决定调用独立 Review，结论随工具结果直接回来，提交时审稿一起进版本", async () => {
+	// 2026-10-05 删掉 read_result：子任务交付只有结论，委派结果里已经原样带回，回读拿不到更多；逐条意见在审稿文件里。
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
@@ -740,11 +741,11 @@ test("Agent 按模型决定调用独立 Review，经持久引用取得报告后�
 				assert.ok(Array.isArray(content));
 				const body = content.find((part) => part.type === "text");
 				assert.ok(body?.type === "text");
-				const handoff = JSON.parse(body.text) as { resultObjectId: string };
-				return call("read_result", { resultObjectId: handoff.resultObjectId });
-			},
-			async (context) => {
-				assert.ok(JSON.stringify(context.messages.at(-1)).includes("因果与代价一致"));
+				const handoff = JSON.parse(body.text) as { verdict: string; summary: string; reviewPath: string };
+				assert.equal(handoff.verdict, "pass");
+				assert.equal(handoff.summary, "因果与代价一致");
+				assert.match(handoff.reviewPath, /^review\/design-/u);
+				assert.equal("resultObjectId" in handoff, false, "执行对象的 id 不交给模型：没有工具能用它");
 				return call("commit", { summary: "采纳候选" });
 			},
 			reply("修改、独立审查与提交完成"),

@@ -34,7 +34,7 @@ Suiming 自建 harness 只有一个理由：做一个**对 Open Story Package �
 - `commit` 结果里的 `ignored` 包含作品目录里所有仓库辅助文件（`.gitattributes`、`AGENTS.md`、`scripts/` …），与 `suim diff` 的 `ignored` 是同一份，不为了「干净」加白名单。
 - 同一 Project 同时只能有一个 `running` session（第 3 节），并行会互相覆盖。
 
-**为什么留 Task。**writer 子智能体一跑十几分钟，进程死了要从它自己的 checkpoint 接上，不能从零重跑；`read_result` 的回读也靠它。改版时 eval-022 的四个 Run 里 `delegate` / `plan` / `review` 一次都没用过（read 93、search 10、check 4、edit 2、commit 1），Task 当时是为长篇规模留的；后来斗破的 Source 抽取用上了它，分段读与分段抽取的并行委派见第 9 节。
+**为什么留 Task。**writer 子智能体一跑十几分钟，进程死了要从它自己的 checkpoint 接上，不能从零重跑。（原来还列着「`read_result` 的回读也靠它」：子任务交付只有一句结论、委派结果里已原样带回，回读拿不到更多，2026-10-05 删了这个工具；交付物本身是作品文件。）改版时 eval-022 的四个 Run 里 `delegate` / `plan` / `review` 一次都没用过（read 93、search 10、check 4、edit 2、commit 1），Task 当时是为长篇规模留的；后来斗破的 Source 抽取用上了它，分段读与分段抽取的并行委派见第 9 节。
 
 **`plan` / `execute_task` 删掉。**预规划、`dependsOn`、撤销未执行计划、task contract 对象——这一整套零使用，而它是 Task 记录里最重的部分（planned 状态、依赖校验、`cancelPlannedTasks`）。要计划就写在消息里，Claude Code 的 TodoWrite 也只是文本不是实体。Task 只剩两个来源：`delegate` 与 `review`（Eval 脚本的 `rank.round` 不在对话里，见第 11 节）。
 
@@ -138,7 +138,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed | unkn
 
 | 能力 | 工具 | replay | 说明 |
 | --- | --- | --- | --- |
-| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` `read_result` | read | `read` 按行分页（默认 2000 行），超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
+| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` | read | `read` 按行分页（默认 2000 行），超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
 | 修改候选 | `write` `edit` `copy` `move` `delete` | reconcile（journal） | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | read / reconcile（receipt） | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | read | 模型主动压缩；系统触发的压缩见第 7 节 |
@@ -214,7 +214,7 @@ pi-ai 不带 provider 原生的 web search，三个工具都是我们自己的�
 
 ### 8.3 Researcher 子智能体
 
-`delegate({ profile: "researcher", goal })` 派一个只读作品、可上网、只能写 `reference/**` 的子智能体：工具是 `read` / `search` / `frame`（作品）+ 三个调研工具 + 限定路径的 `write` / `edit` + `submit_task`。交付形状是结构化结果：认识、分歧、适用边界、来源列表（URL + 对象 id），存为结果对象，父按 `read_result` 回读引用，主模型不转录。模型 profile `researcher` 缺省回落到 main。
+`delegate({ profile: "researcher", goal })` 派一个只读作品、可上网、只能写 `reference/**` 的子智能体：工具是 `read` / `search` / `frame`（作品）+ 三个调研工具 + 限定路径的 `write` / `edit` + `submit_task`。交付形状是结构化结果：认识、分歧、适用边界、来源列表（URL + 对象 id），存为结果对象；综合认识写进 `reference/research/<topic-id>.md`，主模型不转录。结果大到不宜随委派结果原样带回时，再加一个按结果对象回读的工具（2026-10-05 删掉的 `read_result` 就是这个形状，当时没有一种交付大到需要它）。模型 profile `researcher` 缺省回落到 main。
 
 这是第 9 节「角色定义与 Context 投影成对交付」的第三个实例（前两个是 writer 与 reviewer）：profile 绑定模型、system prompt、Context 编译器、交付契约、工具集五样；何时派、派几次由根 Agent 决定。
 
@@ -270,7 +270,7 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 | `main` | 与根相同 | 通用委派 |
 | `researcher` | `reference/**` | 随切片 E 才有，现在 `delegate` 不接受它 |
 
-子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`、`read_result`。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。
+子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。
 
 没有预规划：`plan` / `execute_task` 已删（第 2 节）。根 Agent 要分几步做，写在自己的回复里；`delegate` 是同步调用，结果回来再决定下一个。例外是写入不重叠的委派，见下一段。
 
@@ -427,7 +427,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | `submit_review` 引文不在锚定文件里 | 该 finding 被拒，Reviewer 收到具体哪条；报告不落库 | `host-context`「context compile 给 host 的输入按路径列出作品文件；review record 写成 review/<id>.md…」里的 `review_quote_not_found`（host 与引擎共用 `composeReviewFile`）；Source 层锚在抽取文件上可以引原作，两边都没有才拒：`agent-source`「Source 审稿锚在抽取文件上的 finding 可以引原作…」 |
 | **`fetch` 中途退出** | 有 prepared 结果复用；无则重取，内容不同存新对象并标 refetched | **没有测试**（切片 E） |
 | **`fetch` 私网地址 / 重定向到私网 / 超大响应** | 拒绝，工具结果说明原因，不落任何对象 | **没有测试**（切片 E） |
-| **Researcher 试图写 `reference/**` 之外或调用 commit** | 拒绝；结果对象里的来源列表可被父 `read_result` 回读 | **没有测试**（切片 E） |
+| **Researcher 试图写 `reference/**` 之外或调用 commit** | 拒绝；来源列表随结果对象交回父 Agent | **没有测试**（切片 E） |
 | **`run_command` 超时 / 输出超限 / 试图联网、读写 checkout 之外或 `.git` / `.suiming`** | 超时与超限如实返回已捕获部分并标明；联网与越界读写被 Seatbelt 拒绝并出现在 stderr | **没有测试**（切片 F；本机 2026-09-13 手工验过联网与越界读两种拒绝） |
 | **`run_command` 写了文件** | 结果里的改动清单与实际 diff 一致；Story 根内的进候选，之外的在 `commit` 结果里被点名跳过 | **没有测试**（切片 F） |
 | **`run_command` 中途退出** | 有结果复用；停在 effect_pending 不重跑，模型收到「结果未知」与文件差集 | **没有测试**（切片 F） |
