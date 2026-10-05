@@ -360,9 +360,11 @@
 /* 三栏第二工具行统一图标尺寸，不随按钮尺寸变体变化；点击范围由按钮保留。 */
 [data-panel-toolbar] .lucide { width: var(--toolbar-icon-size); height: var(--toolbar-icon-size); }
 
-/* 面包屑以主工作面为中心；操作收纳由工作面的实际宽度决定。 */
+/* 面包屑以主工作面为中心；操作收纳由工作面的实际宽度决定。两侧等宽、至少放下各自的按钮，中间按面包屑实际需要
+   取宽，放不下才截短。2026-10-05 之前中间写死最多 24%：主工作面约 770px 时只有 178px，两侧各空着 280px，
+   卷名几乎总被截成两三个字。 */
 .document-toolbar {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 24%) minmax(0, 1fr);
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
 }
 .document-view-menu { display: none; }
 @container document (max-width: 420px) {

@@ -1195,7 +1195,8 @@ test("提示：避免重复名称，截断补全、中文说明、禁用原因�
 		// 长文件名在窄窗口里完整换行，并保持在窗口内。
 		const longFile = `${"long-source-name-".repeat(12)}.md`;
 		await writeFile(join(root, longFile), "辅助材料\n");
-		const resizeFile = "窗口宽度变化后的完整材料.md";
+		const resizeFile =
+			"窗口宽度变化之后才能完整显示出来的一份相当长的参考材料，用来检查面包屑在窄窗口里截断、放宽之后完整显示.md";
 		await writeFile(
 			join(root, resizeFile),
 			"辅助材料\n\nhttps://example.com/plain\n\n[材料出处](https://example.com/source)\n",
