@@ -59,7 +59,8 @@ export function ConversationViewport({
 				// biome-ignore lint/a11y/noNoninteractiveTabindex: 可滚动阅读区需要键盘滚动入口。
 				tabIndex={0}
 				data-conversation-viewport
-				className="min-h-0 flex-1 overflow-auto px-3.5 pt-3 outline-none"
+				// relative：消息里绝对定位的读屏标签以滚动区为包含块，不然它们排到外层、把右栏撑成能被程序滚动。
+				className="relative min-h-0 flex-1 overflow-auto px-3.5 pt-3 outline-none"
 				onWheel={(event) => {
 					if (event.deltaY < 0) stopFollowing();
 				}}

@@ -9,7 +9,15 @@ import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import { collectPageErrors, launchDesktop, openGate } from "./launch.js";
 
 declare const window: { suiming?: DesktopBridge };
-declare const document: { querySelector(selector: string): { scrollTop: number } | null };
+/** 测试的 tsconfig 不带 DOM 类型；只声明 page.evaluate 里用到的那几样。 */
+interface PageElement {
+	scrollTop: number;
+	className: string;
+	parentElement: PageElement | null;
+	matches(selector: string): boolean;
+	scrollIntoView(options: { block: "center" }): void;
+}
+declare const document: { querySelector(selector: string): PageElement | null };
 
 test("原生对话：引用与附件、IME、迟到回包及发送重试、消息操作和阅读位置", { timeout: 90000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-composer-"));
@@ -161,6 +169,23 @@ test("原生对话：引用与附件、IME、迟到回包及发送重试、消�
 		assert.ok(
 			await viewport.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop < 8),
 		);
+		// 消息里给读屏的「你 / 燧明」标签是绝对定位的。对话滚动区没有定位时，它们以外层为包含块、排到几千像素深，
+		// 把 overflow: hidden 的右栏撑成「能被程序滚动」：任何 scrollIntoView（键盘聚焦、引用、自动化）都会把整栏推上去，
+		// 输入框浮到中间、下面空出一块，又没有滚动条拉得回来（2026-10-05 模拟作者操作时撞到）。对话要比右栏长才暴露。
+		await viewport.evaluate((element) => {
+			const message = [...element.querySelectorAll(".message")].at(-1);
+			for (let count = 0; count < 12 && message?.parentElement; count += 1)
+				message.parentElement.appendChild(message.cloneNode(true));
+		});
+		await page.evaluate(() => document.querySelector("[data-composer-submit]")?.scrollIntoView({ block: "center" }));
+		const shifted = await page.evaluate(() => {
+			const moved: string[] = [];
+			for (let element = document.querySelector("[data-composer-submit]"); element; element = element.parentElement)
+				if (element.scrollTop > 0 && !element.matches("[data-conversation-viewport]"))
+					moved.push(`${element.className} ↑${element.scrollTop}`);
+			return moved;
+		});
+		assert.deepEqual(shifted, [], "输入框所在的右栏不能被程序滚动");
 		assert.deepEqual(errors, []);
 	} catch (error) {
 		await page.screenshot({ path: "/tmp/suiming-composer-failure.png" });

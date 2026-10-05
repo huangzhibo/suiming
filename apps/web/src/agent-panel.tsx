@@ -156,7 +156,8 @@ export function AgentPanel({
 		{ label: "最近", items: sessions.filter((item) => item.status === "idle") },
 	].filter((group) => group.items.length);
 	return (
-		<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+		// clip 而不是 hidden：hidden 的容器仍能被 scrollIntoView 滚动，滚了整栏就上移、输入框浮到中间，又没有滚动条拉回来。
+		<div className="flex min-h-0 flex-1 flex-col overflow-clip">
 			<PanelToolbar className="justify-center">
 				<ToolButton
 					label="新对话"
