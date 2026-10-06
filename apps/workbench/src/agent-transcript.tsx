@@ -7,10 +7,12 @@ import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
 import {
 	actionRuns,
+	type DetailField,
 	delegatingActions,
 	detailFields,
-	detailText,
+	internalId,
 	messageReferences,
+	outputView,
 	taskRoleLabel,
 	transcriptGroups,
 	turnSummaryText,
@@ -199,35 +201,43 @@ function ActionDetail({
 			</p>
 		);
 	const detail = query.data;
-	const fields = detailFields(detail.input);
-	const block = "max-h-60 overflow-auto rounded-md bg-muted px-2 py-1.5 font-sans whitespace-pre-wrap break-words";
+	const output = detail.output === undefined ? undefined : outputView(detail.output);
 	return (
 		<div className="action-detail mt-1.5 grid gap-1.5 text-foreground/80">
-			{fields.map((field) =>
-				field.block ? (
-					<div key={field.name}>
-						<p className="text-muted-foreground">{field.name}</p>
-						<pre className={`mt-0.5 ${block}`}>{field.value}</pre>
-					</div>
-				) : (
-					<p key={field.name} className="break-words">
-						<span className="text-muted-foreground">{field.name}：</span>
-						{field.value}
-					</p>
-				),
-			)}
-			<div>
+			<DetailFields fields={detailFields(detail.input)} />
+			<div className="grid gap-1.5">
 				<p className="text-muted-foreground">结果</p>
-				{detail.output === undefined ? (
+				{output === undefined ? (
 					<p>还没交回。</p>
+				) : "fields" in output ? (
+					<DetailFields fields={output.fields} error={detail.isError} />
 				) : (
-					<pre className={`mt-0.5 ${block} ${detail.isError ? "text-destructive" : ""}`}>
-						{detailText(detail.output) || "（没有输出）"}
+					<pre className={`${DETAIL_BLOCK} ${detail.isError ? "text-destructive" : ""}`}>
+						{output.text || "（没有输出）"}
 					</pre>
 				)}
-				{detail.truncated && <p className="mt-0.5 text-muted-foreground">结果太长，只显示前 10 万字。</p>}
+				{detail.truncated && <p className="text-muted-foreground">结果太长，只显示前 10 万字。</p>}
 			</div>
 		</div>
+	);
+}
+
+const DETAIL_BLOCK = "max-h-60 overflow-auto rounded-md bg-muted px-2 py-1.5 font-sans whitespace-pre-wrap break-words";
+
+/** 参数或 JSON 结果的各项：短的一行「名：值」，长的单独成块。 */
+function DetailFields({ fields, error = false }: { fields: DetailField[]; error?: boolean }) {
+	return fields.map((field) =>
+		field.block ? (
+			<div key={field.name}>
+				<p className="text-muted-foreground">{field.name}</p>
+				<pre className={`mt-0.5 ${DETAIL_BLOCK} ${error ? "text-destructive" : ""}`}>{field.value}</pre>
+			</div>
+		) : (
+			<p key={field.name} className={`break-words ${error ? "text-destructive" : ""}`}>
+				<span className="text-muted-foreground">{field.name}：</span>
+				{field.value}
+			</p>
+		),
 	);
 }
 
@@ -250,6 +260,8 @@ function ActionRow({
 }) {
 	const [expanded, setExpanded] = useState(activity.status === "failed");
 	const label = actionLabels[activity.label] ?? activity.label;
+	// 内部编号（执行对象、子任务的 id）不给作者看，2026-10-05 之前的 read_result 就以它为对象。
+	const target = activity.target && !internalId(activity.target) ? activity.target : undefined;
 	return (
 		<details
 			className="activity leading-relaxed"
@@ -260,9 +272,9 @@ function ActionRow({
 			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
 				<ChevronRight className="shrink-0" />
 				<span className="min-w-0 flex-1 truncate">
-					{compact && activity.target ? null : label}
-					{activity.target && !compact ? " · " : ""}
-					<ActivityTarget target={activity.target} titles={titles} open={open} />
+					{compact && target ? null : label}
+					{target && !compact ? " · " : ""}
+					<ActivityTarget target={target} titles={titles} open={open} />
 				</span>
 				{/* 动作只在结束时发出（suiming.action 只有 completed / failed）；成功的不另外标。 */}
 				{activity.status === "failed" && <span className="shrink-0 text-destructive">失败</span>}

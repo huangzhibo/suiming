@@ -263,10 +263,13 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			await page.locator('.transcript [data-page="text/beat-0001.md"]').first().innerText(),
 			/^[^/]+ · 正文$/u,
 		);
-		// 点开一个动作看完整的输入与输出：事件里只有一句摘要，完整内容点开时从执行记录读；提交的结果排成缩进的 JSON。
+		// 点开一个动作看完整的输入与输出：事件里只有一句摘要，完整内容点开时从执行记录读；提交的 JSON 结果按字段列。
 		const committed = page.locator(".transcript .activity").filter({ hasText: "提交作品" }).first();
 		await committed.locator("summary").first().click();
-		await committed.locator(".action-detail").filter({ hasText: '"revisionLabel"' }).waitFor();
+		await committed
+			.locator(".action-detail")
+			.filter({ hasText: /revisionLabel：r\d+/u })
+			.waitFor();
 		await page.locator('.transcript [data-page="text/beat-0001.md"]').first().click();
 		// 复用当前标签打开，不新增页：后面按基线标签数断言。
 		await page.locator(".tab-btn").filter({ hasText: "beat-0001" }).first().waitFor();

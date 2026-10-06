@@ -4,9 +4,10 @@ import {
 	actionRuns,
 	delegatingActions,
 	detailFields,
-	detailText,
+	internalId,
 	isSessionActive,
 	messageReferences,
+	outputView,
 	sessionProblem,
 	taskRoleLabel,
 	transcriptGroups,
@@ -240,22 +241,38 @@ test("子任务那一行代表建它的委派：根 Agent 那边的委派与审�
 	assert.deepEqual([...delegatingActions(groups, tasks)], ["action-delegate-a"]);
 });
 
-test("点开动作：短参数一行「名：值」，长文本与多行单独成块；JSON 结果排成缩进，其余原样", () => {
+test("点开动作：逐项「名：值」，长文本与多行单独成块，短数组一行；JSON 对象结果按字段列、嵌套展开、换行保留", () => {
 	assert.deepEqual(
-		detailFields({ path: "intent/a.md", content: "第一行\n第二行", check: true, goal: "字".repeat(81) }),
+		detailFields({
+			path: "intent/a.md",
+			content: "第一行\n第二行",
+			check: true,
+			span: [205294, 256503],
+			goal: "字".repeat(81),
+			beatRange: { from: 401, to: 499 },
+		}),
 		[
 			{ name: "path", value: "intent/a.md", block: false },
 			{ name: "content", value: "第一行\n第二行", block: true },
 			{ name: "check", value: "true", block: false },
+			{ name: "span", value: "[205294,256503]", block: false },
 			{ name: "goal", value: "字".repeat(81), block: true },
+			{ name: "beatRange.from", value: "401", block: false },
+			{ name: "beatRange.to", value: "499", block: false },
 		],
 	);
-	assert.equal(
-		detailText('{"revisionLabel":"r2","committed":["a.md"]}'),
-		'{\n  "revisionLabel": "r2",\n  "committed": [\n    "a.md"\n  ]\n}',
-	);
-	assert.equal(detailText("已写入 intent/a.md，5 字"), "已写入 intent/a.md，5 字");
-	assert.equal(detailText("{不是 JSON"), "{不是 JSON");
+	// 委派交回的报告在 JSON 里，换行要还原，不能显示成 \n。
+	assert.deepEqual(outputView('{"taskId":"task_1","result":{"summary":"读完了\\n\\n接着整合"}}'), {
+		fields: [
+			{ name: "taskId", value: "task_1", block: false },
+			{ name: "result.summary", value: "读完了\n\n接着整合", block: true },
+		],
+	});
+	assert.deepEqual(outputView('["a.md","b.md"]'), { text: '[\n  "a.md",\n  "b.md"\n]' });
+	assert.deepEqual(outputView("已写入 intent/a.md，5 字"), { text: "已写入 intent/a.md，5 字" });
+	assert.deepEqual(outputView("{不是 JSON"), { text: "{不是 JSON" });
+	assert.equal(internalId("eo_592ea3347817cc23"), true);
+	assert.equal(internalId("text/beat-0001.md"), false);
 });
 
 test("作者消息里的引用折成标签：原话照常显示，选段带标题与段落位置，修订与内容 SHA 不摊在气泡里", () => {

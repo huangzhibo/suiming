@@ -142,24 +142,50 @@ export function delegatingActions(
 	return new Set(tasks.filter((task) => shown.has(task.id)).map((task) => task.key));
 }
 
-/** 点开动作时参数怎么摆：短的一行「名：值」，长文本与多行的单独成块。 */
-export function detailFields(input: Record<string, unknown>): { name: string; value: string; block: boolean }[] {
-	return Object.entries(input).map(([name, value]) => {
-		const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
-		return { name, value: text, block: text.includes("\n") || Array.from(text).length > 80 };
+export interface DetailField {
+	name: string;
+	value: string;
+	/** 单独成块（长文本、多行、长 JSON），否则一行「名：值」。 */
+	block: boolean;
+}
+
+/**
+ * 点开动作时参数（或 JSON 结果）怎么摆：逐项「名：值」，嵌套的对象展开成「外.内」；字符串保留换行，长的或多行的
+ * 单独成块；其余值写成 JSON，短的一行，长的成块并缩进。斗破走查里 `span: [205294, 256503]` 被拆成四行大块，
+ * 委派交回的报告在 JSON 里换行全成了 \n。
+ */
+export function detailFields(value: Record<string, unknown>, prefix = "", depth = 0): DetailField[] {
+	return Object.entries(value).flatMap(([key, item]): DetailField[] => {
+		const name = prefix ? `${prefix}.${key}` : key;
+		if (item !== null && typeof item === "object" && !Array.isArray(item) && depth < 2)
+			return detailFields(item as Record<string, unknown>, name, depth + 1);
+		if (typeof item === "string")
+			return [{ name, value: item, block: item.includes("\n") || Array.from(item).length > 80 }];
+		const compact = JSON.stringify(item) ?? String(item);
+		return Array.from(compact).length > 80
+			? [{ name, value: JSON.stringify(item, null, 2), block: true }]
+			: [{ name, value: compact, block: false }];
 	});
 }
 
-/** 工具结果是 JSON 的（作品状态、提交、委派的交回）排成缩进的样子，其余原样。 */
-export function detailText(output: string): string {
+/** 工具结果：JSON 对象按字段列（作品状态、提交、委派的交回），JSON 数组排成缩进，其余原样。 */
+export function outputView(output: string): { fields: DetailField[] } | { text: string } {
 	const trimmed = output.trim();
-	if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return output;
-	try {
-		return JSON.stringify(JSON.parse(trimmed), null, 2);
-	} catch {
-		return output;
+	if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+		try {
+			const parsed: unknown = JSON.parse(trimmed);
+			if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed))
+				return { fields: detailFields(parsed as Record<string, unknown>) };
+			return { text: JSON.stringify(parsed, null, 2) };
+		} catch {
+			// 不是 JSON，原样显示
+		}
 	}
+	return { text: output };
 }
+
+/** 内部编号（执行对象、子任务、动作的 id）不给作者看；动作的对象是它们时不显示。 */
+export const internalId = (value: string) => /^(?:eo|task|action|call|session)_[0-9a-f]/u.test(value);
 
 type TaskRole = LocalCommandOutput<"models.show">["profiles"][number]["id"];
 /**
