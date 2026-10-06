@@ -374,7 +374,8 @@ function childProgress(session: HarnessSession, actionId: string): string {
 	const task = session.execution.tasksOf(session.sessionId).find((item) => item.key === actionId);
 	if (task === undefined) return "子任务还没开始，没有进度；要做就重新委派。";
 	const name = task.title === undefined ? task.id : `${task.id}（${task.title}）`;
-	if (task.status === "completed") return `子任务 ${name} 其实已经做完了，调用 resume_task 取回它的结果。`;
+	if (task.status === "completed")
+		return `子任务 ${name} 其实已经做完了，调用 resume_task（taskId: "${task.id}"）取回它的结果。`;
 	return `子任务 ${name} 做了 ${task.usage?.confirmedCalls ?? 0} 次模型调用后停下，写进作品目录的改动都还在（没有提交）。要接着做就调用 resume_task（taskId: "${task.id}"），它从自己的进度继续、不从头来；方向变了就不用管它。`;
 }
 
