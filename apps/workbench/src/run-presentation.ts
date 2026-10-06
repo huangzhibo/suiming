@@ -127,6 +127,40 @@ export function actionRuns<A extends { label: string; status: string }>(
 	return runs;
 }
 
+/**
+ * 子任务那一行已经代表了建它的那次委派或审稿，根 Agent 里那一行就不再单独列：点开子任务那一行，先看到的就是
+ * 委派的内容与交回的结果。只收起对话里确实有子任务那一行的；子任务一个动作都没做就失败了（开场就放不下），
+ * 委派那一行照常显示，否则这件事在对话里就看不见了。
+ */
+export function delegatingActions(
+	groups: readonly { kind: string; taskId?: string }[],
+	tasks: readonly { id: string; key: string }[],
+): Set<string> {
+	const shown = new Set(
+		groups.flatMap((group) => (group.kind === "activities" && group.taskId ? [group.taskId] : [])),
+	);
+	return new Set(tasks.filter((task) => shown.has(task.id)).map((task) => task.key));
+}
+
+/** 点开动作时参数怎么摆：短的一行「名：值」，长文本与多行的单独成块。 */
+export function detailFields(input: Record<string, unknown>): { name: string; value: string; block: boolean }[] {
+	return Object.entries(input).map(([name, value]) => {
+		const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+		return { name, value: text, block: text.includes("\n") || Array.from(text).length > 80 };
+	});
+}
+
+/** 工具结果是 JSON 的（作品状态、提交、委派的交回）排成缩进的样子，其余原样。 */
+export function detailText(output: string): string {
+	const trimmed = output.trim();
+	if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return output;
+	try {
+		return JSON.stringify(JSON.parse(trimmed), null, 2);
+	} catch {
+		return output;
+	}
+}
+
 type TaskRole = LocalCommandOutput<"models.show">["profiles"][number]["id"];
 /**
  * 子任务按角色（它绑定的模型档位）显示的中文名，与设置页的档位名一致（Runtime 的 MODEL_PROFILE_LABELS）；

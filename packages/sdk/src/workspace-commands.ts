@@ -420,6 +420,25 @@ export const LOCAL_COMMANDS = {
 			),
 		),
 	),
+	/**
+	 * 对话里点开一个动作时看的完整输入与输出。事件流里的 `suiming.action` 只带一句摘要，完整内容在跑它的那个 loop
+	 * （根 Agent，或 `taskId` 指的子任务）的 checkpoint 里，点开时才读，不在事件里再存一份。动作还没交回时没有 output；
+	 * 找不到报 `action_not_found`。
+	 */
+	"session.action": command(
+		Type.Object({ sessionId: id, actionId: id, taskId: Type.Optional(id) }, { additionalProperties: false }),
+		Type.Object(
+			{
+				tool: id,
+				input: Type.Record(Type.String(), Type.Unknown()),
+				output: Type.Optional(Type.String()),
+				isError: Type.Boolean(),
+				/** output 太长，只给了前一部分。 */
+				truncated: Type.Boolean(),
+			},
+			{ additionalProperties: false },
+		),
+	),
 	"session.attach": command(
 		Type.Object(
 			{ sessionId: id, afterSequence: Type.Optional(Type.Integer({ minimum: 0 })) },

@@ -529,5 +529,5 @@ html[data-pane-resizing] * {
 .message:hover .message-actions, .message:focus-within .message-actions,
 .message[data-latest="true"] .message-actions { opacity: 1; }
 @media (hover: none) { .message-actions { opacity: 1; } }
-.activities > summary > svg, .activity-run > summary > svg { width: 12px; height: 12px; transition: transform .12s; }
-.activities[open] > summary > svg, .activity-run[open] > summary > svg { transform: rotate(90deg); }
+.activities > summary > svg, .activity-run > summary > svg, .activity > summary > svg { width: 12px; height: 12px; transition: transform .12s; }
+.activities[open] > summary > svg, .activity-run[open] > summary > svg, .activity[open] > summary > svg { transform: rotate(90deg); }

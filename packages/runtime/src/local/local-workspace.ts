@@ -26,6 +26,7 @@ import { OpenStoryDirectoryCache, readOpenStoryDirectory } from "../artifact/ope
 import { commitResult, rollbackResult } from "../artifact/revision-summary.js";
 import { storyPackageCodec } from "../artifact/story-package-codec.js";
 import { sessionSummaries, taskSummaries } from "../execution/session-summary.js";
+import { ActionDetailReader } from "../harness/action-detail.js";
 import { compileDesignViewContext } from "../harness/design-view-context.js";
 import { productEventSnapshot } from "../harness/event-snapshot.js";
 import { parseHostContextTask } from "../harness/host-context.js";
@@ -160,6 +161,8 @@ export class LocalWorkspace implements LocalCommandClient {
 	readonly #directoryCache = new OpenStoryDirectoryCache();
 	/** 按字节对象记住每个文件的投影：目录缓存对没变的文件返回同一个对象，于是不再每 100ms 重解码、重解析。 */
 	readonly #projections = new WeakMap<Uint8Array, FileProjection>();
+	/** 点开对话里的动作时读完整输入输出（session.action）；按 checkpoint 缓存最近几份。 */
+	#actions: ActionDetailReader | undefined;
 	#projection(file: OpenPackageFile): FileProjection {
 		const known = this.#projections.get(file.bytes);
 		if (known?.file.path === file.path) return known;
@@ -519,6 +522,24 @@ export class LocalWorkspace implements LocalCommandClient {
 				if (!session) throw new ArtifactError("session_not_found", sessionId);
 				const consumed = session.inboxSequence ?? 0;
 				return project.readInbox(sessionId).map((item) => ({ ...item, delivered: item.sequence <= consumed }));
+			}
+			case "session.action": {
+				const args = input as LocalCommandInput<"session.action">;
+				const state = project.loadExecutionEntities();
+				const session = state.sessions.find((item) => item.id === args.sessionId);
+				if (!session) throw new ArtifactError("session_not_found", `找不到对话：${args.sessionId}`);
+				// 2026-10-05 之前的事件把根 Agent 的动作也标上 sessionId。
+				const task =
+					args.taskId === undefined || args.taskId === args.sessionId
+						? undefined
+						: state.tasks.find((item) => item.id === args.taskId && item.sessionId === args.sessionId);
+				if (args.taskId !== undefined && args.taskId !== args.sessionId && task === undefined)
+					throw new ArtifactError("task_not_found", `这个对话里没有子任务 ${args.taskId}`);
+				const ref = (task ?? session).checkpointRef;
+				this.#actions ??= new ActionDetailReader(project);
+				const detail = ref === undefined ? undefined : await this.#actions.read(ref.id, args.actionId);
+				if (detail === undefined) throw new ArtifactError("action_not_found", "这一步的原始记录没有保存");
+				return detail;
 			}
 			case "session.attach": {
 				const args = input as LocalCommandInput<"session.attach">;

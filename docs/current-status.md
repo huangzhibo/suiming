@@ -11,7 +11,7 @@
 - **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
 - **证据**：最高到「真实调用」——2026-09-16 重构后第一次完整真实对话（[基线](validation/2026-09-16-first-real-session/README.md)），以及 2026-10 起斗破前 120 章的忠实抽取与留出评测。没有任何能力达到「真实长篇」。
 
-验证（2026-10-06）：`npm run check` 通过（含示例作品 `examples/sanguo` 过 Checker）；`npm test` 446 项，441 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 20 条：2026-10-06 换 Base UI 后 19 条通过，「分栏调宽」卡在进入全屏（宿主屏幕锁着），去掉全屏段单跑其余部分通过，全屏段待解锁后补跑；同日删掉半途核对后，「主进程 SIGKILL 后重开」改成作废重发，还没在真实 Electron 上跑。真实模型回归现有六个任务（2026-10-04 从八个收敛、判分收紧），GPT-6.1 Sol 上的新基线是 2026-10-05 的 18 / 18（[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
+验证（2026-10-06）：`npm run check` 通过（含示例作品 `examples/sanguo` 过 Checker）；`npm test` 449 项，444 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 20 条：2026-10-06 换 Base UI 后 19 条通过，「分栏调宽」卡在进入全屏（宿主屏幕锁着），去掉全屏段单跑其余部分通过，全屏段待解锁后补跑；同日删掉半途核对后，「主进程 SIGKILL 后重开」改成作废重发，对话动作改成两层、点开看完整参数与结果，这两处的 E2E 还没在真实 Electron 上跑。真实模型回归现有六个任务（2026-10-04 从八个收敛、判分收紧），GPT-6.1 Sol 上的新基线是 2026-10-05 的 18 / 18（[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
 
 ## 能力与证据
 

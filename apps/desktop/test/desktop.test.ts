@@ -253,16 +253,21 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			"本轮：作者 1 条 · 意图未改动 · 正文改了 1 个文件 · 审稿改了 1 个文件 · 提交了 2 个版本",
 		);
 		await page.locator(".message.user").filter({ hasText: "诈降" }).first().waitFor();
-		await page.locator(".activities").first().waitFor();
+		await page.locator(".transcript .activity").first().waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/workspace.png" });
-		// 活动的 target 指向真实作品路径时可直接点开。活动按连续性分组，作者回答会把它们隔成多组，所以逐组展开。
+		// 活动的 target 指向真实作品路径时可直接点开。子任务那一行与连着的同类动作都收着，逐个展开再找。
 		for (const group of await page.locator(".activities").all()) await group.locator("summary").first().click();
+		for (const run of await page.locator(".activity-run").all()) await run.locator("summary").first().click();
 		// 显示作品标题，不是路径：作者认不出 text/beat-0001.md 是哪一节。
 		assert.match(
-			await page.locator('.activities [data-page="text/beat-0001.md"]').first().innerText(),
+			await page.locator('.transcript [data-page="text/beat-0001.md"]').first().innerText(),
 			/^[^/]+ · 正文$/u,
 		);
-		await page.locator('.activities [data-page="text/beat-0001.md"]').first().click();
+		// 点开一个动作看完整的输入与输出：事件里只有一句摘要，完整内容点开时从执行记录读；提交的结果排成缩进的 JSON。
+		const committed = page.locator(".transcript .activity").filter({ hasText: "提交作品" }).first();
+		await committed.locator("summary").first().click();
+		await committed.locator(".action-detail").filter({ hasText: '"revisionLabel"' }).waitFor();
+		await page.locator('.transcript [data-page="text/beat-0001.md"]').first().click();
 		// 复用当前标签打开，不新增页：后面按基线标签数断言。
 		await page.locator(".tab-btn").filter({ hasText: "beat-0001" }).first().waitFor();
 		// 审稿从左栏的 Review 组进入；被审版本的稿与当前稿并置在同一页。

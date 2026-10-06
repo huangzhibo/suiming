@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
+import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import {
 	composeReviewFile,
 	JsonFileCredentialStore,
@@ -259,6 +259,62 @@ test("idle 的 session：interrupt 原样返回；delete 带走子任务与执�
 		assert.deepEqual(project.loadExecutionState().sessions, []);
 		assert.deepEqual(project.loadExecutionState().tasks, []);
 		await assert.rejects(workspace.invoke("session.tasks", { sessionId: "s" }), { code: "session_not_found" });
+	}));
+
+test("session.action：点开对话里的动作，从跑它的 loop 的 checkpoint 读完整输入与输出；子任务的按 taskId 找，找不到如实报错", async () =>
+	fixture(async (project) => {
+		const { gateway } = fauxGateway([
+			fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+			fauxAssistantMessage(fauxToolCall("delegate", { goal: "看看阚泽的人物档", title: "看阚泽", profile: "main" })),
+			fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/阚泽.md" })),
+			fauxAssistantMessage(fauxToolCall("submit_task", { summary: "阚泽的人物档读过了" })),
+			fauxAssistantMessage("都看过了"),
+		]);
+		const workspace = new LocalWorkspace(project, async () => gateway);
+		const { sessionId } = await workspace.invoke("session.send", { commandId: "send", text: "看看两个人物" });
+		await untilIdle(workspace);
+		const actions = project
+			.readSessionEvents(sessionId)
+			.map((record) => record.event)
+			.flatMap((event) =>
+				event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.action"
+					? [
+							{
+								id: event.messageId,
+								taskId: event.subagentRunId,
+								label: (event.content as { label: string }).label,
+							},
+						]
+					: [],
+			);
+		const rootRead = actions.find((item) => item.label === "read" && item.taskId === undefined);
+		const childRead = actions.find((item) => item.label === "read" && item.taskId !== undefined);
+		assert.ok(rootRead && childRead);
+		const root = await workspace.invoke("session.action", { sessionId, actionId: rootRead.id });
+		assert.equal(root.tool, "read");
+		assert.deepEqual(root.input, { path: "world/characters/黄盖.md" });
+		assert.match(root.output ?? "", /黄盖/u, "事件里只有一句摘要，这里是完整结果");
+		assert.equal(root.isError, false);
+		const child = await workspace.invoke("session.action", {
+			sessionId,
+			taskId: childRead.taskId as string,
+			actionId: childRead.id,
+		});
+		assert.match(child.output ?? "", /阚泽/u);
+		// 子任务那一行点开先看委派：建它的那次动作在根 Agent 的 loop 里，id 就是子任务的 key。
+		const [task] = await workspace.invoke("session.tasks", { sessionId });
+		assert.ok(task);
+		const delegated = await workspace.invoke("session.action", { sessionId, actionId: task.key });
+		assert.equal(delegated.tool, "delegate");
+		assert.equal(delegated.input.goal, "看看阚泽的人物档");
+		assert.match(delegated.output ?? "", /阚泽的人物档读过了/u);
+		await assert.rejects(workspace.invoke("session.action", { sessionId, actionId: "action_nope" }), {
+			code: "action_not_found",
+		});
+		await assert.rejects(
+			workspace.invoke("session.action", { sessionId, taskId: "task_nope", actionId: childRead.id }),
+			{ code: "task_not_found" },
+		);
 	}));
 
 test("命令重发校验输入：并发 send 只有一个 controller，跑完后的重发返回原回执不再开 turn", async () =>

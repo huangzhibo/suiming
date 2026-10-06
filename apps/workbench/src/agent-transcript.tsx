@@ -5,7 +5,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
-import { actionRuns, messageReferences, taskRoleLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
+import {
+	actionRuns,
+	delegatingActions,
+	detailFields,
+	detailText,
+	messageReferences,
+	taskRoleLabel,
+	transcriptGroups,
+	turnSummaryText,
+} from "./run-presentation.js";
 import { Hint } from "./ui-bits.js";
 import { useConversation } from "./use-conversation.js";
 
@@ -65,6 +74,7 @@ const actionLabels: Record<string, string> = {
 	review: "独立审稿",
 	write_context: "读取写作依据",
 	delegate: "派出子任务",
+	resume_task: "续做子任务",
 	// 2026-10-05 删掉的工具，旧对话的动作记录里还有
 	read_result: "读取子任务结果",
 	read_source: "读原作",
@@ -160,24 +170,208 @@ function UserMessage({
 const TASK_STATUS_TEXT: Record<string, string> = { running: "进行中", failed: "没有完成", interrupted: "已停下" };
 
 /**
- * 一组动作：根 Agent 的是「已执行 N 项操作」，子任务的是「角色 · 它在做什么 · N 项操作」加失败数与状态，
- * 标题来自委派时给的 title（2026-10-06 之前的记录没有，只显示角色）。收起时不挂里面的行：一轮抽取两千多个动作，
- * 全挂上是一万多个节点，切到对话就要渲染好几秒。组里连续的同类动作再并成一行（actionRuns）。
- * 「显示全部操作」打开时各组默认展开，与原来一样。
+ * 点开一个动作看到的完整输入与输出，从跑它的 loop 的执行记录里按需读（`session.action`）：事件里只有一句摘要，
+ * 不为它在事件流里再存一份。revision 变了就重读——子任务那一行里的委派，子任务做完之前还没有交回的结果。
  */
-function ActivityGroup({
+function ActionDetail({
+	sessionId,
+	taskId,
+	actionId,
+	revision,
+}: {
+	sessionId: string;
+	/** 跑这个动作的子任务；根 Agent 的动作不给。 */
+	taskId: string | undefined;
+	actionId: string;
+	revision: string;
+}) {
+	const query = useQuery({
+		queryKey: ["action", sessionId, taskId ?? "", actionId, revision],
+		queryFn: () => invoke("session.action", { sessionId, actionId, ...(taskId === undefined ? {} : { taskId }) }),
+		staleTime: Number.POSITIVE_INFINITY,
+		retry: false,
+	});
+	if (query.isPending) return <p className="action-detail mt-1">正在读取…</p>;
+	if (query.isError)
+		return (
+			<p className="action-detail mt-1">
+				{query.error instanceof Error ? query.error.message : String(query.error)}
+			</p>
+		);
+	const detail = query.data;
+	const fields = detailFields(detail.input);
+	const block = "max-h-60 overflow-auto rounded-md bg-muted px-2 py-1.5 font-sans whitespace-pre-wrap break-words";
+	return (
+		<div className="action-detail mt-1.5 grid gap-1.5 text-foreground/80">
+			{fields.map((field) =>
+				field.block ? (
+					<div key={field.name}>
+						<p className="text-muted-foreground">{field.name}</p>
+						<pre className={`mt-0.5 ${block}`}>{field.value}</pre>
+					</div>
+				) : (
+					<p key={field.name} className="break-words">
+						<span className="text-muted-foreground">{field.name}：</span>
+						{field.value}
+					</p>
+				),
+			)}
+			<div>
+				<p className="text-muted-foreground">结果</p>
+				{detail.output === undefined ? (
+					<p>还没交回。</p>
+				) : (
+					<pre className={`mt-0.5 ${block} ${detail.isError ? "text-destructive" : ""}`}>
+						{detailText(detail.output) || "（没有输出）"}
+					</pre>
+				)}
+				{detail.truncated && <p className="mt-0.5 text-muted-foreground">结果太长，只显示前 10 万字。</p>}
+			</div>
+		</div>
+	);
+}
+
+/** 一个动作一行「名称 · 对象」，点开看完整输入与输出；失败的默认展开。 */
+function ActionRow({
+	sessionId,
+	taskId,
+	activity,
+	titles,
+	open,
+	compact = false,
+}: {
+	sessionId: string;
+	taskId: string | undefined;
+	activity: Activity;
+	titles: ReadonlyMap<string, string>;
+	open(path: string): void;
+	/** 在「修改文件 24 次」这样的行里：动作名已经在上面，只写对象。 */
+	compact?: boolean;
+}) {
+	const [expanded, setExpanded] = useState(activity.status === "failed");
+	const label = actionLabels[activity.label] ?? activity.label;
+	return (
+		<details
+			className="activity leading-relaxed"
+			data-action-id={activity.id}
+			open={expanded}
+			onToggle={(event) => setExpanded(event.currentTarget.open)}
+		>
+			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+				<ChevronRight className="shrink-0" />
+				<span className="min-w-0 flex-1 truncate">
+					{compact && activity.target ? null : label}
+					{activity.target && !compact ? " · " : ""}
+					<ActivityTarget target={activity.target} titles={titles} open={open} />
+				</span>
+				{/* 动作只在结束时发出（suiming.action 只有 completed / failed）；成功的不另外标。 */}
+				{activity.status === "failed" && <span className="shrink-0 text-destructive">失败</span>}
+			</summary>
+			{expanded && (
+				<div className="ml-4">
+					<ActionDetail sessionId={sessionId} taskId={taskId} actionId={activity.id} revision={activity.status} />
+				</div>
+			)}
+		</details>
+	);
+}
+
+/** 连续的同类动作：一行「读取文件 12 次」，展开是每一个，再点开看各自的输入与输出；有失败的默认展开。 */
+function ActionRun({
+	sessionId,
+	taskId,
+	run,
+	titles,
+	open,
+}: {
+	sessionId: string;
+	taskId: string | undefined;
+	run: { label: string; rows: Activity[]; failed: number };
+	titles: ReadonlyMap<string, string>;
+	open(path: string): void;
+}) {
+	const [expanded, setExpanded] = useState(run.failed > 0);
+	return (
+		<details
+			className="activity-run leading-relaxed"
+			open={expanded}
+			onToggle={(event) => setExpanded(event.currentTarget.open)}
+		>
+			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+				<ChevronRight className="shrink-0" />
+				{run.label} {run.rows.length} 次{run.failed ? `，${run.failed} 次失败` : ""}
+			</summary>
+			{expanded && (
+				<div className="mt-1 ml-4 grid gap-1">
+					{run.rows.map((activity) => (
+						<ActionRow
+							key={activity.id}
+							sessionId={sessionId}
+							taskId={taskId}
+							activity={activity}
+							titles={titles}
+							open={open}
+							compact
+						/>
+					))}
+				</div>
+			)}
+		</details>
+	);
+}
+
+/** 一串动作：连续的同类动作并成一行（actionRuns），其余一个一行。 */
+function ActionList({
+	sessionId,
+	taskId,
+	rows,
+	titles,
+	open,
+}: {
+	sessionId: string;
+	taskId: string | undefined;
+	rows: Activity[];
+	titles: ReadonlyMap<string, string>;
+	open(path: string): void;
+}) {
+	return actionRuns(rows, (row) => actionLabels[row.label] ?? row.label).map((run) =>
+		run.rows.length === 1 ? (
+			<ActionRow
+				key={run.rows[0]?.id}
+				sessionId={sessionId}
+				taskId={taskId}
+				activity={run.rows[0] as Activity}
+				titles={titles}
+				open={open}
+			/>
+		) : (
+			<ActionRun key={run.rows[0]?.id} sessionId={sessionId} taskId={taskId} run={run} titles={titles} open={open} />
+		),
+	);
+}
+
+/**
+ * 子任务一行：「角色 · 它在做什么 · N 项操作」加失败数与状态（标题来自委派时给的 title，2026-10-06 之前的记录没有，
+ * 只显示角色）。点开先是委派那一行——交给它的任务与它交回的结果，根 Agent 那边就不再单独列——再是它的每一步。
+ * 收起时不挂里面的行：一轮抽取两千多个动作，全挂上是一万多个节点，切到对话就要渲染好几秒。「展开执行记录」时默认展开。
+ */
+function SubtaskGroup({
+	sessionId,
 	taskId,
 	heading,
 	status,
+	delegation,
 	rows,
 	showLog,
 	titles,
 	open,
 }: {
-	taskId: string | undefined;
-	/** 子任务的「角色 · 标题」；根 Agent 的组不给。 */
-	heading: string | undefined;
+	sessionId: string;
+	taskId: string;
+	heading: string;
 	status: string | undefined;
+	/** 建这个子任务的那次委派或审稿（根 Agent 的动作）；子任务列表还没读到时没有。 */
+	delegation: Activity | undefined;
 	rows: Activity[];
 	showLog: boolean;
 	titles: ReadonlyMap<string, string>;
@@ -190,7 +384,7 @@ function ActivityGroup({
 	const state = status === undefined ? undefined : TASK_STATUS_TEXT[status];
 	return (
 		<details
-			className={`activities text-xs text-muted-foreground ${taskId ? "ml-3 border-l pl-3" : ""}`}
+			className="activities text-xs text-muted-foreground"
 			data-task-id={taskId}
 			open={expanded}
 			onToggle={(event) => setExpanded(event.currentTarget.open)}
@@ -198,82 +392,23 @@ function ActivityGroup({
 			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
 				<ChevronRight className="shrink-0" />
 				<span className="min-w-0 truncate">
-					{heading ? `${heading} · ${count}` : `已执行 ${count}`}
+					{heading} · {count}
 					{state ? ` · ${state}` : ""}
 				</span>
 			</summary>
-			{expanded &&
-				actionRuns(rows, (row) => actionLabels[row.label] ?? row.label).map((run) =>
-					run.rows.length === 1 ? (
-						<ActivityRow key={run.rows[0]?.id} activity={run.rows[0] as Activity} titles={titles} open={open} />
-					) : (
-						<ActivityRun key={run.rows[0]?.id} run={run} titles={titles} open={open} />
-					),
-				)}
-		</details>
-	);
-}
-
-/** 连续的同类动作：一行「读取文件 12 次」，展开再看每一个；有失败的默认展开。 */
-function ActivityRun({
-	run,
-	titles,
-	open,
-}: {
-	run: { label: string; rows: Activity[]; failed: number };
-	titles: ReadonlyMap<string, string>;
-	open(path: string): void;
-}) {
-	const [expanded, setExpanded] = useState(run.failed > 0);
-	return (
-		<details
-			className="activity-run mt-2 ml-3 border-l pl-3 leading-relaxed"
-			open={expanded}
-			onToggle={(event) => setExpanded(event.currentTarget.open)}
-		>
-			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
-				<ChevronRight className="shrink-0" />
-				{run.label} {run.rows.length} 次{run.failed ? `，${run.failed} 次失败` : ""}
-			</summary>
-			{expanded &&
-				run.rows.map((activity) => (
-					<ActivityRow key={activity.id} activity={activity} titles={titles} open={open} compact />
-				))}
-		</details>
-	);
-}
-
-function ActivityRow({
-	activity,
-	titles,
-	open,
-	compact = false,
-}: {
-	activity: Activity;
-	titles: ReadonlyMap<string, string>;
-	open(path: string): void;
-	/** 在「修改文件 24 次」这样的行里：动作名已经在上面，只写对象。 */
-	compact?: boolean;
-}) {
-	const label = actionLabels[activity.label] ?? activity.label;
-	return (
-		<details
-			className="activity mt-2 ml-3 border-l pl-3 leading-relaxed"
-			open={activity.status === "failed" || undefined}
-		>
-			<summary className="flex cursor-pointer items-center justify-between gap-2">
-				<span className="min-w-0 truncate">
-					{compact && activity.target ? null : label}
-					{activity.target && !compact ? " · " : ""}
-					<ActivityTarget target={activity.target} titles={titles} open={open} />
-				</span>
-				<span className="shrink-0">
-					{/* 动作只在结束时发出（suiming.action 只有 completed / failed）。 */}
-					{activity.status === "failed" ? "失败" : "完成"}
-				</span>
-			</summary>
-			{activity.summary && (
-				<p className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{activity.summary}</p>
+			{expanded && (
+				<div className="mt-1 ml-4 grid gap-1">
+					{delegation && (
+						<ActionRow
+							sessionId={sessionId}
+							taskId={undefined}
+							activity={delegation}
+							titles={titles}
+							open={open}
+						/>
+					)}
+					<ActionList sessionId={sessionId} taskId={taskId} rows={rows} titles={titles} open={open} />
+				</div>
 			)}
 		</details>
 	);
@@ -381,6 +516,21 @@ export function Transcript({
 	const groups = transcriptGroups(rows, sessionId);
 	const tasks = useQuery({ queryKey: ["tasks", sessionId], queryFn: () => invoke("session.tasks", { sessionId }) });
 	const taskOf = (taskId: string) => tasks.data?.find((task) => task.id === taskId);
+	// 有子任务那一行的委派与审稿不在根 Agent 的动作里重复列，放进子任务那一行。
+	const delegating = delegatingActions(groups, tasks.data ?? []);
+	const delegationOf = (taskId: string): Activity | undefined => {
+		const task = taskOf(taskId);
+		if (task === undefined) return undefined;
+		// 子任务还在跑时，委派那个动作还没交回、事件还没来。
+		return (
+			store.current.activities.get(task.key) ?? {
+				id: task.key,
+				sequence: 0,
+				label: task.kind === "reviewer" ? "review" : "delegate",
+				status: "running",
+			}
+		);
+	};
 	return (
 		<div className="transcript flex flex-col gap-3">
 			{connectionState === "loading" && !messages.length && (
@@ -416,18 +566,29 @@ export function Transcript({
 						)}
 						<MessageActions text={group.text} onReference={() => onReference(group.id, group.text)} />
 					</article>
+				) : group.taskId === undefined ? (
+					// 根 Agent 的动作直接排在对话里，同类连着的并成一行；点开任何一行看完整输入与输出。
+					group.rows.some((row) => !delegating.has(row.id)) && (
+						<div key={group.rows[0]?.id} className="actions grid gap-1 text-xs text-muted-foreground">
+							<ActionList
+								sessionId={sessionId}
+								taskId={undefined}
+								rows={group.rows.filter((row) => !delegating.has(row.id))}
+								titles={titles}
+								open={open}
+							/>
+						</div>
+					)
 				) : (
-					<ActivityGroup
+					<SubtaskGroup
 						key={group.rows[0]?.id}
+						sessionId={sessionId}
 						taskId={group.taskId}
-						heading={
-							group.taskId === undefined
-								? undefined
-								: [taskRoleLabel(taskOf(group.taskId)?.kind), taskOf(group.taskId)?.title]
-										.filter(Boolean)
-										.join(" · ")
-						}
-						status={group.taskId === undefined ? undefined : taskOf(group.taskId)?.status}
+						heading={[taskRoleLabel(taskOf(group.taskId)?.kind), taskOf(group.taskId)?.title]
+							.filter(Boolean)
+							.join(" · ")}
+						status={taskOf(group.taskId)?.status}
+						delegation={delegationOf(group.taskId)}
 						rows={group.rows}
 						showLog={showLog}
 						titles={titles}

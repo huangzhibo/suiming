@@ -340,6 +340,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 | `session.interrupt`（IPC） | 第 3 节。CLI 没有：每次 `suim` 调用是新进程，停不了别的进程里跑着的 turn，自己跑的那一轮按 Ctrl+C |
 | `session.list` / `session.show`（CLI）/ `session.tasks`（IPC） | 查询；摘要投影只有一份（`sessionSummary`），标题是 inbox 第一条。候选 diff 是 `project.diff`，没有 `session.diff`——候选不属于 session |
 | `session.inbox`（IPC） | 作者消息队列，每条带是否已被取走 |
+| `session.action`（IPC） | 对话里点开一个动作时的完整参数与结果。事件里的 `suiming.action` 只带一句摘要，完整内容在跑它的那个 loop（根 Agent 或子任务）的 checkpoint 里，点开时才读（按 checkpoint 对象缓存最近几份，整读一份几十到两百多毫秒），不在事件里再存一份。依赖 checkpoint 的 `actions` 不被裁剪，与 `resume_task` 同一个前提 |
 | `session.events`（CLI，`--after`）/ `session.attach`（IPC，`afterSequence`） | 从持久游标读事件；attach 只读，不启动执行 |
 | `session.delete`（IPC） | 第 3 节 |
 | `rank`（CLI） | Eval 协议，见下 |

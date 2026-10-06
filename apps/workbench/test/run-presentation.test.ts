@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	actionRuns,
+	delegatingActions,
+	detailFields,
+	detailText,
 	isSessionActive,
 	messageReferences,
 	sessionProblem,
@@ -221,6 +224,38 @@ test("组内连续的同类动作并成一行：读了 12 个文件是一行「�
 		[["修改文件", 2]],
 		"显示成同一个名字的并在一起",
 	);
+});
+
+test("子任务那一行代表建它的委派：根 Agent 那边的委派与审稿不再单独列；子任务一个动作都没做就失败的，委派照常显示", () => {
+	const groups = [
+		{ kind: "activities", rows: [] },
+		{ kind: "activities", taskId: "task-a", rows: [] },
+		{ kind: "message", id: "m" },
+	];
+	const tasks = [
+		{ id: "task-a", key: "action-delegate-a" },
+		// 开场就放不下、一步没做就失败的子任务：对话里没有它那一行。
+		{ id: "task-b", key: "action-delegate-b" },
+	];
+	assert.deepEqual([...delegatingActions(groups, tasks)], ["action-delegate-a"]);
+});
+
+test("点开动作：短参数一行「名：值」，长文本与多行单独成块；JSON 结果排成缩进，其余原样", () => {
+	assert.deepEqual(
+		detailFields({ path: "intent/a.md", content: "第一行\n第二行", check: true, goal: "字".repeat(81) }),
+		[
+			{ name: "path", value: "intent/a.md", block: false },
+			{ name: "content", value: "第一行\n第二行", block: true },
+			{ name: "check", value: "true", block: false },
+			{ name: "goal", value: "字".repeat(81), block: true },
+		],
+	);
+	assert.equal(
+		detailText('{"revisionLabel":"r2","committed":["a.md"]}'),
+		'{\n  "revisionLabel": "r2",\n  "committed": [\n    "a.md"\n  ]\n}',
+	);
+	assert.equal(detailText("已写入 intent/a.md，5 字"), "已写入 intent/a.md，5 字");
+	assert.equal(detailText("{不是 JSON"), "{不是 JSON");
 });
 
 test("作者消息里的引用折成标签：原话照常显示，选段带标题与段落位置，修订与内容 SHA 不摊在气泡里", () => {
