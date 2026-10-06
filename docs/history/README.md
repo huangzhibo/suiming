@@ -14,5 +14,6 @@
 | [工作台审查与收敛](workbench-consolidation.md) | 2026-09-10 | 代码收敛记录 | 作者工作台设计第 7 节 |
 | [Agent 输入能力方案](agent-input-capabilities.md) | 2026-09-10 | 引用与文本附件已实现；语音、图片与 PDF 未排期 | 作者工作台设计 4.1 |
 | [assistant-ui 源码参考](assistant-ui-reference-review.md) | 2026-09-10 | 对话功能的源码研究笔记 | — |
+| [半途恢复简化](recovery-simplification.md) | 2026-10-06 | 删掉半途核对与 paused，改成补「被打断」结果交给模型；逐条测试的删留改 | [Harness 设计](../harness-design.md)第 3、5、10 节 |
 
 已删除的「Agent 自主性评估」（2026-09-07）核心建议已被推翻，原文见基线提交 `7d50f37`。
