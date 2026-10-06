@@ -271,6 +271,8 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 | `main` | 与根相同 | 通用委派 |
 | `researcher` | `reference/**` | 随切片 E 才有，现在 `delegate` 不接受它 |
 
+**子任务带一句给作者看的标题**（2026-10-06）：`delegate` 有可选的 `title`，模型写十来个字说这个子任务做什么（「抽取第 21–40 章」），没给就取 goal 的第一句截到 24 字；审稿按层与范围起（「审正文 · 3 节」）。标题记在 Task 上、随 `session.tasks` 给界面，对话里子任务那一行显示它，不进任何模型请求。原来那一行只有「子任务执行了 47 项操作」，斗破那次 16 个并行的抽取分不清谁负责哪一段；做法对照 Claude Code 的子智能体（一行任务描述加统计，内部步骤收起）。
+
 子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。**子任务的角色就是它的 profile**，TaskRecord 的 `kind` 与 SUBAGENT_STARTED 的 `name` 都记它（`writer`、`source-reader`、`source-extractor`、`main` 来自 `delegate`，`reviewer` 来自 `review`，`judge` 来自 `suim rank`），界面按它显示设置页里同一个档位名。2026-10-05 之前另有一维 kind（`subagent` / `review` / `rank.round`），按建它的入口起名，其中 `subagent` 说的是类别本身；角色推得出入口、入口推不出角色，所以只留角色，读旧记录时界面仍认那三个值。
 
 没有预规划：`plan` / `execute_task` 已删（第 2 节）。根 Agent 要分几步做，写在自己的回复里；`delegate` 是同步调用，结果回来再决定下一个。例外是写入不重叠的委派，见下一段。

@@ -77,6 +77,7 @@ function layerTools(handle: TaskHandle, compiled: CompiledReviewContext): Harnes
 	return [...fileTools(handle.env, "read"), searchTool(handle.scan), checkTool(handle.scan), frameTool(handle.scan)];
 }
 
+const REVIEW_TITLES: Readonly<Record<ReviewLayer, string>> = { design: "审设计", text: "审正文", source: "审原作抽取" };
 const SUBMIT_DESCRIPTIONS: Readonly<Record<ReviewLayer, string>> = {
 	design:
 		"提交对当前 Design 候选的独立 ReviewDraft。finding 必须锚定实际 artifact path，evidence 必须逐字引用该文件里的原文；pass 的 findings/uncovered 必须为空，revise 必须有 finding。",
@@ -103,6 +104,9 @@ export function reviewTask(input: ReviewTaskInput): ReviewTaskHandle {
 	const scope = compiled.subject;
 	const spec: Omit<TaskSpec, "key" | "parent"> = {
 		profileId: "reviewer",
+		title: `${REVIEW_TITLES[input.layer]} · ${
+			scope.kind === "book" ? "全书" : scope.kind === "beats" ? `${scope.storyBeatIds.length} 节` : scope.sourceId
+		}`,
 		// Reviewer 只写自己的审稿文件，作品其它部分对它只读。
 		policy: "write",
 		writable: (path) => path.startsWith("review/"),

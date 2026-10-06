@@ -107,6 +107,8 @@ export interface TaskSpec {
 	 * 其中 subagent 说的是类别本身；角色能推出入口，入口推不出角色，所以只留角色。
 	 */
 	profileId: ModelProfileId;
+	/** 给作者看的一句话（对话里子任务那一行显示它），不进模型的请求。 */
+	title?: string;
 	policy: ConfinedEnvPolicy;
 	writable?: (logicalPath: string) => boolean;
 	readable?: (logicalPath: string) => boolean;
@@ -464,6 +466,7 @@ export class HarnessSession {
 				kind: spec.profileId,
 				key: spec.key,
 				...(spec.parent === undefined ? {} : { parent: spec.parent }),
+				...(spec.title === undefined ? {} : { title: spec.title }),
 				model: bound.snapshot,
 			});
 		} else {

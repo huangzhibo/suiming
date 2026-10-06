@@ -92,6 +92,8 @@ export interface TaskRecord {
 	key: string;
 	/** 发起委派的动作；taskId 缺省表示父是 session 的根 Agent。 */
 	parent?: { taskId?: string; actionId: string };
+	/** 给作者看的一句话：对话里子任务那一行显示它。2026-10-06 之前的记录没有，界面退回角色名。 */
+	title?: string;
 	status: TaskStatus;
 	/** 子任务创建时冻结的模型绑定，跑完为止。 */
 	model?: ModelBindingSnapshot;

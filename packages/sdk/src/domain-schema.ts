@@ -123,6 +123,8 @@ export const taskSummarySchema = Type.Object(
 		/** 子任务的角色，即它绑定的模型档位（writer、reviewer、judge……）；2026-10-05 之前的记录是 subagent / review / rank.round。 */
 		kind: id,
 		key: id,
+		/** 给作者看的一句话；2026-10-06 之前的记录没有。 */
+		title: Type.Optional(Type.String({ minLength: 1 })),
 		status: id,
 		parentTaskId: Type.Optional(id),
 		model: Type.Optional(modelBindingSchema),

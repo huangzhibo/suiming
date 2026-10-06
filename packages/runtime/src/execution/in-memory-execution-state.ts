@@ -64,6 +64,7 @@ export interface AddTaskInput {
 	kind: string;
 	key: string;
 	parent?: { taskId?: string; actionId: string };
+	title?: string;
 	model?: ModelBindingSnapshot;
 }
 
@@ -380,6 +381,7 @@ export class InMemoryExecutionState {
 				kind: nonempty(input.kind, "task.kind"),
 				key,
 				...(input.parent === undefined ? {} : { parent: { ...input.parent } }),
+				...(input.title ? { title: input.title } : {}),
 				status: "running",
 				...(input.model === undefined ? {} : { model: clone(input.model) }),
 				createdAt: timestamp,

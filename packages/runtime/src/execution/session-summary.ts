@@ -70,6 +70,7 @@ export interface TaskSummary {
 	id: string;
 	kind: string;
 	key: string;
+	title?: string;
 	status: string;
 	parentTaskId?: string;
 	model?: {
@@ -92,6 +93,7 @@ export function taskSummaries(execution: ExecutionEntities, sessionId: string): 
 			id: task.id,
 			kind: task.kind,
 			key: task.key,
+			...(task.title === undefined ? {} : { title: task.title }),
 			status: task.status,
 			...(task.parent?.taskId === undefined ? {} : { parentTaskId: task.parent.taskId }),
 			...(task.model === undefined

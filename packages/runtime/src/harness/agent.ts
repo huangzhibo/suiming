@@ -56,6 +56,14 @@ const ReviewSchema = Type.Object(
 const DelegateSchema = Type.Object(
 	{
 		goal: Type.String({ minLength: 1 }),
+		title: Type.Optional(
+			Type.String({
+				minLength: 1,
+				maxLength: 40,
+				description:
+					"给作者看的一句话，十来个字，说这个子任务做什么（如「抽取第 21–40 章」）；对话里子任务那一行显示它",
+			}),
+		),
 		profile: Type.Union([
 			Type.Literal("main"),
 			Type.Literal("writer"),
@@ -164,6 +172,12 @@ function projectStatusTool(session: HarnessSession, handle: TaskHandle): Harness
 
 const beatNumber = (value: number) => String(value).padStart(4, "0");
 
+/** 模型没给标题时，取 goal 的第一句，超过 24 个字截短。 */
+function goalTitle(goal: string): string {
+	const first = [...(goal.trim().split(/[。；！？\n]/u)[0] ?? "")];
+	return first.length > 24 ? `${first.slice(0, 23).join("")}…` : first.join("");
+}
+
 /**
  * 分段的 source-extractor 能写什么：号段内的 Beat（在哪个卷目录都算，整合时会移卷）与这段的笔记。
  * 并行的各段号段不重叠，写入就不重叠（Harness 设计第 9 节「Source 抽取的分工」）。
@@ -271,6 +285,7 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 		let submission: unknown;
 		const spec: Omit<TaskSpec, "key" | "parent"> = {
 			profileId: params.profile,
+			title: params.title?.trim() || goalTitle(params.goal),
 			policy,
 			...(writable === undefined ? {} : { writable }),
 			// 目录本身也要放行（list 传进来的是不带斜杠的 source/<id>），与 Source Reviewer 的读范围同一口径。

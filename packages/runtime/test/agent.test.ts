@@ -17,6 +17,7 @@ import {
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
 import { EventType, type SessionEventBody } from "@suiming/sdk";
 import { from, lastValueFrom, toArray } from "rxjs";
+import { taskSummaries } from "../src/execution/session-summary.js";
 import { agentTurn } from "../src/harness/agent.js";
 import { productEventSnapshot } from "../src/harness/event-snapshot.js";
 import type { LoopCheckpoint } from "../src/harness/loop.js";
@@ -971,6 +972,49 @@ test("Reviewer 交的引文在被审文件里找不到：拒绝回到 Reviewer �
 		const written = await f.checkoutFile(`review/${reviews[0]}`);
 		assert.match(written, /江东老将，跟过孙坚、孙策/u);
 		assert.doesNotMatch(written, /他从来没到过赤壁/u);
+	} finally {
+		await f.close();
+	}
+});
+
+test("子任务带一句给作者看的标题：委派时给的 title，没给就取 goal 的第一句并截短；审稿按层与范围", async () => {
+	// 2026-10-06 作者对照 Claude Code：对话里子任务那一行原来只写「子任务执行了 47 项操作」，
+	// 斗破那次 16 个并行的抽取分不清谁负责哪一段。标题记在执行库的 Task 上，taskSummaries 带给界面。
+	const f = await fixture();
+	try {
+		f.provider.setResponses([
+			call("delegate", {
+				goal: "核对黄盖人物档里写的年纪与官职，和赤壁之战时的记载对一遍；只读不改。",
+				profile: "main",
+				title: "核对黄盖的年纪与官职",
+			}),
+			call("submit_task", { summary: "对过了" }),
+			call("delegate", {
+				goal: "把苦肉计这一节的设计从头读一遍，找出代价写得不够具体的地方，列出来交回。不要改文件。",
+				profile: "main",
+			}),
+			call("submit_task", { summary: "列好了" }),
+			call("review", { layer: "design", goal: "核对人物档" }),
+			call("submit_review", {
+				verdict: "pass",
+				summary: "没有问题",
+				findings: [],
+				uncovered: [],
+				uncertainties: [],
+			}),
+			reply("都做完了"),
+		]);
+		const outcome = await f.say("分头看一下");
+		assert.equal(outcome.failure, undefined);
+		const execution = f.project.loadExecutionState();
+		assert.deepEqual(
+			taskSummaries(execution, outcome.session.id).map((task) => [task.kind, task.title]),
+			[
+				["main", "核对黄盖的年纪与官职"],
+				["main", "把苦肉计这一节的设计从头读一遍，找出代价写得不…"],
+				["reviewer", "审设计 · 全书"],
+			],
+		);
 	} finally {
 		await f.close();
 	}
