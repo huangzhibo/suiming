@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+	actionRuns,
 	isSessionActive,
 	messageReferences,
 	sessionProblem,
@@ -197,6 +198,33 @@ test("并行的子任务动作交错到达时，同一段里按子任务各成�
 			"message",
 			["task-2", ["g"]],
 		],
+	);
+});
+
+test("组内连续的同类动作并成一行：读了 12 个文件是一行「读取文件 12 次」，展开再看每一个", () => {
+	const row = (id: string, label: string, status = "completed") => ({ id, label, status });
+	assert.deepEqual(
+		actionRuns([
+			row("1", "read"),
+			row("2", "read"),
+			row("3", "read", "failed"),
+			row("4", "write"),
+			row("5", "read"),
+		]).map((run) => [run.label, run.rows.map((item) => item.id), run.failed]),
+		[
+			["read", ["1", "2", "3"], 1],
+			["write", ["4"], 0],
+			["read", ["5"], 0],
+		],
+	);
+	const shown: Record<string, string> = { write: "修改文件", edit: "修改文件" };
+	assert.deepEqual(
+		actionRuns([row("1", "write"), row("2", "edit")], (item) => shown[item.label] ?? item.label).map((run) => [
+			run.label,
+			run.rows.length,
+		]),
+		[["修改文件", 2]],
+		"显示成同一个名字的并在一起",
 	);
 });
 

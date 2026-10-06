@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
-import { messageReferences, taskRoleLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
+import { actionRuns, messageReferences, taskRoleLabel, transcriptGroups, turnSummaryText } from "./run-presentation.js";
 import { Hint } from "./ui-bits.js";
 import { useConversation } from "./use-conversation.js";
 
@@ -71,6 +71,12 @@ const actionLabels: Record<string, string> = {
 	source_coverage: "查看原作读到哪里",
 	story_guide: "查格式说明",
 	read_material: "读材料",
+	search_material: "检索材料",
+	search_source: "检索原作",
+	impact: "查看改动影响",
+	copy: "复制文件",
+	move: "移动文件",
+	submit_ranking: "交回排名",
 	submit_task: "交回子任务结果",
 	submit_review: "交回审稿",
 };
@@ -150,20 +156,28 @@ function UserMessage({
 	);
 }
 
+/** 子任务停在哪儿；完成的不另外说。 */
+const TASK_STATUS_TEXT: Record<string, string> = { running: "进行中", failed: "没有完成", interrupted: "已停下" };
+
 /**
- * 一组动作。收起时不挂里面的行：一轮抽取两千多个动作，全挂上是一万多个节点，切到对话就要渲染好几秒。
+ * 一组动作：根 Agent 的是「已执行 N 项操作」，子任务的是「角色 · 它在做什么 · N 项操作」加失败数与状态，
+ * 标题来自委派时给的 title（2026-10-06 之前的记录没有，只显示角色）。收起时不挂里面的行：一轮抽取两千多个动作，
+ * 全挂上是一万多个节点，切到对话就要渲染好几秒。组里连续的同类动作再并成一行（actionRuns）。
  * 「显示全部操作」打开时各组默认展开，与原来一样。
  */
 function ActivityGroup({
 	taskId,
-	label,
+	heading,
+	status,
 	rows,
 	showLog,
 	titles,
 	open,
 }: {
 	taskId: string | undefined;
-	label: string;
+	/** 子任务的「角色 · 标题」；根 Agent 的组不给。 */
+	heading: string | undefined;
+	status: string | undefined;
 	rows: Activity[];
 	showLog: boolean;
 	titles: ReadonlyMap<string, string>;
@@ -171,6 +185,9 @@ function ActivityGroup({
 }) {
 	const [expanded, setExpanded] = useState(showLog);
 	useEffect(() => setExpanded(showLog), [showLog]);
+	const failed = rows.filter((item) => item.status === "failed").length;
+	const count = `${rows.length} 项操作${failed ? `，${failed} 项失败` : ""}`;
+	const state = status === undefined ? undefined : TASK_STATUS_TEXT[status];
 	return (
 		<details
 			className={`activities text-xs text-muted-foreground ${taskId ? "ml-3 border-l pl-3" : ""}`}
@@ -179,33 +196,85 @@ function ActivityGroup({
 			onToggle={(event) => setExpanded(event.currentTarget.open)}
 		>
 			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
-				<ChevronRight />
-				{label}
-				{rows.some((item) => item.status === "failed") && " · 有操作失败"}
+				<ChevronRight className="shrink-0" />
+				<span className="min-w-0 truncate">
+					{heading ? `${heading} · ${count}` : `已执行 ${count}`}
+					{state ? ` · ${state}` : ""}
+				</span>
 			</summary>
 			{expanded &&
-				rows.map((activity) => (
-					<details
-						key={activity.id}
-						className="activity mt-2 ml-3 border-l pl-3 leading-relaxed"
-						open={activity.status === "failed" || undefined}
-					>
-						<summary className="flex cursor-pointer items-center justify-between gap-2">
-							<span className="min-w-0 truncate">
-								{actionLabels[activity.label] ?? activity.label}
-								{activity.target ? " · " : ""}
-								<ActivityTarget target={activity.target} titles={titles} open={open} />
-							</span>
-							<span>
-								{/* 动作只在结束时发出（suiming.action 只有 completed / failed）。 */}
-								{activity.status === "failed" ? "失败" : "完成"}
-							</span>
-						</summary>
-						{activity.summary && (
-							<p className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{activity.summary}</p>
-						)}
-					</details>
+				actionRuns(rows, (row) => actionLabels[row.label] ?? row.label).map((run) =>
+					run.rows.length === 1 ? (
+						<ActivityRow key={run.rows[0]?.id} activity={run.rows[0] as Activity} titles={titles} open={open} />
+					) : (
+						<ActivityRun key={run.rows[0]?.id} run={run} titles={titles} open={open} />
+					),
+				)}
+		</details>
+	);
+}
+
+/** 连续的同类动作：一行「读取文件 12 次」，展开再看每一个；有失败的默认展开。 */
+function ActivityRun({
+	run,
+	titles,
+	open,
+}: {
+	run: { label: string; rows: Activity[]; failed: number };
+	titles: ReadonlyMap<string, string>;
+	open(path: string): void;
+}) {
+	const [expanded, setExpanded] = useState(run.failed > 0);
+	return (
+		<details
+			className="activity-run mt-2 ml-3 border-l pl-3 leading-relaxed"
+			open={expanded}
+			onToggle={(event) => setExpanded(event.currentTarget.open)}
+		>
+			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+				<ChevronRight className="shrink-0" />
+				{run.label} {run.rows.length} 次{run.failed ? `，${run.failed} 次失败` : ""}
+			</summary>
+			{expanded &&
+				run.rows.map((activity) => (
+					<ActivityRow key={activity.id} activity={activity} titles={titles} open={open} compact />
 				))}
+		</details>
+	);
+}
+
+function ActivityRow({
+	activity,
+	titles,
+	open,
+	compact = false,
+}: {
+	activity: Activity;
+	titles: ReadonlyMap<string, string>;
+	open(path: string): void;
+	/** 在「修改文件 24 次」这样的行里：动作名已经在上面，只写对象。 */
+	compact?: boolean;
+}) {
+	const label = actionLabels[activity.label] ?? activity.label;
+	return (
+		<details
+			className="activity mt-2 ml-3 border-l pl-3 leading-relaxed"
+			open={activity.status === "failed" || undefined}
+		>
+			<summary className="flex cursor-pointer items-center justify-between gap-2">
+				<span className="min-w-0 truncate">
+					{compact && activity.target ? null : label}
+					{activity.target && !compact ? " · " : ""}
+					<ActivityTarget target={activity.target} titles={titles} open={open} />
+				</span>
+				<span className="shrink-0">
+					{/* 动作只在结束时发出（suiming.action 只有 completed / failed）。 */}
+					{activity.status === "failed" ? "失败" : "完成"}
+				</span>
+			</summary>
+			{activity.summary && (
+				<p className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{activity.summary}</p>
+			)}
 		</details>
 	);
 }
@@ -311,7 +380,7 @@ export function Transcript({
 	}
 	const groups = transcriptGroups(rows, sessionId);
 	const tasks = useQuery({ queryKey: ["tasks", sessionId], queryFn: () => invoke("session.tasks", { sessionId }) });
-	const taskRole = (taskId: string) => tasks.data?.find((task) => task.id === taskId)?.kind;
+	const taskOf = (taskId: string) => tasks.data?.find((task) => task.id === taskId);
 	return (
 		<div className="transcript flex flex-col gap-3">
 			{connectionState === "loading" && !messages.length && (
@@ -351,11 +420,14 @@ export function Transcript({
 					<ActivityGroup
 						key={group.rows[0]?.id}
 						taskId={group.taskId}
-						label={
-							group.taskId
-								? `${taskRoleLabel(taskRole(group.taskId))}执行了 ${group.rows.length} 项操作`
-								: `已执行 ${group.rows.length} 项操作`
+						heading={
+							group.taskId === undefined
+								? undefined
+								: [taskRoleLabel(taskOf(group.taskId)?.kind), taskOf(group.taskId)?.title]
+										.filter(Boolean)
+										.join(" · ")
 						}
+						status={group.taskId === undefined ? undefined : taskOf(group.taskId)?.status}
 						rows={group.rows}
 						showLog={showLog}
 						titles={titles}

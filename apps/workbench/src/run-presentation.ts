@@ -115,6 +115,27 @@ export function transcriptGroups<R extends TranscriptRow>(rows: readonly R[], se
 	return groups;
 }
 
+/**
+ * 组里连续的同类动作并成一行（读了 12 个文件是一行「读取文件 12 次」，展开再看每一个）。只并相邻的：
+ * 动作之间的先后有意义（读完再写、写完再检查），不按种类重排。
+ */
+export function actionRuns<A extends { label: string; status: string }>(
+	rows: readonly A[],
+	/** 按什么算同类：界面上按显示的名字，write 与 edit 都显示「修改文件」，就并在一起。 */
+	kind: (row: A) => string = (row) => row.label,
+): { label: string; rows: A[]; failed: number }[] {
+	const runs: { label: string; rows: A[]; failed: number }[] = [];
+	for (const row of rows) {
+		const previous = runs.at(-1);
+		const label = kind(row);
+		const run = previous?.label === label ? previous : { label, rows: [], failed: 0 };
+		if (run !== previous) runs.push(run);
+		run.rows.push(row);
+		if (row.status === "failed") run.failed += 1;
+	}
+	return runs;
+}
+
 type TaskRole = LocalCommandOutput<"models.show">["profiles"][number]["id"];
 /**
  * 子任务按角色（它绑定的模型档位）显示的中文名，与设置页的档位名一致（Runtime 的 MODEL_PROFILE_LABELS）；
