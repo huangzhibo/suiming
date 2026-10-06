@@ -93,6 +93,28 @@ test("对话交给 AG-UI 官方客户端拼：attach 快照加之后的增量，
 	assert.equal(conversationMessages(agent.messages)[0]?.sequence, 2, "快照里的持久序号随消息带着");
 });
 
+test("动作快照不进官方客户端：它每应用一个事件就深拷贝整份消息列表，动作多了是平方级", async () => {
+	// 2026-10-06 斗破 120 章那次对话 attach 时有两千多个动作快照，客户端为每个事件 structuredClone 一遍全部消息，
+	// 主线程卡住四秒。动作由对话视图直接从事件流读（bridge 的 onEvent），官方客户端只拼对话里的话。
+	const actions = Array.from(
+		{ length: 3 },
+		(_, index): AGUIEvent => ({
+			type: EventType.ACTIVITY_SNAPSHOT,
+			messageId: `a${index}`,
+			activityType: "suiming.action",
+			content: { label: "read", status: "completed" },
+		}),
+	);
+	const agent = new DesktopAgent("s", () =>
+		stream([run("t1"), ...actions, ...text("m1", "assistant", "好"), finished("t1")]),
+	);
+	await agent.connectAgent();
+	assert.deepEqual(
+		agent.messages.map((message) => [message.id, message.role]),
+		[["m1", "assistant"]],
+	);
+});
+
 test("落在运行之外的事件会让官方客户端整条流报错：Runtime 那边由 run-event-stream 的生命周期测试守着", async () => {
 	// 换客户端前查到 Runtime 唯一一处不符：新建 session 的 suiming.session 通知落在任何一次运行之前。
 	const outside: AGUIEvent = {

@@ -1,4 +1,4 @@
-import { AbstractAgent, type BaseEvent, type Message } from "@ag-ui/client";
+import { AbstractAgent, type BaseEvent, EventType, type Message } from "@ag-ui/client";
 import { Observable, throwError } from "rxjs";
 
 /**
@@ -25,7 +25,12 @@ export class DesktopAgent extends AbstractAgent {
 			const controller = new AbortController();
 			void (async () => {
 				try {
-					for await (const event of this.#events(controller.signal)) subscriber.next(event);
+					for await (const event of this.#events(controller.signal)) {
+						// 动作快照不交给官方客户端：它每应用一个事件就把整份消息列表深拷贝一遍，动作也算消息，
+						// 两千多个动作的对话 attach 时主线程卡住四秒（2026-10-06）。对话视图直接从事件流读动作。
+						if (event.type === EventType.ACTIVITY_SNAPSHOT || event.type === EventType.ACTIVITY_DELTA) continue;
+						subscriber.next(event);
+					}
 					subscriber.complete();
 				} catch (error) {
 					subscriber.error(error);
@@ -45,7 +50,7 @@ export interface ConversationMessage {
 }
 
 /**
- * 对话里给作者看的消息：作者与根 Agent 的话；动作快照、子任务的话（带 AG-UI 的 subagentRunId）与空消息不算。
+ * 对话里给作者看的消息：作者与根 Agent 的话；子任务的话（带 AG-UI 的 subagentRunId）与空消息不算。
  * 2026-10-05 之前落盘的事件没有 subagentRunId，子任务的话靠 metadata.suiming.taskKind 认（根 Agent 是 "agent"）。
  */
 export function conversationMessages(messages: readonly Message[]): ConversationMessage[] {

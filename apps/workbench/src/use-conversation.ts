@@ -18,8 +18,19 @@ export function useConversation(
 		const agent = new DesktopAgent(sessionId, (signal) =>
 			attachEvents(sessionId, onEvent, onConnection, once, signal),
 		);
+		// 官方客户端每应用一个事件就回调一次：长对话 attach 时一次重放几千个事件，逐个过滤消息再重渲染会卡住主线程，
+		// 这里只记下最新的列表，按帧合成一次。
+		let latest: Parameters<typeof conversationMessages>[0] = [];
+		let frame = 0;
 		const { unsubscribe } = agent.subscribe({
-			onMessagesChanged: ({ messages: next }) => setMessages(conversationMessages(next)),
+			onMessagesChanged: ({ messages: next }) => {
+				latest = next;
+				if (!frame)
+					frame = requestAnimationFrame(() => {
+						frame = 0;
+						setMessages(conversationMessages(latest));
+					});
+			},
 			onRunStartedEvent: () => {
 				setGenerating(true);
 			},
@@ -36,6 +47,7 @@ export function useConversation(
 			onConnection("disconnected");
 		});
 		return () => {
+			cancelAnimationFrame(frame);
 			unsubscribe();
 			void agent.detachActiveRun();
 		};

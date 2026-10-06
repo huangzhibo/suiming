@@ -150,6 +150,66 @@ function UserMessage({
 	);
 }
 
+/**
+ * 一组动作。收起时不挂里面的行：一轮抽取两千多个动作，全挂上是一万多个节点，切到对话就要渲染好几秒。
+ * 「显示全部操作」打开时各组默认展开，与原来一样。
+ */
+function ActivityGroup({
+	taskId,
+	label,
+	rows,
+	showLog,
+	titles,
+	open,
+}: {
+	taskId: string | undefined;
+	label: string;
+	rows: Activity[];
+	showLog: boolean;
+	titles: ReadonlyMap<string, string>;
+	open(path: string): void;
+}) {
+	const [expanded, setExpanded] = useState(showLog);
+	useEffect(() => setExpanded(showLog), [showLog]);
+	return (
+		<details
+			className={`activities text-xs text-muted-foreground ${taskId ? "ml-3 border-l pl-3" : ""}`}
+			data-task-id={taskId}
+			open={expanded}
+			onToggle={(event) => setExpanded(event.currentTarget.open)}
+		>
+			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+				<ChevronRight />
+				{label}
+				{rows.some((item) => item.status === "failed") && " · 有操作失败"}
+			</summary>
+			{expanded &&
+				rows.map((activity) => (
+					<details
+						key={activity.id}
+						className="activity mt-2 ml-3 border-l pl-3 leading-relaxed"
+						open={activity.status === "failed" || undefined}
+					>
+						<summary className="flex cursor-pointer items-center justify-between gap-2">
+							<span className="min-w-0 truncate">
+								{actionLabels[activity.label] ?? activity.label}
+								{activity.target ? " · " : ""}
+								<ActivityTarget target={activity.target} titles={titles} open={open} />
+							</span>
+							<span>
+								{/* 动作只在结束时发出（suiming.action 只有 completed / failed）。 */}
+								{activity.status === "failed" ? "失败" : "完成"}
+							</span>
+						</summary>
+						{activity.summary && (
+							<p className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{activity.summary}</p>
+						)}
+					</details>
+				))}
+		</details>
+	);
+}
+
 type Row =
 	| { kind: "message"; id: string; sequence: number; role: string; text: string }
 	| { kind: "activity"; id: string; sequence: number; activity: Activity }
@@ -177,23 +237,27 @@ export function Transcript({
 	onReference(id: string, text: string): void;
 }) {
 	const links = useMemo(() => new Map([...titles.keys()].map((path) => [path, () => open(path)])), [titles, open]);
-	const [activities, setActivities] = useState<Record<string, Activity>>({});
-	const [summaries, setSummaries] = useState<Record<string, { sequence: number; summary: SuimingTurnSummary }>>({});
-	const [order, setOrder] = useState<Record<string, number>>({});
+	// 事件只改这份记录，同一帧里到的合成一次重渲染。原来每个动作快照都 setState 复制整份记录：长对话 attach 时
+	// 一次重放两千多个动作，复制是平方级的，加上逐个重渲染，主线程卡住四秒多（2026-10-06，斗破 120 章那次对话）。
+	const store = useRef({
+		activities: new Map<string, Activity>(),
+		summaries: new Map<string, { sequence: number; summary: SuimingTurnSummary }>(),
+		order: new Map<string, number>(),
+	});
+	const [, setVersion] = useState(0);
+	const frame = useRef(0);
+	useEffect(() => () => cancelAnimationFrame(frame.current), []);
 	const [connectionState, setConnectionState] = useState("loading");
 	const onEvent = useCallback((record: SessionEvent) => {
 		const event = record.event;
-		if (event.type === "TEXT_MESSAGE_START")
-			setOrder((previous) => ({ ...previous, [event.messageId]: record.sequence }));
+		const { activities, summaries, order } = store.current;
+		if (event.type === "TEXT_MESSAGE_START") order.set(event.messageId, record.sequence);
 		if (event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn")
-			setSummaries((previous) => ({
-				...previous,
-				[event.messageId]: {
-					sequence:
-						previous[event.messageId]?.sequence ?? Number(event.metadata?.suiming?.sequence ?? record.sequence),
-					summary: event.content as SuimingTurnSummary,
-				},
-			}));
+			summaries.set(event.messageId, {
+				sequence:
+					summaries.get(event.messageId)?.sequence ?? Number(event.metadata?.suiming?.sequence ?? record.sequence),
+				summary: event.content as SuimingTurnSummary,
+			});
 		if (event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.action") {
 			const body = event.content as {
 				/** 2026-10-05 之前落盘的事件：执行者写在内容里（根 Agent 是 sessionId），现在是事件上的 subagentRunId。 */
@@ -203,23 +267,26 @@ export function Transcript({
 				target?: string;
 				summary?: string;
 			};
-			setActivities((previous) => ({
-				...previous,
-				[event.messageId]: {
-					...body,
-					...(event.subagentRunId === undefined ? {} : { taskId: event.subagentRunId }),
-					id: event.messageId,
-					sequence:
-						previous[event.messageId]?.sequence ?? Number(event.metadata?.suiming?.sequence ?? record.sequence),
-				},
-			}));
+			activities.set(event.messageId, {
+				...body,
+				...(event.subagentRunId === undefined ? {} : { taskId: event.subagentRunId }),
+				id: event.messageId,
+				sequence:
+					activities.get(event.messageId)?.sequence ??
+					Number(event.metadata?.suiming?.sequence ?? record.sequence),
+			});
 		}
+		if (!frame.current)
+			frame.current = requestAnimationFrame(() => {
+				frame.current = 0;
+				setVersion((version) => version + 1);
+			});
 	}, []);
 	const { messages, generating } = useConversation(sessionId, onEvent, setConnectionState, history);
 	const rows: Row[] = messages.map((message) => ({
 		kind: "message" as const,
 		id: message.id,
-		sequence: order[message.id] ?? message.sequence ?? 0,
+		sequence: store.current.order.get(message.id) ?? message.sequence ?? 0,
 		role: message.role,
 		text: message.text,
 	}));
@@ -231,14 +298,14 @@ export function Transcript({
 		if (connectionState === "ready" && messages.length) onExport(sessionId, exported);
 	}, [sessionId, exported, onExport, connectionState, messages.length]);
 	rows.push(
-		...Object.values(activities).map((activity) => ({
+		...[...store.current.activities.values()].map((activity) => ({
 			kind: "activity" as const,
 			id: activity.id,
 			sequence: activity.sequence,
 			activity,
 		})),
 	);
-	for (const [id, { sequence, summary }] of Object.entries(summaries)) {
+	for (const [id, { sequence, summary }] of store.current.summaries) {
 		const text = turnSummaryText(summary);
 		if (text) rows.push({ kind: "summary", id, sequence, text });
 	}
@@ -281,42 +348,19 @@ export function Transcript({
 						<MessageActions text={group.text} onReference={() => onReference(group.id, group.text)} />
 					</article>
 				) : (
-					<details
+					<ActivityGroup
 						key={group.rows[0]?.id}
-						className={`activities text-xs text-muted-foreground ${group.taskId ? "ml-3 border-l pl-3" : ""}`}
-						data-task-id={group.taskId}
-						open={showLog || undefined}
-					>
-						<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
-							<ChevronRight />
-							{group.taskId
+						taskId={group.taskId}
+						label={
+							group.taskId
 								? `${taskRoleLabel(taskRole(group.taskId))}执行了 ${group.rows.length} 项操作`
-								: `已执行 ${group.rows.length} 项操作`}
-							{group.rows.some((item) => item.status === "failed") && " · 有操作失败"}
-						</summary>
-						{group.rows.map((activity) => (
-							<details
-								key={activity.id}
-								className="activity mt-2 ml-3 border-l pl-3 leading-relaxed"
-								open={activity.status === "failed" || undefined}
-							>
-								<summary className="flex cursor-pointer items-center justify-between gap-2">
-									<span className="min-w-0 truncate">
-										{actionLabels[activity.label] ?? activity.label}
-										{activity.target ? " · " : ""}
-										<ActivityTarget target={activity.target} titles={titles} open={open} />
-									</span>
-									<span>
-										{/* 动作只在结束时发出（suiming.action 只有 completed / failed）。 */}
-										{activity.status === "failed" ? "失败" : "完成"}
-									</span>
-								</summary>
-								{activity.summary && (
-									<p className="max-h-32 overflow-auto whitespace-pre-wrap break-words">{activity.summary}</p>
-								)}
-							</details>
-						))}
-					</details>
+								: `已执行 ${group.rows.length} 项操作`
+						}
+						rows={group.rows}
+						showLog={showLog}
+						titles={titles}
+						open={open}
+					/>
 				),
 			)}
 			{!history && <InboxStatus sessionId={sessionId} />}
