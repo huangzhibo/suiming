@@ -77,9 +77,8 @@ type TranscriptRow =
 	| { kind: "message" | "summary"; id: string; sequence: number }
 	| { kind: "activity"; id: string; sequence: number; activity: { taskId?: string | undefined } };
 type ActivityOf<R> = R extends { kind: "activity"; activity: infer A } ? A : never;
-export type TranscriptGroup<R> =
-	| Exclude<R, { kind: "activity" }>
-	| { kind: "activities"; taskId?: string; rows: ActivityOf<R>[] };
+type ActivityGroup<R> = { kind: "activities"; taskId?: string; rows: ActivityOf<R>[] };
+export type TranscriptGroup<R> = Exclude<R, { kind: "activity" }> | ActivityGroup<R>;
 
 /**
  * 对话按时间排好之后成组：消息与 turn 摘要各自一行；相邻的动作按执行者并成一组——根 Agent 的一组，
@@ -88,17 +87,30 @@ export type TranscriptGroup<R> =
  */
 export function transcriptGroups<R extends TranscriptRow>(rows: readonly R[], sessionId: string): TranscriptGroup<R>[] {
 	const groups: TranscriptGroup<R>[] = [];
+	// 一段从上一条消息或根 Agent 的动作之后开始。并行的子任务动作在事件流里交错到达，同一段里按子任务归组，
+	// 不在每次换任务时断开；根 Agent 的动作仍是时间上的分界，不往前并。
+	let span = 0;
 	for (const row of [...rows].sort((a, b) => a.sequence - b.sequence)) {
 		if (row.kind !== "activity") {
 			groups.push(row as Exclude<R, { kind: "activity" }>);
+			span = groups.length;
 			continue;
 		}
 		const activity = (row as Extract<R, { kind: "activity" }>).activity as ActivityOf<R>;
 		const owner = (activity as { taskId?: string | undefined }).taskId;
 		const taskId = owner && owner !== sessionId ? owner : undefined;
 		const previous = groups.at(-1);
-		if (previous?.kind === "activities" && previous.taskId === taskId) previous.rows.push(activity);
-		else groups.push({ kind: "activities", ...(taskId === undefined ? {} : { taskId }), rows: [activity] });
+		if (taskId === undefined) {
+			if (previous?.kind === "activities" && previous.taskId === undefined) previous.rows.push(activity);
+			else groups.push({ kind: "activities", rows: [activity] });
+			span = groups.length;
+			continue;
+		}
+		const same = groups.slice(span).find((group) => group.kind === "activities" && group.taskId === taskId) as
+			| ActivityGroup<R>
+			| undefined;
+		if (same) same.rows.push(activity);
+		else groups.push({ kind: "activities", taskId, rows: [activity] });
 	}
 	return groups;
 }

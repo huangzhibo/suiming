@@ -156,6 +156,50 @@ test("对话里的动作按执行者成组：子任务的动作不并进根 Agen
 	);
 });
 
+test("并行的子任务动作交错到达时，同一段里按子任务各成一组，不在每次换任务时断开", () => {
+	// 2026-10-06 作者在斗破 120 章那次对话里看到几百行「子任务执行了 1 项操作」：16 个子任务并行，
+	// 动作在事件流里交错，原来只把相邻的同一子任务并成一组，几乎每个动作自成一组。
+	const action = (id: string, sequence: number, taskId?: string) => ({
+		kind: "activity" as const,
+		id,
+		sequence,
+		activity: { id, taskId },
+	});
+	const groups = transcriptGroups(
+		[
+			{ kind: "message" as const, id: "m1", sequence: 1 },
+			action("delegate", 2, "session-1"),
+			action("a", 3, "task-1"),
+			action("b", 4, "task-2"),
+			action("c", 5, "task-1"),
+			action("d", 6, "task-3"),
+			action("e", 7, "task-2"),
+			action("commit", 8, "session-1"),
+			action("f", 9, "task-1"),
+			{ kind: "message" as const, id: "m2", sequence: 10 },
+			action("g", 11, "task-2"),
+		],
+		"session-1",
+	);
+	assert.deepEqual(
+		groups.map((group) =>
+			group.kind === "activities" ? [group.taskId ?? "root", group.rows.map((row) => row.id)] : group.kind,
+		),
+		[
+			"message",
+			["root", ["delegate"]],
+			["task-1", ["a", "c"]],
+			["task-2", ["b", "e"]],
+			["task-3", ["d"]],
+			// 根 Agent 的动作是时间上的分界：子任务都做完之后的提交仍排在它们后面，之后再来的动作另起一组。
+			["root", ["commit"]],
+			["task-1", ["f"]],
+			"message",
+			["task-2", ["g"]],
+		],
+	);
+});
+
 test("作者消息里的引用折成标签：原话照常显示，选段带标题与段落位置，修订与内容 SHA 不摊在气泡里", () => {
 	const selection =
 		"作品引用：text/beat-0002.md\nrevision: aaaa\ncontentSHA: bbbb\n第 3 段选段：\n黄盖在军杖落下前停了一下。\n\n他没有回头。";
