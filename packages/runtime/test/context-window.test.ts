@@ -82,13 +82,10 @@ function bigTool(size: number): HarnessTool {
 		name: "big",
 		description: "读一大段正文",
 		parameters: Type.Object({}, { additionalProperties: false }),
-		replay: "read",
-		async prepare() {
+		rereadable: true,
+		async execute() {
 			count += 1;
 			return { content: [{ type: "text" as const, text: `第${count}段：${"黄盖受刑".repeat(size / 4)}` }] };
-		},
-		async execute(_id, _params, _signal, _update, prepared) {
-			return prepared as { content: { type: "text"; text: string }[] };
 		},
 	};
 }
@@ -209,10 +206,8 @@ test("清掉工具结果后仍然偏大：请求末尾请模型先 compact_conte
 		description: "记一笔",
 		// 每次记的不一样：同一动作同一结果连续三次会被当成空转停下（run_no_progress）。
 		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
-		replay: "read",
-		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-		execute: async (_id, _params, _signal, _update, prepared) =>
-			prepared as { content: { type: "text"; text: string }[] },
+		rereadable: true,
+		execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 	};
 	const { compactContextTool } = await import("../src/harness/tools.js");
 	const outcome = await runTaskLoop({
@@ -255,10 +250,8 @@ test("作者的开场消息本身就超过压缩线：压不动就不再要求�
 		name: "note",
 		description: "记一笔",
 		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
-		replay: "read",
-		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-		execute: async (_id, _params, _signal, _update, prepared) =>
-			prepared as { content: { type: "text"; text: string }[] },
+		rereadable: true,
+		execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 	};
 	const { compactContextTool } = await import("../src/harness/tools.js");
 	const outcome = await runTaskLoop({
@@ -403,23 +396,15 @@ test("提交产生新版本是边界：之前的大读取结果折成头尾；�
 		},
 	];
 	provider.setResponses(respond);
-	const tool = (name: string, replay: HarnessTool["replay"], text: string, boundary = false): HarnessTool => ({
+	const tool = (name: string, rereadable: boolean, text: string, boundary = false): HarnessTool => ({
 		name,
 		description: name,
 		parameters: Type.Object({}, { additionalProperties: false }),
-		replay,
-		prepare: async () => ({
+		rereadable,
+		execute: async () => ({
 			content: [{ type: "text" as const, text }],
 			...(boundary ? { contextBoundary: true } : {}),
 		}),
-		execute: async (_id, _params, _signal, _update, prepared) =>
-			prepared as { content: { type: "text"; text: string }[] },
-		...(replay === "reconcile"
-			? {
-					reconcile: async (_id: string, _params: unknown, prepared: unknown) =>
-						prepared as { content: { type: "text"; text: string }[] },
-				}
-			: {}),
 	});
 	await runTaskLoop({
 		model,
@@ -427,9 +412,9 @@ test("提交产生新版本是边界：之前的大读取结果折成头尾；�
 		prompt: "读、委派、提交",
 		tools: [
 			bigTool(FOLD_SIZE),
-			tool("delegate", "reconcile", `子任务交付：${"阚泽献书".repeat(FOLD_SIZE / 4)}`),
-			tool("small", "read", "小结果"),
-			tool("commit", "reconcile", "已提交 r2", true),
+			tool("delegate", false, `子任务交付：${"阚泽献书".repeat(FOLD_SIZE / 4)}`),
+			tool("small", true, "小结果"),
+			tool("commit", false, "已提交 r2", true),
 		],
 		budget: { maxTurns: 10 },
 	});
@@ -479,10 +464,8 @@ test("刚过边界、上下文过半：新一轮的第一次请求请模型先�
 		name: "note",
 		description: "记一笔",
 		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
-		replay: "read",
-		prepare: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-		execute: async (_id, _params, _signal, _update, prepared) =>
-			prepared as { content: { type: "text"; text: string }[] },
+		rereadable: true,
+		execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 	};
 	const { compactContextTool } = await import("../src/harness/tools.js");
 	const run = (responses: ((context: Transcript) => Promise<ReturnType<typeof fauxAssistantMessage>>)[]) => {

@@ -245,8 +245,7 @@ function WorkspaceShell() {
 	const readingContent = buffer;
 	const textCount = book.order.filter((id) => book.text(id)).length;
 	const workName = data.checkoutPath.split("/").at(-1) ?? "作品";
-	const agentNeedsInput = data.sessions.some((session) => session.status === "paused");
-	const rightButton = (mode: RightMode, label: string, icon: React.ReactNode, badge = false) => (
+	const rightButton = (mode: RightMode, label: string, icon: React.ReactNode) => (
 		<ToolButton
 			label={label}
 			description={
@@ -282,7 +281,6 @@ function WorkspaceShell() {
 			}}
 		>
 			{icon}
-			{badge && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-amber" />}
 		</ToolButton>
 	);
 	const paneProps = { book, reviews, view, page, patch, open };
@@ -334,7 +332,7 @@ function WorkspaceShell() {
 						{rightButton("back", "被引用", <Link2 />)}
 						{rightButton("evidence", "依据", <ScrollText />)}
 						{rightButton("state", "故事状态", <Clock />)}
-						{rightButton("agent", "对话", <MessageSquare />, agentNeedsInput)}
+						{rightButton("agent", "对话", <MessageSquare />)}
 						<span className="flex-1" />
 						<ToolButton label="收起右栏" onClick={() => patch({ right: false, expanded: false })}>
 							<PanelRight />
@@ -353,7 +351,6 @@ function WorkspaceShell() {
 							}}
 						>
 							<PanelRight />
-							{agentNeedsInput && <span className="absolute top-1 right-1 size-1.5 rounded-full bg-amber" />}
 						</ToolButton>
 					</div>
 				)}

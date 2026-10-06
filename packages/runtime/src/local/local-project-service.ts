@@ -836,8 +836,9 @@ export class LocalProjectService {
 
 	#recoverExecutionAfterProcessRestart(): void {
 		const snapshot = this.#store.loadExecutionState();
+		// 2026-10-06 之前落盘的 paused 也在这里收敛成 idle（recoverUnfinished）。
 		const unfinished = snapshot.sessions
-			.filter((session) => session.status === "running")
+			.filter((session) => session.status === "running" || (session.status as string) === "paused")
 			.map((session) => `${session.id}@${session.version}`)
 			.sort();
 		if (unfinished.length === 0) return;

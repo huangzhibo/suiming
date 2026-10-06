@@ -134,13 +134,13 @@ test("同一作品同时只有一个 running session，跨进程也一样；持�
 		);
 
 		// 桌面那一轮结束后，命令行就能开。
-		desktop.endTurn({ commandId: "a:end", sessionId: "session-a", status: "idle" });
+		desktop.endTurn({ commandId: "a:end", sessionId: "session-a" });
 		const retry = new InMemoryExecutionState({
 			snapshot: second.loadExecutionState(),
 			commit: (delta) => second?.applyExecutionDelta(delta),
 		});
 		retry.startTurn({ commandId: "b:start-2", sessionId: "session-b", lease: { ...alive, ownerId: "cli" } });
-		retry.endTurn({ commandId: "b:end", sessionId: "session-b", status: "idle" });
+		retry.endTurn({ commandId: "b:end", sessionId: "session-b" });
 
 		// 崩溃遗留：session-a 还标着 running，持有进程已经不在了，不挡别的 session。
 		const crashed = new InMemoryExecutionState({

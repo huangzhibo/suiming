@@ -53,7 +53,7 @@ async function untilIdle(workspace: LocalWorkspace): Promise<void> {
 	assert.fail("turn 没有结束");
 }
 
-test("执行查询独立于作品文件有效性，并保留 paused 的结构化原因", async () =>
+test("执行查询独立于作品文件有效性，并保留上一轮失败的结构化原因", async () =>
 	fixture(async (project, root) => {
 		const workspace = new LocalWorkspace(project, async () => {
 			throw new Error("不应加载模型");
@@ -62,15 +62,14 @@ test("执行查询独立于作品文件有效性，并保留 paused 的结构化
 		state.createSession({ commandId: "s", id: "s", projectId: project.projectId });
 		state.startTurn({ commandId: "start", sessionId: "s", lease });
 		state.endTurn({
-			commandId: "pause",
+			commandId: "end",
 			sessionId: "s",
-			status: "paused",
-			failure: { code: "model_call_unknown", message: "Request timed out", retryable: false },
+			failure: { code: "model_call_failed", message: "Request timed out", retryable: false },
 		});
 		await writeFile(join(root, "outline/story/index.yaml"), "invalid: [");
 		const listed = await workspace.invoke("session.list", {});
-		assert.equal(listed.sessions[0]?.status, "paused");
-		assert.equal(listed.sessions[0]?.pause?.code, "model_call_unknown");
+		assert.equal(listed.sessions[0]?.status, "idle");
+		assert.equal(listed.sessions[0]?.lastFailure?.code, "model_call_failed");
 		assert.equal(listed.sessions[0]?.turn, 1);
 		assert.equal(listed.projectId, project.projectId);
 	}));
@@ -178,10 +177,7 @@ test("状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先
 		database.exec(
 			"CREATE TRIGGER fail_terminal BEFORE INSERT ON session_events WHEN json_extract(NEW.event_json, '$.event.type') = 'RUN_FINISHED' BEGIN SELECT RAISE(ABORT, 'event storage failed'); END",
 		);
-		assert.throws(
-			() => execution.endTurn({ commandId: "end", sessionId: "s", status: "idle" }),
-			/event storage failed/,
-		);
+		assert.throws(() => execution.endTurn({ commandId: "end", sessionId: "s" }), /event storage failed/);
 		assert.equal(project.loadExecutionState().sessions[0]?.status, "running");
 		assert.equal(
 			project.readSessionEvents("s").some((record) => record.event.type === "RUN_FINISHED"),
@@ -189,7 +185,7 @@ test("状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先
 		);
 		database.exec("DROP TRIGGER fail_terminal");
 		database.close();
-		project.createExecutionState().endTurn({ commandId: "end", sessionId: "s", status: "idle" });
+		project.createExecutionState().endTurn({ commandId: "end", sessionId: "s" });
 		assert.equal(project.loadExecutionState().sessions[0]?.status, "idle");
 		const workspace = new LocalWorkspace(project, async () => {
 			throw new Error("attach 不应启动模型");
@@ -244,26 +240,17 @@ test("本地执行库只认 v6：旧版本打开时说清怎么办且不动库�
 	}
 });
 
-test("paused 的 session：interrupt 放弃核对回 idle，idle 不能 resume，delete 带走执行记录", async () =>
+test("idle 的 session：interrupt 原样返回；delete 带走子任务与执行记录", async () =>
 	fixture(async (project) => {
 		const execution = project.createExecutionState();
 		execution.createSession({ commandId: "s", id: "s", projectId: project.projectId });
 		execution.startTurn({ commandId: "start", sessionId: "s", lease });
 		execution.addTask({ commandId: "t", id: "t", sessionId: "s", kind: "main", key: "a" });
-		execution.endTurn({
-			commandId: "pause",
-			sessionId: "s",
-			status: "paused",
-			failure: { code: "model_call_unknown", message: "结果未知", retryable: true },
-		});
+		execution.endTurn({ commandId: "end", sessionId: "s" });
 		assert.equal(execution.task("t").status, "interrupted");
 		const workspace = new LocalWorkspace(project, async () => fauxGateway().gateway);
 		assert.equal((await workspace.invoke("session.interrupt", { sessionId: "s" })).status, "idle");
-		assert.equal((await workspace.invoke("session.interrupt", { sessionId: "s" })).status, "idle");
 		assert.equal((await project.history()).length, 1);
-		await assert.rejects(workspace.invoke("session.resume", { commandId: "resume", sessionId: "s" }), {
-			code: "session_not_paused",
-		});
 		assert.deepEqual(
 			(await workspace.invoke("session.tasks", { sessionId: "s" })).map((task) => task.status),
 			["interrupted"],

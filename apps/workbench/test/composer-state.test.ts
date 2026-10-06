@@ -66,7 +66,7 @@ test("附件在草稿跟随新 session 后完成，仍回到原附件；移除�
 	);
 });
 
-test("同一 session 的消息带 sessionId；paused 不收；模型选择只在 turn 边界带上；未读完、失败引用及待确认提交不能再次发送", () => {
+test("同一 session 的消息带 sessionId；模型选择只在 turn 边界带上；未读完、失败引用及待确认提交不能再次发送", () => {
 	const oversized = {
 		goal: "目标",
 		attachments: [
@@ -82,8 +82,6 @@ test("同一 session 的消息带 sessionId；paused 不收；模型选择只在
 		assert.deepEqual(staged.model, model, "输入框里的选择留到下一轮");
 		assert.equal(stageSubmission(staged), staged);
 	}
-	const paused = { goal: "补充", attachments: [] };
-	assert.equal(stageSubmission(paused, { id: "session-1", status: "paused" }), paused);
 	for (const status of ["reading", "failed"] as const) {
 		const draft = {
 			...emptyComposer(),

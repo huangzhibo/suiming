@@ -30,7 +30,7 @@ function createSession(execution: InMemoryExecutionState, suffix = "1"): void {
 	});
 }
 
-test("session 只有 idle / running / paused：turn 开始拿 lease，模型停下回 idle", () => {
+test("session 只有 idle / running：turn 开始拿 lease，模型停下回 idle", () => {
 	const execution = state();
 	createSession(execution);
 	assert.equal(execution.session("session-1").status, "idle");
@@ -40,47 +40,44 @@ test("session 只有 idle / running / paused：turn 开始拿 lease，模型停�
 	assert.equal(started.turnId, "owner-1");
 	execution.recordSessionCheckpoint("checkpoint-1", "session-1", { kind: "object", id: "checkpoint-object" }, 1);
 	assert.equal(execution.session("session-1").inboxSequence, 1);
-	const ended = execution.endTurn({ commandId: "end-1", sessionId: "session-1", status: "idle" });
+	const ended = execution.endTurn({ commandId: "end-1", sessionId: "session-1" });
 	assert.equal(ended.status, "idle");
 	assert.equal(ended.lease, undefined);
 	assert.equal(ended.turnId, "owner-1", "turn id 留给事件恢复与归因");
 });
 
-test("paused 只能显式 resume；idle 上的 lastFailure 在下一个 turn 开始时清掉", () => {
+test("turn 非正常结束的原因记为 lastFailure，下一个 turn 开始时清掉；在跑的 session 不能再开 turn", () => {
 	const execution = state();
 	createSession(execution);
 	execution.startTurn({ commandId: "turn-1", sessionId: "session-1", lease });
-	assert.throws(
-		() => execution.endTurn({ commandId: "end-bad", sessionId: "session-1", status: "paused" }),
-		(error: unknown) => error instanceof ExecutionStateError && error.code === "invalid_execution_input",
-	);
-	const paused = execution.endTurn({
+	const idle = execution.endTurn({
 		commandId: "end-1",
 		sessionId: "session-1",
-		status: "paused",
-		failure: { code: "model_call_unknown", message: "结果未知", retryable: true },
-	});
-	assert.equal(paused.status, "paused");
-	assert.equal(paused.pause?.code, "model_call_unknown");
-	assert.throws(
-		() => execution.startTurn({ commandId: "turn-2", sessionId: "session-1", lease }),
-		(error: unknown) => error instanceof ExecutionStateError && error.code === "session_paused",
-	);
-	const resumed = execution.startTurn({ commandId: "turn-2", sessionId: "session-1", lease, fromPaused: true });
-	assert.equal(resumed.status, "running");
-	assert.equal(resumed.pause, undefined);
-	const idle = execution.endTurn({
-		commandId: "end-2",
-		sessionId: "session-1",
-		status: "idle",
 		failure: { code: "run_no_progress", message: "重复动作", retryable: true },
 	});
+	assert.equal(idle.status, "idle");
 	assert.equal(idle.lastFailure?.code, "run_no_progress");
-	assert.equal(execution.startTurn({ commandId: "turn-3", sessionId: "session-1", lease }).lastFailure, undefined);
+	assert.equal(execution.startTurn({ commandId: "turn-2", sessionId: "session-1", lease }).lastFailure, undefined);
 	assert.throws(
-		() => execution.startTurn({ commandId: "turn-4", sessionId: "session-1", lease }),
+		() => execution.startTurn({ commandId: "turn-3", sessionId: "session-1", lease }),
 		(error: unknown) => error instanceof ExecutionStateError && error.code === "session_running",
 	);
+});
+
+test("2026-10-06 之前落盘的 paused session：打开时收敛成 idle，暂停原因转记为 lastFailure，作者一句话就能续", () => {
+	const before = state();
+	createSession(before);
+	const snapshot = before.exportSnapshot();
+	const legacy = snapshot.sessions[0] as unknown as Record<string, unknown>;
+	legacy.status = "paused";
+	legacy.pause = { code: "model_call_unknown", message: "模型调用的远端结果未知", retryable: true };
+	const restored = new InMemoryExecutionState({ now: () => new Date("2026-10-06T00:00:00.000Z"), snapshot });
+	assert.deepEqual(restored.recoverUnfinished("recover-1"), { recoveredSessionIds: ["session-1"] });
+	const session = restored.session("session-1") as unknown as Record<string, unknown>;
+	assert.equal(session.status, "idle");
+	assert.equal((session.lastFailure as { code?: string } | undefined)?.code, "model_call_unknown");
+	assert.equal("pause" in session, false);
+	assert.equal(restored.startTurn({ commandId: "turn-1", sessionId: "session-1", lease }).status, "running");
 });
 
 test("子任务只能在 running 的 turn 里建；turn 结束把还在跑的子任务标 interrupted，续跑接着来", () => {
@@ -135,7 +132,7 @@ test("子任务只能在 running 的 turn 里建；turn 结束把还在跑的子
 		},
 	});
 	assert.equal(execution.session("session-1").usage?.totalTokens, 15, "子任务用量累计到 session");
-	execution.endTurn({ commandId: "end-1", sessionId: "session-1", status: "idle" });
+	execution.endTurn({ commandId: "end-1", sessionId: "session-1" });
 	assert.equal(execution.task("task-1").status, "interrupted");
 	execution.startTurn({ commandId: "turn-2", sessionId: "session-1", lease });
 	assert.equal(execution.resumeTask("task-resume", "task-1").status, "running");
@@ -194,7 +191,7 @@ test("删除 session 带走它的子任务；turn 进行中不能删", () => {
 		() => execution.deleteSession("delete-early", "session-1"),
 		(error: unknown) => error instanceof ExecutionStateError && error.code === "session_running",
 	);
-	execution.endTurn({ commandId: "end-1", sessionId: "session-1", status: "idle" });
+	execution.endTurn({ commandId: "end-1", sessionId: "session-1" });
 	execution.deleteSession("delete-1", "session-1");
 	assert.throws(() => execution.session("session-1"), ExecutionStateError);
 	assert.throws(() => execution.task("task-1"), ExecutionStateError);

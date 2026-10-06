@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Ellipsis, Maximize2, Minimize2, Plus } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -24,7 +24,7 @@ import {
 	sessionProblem,
 	taskRoleLabel,
 } from "./run-presentation.js";
-import { ActionButton, PanelToolbar, ToolButton } from "./ui-bits.js";
+import { PanelToolbar, ToolButton } from "./ui-bits.js";
 
 type Session = SessionSummary;
 
@@ -132,24 +132,7 @@ export function AgentPanel({
 		}
 	}
 
-	const resumeCommand = useRef<{ fingerprint: string; commandId: string } | undefined>(undefined);
 	const problem = session ? sessionProblem(session) : undefined;
-	const resume = (retryUnknown: boolean) => {
-		if (!session) return;
-		const input = {
-			sessionId: session.id,
-			...(retryUnknown ? { retryUnknown: true } : {}),
-			...(!retryUnknown && binding.composer.model ? { model: binding.composer.model } : {}),
-		};
-		const fingerprint = JSON.stringify(input);
-		if (resumeCommand.current?.fingerprint !== fingerprint)
-			resumeCommand.current = { fingerprint, commandId: crypto.randomUUID() };
-		const commandId = resumeCommand.current.commandId;
-		return action(async () => {
-			await invoke("session.resume", { commandId, ...input });
-			resumeCommand.current = undefined;
-		});
-	};
 
 	const groups = [
 		{ label: "进行中", items: sessions.filter((item) => item.status !== "idle") },
@@ -340,7 +323,7 @@ export function AgentPanel({
 							className={`run-controls flex flex-wrap gap-2 ${problem ? "rounded-lg border bg-muted/40 px-3 py-2.5" : ""}`}
 						>
 							{problem && (
-								<div role={problem.paused ? "alert" : "status"} className="w-full text-xs leading-relaxed">
+								<div role="status" className="w-full text-xs leading-relaxed">
 									<strong className="font-medium">{problem.title}</strong>
 									<p className="mt-1 text-muted-foreground">{problem.hint}</p>
 									{problem.detail && (
@@ -350,36 +333,6 @@ export function AgentPanel({
 										</details>
 									)}
 								</div>
-							)}
-							{problem?.paused && (
-								<>
-									<ActionButton
-										variant="outline"
-										size="xs"
-										disabled={busy}
-										disabledReason={
-											problem.unknownModelCall
-												? "上一次模型请求的结果不确定，直接继续可能重复花费：先确认重新请求，或放弃这次核对"
-												: undefined
-										}
-										onClick={() => resume(false)}
-									>
-										继续
-									</ActionButton>
-									{problem.unknownModelCall && (
-										<Button variant="outline" size="xs" disabled={busy} onClick={() => resume(true)}>
-											确认重新请求模型
-										</Button>
-									)}
-									<Button
-										variant="ghost"
-										size="xs"
-										disabled={busy}
-										onClick={() => action(() => invoke("session.interrupt", { sessionId: session.id }))}
-									>
-										放弃这次核对
-									</Button>
-								</>
 							)}
 						</div>
 					</>

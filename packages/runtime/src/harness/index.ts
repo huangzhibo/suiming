@@ -25,14 +25,12 @@ export {
 	type RecordHostReviewInput,
 } from "./host-context.js";
 export {
-	hasUnconfirmedEffects,
 	type LoopCheckpoint,
 	runTaskLoop,
 	type TaskLoopBudget,
 	type TaskLoopOptions,
 	type TaskLoopOutcome,
 	type TaskLoopToolCallEvent,
-	taskLoopBinding,
 } from "./loop.js";
 export {
 	type MaterialSpan,

@@ -23,7 +23,6 @@ export const SuimingSessionNoticeSchema = Type.Object(
 		status: sessionStatusSchema,
 		version: Type.Integer({ minimum: 1 }),
 		turn: Type.Integer({ minimum: 0 }),
-		pause: Type.Optional(executionFailureSchema),
 		lastFailure: Type.Optional(executionFailureSchema),
 		usage: Type.Optional(modelUsageSchema),
 	},

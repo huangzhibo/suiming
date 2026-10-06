@@ -84,7 +84,7 @@ test("32 轮不同的 10 KB 工具结果共享历史，保存体积低于 3 MiB�
 			{
 				name: "read",
 				description: "read",
-				replay: "read" as const,
+				rereadable: true,
 				parameters: Type.Object({}),
 				async execute() {
 					return { content: [{ type: "text", text: `${index++}:${"x".repeat(10000)}` }] };
@@ -102,7 +102,8 @@ test("32 轮不同的 10 KB 工具结果共享历史，保存体积低于 3 MiB�
 		).bytes,
 	)) as LoopCheckpoint;
 	assert.equal(checkpoint.calls.length, 32);
-	assert.ok(checkpoint.calls.filter((call) => call.context).length <= 2);
+	// 请求的输入只在内存里：恢复时没收到回复的请求作废重组，checkpoint 不存它。
+	assert.ok(checkpoint.calls.every((call) => !("context" in call)));
 	assert.equal(checkpoint.messages.filter((message) => message.role === "toolResult").length, 32);
 	assert.ok(JSON.stringify(checkpoint.messages).includes(`31:${"x".repeat(10000)}`));
 });

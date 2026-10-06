@@ -51,7 +51,7 @@ test("错误类别的代表样本", () => {
 	assert.equal(errorCategory("review_report_not_found"), "not_found");
 	assert.equal(errorCategory("local_project_not_initialized"), "not_found");
 	assert.equal(errorCategory("run_interrupted"), "interrupted");
-	assert.equal(errorCategory("binding_mismatch"), "interrupted");
+	assert.equal(errorCategory("turn_usage_checkpoint"), "interrupted");
 	assert.equal(errorCategory("local_store_corrupt"), "internal");
 	assert.equal(errorCategory("something_nobody_declared"), "internal");
 });

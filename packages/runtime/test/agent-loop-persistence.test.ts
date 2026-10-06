@@ -17,7 +17,6 @@ async function fixture() {
 		name,
 		label: name,
 		description: name,
-		replay: "read" as const,
 		parameters: Type.Object({}),
 		execute: async () => {
 			effects.push(name);
@@ -180,7 +179,6 @@ test("同一次回复里相邻的可并行动作同时执行，结果按派出�
 		name,
 		label: name,
 		description: name,
-		replay: "read" as const,
 		parallel: () => true,
 		parameters: Type.Object({}),
 		execute: async () => {
@@ -194,7 +192,6 @@ test("同一次回复里相邻的可并行动作同时执行，结果按派出�
 		name: "serial",
 		label: "serial",
 		description: "serial",
-		replay: "read" as const,
 		parameters: Type.Object({}),
 		execute: async () => {
 			log.push("serial 完成");

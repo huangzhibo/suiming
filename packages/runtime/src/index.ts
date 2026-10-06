@@ -201,7 +201,7 @@ export type {
 	TaskRecord,
 	TaskStatus,
 } from "./execution/types.js";
-export { AuthorStop, SuimingHarnessError } from "./harness/errors.js";
+export { SuimingHarnessError } from "./harness/errors.js";
 export * from "./harness/index.js";
 export { readProjectStatus } from "./harness/project-status.js";
 export { type CheckDiagnostic, type CheckSummary, checkDiagnostic, checkSummary } from "./local/check-summary.js";
@@ -227,11 +227,9 @@ export { LocalProjectService } from "./local/local-project-service.js";
 export type {
 	IdleOutcome,
 	LocalSessionControllerOptions,
-	ResumeInput,
 	SendInput,
 } from "./local/local-session-controller.js";
 export {
-	abandonPausedSession,
 	DEFAULT_IDLE_TIMEOUT_MS,
 	LocalSessionController,
 	notActiveInProcess,

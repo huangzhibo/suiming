@@ -9,7 +9,7 @@ import { type Static, Type } from "typebox";
  */
 const id = Type.String({ minLength: 1 });
 
-export const sessionStatusSchema = Type.Union([Type.Literal("idle"), Type.Literal("running"), Type.Literal("paused")]);
+export const sessionStatusSchema = Type.Union([Type.Literal("idle"), Type.Literal("running")]);
 export const sessionKindSchema = Type.Union([Type.Literal("agent"), Type.Literal("rank")]);
 
 export const executionFailureSchema = Type.Object(
@@ -136,7 +136,7 @@ export const taskSummarySchema = Type.Object(
 
 /**
  * Session 摘要的唯一 schema，与 `sessionSummary()` 投影成对。`title` 是 inbox 的第一条消息，
- * 由调用方取；`pause` 是要作者处理的原因（三种），`lastFailure` 是作者一句话就能续的那类。
+ * 由调用方取；`lastFailure` 是最近一个 turn 非正常结束的原因，作者一句话就能续。
  */
 export const sessionSummarySchema = Type.Object(
 	{
@@ -148,7 +148,6 @@ export const sessionSummarySchema = Type.Object(
 		turnId: Type.Optional(id),
 		usage: Type.Optional(modelUsageSchema),
 		model: Type.Optional(modelChoiceSchema),
-		pause: Type.Optional(executionFailureSchema),
 		lastFailure: Type.Optional(executionFailureSchema),
 		result: Type.Optional(resultReferenceSchema),
 		createdAt: id,

@@ -85,8 +85,8 @@ test("list：列出一层目录，目录带斜杠；.git / .suiming 与 symlink 
 		const listOf = async (env: ConfinedExecutionEnv, path?: string) => {
 			const tool = fileTools(env, "read").find((item) => item.name === "list");
 			assert.ok(tool, "只读角色也有 list");
-			const prepared = await tool.prepare?.(path === undefined ? {} : { path });
-			return (prepared as { content: { text: string }[] }).content[0]?.text ?? "";
+			const result = await tool.execute("call", path === undefined ? {} : { path });
+			return (result as { content: { text: string }[] }).content[0]?.text ?? "";
 		};
 		const env = new ConfinedExecutionEnv({ rootPath: root, policy: "read" });
 		assert.equal(await listOf(env), "evidence/\nintent/\nreview/");
@@ -128,7 +128,7 @@ test("host 接入目录：模型的环境列不出、读不到、写不了（大
 		const env = new ConfinedExecutionEnv({ rootPath: root, policy: "write" });
 		const list = fileTools(env, "write").find((item) => item.name === "list");
 		assert.ok(list);
-		const listed = await list.prepare?.({});
+		const listed = await list.execute("call", {});
 		assert.equal((listed as { content: { text: string }[] }).content[0]?.text, "AGENTS.md\nevidence/\nintent/");
 		for (const path of [".agents/skills/suiming/SKILL.md", ".Claude/skills/suiming/SKILL.md", ".codex/agents"]) {
 			await assert.rejects(env.readTextFile(path), { code: "permission_denied", message: /接入文件/u });
@@ -160,8 +160,7 @@ test("write / edit 的结果带写入后的字数：模型汇报篇幅以它为�
 		const run = async (name: string, params: Record<string, unknown>) => {
 			const tool = tools.find((item) => item.name === name);
 			assert.ok(tool);
-			const prepared = await tool.prepare?.(params);
-			const result = await tool.execute("call", params, undefined, undefined, prepared);
+			const result = await tool.execute("call", params);
 			return (result as { content: { text: string }[] }).content[0]?.text ?? "";
 		};
 		assert.match(
@@ -220,11 +219,7 @@ test("copy：整个目录或单个文件原样复制，Source 提升为 Target �
 		const copy = tools.find((item) => item.name === "copy");
 		assert.ok(copy);
 		const run = async (params: Record<string, unknown>) => {
-			const prepared = await copy.prepare?.(params);
-			const first = await copy.execute("call", params, undefined, undefined, prepared);
-			// 恢复时按 journal 重放：已经落盘的不算冲突，结果不变
-			const again = await copy.execute("call", params, undefined, undefined, prepared);
-			assert.deepEqual(again, first);
+			const first = await copy.execute("call", params);
 			return (first as { content: { text: string }[] }).content[0]?.text ?? "";
 		};
 
@@ -243,11 +238,11 @@ test("copy：整个目录或单个文件原样复制，Source 提升为 Target �
 		const rejected = (code: string) => (error: { name?: string; code?: string }) =>
 			error.name === "ToolRejection" && error.code === code;
 		await assert.rejects(
-			Promise.resolve(copy.prepare?.({ from: "source", to: "source/访谈/备份" })),
+			copy.execute("call", { from: "source", to: "source/访谈/备份" }),
 			rejected("copy_into_itself"),
 		);
-		await assert.rejects(Promise.resolve(copy.prepare?.({ from: "不存在", to: "x" })), rejected("file_not_found"));
-		await assert.rejects(Promise.resolve(copy.prepare?.({ from: "world", to: "../outside/world" })), {
+		await assert.rejects(copy.execute("call", { from: "不存在", to: "x" }), rejected("file_not_found"));
+		await assert.rejects(copy.execute("call", { from: "world", to: "../outside/world" }), {
 			name: "ToolRejection",
 		});
 		assert.equal(
@@ -278,11 +273,7 @@ test("move：一条调用把几个 Beat 挪进另一卷，或给文件 / 目录�
 		const move = fileTools(env, "write").find((item) => item.name === "move");
 		assert.ok(move);
 		const run = async (params: Record<string, unknown>) => {
-			const prepared = await move.prepare?.(params);
-			const first = await move.execute("call", params, undefined, undefined, prepared);
-			// 恢复时按 journal 重放：已经挪过去的不算冲突，结果不变
-			const again = await move.execute("call", params, undefined, undefined, prepared);
-			assert.deepEqual(again, first);
+			const first = await move.execute("call", params);
 			return (first as { content: { text: string }[] }).content[0]?.text ?? "";
 		};
 		const exists = (path: string) =>
@@ -310,17 +301,14 @@ test("move：一条调用把几个 Beat 挪进另一卷，或给文件 / 目录�
 			error.name === "ToolRejection" && error.code === code;
 		await writeFile(join(root, "world/另一份.md"), "别的设定\n");
 		await assert.rejects(
-			Promise.resolve(move.prepare?.({ from: ["world/新名.md"], to: "world/另一份.md" })),
+			move.execute("call", { from: ["world/新名.md"], to: "world/另一份.md" }),
 			rejected("move_target_exists"),
 		);
 		await assert.rejects(
-			Promise.resolve(move.prepare?.({ from: ["outline/story"], to: "outline/story/vol-0009" })),
+			move.execute("call", { from: ["outline/story"], to: "outline/story/vol-0009" }),
 			rejected("move_into_itself"),
 		);
-		await assert.rejects(
-			Promise.resolve(move.prepare?.({ from: ["不存在.md"], to: "x.md" })),
-			rejected("file_not_found"),
-		);
+		await assert.rejects(move.execute("call", { from: ["不存在.md"], to: "x.md" }), rejected("file_not_found"));
 		assert.equal(
 			fileTools(new ConfinedExecutionEnv({ rootPath: root, policy: "read" }), "read").some(
 				(item) => item.name === "move",

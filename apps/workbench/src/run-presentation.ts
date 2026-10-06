@@ -4,22 +4,15 @@ export type SessionSummary = LocalCommandOutput<"session.list">["sessions"][numb
 export const sessionStatusLabels: Record<string, string> = {
 	running: "正在处理",
 	idle: "等你继续",
-	paused: "需要处理",
 };
 export const isSessionActive = (session: { status: string } | undefined) => session?.status === "running";
 
 /** 操作由 Runtime 错误码决定；原始原因保留在详情中，不用文案猜测恢复策略。 */
 export function sessionProblem(session: SessionSummary) {
-	const failure = session.pause ?? session.lastFailure;
+	const failure = session.lastFailure;
 	if (!failure) return undefined;
 	const code = failure.code;
 	const known: Record<string, { title: string; hint: string }> = {
-		model_call_unknown: {
-			title: "模型请求结果待确认",
-			hint: "上次请求可能已经产生用量。确认后可重新请求，已保存的工具结果不会重复执行。",
-		},
-		action_effect_unknown: { title: "有一个动作停在半途", hint: "查看原因后继续，已保存的结果不会重复执行。" },
-		binding_mismatch: { title: "模型或工具面已变化", hint: "换回原来的模型继续，或停止后再换。" },
 		run_no_progress: {
 			title: "需要调整方向",
 			hint: "模型在原地打转：同一个动作反复得到同一个结果，或接连做了被拒绝的动作。进度已保存，在输入框补充要求后继续。",
@@ -37,8 +30,6 @@ export function sessionProblem(session: SessionSummary) {
 	return {
 		...(known[code] ?? { title: "这一轮没有正常结束", hint: "查看原因后继续，已保存的结果与提交都会保留。" }),
 		detail: failure.message,
-		paused: session.status === "paused",
-		unknownModelCall: code === "model_call_unknown",
 	};
 }
 

@@ -10,7 +10,7 @@ import type { ModelBindingSnapshot } from "../model/model-gateway.js";
  * 曾经的 Conversation / Run / Attempt 都没有了：Run 是 turn 的七态状态机，Attempt 是「冻结绑定」的载体，
  * 两者的信息现在分别是 turn 边界的事件与每条 AssistantMessage 自带的 provider / model。
  */
-export type SessionStatus = "idle" | "running" | "paused";
+export type SessionStatus = "idle" | "running";
 export type SessionKind = "agent" | "rank";
 export type TaskStatus = "running" | "completed" | "failed" | "interrupted";
 
@@ -71,10 +71,8 @@ export interface SessionRecord {
 	inboxSequence?: number;
 	/** session 已知的已提交基线：创建时是 head，作者在两个 turn 之间提交过、或本 session 阶段提交后推进。 */
 	baseRevisionId?: string;
-	/** running / paused 期间持有它的进程；结束后清空。 */
+	/** running 期间持有它的进程；结束后清空。 */
 	lease?: SessionLease;
-	/** paused 时要作者处理的原因；idle 时不存在。 */
-	pause?: ExecutionFailure;
 	/** 最近一个 turn 非正常结束的原因（作者一句话就能续的那类）；下一个 turn 开始时清掉。 */
 	lastFailure?: ExecutionFailure;
 	/** rank 之类脚本驱动的 session 的结果。 */

@@ -85,11 +85,7 @@ export function SelectionBar({
 			status: "ready",
 			content: quote(selPara >= 0 ? `第 ${selPara + 1} 段选段` : "选段"),
 		};
-		const occupied =
-			composer.goal.trim() !== "" ||
-			composer.attachments.length > 0 ||
-			composer.pending !== undefined ||
-			conversation?.status === "paused";
+		const occupied = composer.goal.trim() !== "" || composer.attachments.length > 0 || composer.pending !== undefined;
 		if (occupied) {
 			updateComposer(draftKey, (draft) => ({
 				...draft,

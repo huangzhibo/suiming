@@ -6,12 +6,12 @@
 
 桌面工作台与自主 Agent 的主路径已贯通，并收敛到 Session 模型：
 
-- **执行**：只有 Session（根 Agent，一份连续的消息列表，idle / running / paused）与 Task（子智能体）。Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径。创作路径没有预算，只有每轮用量检查点：一轮的折算用量到 600 万 token 就停下，等作者说继续，与模型单价无关（[Harness 设计](harness-design.md)第 10 节）。
+- **执行**：只有 Session（根 Agent，一份连续的消息列表，idle / running）与 Task（子智能体）。Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径。创作路径没有预算，只有每轮用量检查点：一轮的折算用量到 600 万 token 就停下，等作者说继续，与模型单价无关（[Harness 设计](harness-design.md)第 10 节）。
 - **作品**：本地作品目录就是 git 仓，`refs/suiming/canon` 只由过 Checker 的提交推进；SQLite 只存执行数据。审稿与材料笔记是普通作品文件，正文 / 审稿时效与 Source 覆盖率从 git 历史派生。
 - **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
 - **证据**：最高到「真实调用」——2026-09-16 重构后第一次完整真实对话（[基线](validation/2026-09-16-first-real-session/README.md)），以及 2026-10 起斗破前 120 章的忠实抽取与留出评测。没有任何能力达到「真实长篇」。
 
-验证（2026-10-06）：`npm run check` 通过（含示例作品 `examples/sanguo` 过 Checker）；`npm test` 446 项，441 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 20 条：2026-10-06 换 Base UI 后 19 条通过，「分栏调宽」卡在进入全屏（宿主屏幕锁着），去掉全屏段单跑其余部分通过，全屏段待解锁后补跑。真实模型回归现有六个任务（2026-10-04 从八个收敛、判分收紧），GPT-6.1 Sol 上的新基线是 2026-10-05 的 18 / 18（[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
+验证（2026-10-06）：`npm run check` 通过（含示例作品 `examples/sanguo` 过 Checker）；`npm test` 446 项，441 通过、5 skip——那 5 条要真实 PostgreSQL / S3 / 双进程，2026-09-30 起用一次性容器真跑过，11 项全过；另有 1 条要本机的 eval-022 作品副本，CI 与别的机器上会多 skip 这一条。桌面 E2E 整套 20 条：2026-10-06 换 Base UI 后 19 条通过，「分栏调宽」卡在进入全屏（宿主屏幕锁着），去掉全屏段单跑其余部分通过，全屏段待解锁后补跑；同日删掉半途核对后，「主进程 SIGKILL 后重开」改成作废重发，还没在真实 Electron 上跑。真实模型回归现有六个任务（2026-10-04 从八个收敛、判分收紧），GPT-6.1 Sol 上的新基线是 2026-10-05 的 18 / 18（[记录](validation/2026-10-01-harness-regression/README.md)）。各次运行的起伏见[变更记录](changelog.md)。
 
 ## 能力与证据
 
@@ -20,7 +20,7 @@
 | Story Language、Checker、硬状态时间线、Contract 生命周期、Release 切分 | `packages/story` | 真实调用：真实运行中的模型产出由它检查与拒绝 |
 | Open Story Directory / Package codec，路径是扫描得到的事实 | `packages/runtime/src/artifact` | 机制；eval-022 的 121 文件副本端到端 |
 | Canon：作品目录的 git 仓 | `git-canon-store.ts` | 机制；eval-022 真实作品测试 |
-| 自有 Harness：checkpoint、命令事务、文件 journal、恢复、阶段提交、进展型兜底与每轮用量检查点 | `packages/runtime/src/harness` | 机制：faux provider 加真实 SQLite 与进程退出 |
+| 自有 Harness：checkpoint、命令事务、写入冲突检测、被打断之后补结果续跑（不做半途核对）、阶段提交、进展型兜底与每轮用量检查点 | `packages/runtime/src/harness` | 机制：faux provider 加真实 SQLite 与进程退出 |
 | 自主 Agent：读、写、检查、委派、独立 Review、提交 | `harness/agent.ts` | 真实调用：基线里一节正文、一次审稿与按审稿修订；斗破前 120 章分段忠实抽取（并行委派、Source 审稿，[记录](validation/2026-10-03-doupo-segmented/README.md)）与留出评测的正文（[记录](validation/2026-10-03-doupo-mini/README.md)）；《三国演义》前五十回抽取到整合（[记录](validation/2026-10-04-sanguo-example/README.md)） |
 | 正文 / 审稿时效、Source 覆盖率 | `artifact/derived.ts` | 真实调用：审稿时效在基线同一场景上验过 |
 | AG-UI 事件、只读 attach、桌面 typed IPC | `sdk/run-event.ts`、`apps/desktop` | 机制与 Electron E2E |

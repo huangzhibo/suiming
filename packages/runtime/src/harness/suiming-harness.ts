@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
+import type { ToolCall } from "@earendil-works/pi-ai";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
 import {
 	EventType,
@@ -30,15 +31,9 @@ import type { ModelProfileId } from "../model/config.js";
 import type { BoundModelProfile, ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
 import { CheckpointArchive } from "./checkpoint-archive.js";
 import { type ConfinedEnvPolicy, ConfinedExecutionEnv } from "./confined-env.js";
-import { AuthorStop, SuimingHarnessError } from "./errors.js";
+import { SuimingHarnessError } from "./errors.js";
 import { type SessionEvent, type SessionEventListener, SessionEventStream } from "./events.js";
-import {
-	hasUnconfirmedEffects,
-	type LoopCheckpoint,
-	runTaskLoop,
-	TASK_OPENING_AT,
-	type TaskLoopOutcome,
-} from "./loop.js";
+import { type LoopCheckpoint, runTaskLoop, TASK_OPENING_AT, type TaskLoopOutcome } from "./loop.js";
 import type { HarnessProjectPort } from "./project-port.js";
 import { readProjectStatus } from "./project-status.js";
 import type { HarnessTool } from "./tool.js";
@@ -149,7 +144,6 @@ export interface RootLoopOutcome {
 interface HarnessCheckpoint {
 	schemaVersion: 2;
 	loop: LoopCheckpoint;
-	systemPrompt: string;
 }
 
 interface TaskResultObject {
@@ -178,18 +172,11 @@ function reasonText(signal: AbortSignal | undefined, fallback: string): string {
 	return reason instanceof Error ? reason.message : typeof reason === "string" ? reason : fallback;
 }
 
-/** 只有这三种情况系统不问作者就不能安全继续；其余都是 idle 加一句话。 */
-const PAUSE_CODES = new Set(["model_call_unknown", "action_effect_unknown", "binding_mismatch"]);
-
 export interface TurnOptions {
 	signal?: AbortSignal;
 	onEvent?: SessionEventListener;
-	/** 显式授权重发结果未知的模型请求；恢复 checkpoint 本身不表示再次调用。 */
-	retryUnknownModelCall?: boolean;
-	/** 在这个 turn 边界换绑。 */
+	/** 从这个 turn 起换用的模型。 */
 	model?: ModelBindingSnapshot;
-	/** 从 paused 继续；作者已核对原因。 */
-	fromPaused?: boolean;
 	onStarted?(value: { sessionId: string; turnId: string }): Promise<void> | void;
 }
 
@@ -217,7 +204,6 @@ export class HarnessSession {
 	readonly #engine: SuimingHarness;
 	readonly #execution: InMemoryExecutionState;
 	readonly #signal: AbortSignal | undefined;
-	readonly #retryUnknownModelCall: boolean;
 	/** 已提交基线：当前 head 的快照。turn 开场 Context 与「未提交了几个文件」都相对它算。 */
 	#base: ArtifactCandidate;
 	#telemetry: TelemetryContext;
@@ -236,7 +222,6 @@ export class HarnessSession {
 			execution: InMemoryExecutionState;
 			events: SessionEventStream;
 			signal: AbortSignal | undefined;
-			retryUnknownModelCall?: boolean;
 			telemetry: TelemetryContext;
 			usageCheckpoint: number;
 		},
@@ -250,7 +235,6 @@ export class HarnessSession {
 		this.#execution = input.execution;
 		this.events = input.events;
 		this.#signal = input.signal;
-		this.#retryUnknownModelCall = input.retryUnknownModelCall ?? false;
 		this.#telemetry = input.telemetry;
 	}
 
@@ -261,11 +245,6 @@ export class HarnessSession {
 
 	get execution(): InMemoryExecutionState {
 		return this.#execution;
-	}
-
-	/** 这一轮是作者按停止打断的（不是应用退出、SIGINT 或用量检查点）。 */
-	get stoppedByAuthor(): boolean {
-		return this.#signal?.aborted === true && this.#signal.reason instanceof AuthorStop;
 	}
 
 	/** 一个角色当前绑定模型的上下文窗口（token）；拿不到时 undefined。Source 分段按它定大小。 */
@@ -356,13 +335,8 @@ export class HarnessSession {
 		// 合法性在 commit 时由 Checker 判；只有子任务按角色缩小写范围（Harness 设计第 6 节）。
 		const env = new ConfinedExecutionEnv({ rootPath: this.checkoutPath, policy: "write" });
 		const restored = await this.#restore(record.checkpointRef);
-		// turn 边界且 inbox 没有新消息：不该开新的模型调用（resume 只是回到 idle）。
-		if (
-			restored !== undefined &&
-			restored.loop.phase === "settled" &&
-			!hasUnconfirmedEffects(restored.loop) &&
-			this.pendingInbox().length === 0
-		)
+		// 模型已经停下、inbox 也没有新消息：不该开新的模型调用。
+		if (restored !== undefined && restored.loop.phase === "settled" && this.pendingInbox().length === 0)
 			return { stop: restored.loop.stop ?? "model_stopped", reply: "", turns: restored.loop.turns };
 		const outcome = await this.#drive({
 			loopId: this.sessionId,
@@ -525,12 +499,7 @@ export class HarnessSession {
 			// 打断、用量检查点与持久化故障留给 turn 收口（turn 结束时子任务标 interrupted，续跑接着来）；
 			// 其余是这个子任务自己的失败，记在它身上，由父模型决定下一步。
 			const code = executionFailure(error).code;
-			if (
-				code !== "run_interrupted" &&
-				code !== "turn_usage_checkpoint" &&
-				!PAUSE_CODES.has(code) &&
-				this.#writable()
-			) {
+			if (code !== "run_interrupted" && code !== "turn_usage_checkpoint" && this.#writable()) {
 				this.#execution.failTask({
 					commandId: `${taskId}:fail:${this.#execution.task(taskId).version}`,
 					taskId,
@@ -607,19 +576,8 @@ export class HarnessSession {
 		const { restored } = input;
 		const scan: CandidateScanner = () => this.scan();
 		const handle: TaskHandle = { telemetryContext: input.telemetry, taskId: input.loopId, env: input.env, scan };
-		const availableTools = input.tools(handle);
-		// 半途恢复沿用这一轮冻结的工具声明，也就是最近一次请求带的那份；turn 边界用当前工具面，loop 会采用新的 binding。
-		// 不能取会话第一次请求的：binding 按 turn 重算，两轮之间升级过工具面，第一次的声明就永远对不上。
-		const midway = restored !== undefined && hasUnconfirmedEffects(restored.loop);
-		const declarations = midway ? restored.loop.calls.at(-1)?.context?.tools : undefined;
-		const tools = declarations
-			? declarations.map((declaration) => {
-					const tool = availableTools.find((item) => item.name === declaration.name);
-					if (!tool || JSON.stringify(tool.parameters) !== JSON.stringify(declaration.parameters))
-						throw new SuimingHarnessError("binding_mismatch", `工具 ${declaration.name} 的原绑定已不可用`);
-					return { ...tool, description: declaration.description, parameters: declaration.parameters };
-				})
-			: availableTools;
+		// 从 checkpoint 接着跑也用当前的工具面与 systemPrompt：半途的动作不重做，不需要冻结当时的声明。
+		const tools = input.tools(handle);
 		let loop = restored?.loop;
 		// 未交付是可继续的协议暂停；显式续跑仍沿用原消息列表，而非返回旧 settled 结果。
 		if (loop && loop.phase === "settled" && loop.stop !== "terminated") {
@@ -627,7 +585,6 @@ export class HarnessSession {
 			delete loop.stop;
 			delete loop.unsubmittedStops;
 		}
-		const systemPrompt = restored?.systemPrompt ?? input.systemPrompt;
 		// 增量事件上的 sessionId 与信封、threadId 有重复，刻意保留：`suim session send --events` 把事件流原样交给 host，
 		// 仓库里没有消费者不等于没人用。子任务的事件带标准的 subagentRunId（就是 task id）；2026-10-05 之前用
 		// metadata.suiming.taskId / taskKind 标，根 Agent 的 taskKind 是 "agent"。
@@ -635,18 +592,14 @@ export class HarnessSession {
 		const subagentRunId = input.loopId === this.sessionId ? undefined : input.loopId;
 		const outcome = await runTaskLoop({
 			model: input.model,
-			systemPrompt: midway ? systemPrompt : input.systemPrompt,
+			systemPrompt: input.systemPrompt,
 			...(input.prompt === undefined ? {} : { prompt: input.prompt }),
 			...(input.openingLimit === undefined ? {} : { openingLimit: input.openingLimit }),
 			loopId: input.loopId,
-			retryUnknownModelCall: this.#retryUnknownModelCall,
 			...(loop === undefined ? {} : { checkpoint: loop }),
 			...(input.captureSubmission === undefined ? {} : { captureSubmission: input.captureSubmission }),
 			saveCheckpoint: async (state) => {
-				await input.saveCheckpoint(
-					{ schemaVersion: 2, loop: state, systemPrompt: midway ? systemPrompt : input.systemPrompt },
-					state,
-				);
+				await input.saveCheckpoint({ schemaVersion: 2, loop: state }, state);
 				// 请求一旦可能发出就记一次调用；按 commandId 幂等，重复保存不会重复计数。
 				const latest = state.calls.at(-1);
 				if (latest && latest.state !== "prepared") input.recordRequest(latest.id);
@@ -762,18 +715,15 @@ export class HarnessSession {
 	}
 
 	/**
-	 * 阶段提交是可恢复动作，成功后继续原 Agent。它就是作者「提交」按钮与 host `suim commit` 的同一条路：
-	 * 扫 checkout diff → ChangeSet → Checker → 推进 canon ref，只多一个 commandId 回执用于崩溃后去重。
-	 * 没有合并步骤——作者与 Agent 改同一文件时冲突在动作发生的当下就解决了（`edit` 的 `oldText`、保存的 `expectedSHA`）。
+	 * 阶段提交，成功后继续原 Agent。它就是作者「提交」按钮与 host `suim commit` 的同一条路：
+	 * 扫 checkout diff → ChangeSet → Checker → 推进 canon ref，只多一个 commandId 回执，提交被打断时据此告诉模型
+	 * 提交成了没有（committedRevision）。没有合并步骤——作者与 Agent 改同一文件时冲突在动作发生的当下就解决了
+	 * （`edit` 的 `oldText`、保存的 `expectedSHA`）。
 	 */
 	async commitStage(actionId: string): Promise<{ created: boolean; revision: ProjectRevision }> {
 		this.throwIfInterrupted();
 		const commandId = `${this.sessionId}:commit:${actionId}`;
-		const known = await this.#engine.project.recoverCommittedAction(commandId);
-		const committed =
-			known === undefined
-				? await this.#engine.project.commitCheckout({ commandId })
-				: { created: true, revision: known };
+		const committed = await this.#engine.project.commitCheckout({ commandId });
 		const revision = committed.revision;
 		if (this.currentRevisionId !== revision.id) {
 			this.#execution.advanceSessionRevision(
@@ -787,6 +737,18 @@ export class HarnessSession {
 		}
 		this.events.refresh();
 		return committed;
+	}
+
+	/** 这个 commit 动作有没有提交成：提交与回执是同一个 git 提交，查得到回执就是成了。 */
+	committedRevision(actionId: string): Promise<ProjectRevision | undefined> {
+		return this.#engine.project.recoverCommittedAction(`${this.sessionId}:commit:${actionId}`);
+	}
+
+	/** 建这个子任务的那次动作（委派、审稿）：从父 loop 已保存的 checkpoint 里读，续跑时沿用它的参数。 */
+	async originalCall(task: TaskRecord): Promise<ToolCall | undefined> {
+		const parent = task.parent?.taskId === undefined ? this.record : this.#execution.task(task.parent.taskId);
+		const restored = await this.#restore(parent.checkpointRef);
+		return restored?.loop.actions.find((action) => action.id === task.key)?.call;
 	}
 }
 
@@ -938,8 +900,7 @@ export class SuimingHarness {
 
 	/**
 	 * 跑一个 turn：拿 lease → body → 收口。body 正常返回或模型停下 → idle；打断 → idle；
-	 * 只有三种「不问作者就不能安全继续」的错误 → paused；其余错误 → idle 并记 lastFailure。
-	 * 持久化本身失败时抛出，不伪装成收口。
+	 * 其余错误 → idle 并记 lastFailure，作者一句话就能续。持久化本身失败时抛出，不伪装成收口。
 	 */
 	async turn<T>(
 		sessionId: string,
@@ -951,14 +912,6 @@ export class SuimingHarness {
 		const before = execution.session(sessionId);
 		if (before.status === "running")
 			throw new SuimingHarnessError("session_running", `session ${sessionId} 已有 turn 在跑`);
-		if (before.status === "paused" && !options.fromPaused)
-			throw new SuimingHarnessError("session_paused", before.pause?.message ?? `session ${sessionId} 需要作者处理`);
-		if (before.status === "paused" && options.model && before.checkpointRef) {
-			const object = await this.project.readExecutionObject(before.checkpointRef.id);
-			const checkpoint = (await this.checkpoints.read(object.bytes)) as HarnessCheckpoint;
-			if (hasUnconfirmedEffects(checkpoint.loop))
-				throw new SuimingHarnessError("binding_mismatch", "请先用原模型核对未知请求或待确认动作，再换模型");
-		}
 		const lease = this.#lease();
 		const ownerId = lease.ownerId as string;
 		// 先订阅再 startTurn：RUN_STARTED 与紧随其后的状态快照由 startTurn 的命令落盘，订阅晚了它们就只在历史里，
@@ -975,15 +928,13 @@ export class SuimingHarness {
 			lease,
 			turnId: ownerId,
 			...(options.model === undefined ? {} : { model: options.model }),
-			fromPaused: before.status === "paused",
 		});
 		execution.bindOwner(sessionId, ownerId);
 		events.refresh();
-		const endTurn = (status: "idle" | "paused", failure?: ExecutionFailure): SessionRecord =>
+		const endTurn = (failure?: ExecutionFailure): SessionRecord =>
 			execution.endTurn({
 				commandId: `${sessionId}:turn:end:${execution.session(sessionId).version}`,
 				sessionId,
-				status,
 				...(failure === undefined ? {} : { failure }),
 			});
 		return this.telemetry.startSpan(
@@ -1022,7 +973,6 @@ export class SuimingHarness {
 						execution,
 						events,
 						signal: options.signal,
-						retryUnknownModelCall: options.retryUnknownModelCall ?? false,
 						telemetry: span,
 						usageCheckpoint: await this.#usageCheckpoint(),
 					});
@@ -1030,7 +980,7 @@ export class SuimingHarness {
 					start = await turnStart(session);
 					const value = await body(session);
 					await this.#emitTurnSummary(session, start, ownerId);
-					const ended = endTurn("idle");
+					const ended = endTurn();
 					events.refresh();
 					return { session: ended, value };
 				} catch (error) {
@@ -1043,11 +993,7 @@ export class SuimingHarness {
 					// 没有它，对话里只剩一串操作、后面没有回复，作者看不出是自己停的还是出了什么事。
 					if (session !== undefined)
 						await this.#emitTurnSummary(session, start, ownerId, interrupted).catch(() => undefined);
-					const ended = interrupted
-						? endTurn("idle")
-						: PAUSE_CODES.has(failure.code)
-							? endTurn("paused", failure)
-							: endTurn("idle", failure);
+					const ended = interrupted ? endTurn() : endTurn(failure);
 					events.refresh();
 					return { session: ended, ...(interrupted ? {} : { failure }) };
 				} finally {

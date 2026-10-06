@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { type Context, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { codePointCount, sliceCodePoints } from "../src/artifact/code-points.js";
+import { agentTurn } from "../src/harness/agent.js";
 import {
 	findInMaterial,
 	materialSegments,
@@ -622,6 +623,98 @@ test("一次回复里委派的多个 source-reader 同时跑，各写各的笔�
 		const [first, second] = [...tasks].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 		assert.ok((second?.createdAt ?? "") <= (first?.updatedAt ?? ""), "第二个在第一个结束前就开始了");
 		assert.equal(results.length, 2);
+	});
+});
+
+test("被打断的两个 source-reader：根 Agent 一次回复里用 resume_task 同时续上，各从自己的进度接着做；不存在的 taskId 是工具错误", async () => {
+	await withProject(async (project) => {
+		const controller = new AbortController();
+		/** 两个子任务都到了才放行：没有同时跑，这里就等不齐，测试超时失败。 */
+		const barrier = (onBoth: () => void) => {
+			let arrived = 0;
+			let release!: () => void;
+			const both = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			return async () => {
+				arrived += 1;
+				if (arrived === 2) {
+					onBoth();
+					release();
+				}
+				await Promise.race([
+					both,
+					new Promise((_, reject) => setTimeout(() => reject(new Error("两个子任务没有同时跑")), 5000)),
+				]);
+			};
+		};
+		const interrupted = barrier(() => controller.abort(new Error("应用退出，已请求保存进度")));
+		const resumed = barrier(() => undefined);
+		const results: string[] = [];
+		const harness = new SuimingHarness({
+			project,
+			models: gateway([
+				fauxAssistantMessage([
+					fauxToolCall("delegate", { profile: "source-reader", sourceId: "访谈", goal: "读前半" }),
+					fauxToolCall("delegate", { profile: "source-reader", sourceId: "访谈", goal: "读后半" }),
+				]),
+				async () => {
+					await interrupted();
+					return call("source_coverage", { sourceId: "访谈" });
+				},
+				async () => {
+					await interrupted();
+					return call("source_coverage", { sourceId: "访谈" });
+				},
+				(context) => {
+					const encoded = JSON.stringify(context.messages);
+					const ids = [...encoded.matchAll(/taskId: \\"(task_[0-9a-f-]+)\\"/gu)].map((match) => match[1]);
+					assert.equal(new Set(ids).size, 2, "两个委派都说了被打断与怎么续");
+					return fauxAssistantMessage([
+						...ids.map((taskId) => fauxToolCall("resume_task", { taskId: taskId as string })),
+						fauxToolCall("resume_task", { taskId: "task_nope" }),
+					]);
+				},
+				async () => {
+					await resumed();
+					return call("submit_task", { summary: "读完一段" });
+				},
+				async () => {
+					await resumed();
+					return call("submit_task", { summary: "读完一段" });
+				},
+				(context) => {
+					results.push(
+						...context.messages
+							.slice(-3)
+							.filter((message) => message.role === "toolResult")
+							.map((message) => JSON.stringify(message.content)),
+					);
+					return reply("两段都读完了");
+				},
+			]),
+		});
+		const session = await harness.createSession();
+		project.queueInbox(session.id, "分两段读访谈");
+		const stopped = await harness.turn(session.id, { signal: controller.signal }, (handle) => agentTurn(handle));
+		assert.equal(stopped.failure, undefined);
+		assert.deepEqual(
+			project.loadExecutionState().tasks.map((task) => task.status),
+			["interrupted", "interrupted"],
+		);
+		project.queueInbox(session.id, "继续");
+		const next = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+		assert.equal(next.failure, undefined);
+		assert.equal(next.value?.reply, "两段都读完了");
+		const tasks = project.loadExecutionState().tasks;
+		assert.equal(tasks.length, 2, "续的是原来的两个，没有新建");
+		assert.deepEqual(
+			tasks.map((task) => task.status),
+			["completed", "completed"],
+		);
+		assert.equal(results.length, 3);
+		assert.equal(results.filter((text) => text.includes("读完一段")).length, 2);
+		assert.match(results[2] ?? "", /task_not_found/u);
 	});
 });
 

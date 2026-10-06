@@ -81,7 +81,6 @@ export function AgentComposer({
 	const update = (change: (draft: ComposerDraft) => ComposerDraft, persist = false) =>
 		updateComposer(draftKey, change, persist);
 	const active = isSessionActive(session);
-	const paused = session?.status === "paused";
 	const stopping = active && !composerText(composer);
 	const sendLabel = stopping ? "停止" : "发送";
 	async function stop() {
@@ -143,7 +142,7 @@ export function AgentComposer({
 	};
 	const attachments = composer.attachments;
 	const tooLarge = composerReferenceBytes(composer) > MAX_INPUT_BYTES;
-	const ready = !tooLarge && !attachments.some((item) => item.status !== "ready") && !paused;
+	const ready = !tooLarge && !attachments.some((item) => item.status !== "ready");
 	const matches = book.data.files.filter((file) =>
 		`${book.title(file)} ${file.path} ${file.kind === "story-beat" ? "设计" : file.kind === "story-text" ? "正文" : ""}`
 			.normalize("NFKC")
@@ -300,11 +299,6 @@ export function AgentComposer({
 			{tooLarge && (
 				<p role="alert" className="mb-2 text-xs text-destructive">
 					引用总量超过 256 KB，请移除部分内容或改为引用选段。
-				</p>
-			)}
-			{paused && (
-				<p role="status" className="mb-2 text-xs text-muted-foreground">
-					这个对话需要先处理上面的问题才能继续发消息。
 				</p>
 			)}
 			<InputGroup data-variant="composer">

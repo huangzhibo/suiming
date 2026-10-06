@@ -24,7 +24,7 @@ test("子任务按角色显示名称，与设置页的档位名一致；10-05 �
 	assert.equal(taskRoleLabel(undefined), "子任务");
 });
 
-test("恢复入口由错误码决定，原因文案不改变恢复策略；paused 与 idle 的一句话分开呈现", () => {
+test("这一轮没正常结束时说什么由错误码决定，原因原文放在详情里", () => {
 	const session = {
 		id: "s",
 		title: "说明",
@@ -34,20 +34,16 @@ test("恢复入口由错误码决定，原因文案不改变恢复策略；pause
 		createdAt: "2026-09-12T00:00:00.000Z",
 		updatedAt: "2026-09-12T00:00:00.000Z",
 	};
-	const unknown = sessionProblem({
+	const failed = sessionProblem({
 		...session,
-		status: "paused",
-		pause: { code: "model_call_unknown", message: "Request timed out", retryable: false },
+		lastFailure: { code: "model_call_failed", message: "Request timed out", retryable: false },
 	});
-	assert.equal(unknown?.unknownModelCall, true);
-	assert.equal(unknown?.paused, true);
-	assert.equal(unknown?.detail, "Request timed out");
+	assert.equal(failed?.title, "模型调用失败");
+	assert.equal(failed?.detail, "Request timed out");
 	const stuck = sessionProblem({
 		...session,
 		lastFailure: { code: "run_no_progress", message: "重复动作", retryable: true },
 	});
-	assert.equal(stuck?.unknownModelCall, false);
-	assert.equal(stuck?.paused, false);
 	assert.equal(stuck?.title, "需要调整方向");
 	// 两种打转都报 run_no_progress：同一动作同一结果连续三次（成功的也算）、连续五次回复的动作全被拒绝。
 	assert.match(stuck?.hint ?? "", /同一个结果/u);
@@ -56,7 +52,6 @@ test("恢复入口由错误码决定，原因文案不改变恢复策略；pause
 		...session,
 		lastFailure: { code: "turn_usage_checkpoint", message: "这一轮的用量折合 612 万 token", retryable: false },
 	});
-	assert.equal(checkpoint?.paused, false, "检查点不是 paused：作者发一条消息就接着跑");
 	assert.equal(checkpoint?.title, "到了这一轮的用量检查点");
 	assert.equal(checkpoint?.detail, "这一轮的用量折合 612 万 token");
 	const other = sessionProblem({

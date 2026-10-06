@@ -464,7 +464,9 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 	}
 });
 
-test("主进程 SIGKILL 后重开：未知请求默认 paused，显式重发接着同一份消息列表", { timeout: 90000 }, async () => {
+test("主进程 SIGKILL 后重开：没收到回复的请求作废，再发一句就接着同一份消息列表，作废的那次记为未确认调用", {
+	timeout: 90000,
+}, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-desktop-recovery-"));
 	const root = join(directory, "work");
 	await mkdir(root);
@@ -498,22 +500,18 @@ test("主进程 SIGKILL 后重开：未知请求默认 paused，显式重发接�
 		app = await launchDesktop({ directory, project: root, flags: ["--recovery-test", "--recovery-second"] });
 		page = await app.firstWindow();
 		const reopenedErrors = collectPageErrors(page);
-		// 重开时持有进程已死：session 回 idle 记 process_restart；再发一句才会读到停在半途的请求，落进 paused。
+		// 重开时持有进程已死：session 回 idle 记 process_restart；再发一句，停在半途的请求作废、按当前消息重新请求。
 		await page.getByText("上次没有正常结束", { exact: true }).waitFor({ timeout: 7000 });
 		await page.getByRole("textbox", { name: "输入消息" }).fill("接着分析");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
-		await page.getByRole("button", { name: "确认重新请求模型", exact: true }).waitFor({ timeout: 7000 });
-		const before = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
-		assert.equal(before?.sessions.length, 1);
-		assert.equal(before?.sessions[0]?.status, "paused");
-		assert.equal(before?.sessions[0]?.usage?.calls, 1);
-		// usage 原样透传存储形状：待确认数是 calls - confirmedCalls，由界面派生，命令目录不存第二份。
-		const usage = before?.sessions[0]?.usage;
-		assert.ok(usage);
-		assert.equal(usage.calls - (usage.confirmedCalls ?? usage.calls), 1);
-		await page.getByRole("button", { name: "确认重新请求模型", exact: true }).click();
 		await page.locator(".message.assistant").filter({ hasText: "恢复后的分析已完成" }).waitFor();
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
+		const after = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
+		assert.equal(after?.sessions.length, 1);
+		// usage 原样透传存储形状：未确认数是 calls - confirmedCalls，由界面派生，命令目录不存第二份。
+		const usage = after?.sessions[0]?.usage;
+		assert.ok(usage);
+		assert.equal(usage.calls - (usage.confirmedCalls ?? usage.calls), 1, "被杀时在途的那次可能已计费，照记");
 		const opened = await LocalProjectService.open(root);
 		try {
 			const state = opened.loadExecutionState();

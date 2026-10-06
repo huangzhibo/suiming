@@ -122,12 +122,12 @@ test("project.diff 两侧不同是有理由的，不是分叉", () => {
 	assert.deepEqual(LOCAL_COMMANDS["revision.diff"].output, ipc, "两条 diff 同一种清单");
 });
 
-test("session.send / resume / interrupt 两侧不同也是有理由的：CLI 同步跑完一个 turn，桌面是异步回执", () => {
+test("session.send 两侧不同也是有理由的：CLI 同步跑完一个 turn，桌面是异步回执", () => {
 	// 写明理由免得被当成漏网的分叉（2026-10-02 协议面审查列过它）：CLI 的 suim session send 在进程里把这个 turn
 	// 跑完再回整轮结果（session 状态、head、最后一条回复），host 拿到就能接着干；桌面的同名命令只把话放进 inbox
-	// 就返回，回复从事件流里 attach。interrupt 同理：CLI 只能放弃 paused 的核对，桌面能停本进程里跑着的 turn。
-	for (const name of ["session.send", "session.resume", "session.interrupt"] as const)
-		assert.notDeepEqual(SUIM_CLI_COMMAND_DATA[name], LOCAL_COMMANDS[name].output, name);
+	// 就返回，回复从事件流里 attach。停止只有桌面有：每次 suim 调用是新进程，停不了别的进程里跑着的 turn，
+	// 自己跑的那一轮按 Ctrl+C 停。
+	assert.notDeepEqual(SUIM_CLI_COMMAND_DATA["session.send"], LOCAL_COMMANDS["session.send"].output);
 	assert.ok("reply" in SUIM_CLI_COMMAND_DATA["session.send"].properties, "CLI 回整轮结果");
 	assert.ok("sessionId" in LOCAL_COMMANDS["session.send"].output.properties, "桌面回回执");
 });

@@ -31,10 +31,12 @@ export interface TaskLoopToolCallEvent {
 }
 export interface ModelCallRecord {
 	id: string;
-	retryOf?: string;
 	turn: number;
+	/**
+	 * prepared 是登记了还没发；effect_pending 是可能已经发出；unknown 是发出后没收到完整回复、已经作废——
+	 * 进程退出或流抛出异常时落到这里，恢复不核对它，回到 ready 用当前消息重新组装（可能已计费，用量里记一次未确认调用）。
+	 */
 	state: "prepared" | "effect_pending" | "received" | "failed" | "unknown";
-	context?: Context;
 	response?: AssistantMessage;
 	usage?: ModelUsage;
 	usageRecorded?: boolean;
@@ -46,8 +48,11 @@ export interface ActionRecord {
 	id: string;
 	modelCallId: string;
 	call: ToolCall;
+	/**
+	 * planned 是还没开始；effect_pending 是已经开始执行、还没拿到结果。从 checkpoint 接着跑时这两种都不重做，
+	 * 补一条「没有执行」或「执行时被打断」的结果交给模型（interruptedResult）。
+	 */
 	state: "planned" | "effect_pending" | "result_ready" | "delivered";
-	prepared?: unknown;
 	result?: HarnessToolResult;
 	message?: ToolResultMessage;
 }
@@ -56,8 +61,6 @@ export interface LoopCheckpoint {
 	schemaVersion: 2;
 	/** 这份 checkpoint 属于哪个 loop：sessionId 或 taskId。 */
 	loopId: string;
-	/** 模型 + systemPrompt + 工具声明的 hash；按 turn 冻结，只在没有未决副作用的边界重算。 */
-	binding: string;
 	sequence: number;
 	steeringSequence: number;
 	/** 最近一次压缩：摘要就在写它的那次回复的 compact_context 调用里；throughMessage 是那一批结果之后的下标。 */
@@ -107,8 +110,6 @@ export interface TaskLoopOptions {
 	/** 确认保存之后才调用 provider、修改文件或交付工具结果。 */
 	saveCheckpoint?(checkpoint: LoopCheckpoint): Promise<void>;
 	captureSubmission?(): unknown;
-	/** 不确定的远端调用必须显式授权重试；恢复检查点本身不表示再次调用。 */
-	retryUnknownModelCall?: boolean;
 	/** 瞬时失败（流中断、429、5xx）的自动重发；缺省见 TRANSIENT_RETRY。 */
 	transientRetry?: { maxRetries: number; baseDelayMs: number };
 	onTurnStart?(turn: number, context: Context): Promise<void> | void;
@@ -211,7 +212,7 @@ const DEFAULT_TOKENS_PER_BYTE = 1 / 3;
 
 /**
  * 边界折叠（Harness 设计第 7 节「边界折叠」）。边界是上一轮停下之后作者又说了一句，以及一次产生了新版本的提交：
- * 之前读到的东西，用它的那件事已经做完了。边界之前、原文超过这么多字节的读取类结果（`replay: "read"`，同样的
+ * 之前读到的东西，用它的那件事已经做完了。边界之前、原文超过这么多字节的读取类结果（工具声明 `rereadable`，同样的
  * 参数再调一次就拿得回来，拿到的还是当前内容）在请求里只留头尾。不按「发过几次」折：模型常常一次读一个文件、
  * 读完几个才动笔，按次数折会在动笔之前折掉先读的，逼它重读。折叠点只在边界上推进，两个边界之间请求前缀不变。
  */
@@ -334,40 +335,25 @@ function contextOverflowError(): SuimingHarnessError {
 	);
 }
 
-/** Suiming 自有循环。所有已接受的模型决定与工具结果先确认保存，再推进执行位置。 */
-export function taskLoopBinding(options: Pick<TaskLoopOptions, "model" | "systemPrompt" | "tools">): string {
-	const declarations = options.tools.map(({ name, description, parameters }) => ({ name, description, parameters }));
-	return createHash("sha256")
-		.update(
-			JSON.stringify({
-				model: options.model.snapshot,
-				systemPrompt: options.systemPrompt,
-				tools: declarations,
-				implementation: "suiming-loop-2",
-			}),
-		)
-		.digest("hex");
-}
+/** 还没开始的动作在恢复时得到的结果。 */
+const NOT_RUN = "没有执行：这一批动作在它之前被打断了（作者停止、应用退出或进程中断）。需要的话重新调用。";
+/** 执行到一半的动作在恢复时得到的结果；工具可以用 interrupted 再补一句（子任务的进度、提交成了哪个版本）。 */
+const INTERRUPTED =
+	"执行时被打断了（作者停止、应用退出或进程中断），不确定有没有生效。需要的话先读一下相关文件或作品状态，再决定重做还是接着做别的。";
 
-/** 有没有停在半途的外部效果：有就不能换绑，也不能改工具面。 */
-export function hasUnconfirmedEffects(checkpoint: LoopCheckpoint): boolean {
-	const last = checkpoint.calls.at(-1);
-	return (
-		(!!last && ["effect_pending", "unknown"].includes(last.state)) ||
-		checkpoint.actions.some((action) => action.state === "effect_pending")
-	);
-}
-
+/**
+ * Suiming 自有循环。所有已接受的模型决定与工具结果先确认保存，再推进执行位置。
+ * 从 checkpoint 接着跑时不核对半途的效果（Harness 设计第 5 节）：没收到回复的请求作废重发，没有结果的动作补一条
+ * 「被打断」或「没有执行」，由模型看着决定——与 Claude Code、Codex 的做法相同。模型与工具面一律用当前的。
+ */
 export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOutcome> {
 	const declarations = options.tools.map(({ name, description, parameters }) => ({ name, description, parameters }));
-	const foldable = new Set(options.tools.filter((tool) => tool.replay === "read").map((tool) => tool.name));
-	const binding = taskLoopBinding(options);
+	const foldable = new Set(options.tools.filter((tool) => tool.rereadable).map((tool) => tool.name));
 	const state: LoopCheckpoint =
 		options.checkpoint === undefined
 			? {
 					schemaVersion: 2,
 					loopId: options.loopId ?? `loop_${randomUUID()}`,
-					binding,
 					sequence: 0,
 					steeringSequence: 0,
 					phase: "ready",
@@ -383,16 +369,8 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			: structuredClone(options.checkpoint);
 	if (state.schemaVersion !== 2 || (options.loopId !== undefined && state.loopId !== options.loopId))
 		throw new SuimingHarnessError("checkpoint_invalid", "恢复位置不属于这个 loop");
-	if (state.binding !== binding) {
-		// 模型、宪法或工具面变了。turn 边界（没有停在半途的调用或动作）上直接采用新绑定；
-		// 半途恢复必须先用原绑定把未决的调用或动作收口。
-		if (["ready", "settled"].includes(state.phase) && !hasUnconfirmedEffects(state)) state.binding = binding;
-		else
-			throw new SuimingHarnessError(
-				"binding_mismatch",
-				"有未确认的模型请求或动作；请先用原来的模型与工具面核对，再在停下后换绑",
-			);
-	}
+	// 10-06 之前的 checkpoint 还带着按 turn 冻结的绑定 hash，现在不用了。
+	Reflect.deleteProperty(state, "binding");
 	if (
 		!["ready", "model_pending", "tools", "settled"].includes(state.phase) ||
 		!Number.isInteger(state.sequence) ||
@@ -443,14 +421,12 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			messages: state.messages.map(immutableCopy),
 			calls: state.calls.map((call) => ({
 				...call,
-				...(call.context ? { context: immutableCopy(call.context) } : {}),
 				...(call.response ? { response: immutableCopy(call.response) } : {}),
 				...(call.usage ? { usage: immutableCopy(call.usage) } : {}),
 			})),
 			actions: state.actions.map((action) => ({
 				...action,
 				call: immutableCopy(action.call),
-				...(action.prepared !== undefined ? { prepared: immutableCopy(action.prepared) } : {}),
 				...(action.result ? { result: immutableCopy(action.result) } : {}),
 				...(action.message ? { message: immutableCopy(action.message) } : {}),
 			})),
@@ -545,40 +521,48 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		state.phase = "ready";
 		await save();
 	}
-	// 准备好却没发出的请求也撤回：回到 ready 重新组装，带上这期间来的作者消息，不先把旧请求补发一遍。
-	// 重试未知调用的那一次不在此列，它按冻结的 Context 重发。
-	if (state.phase === "model_pending" && last?.state === "prepared" && last.retryOf === undefined) {
-		state.calls.pop();
-		state.turns -= 1;
+	// 没收到回复的请求作废：回到 ready 用当前消息重新组装，带上这期间来的作者消息，不按旧请求补发。
+	// 登记了还没发的直接撤掉；可能已经发出的留下记录（unknown），它的未确认调用已经记在用量里。
+	if (state.phase === "model_pending") {
+		if (last?.state === "prepared") {
+			state.calls.pop();
+			state.turns -= 1;
+		} else if (last !== undefined) last.state = "unknown";
 		state.phase = "ready";
 		await save();
 	}
-	if (state.phase === "model_pending") {
-		const pending = state.calls.at(-1);
-		if (pending?.state === "effect_pending" || pending?.state === "unknown") {
-			pending.state = "unknown";
-			await save();
-			if (!options.retryUnknownModelCall)
-				throw new SuimingHarnessError(
-					"model_call_unknown",
-					`模型调用 ${pending.id} 的远端结果未知；确认重试前保持暂停`,
-				);
-			if (!pending.context) throw new SuimingHarnessError("checkpoint_invalid", "未知请求缺少冻结 Context");
-			// 逻辑输入保留，新的外部请求拥有新身份，未知计费记录不抹除。
-			state.calls.push({
-				id: `call_${randomUUID()}`,
-				turn: pending.turn,
-				retryOf: pending.id,
-				state: "prepared",
-				context: structuredClone(pending.context),
-			});
-			await save();
+	// 一批动作做到一半被打断：已有结果的照常交付，其余补一条结果，不重做、不核对，由模型看着决定。
+	if (state.phase === "tools" && last !== undefined) {
+		const pending = state.actions.filter(
+			(action) =>
+				action.modelCallId === last.id && (action.state === "planned" || action.state === "effect_pending"),
+		);
+		for (const action of pending) {
+			let text = NOT_RUN;
+			if (action.state === "effect_pending") {
+				const tool = options.tools.find((item) => item.name === action.call.name);
+				const note =
+					tool?.interrupted !== undefined && Value.Check(tool.parameters, action.call.arguments)
+						? await tool.interrupted(action.id, action.call.arguments)
+						: undefined;
+				text = note === undefined ? INTERRUPTED : `${INTERRUPTED}\n${note}`;
+			}
+			action.result = { content: [{ type: "text", text }] };
+			action.message = {
+				role: "toolResult",
+				toolCallId: action.call.id,
+				toolName: action.call.name,
+				content: action.result.content,
+				isError: true,
+				timestamp: Date.now(),
+			};
+			action.state = "result_ready";
 		}
+		if (pending.length > 0) await save();
 	}
-	/** 把一个动作推进到 result_ready：准备、落 journal、执行或恢复。交付（进消息列表）另由调用方按派出顺序做。 */
+	/** 把一个动作推进到 result_ready：先记下「已开始」，再执行。交付（进消息列表）另由调用方按派出顺序做。 */
 	const settle = async (action: ActionRecord, call: ModelCallRecord) => {
 		const tool = options.tools.find((item) => item.name === action.call.name);
-		const recoveringEffect = action.state === "effect_pending";
 		let result!: HarnessToolResult;
 		let isError = false;
 		await (options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT).startSpan(
@@ -588,7 +572,6 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 					"langfuse.observation.type": "tool",
 					"langfuse.observation.metadata.action_id": action.id,
 					"langfuse.observation.metadata.model_call_id": call.id,
-					"suiming.tool.recovering": recoveringEffect,
 				},
 			},
 			async (toolSpan) => {
@@ -601,37 +584,11 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 								.map((error) => `${error.instancePath}: ${error.message}`)
 								.join("; "),
 						);
-					if (recoveringEffect) {
-						if (tool.replay === "reconcile" && tool.reconcile)
-							result = await tool.reconcile(action.id, action.call.arguments, action.prepared, options.signal);
-						else if (tool.replay === "read" && action.prepared !== undefined)
-							result = await tool.execute(
-								action.id,
-								action.call.arguments,
-								options.signal,
-								undefined,
-								action.prepared,
-							);
-						else
-							throw new SuimingHarnessError(
-								"action_effect_unknown",
-								`动作 ${action.id} (${action.call.name}) 需要核对副作用后才能继续`,
-							);
-					} else {
-						action.prepared = await tool.prepare?.(action.call.arguments, options.signal);
-						const submission = options.captureSubmission?.();
-						if (submission !== undefined) state.submission = submission;
-						action.state = "effect_pending";
-						await save();
-						check();
-						result = await tool.execute(
-							action.id,
-							action.call.arguments,
-							options.signal,
-							undefined,
-							action.prepared,
-						);
-					}
+					// 先记下「已开始」：恢复时据此区分「执行时被打断」与「没有执行」。
+					action.state = "effect_pending";
+					await save();
+					check();
+					result = await tool.execute(action.id, action.call.arguments, options.signal);
 				} catch (thrown) {
 					const error = rejectionForToolError(thrown);
 					toolSpan.setStatus({
@@ -641,8 +598,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 							message: "Tool action failed",
 						},
 					});
-					// 写冲突也在这里交给模型：落盘前核对过，这次没有写入，模型重读再改就行；抛出去会让 turn 失败，
-					// 而动作还停在 effect_pending，续接时会撞同一个冲突。
+					// 写冲突也在这里交给模型：落盘前核对过，这次没有写入，模型重读再改就行。
 					if (!(error instanceof ToolRejection)) throw error;
 					result = { content: [{ type: "text", text: error.message }] };
 					isError = true;
@@ -663,15 +619,17 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		action.state = "result_ready";
 		await save();
 	};
+	// 这一次请求的输入只在内存里：恢复时没收到回复的请求作废、从消息列表重新组装，checkpoint 不必存它。
+	let request: Context | undefined;
 	mainLoop: while (true) {
 		check();
 		if (state.phase === "ready") {
 			await pullSteering();
 			if (state.turns >= options.budget.maxTurns) return finish("budget_exhausted");
-			// 历史请求的输入可以从消息列表重建；checkpoint 只留当前请求的 Context，未知请求的重发与半途恢复都只用它。
+			// 回复已经在消息列表里，调用记录不再留一份。10-06 之前的 checkpoint 还在调用记录里存过请求的 Context。
 			for (const previous of state.calls) {
-				delete previous.context;
 				delete previous.response;
+				Reflect.deleteProperty(previous, "context");
 			}
 			const build = (): Context => ({
 				systemPrompt: options.systemPrompt,
@@ -739,19 +697,22 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			state.turns += 1;
 			await options.onTurnStart?.(state.turns, context);
 			check();
-			state.calls.push({ id: `call_${randomUUID()}`, turn: state.turns, state: "prepared", context, promptBytes });
+			state.calls.push({ id: `call_${randomUUID()}`, turn: state.turns, state: "prepared", promptBytes });
 			state.phase = "model_pending";
+			request = context;
 			await save();
 		}
 		if (state.phase === "model_pending") {
 			const call = state.calls.at(-1);
-			if (call?.state !== "prepared" || !call.context)
+			if (call?.state !== "prepared" || request === undefined)
 				throw new SuimingHarnessError("checkpoint_invalid", "模型调用恢复位置无效");
+			const context = request;
+			request = undefined;
 			check();
 			call.state = "effect_pending";
 			await save();
 			if (options.signal?.aborted) {
-				// 停在这里时请求还没发出。留着 effect_pending，下一句就会被当成「远端结果未知」停下来问作者。
+				// 停在这里时请求确定没发出，退回 prepared，恢复时直接撤掉。
 				call.state = "prepared";
 				await save();
 				throw interruptedError(options.signal);
@@ -761,7 +722,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			options.signal?.addEventListener("abort", onAbort, { once: true });
 			let response: AssistantMessage;
 			try {
-				const stream = options.model.stream(call.context, {
+				const stream = options.model.stream(context, {
 					signal: abort.signal,
 					...(options.loopId === undefined ? {} : { sessionId: options.loopId }),
 					...(options.telemetryContext === undefined ? {} : { telemetryContext: options.telemetryContext }),
@@ -772,9 +733,13 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				response = await stream.result();
 			} catch (error) {
 				abort.abort(error);
-				// 模型流或通知失败不能假定 provider 没执行；持久化错误由调用方的 latch 拦截。
 				if (options.signal?.aborted) throw interruptedError(options.signal);
-				throw new SuimingHarnessError("model_call_unknown", error instanceof Error ? error.message : String(error));
+				// 流本身抛了异常（pi-ai 通常把错误转成回复，很少走到这里）：这次请求作废，作者说一句就重新请求。
+				// 它可能已经计费，未确认调用已经记在用量里。持久化错误由调用方的 latch 拦截。
+				call.state = "unknown";
+				state.phase = "ready";
+				await save();
+				throw new SuimingHarnessError("model_call_failed", error instanceof Error ? error.message : String(error));
 			} finally {
 				options.signal?.removeEventListener("abort", onAbort);
 			}
@@ -866,7 +831,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				const tool = options.tools.find((item) => item.name === action.call.name);
 				const pending = action.state === "planned" || action.state === "effect_pending";
 				if (!pending || !tool?.parallel || !Value.Check(tool.parameters, action.call.arguments)) break;
-				if (!tool.parallel(action.call.arguments)) break;
+				if (!(await tool.parallel(action.call.arguments))) break;
 				group.push(action);
 				index += 1;
 			}

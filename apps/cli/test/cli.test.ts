@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { hostname, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import {
@@ -618,7 +618,10 @@ test("suim 退出时统一由 shutdown 导出并关闭观测实例，成功与�
 		const failing = harness(checkoutPath, designRunGateway());
 		failing.io.telemetry = telemetry;
 		assert.notEqual(
-			await runSuimCli(["--json", "session", "resume", "session-that-does-not-exist"], failing.io),
+			await runSuimCli(
+				["--json", "session", "send", "--session", "session-that-does-not-exist", "接着做"],
+				failing.io,
+			),
 			SUIM_CLI_EXIT.success,
 		);
 		assert.deepEqual(calls, ["shutdown", "shutdown"]);
@@ -1478,43 +1481,12 @@ test("suim run rank：多版候选文件匿名交给评委，输出合并名次�
 	}
 });
 
-test("session interrupt：paused 的放弃核对回 idle；在别的进程里跑的如实报错，不假装停了", async () => {
-	// 2026-10-02 之前这条命令只读出状态就返回，exit 0：paused 的停不掉，running 的也没停，看上去却成功了。
+test("session show / events：id 打错如实报 session_not_found，中文说明", async () => {
 	const checkoutPath = await fixture();
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
-		const project = await LocalProjectService.open(checkoutPath);
-		try {
-			const execution = project.createExecutionState();
-			const live = { pid: process.pid, hostname: hostname(), acquiredAt: new Date().toISOString() };
-			execution.createSession({ commandId: "p:create", id: "paused", projectId: project.projectId });
-			execution.startTurn({ commandId: "p:start", sessionId: "paused", lease: { ownerId: "p", ...live } });
-			execution.endTurn({
-				commandId: "p:pause",
-				sessionId: "paused",
-				status: "paused",
-				failure: { code: "model_call_unknown", message: "结果未知", retryable: true },
-			});
-			// 持有进程还活着（就是测试进程本身），但不是这次 suim 调用：它只能在那边停。
-			execution.createSession({ commandId: "r:create", id: "running", projectId: project.projectId });
-			execution.startTurn({ commandId: "r:start", sessionId: "running", lease: { ownerId: "r", ...live } });
-		} finally {
-			project.close();
-		}
-
-		const abandoned = await jsonCommand(checkoutPath, ["session", "interrupt", "paused"]);
-		assert.equal(abandoned.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(abandoned.value));
-		assert.equal((abandoned.value.data as { session: { status: string } }).session.status, "idle");
-
-		const elsewhere = await jsonCommand(checkoutPath, ["session", "interrupt", "running"]);
-		assert.equal(elsewhere.exitCode, SUIM_CLI_EXIT.conflict);
-		const error = elsewhere.value.error as { code: string; message: string };
-		assert.equal(error.code, "session_not_active_in_process");
-		assert.match(error.message, /另一个进程/u);
-
 		// id 打错是作者正常操作会撞到的：与桌面同一个错误码，中文说明（原来是 execution_not_found 加英文）
 		for (const args of [
-			["session", "interrupt", "nope"],
 			["session", "show", "nope"],
 			["session", "events", "nope"],
 		]) {

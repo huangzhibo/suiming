@@ -19,7 +19,6 @@ export interface SessionSummary {
 	turnId?: string;
 	usage?: ModelUsage;
 	model?: ModelChoice;
-	pause?: NonNullable<SessionRecord["pause"]>;
 	lastFailure?: NonNullable<SessionRecord["lastFailure"]>;
 	result?: NonNullable<SessionRecord["result"]>;
 	createdAt: string;
@@ -47,7 +46,6 @@ export function sessionSummary(session: SessionRecord, title = ""): SessionSumma
 		...(session.turnId === undefined ? {} : { turnId: session.turnId }),
 		...(session.usage === undefined ? {} : { usage: session.usage }),
 		...(model === undefined ? {} : { model }),
-		...(session.pause === undefined ? {} : { pause: session.pause }),
 		...(session.lastFailure === undefined ? {} : { lastFailure: session.lastFailure }),
 		...(session.result === undefined ? {} : { result: session.result }),
 		createdAt: session.createdAt,

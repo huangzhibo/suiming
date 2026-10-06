@@ -3,7 +3,6 @@ import type { ModelChoice } from "@suiming/sdk";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ExecutionStateEvent, SessionRecord } from "../execution/types.js";
 import { agentTurn } from "../harness/agent.js";
-import { AuthorStop } from "../harness/errors.js";
 import type { SessionEventListener } from "../harness/events.js";
 import { SuimingHarness, type TurnOutcome } from "../harness/suiming-harness.js";
 import type { ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
@@ -21,29 +20,6 @@ export interface LocalSessionControllerOptions {
 interface ActiveSession {
 	controller: AbortController;
 	completion: Promise<void>;
-}
-
-/**
- * paused 的 session 没有在跑的 turn：interrupt 就是放弃这次核对，回 idle，消息列表保留。
- * 不需要模型，桌面与 CLI 共用——CLI 不必为了放弃一次核对去建模型网关、要凭据。不是 paused 的原样返回。
- */
-export function abandonPausedSession(project: LocalProjectService, sessionId: string): SessionRecord {
-	const execution = project.createExecutionState();
-	const session = execution.session(sessionId);
-	if (session.status !== "paused") return session;
-	execution.startTurn({
-		commandId: `${session.id}:interrupt:${session.version}:start`,
-		sessionId: session.id,
-		// hostname 留空：这不是有进程驱动的 turn，「同一作品只有一个 running」的检查不算它。
-		lease: { pid: process.pid, hostname: "", acquiredAt: new Date().toISOString() },
-		turnId: `${session.id}:interrupt:${session.version}`,
-		fromPaused: true,
-	});
-	return execution.endTurn({
-		commandId: `${session.id}:interrupt:${session.version}:end`,
-		sessionId: session.id,
-		status: "idle",
-	});
 }
 
 /** 在另一个进程里跑的 turn 只能由那个进程停：本进程没有它的中止信号，也不能去改它持有的状态。 */
@@ -70,14 +46,6 @@ export interface SendInput {
 	sessionId?: string;
 	/** 新 session 的模型，或在 turn 边界换绑。 */
 	model?: ModelChoice;
-	binding?: ModelBindingSnapshot;
-	onEvent?: SessionEventListener;
-}
-
-export interface ResumeInput {
-	commandId: string;
-	sessionId: string;
-	retryUnknownModelCall?: boolean;
 	binding?: ModelBindingSnapshot;
 	onEvent?: SessionEventListener;
 }
@@ -146,7 +114,7 @@ export class LocalSessionController {
 		});
 	}
 
-	/** 作者说一句话：入 inbox；idle 就开 turn，running 就等下一边界注入，paused 由 inbox 拒绝。 */
+	/** 作者说一句话：入 inbox；idle 就开 turn，running 就等下一边界注入。 */
 	async send(input: SendInput): Promise<{ sessionId: string; sequence: number }> {
 		const harness = this.harness();
 		let sessionId = input.sessionId;
@@ -176,27 +144,11 @@ export class LocalSessionController {
 		return { sessionId, sequence: queued.sequence };
 	}
 
-	/** 从 paused 继续；作者已核对原因。 */
-	async resume(input: ResumeInput): Promise<{ sessionId: string }> {
-		const harness = this.harness();
-		const record = harness.session(input.sessionId);
-		if (record.status !== "paused")
-			throw new ArtifactError("session_not_paused", `session ${input.sessionId} 是 ${record.status}，不需要 resume`);
-		this.#requireFree(input.sessionId);
-		this.#drive(harness, input.sessionId, {
-			fromPaused: true,
-			retryUnknownModelCall: input.retryUnknownModelCall ?? false,
-			...(input.binding === undefined ? {} : { model: input.binding }),
-			...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
-		});
-		return { sessionId: input.sessionId };
-	}
-
 	/**
-	 * 中止当前 turn：消息列表原样，回 idle。不在本进程跑的 session 只能由持有进程停。缺省是作者按停止
-	 * （`AuthorStop`：正在跑的子任务以「被作者停下」交回根 Agent）；应用退出、SIGINT 传普通 Error，下一句续跑。
+	 * 中止当前 turn：消息列表原样，回 idle，下一句接着跑。不在本进程跑的 session 只能由持有进程停。
+	 * stop 是给 turn 的原因（作者停止、应用退出、SIGINT），只用于说明。
 	 */
-	interrupt(sessionId: string, stop: Error = new AuthorStop()): SessionRecord {
+	interrupt(sessionId: string, stop: Error = new Error("作者停止了当前回复")): SessionRecord {
 		const active = this.#active.get(sessionId);
 		if (active === undefined) {
 			const existing = this.#project.loadExecutionEntities().sessions.find((session) => session.id === sessionId);
@@ -227,8 +179,6 @@ export class LocalSessionController {
 		options: {
 			model?: ModelBindingSnapshot;
 			onEvent?: SessionEventListener;
-			fromPaused?: boolean;
-			retryUnknownModelCall?: boolean;
 		},
 	): void {
 		const controller = new AbortController();
@@ -241,7 +191,6 @@ export class LocalSessionController {
 						{
 							signal: controller.signal,
 							...(first ? options : {}),
-							...(first && options.fromPaused ? { fromPaused: true } : {}),
 							...(options.onEvent === undefined ? {} : { onEvent: options.onEvent }),
 						},
 						(session) => agentTurn(session),

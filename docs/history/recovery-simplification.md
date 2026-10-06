@@ -87,5 +87,5 @@ Suiming 原来的恢复是「半途核对」：模型请求与每个动作都有
 | execution-persistence「inbox：paused 拒绝，idle 与 running 都排队…」 | 改 | idle 与 running 都排队 |
 | workspace「…保留 paused 的结构化原因」「paused 的 session：interrupt 放弃核对…」 | 改 | 失败原因以 `lastFailure` 保留；只留删除带走执行记录 |
 | cli、desktop E2E、composer-state、run-presentation、domain-schema、error-category 里的 paused / resume 断言 | 改或删 | 跟着命令与状态删掉 |
-| 新增：`resume_task` 并行续两个 reader；不能续别的 session 的或正在跑的子任务 | 新 | 新工具的边界 |
+| 新增：`resume_task` 一次回复里同时续两个被打断的 reader；不存在的 taskId 是工具错误 | 新 | 新工具的边界；把并行判定改成「不并行」时这条会失败 |
 | 新增：2026-10-06 之前落盘的 paused session 打开后是 idle，原因在 `lastFailure` | 新 | 旧数据收敛 |

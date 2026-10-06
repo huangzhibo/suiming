@@ -40,8 +40,6 @@ export const SUIM_CLI_COMMANDS = [
 	"release.status",
 	"release.publish",
 	"session.send",
-	"session.resume",
-	"session.interrupt",
 	"session.list",
 	"session.show",
 	"session.events",
@@ -681,7 +679,7 @@ export const SuimCliReleasePublishDataSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
-/** `session send` / `session resume`：一个 turn 跑完后的 session 状态与本轮的作者可见交付。 */
+/** `session send`：一个 turn 跑完后的 session 状态与本轮的作者可见交付。 */
 export const SuimCliSessionTurnDataSchema = Type.Object(
 	{
 		projectId: Type.String({ minLength: 1 }),
@@ -689,14 +687,6 @@ export const SuimCliSessionTurnDataSchema = Type.Object(
 		headRevisionId: Type.String({ minLength: 1 }),
 		/** 本 turn 里 Agent 的最后一条完整回复；模型停下就是 turn 结束。 */
 		reply: Type.String(),
-	},
-	{ additionalProperties: false },
-);
-
-export const SuimCliSessionStatusDataSchema = Type.Object(
-	{
-		projectId: Type.String({ minLength: 1 }),
-		session: sessionSummarySchema,
 	},
 	{ additionalProperties: false },
 );
@@ -794,8 +784,6 @@ export const SUIM_CLI_COMMAND_DATA = {
 	"release.status": SuimCliReleaseStatusDataSchema,
 	"release.publish": SuimCliReleasePublishDataSchema,
 	"session.send": SuimCliSessionTurnDataSchema,
-	"session.resume": SuimCliSessionTurnDataSchema,
-	"session.interrupt": SuimCliSessionStatusDataSchema,
 	"session.list": SuimCliSessionListDataSchema,
 	"session.show": SuimCliSessionShowDataSchema,
 	"session.events": SuimCliSessionEventsDataSchema,

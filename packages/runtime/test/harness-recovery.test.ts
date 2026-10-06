@@ -65,15 +65,27 @@ test("作者消息已存入 checkpoint 而消息发布失败时，恢复补齐�
 	assert.equal(provider.state.callCount, 1);
 });
 
-test("进程在文件已改、结果未保存时退出：原动作 journal 续接，不重复相对修改", async () => {
+test("进程在动作执行时退出：续跑不重做它，补「执行时被打断」；同一批还没开始的补「没有执行」，由模型决定", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-loop-recovery-"));
 	try {
 		await mkdir(join(root, "intent"));
 		await writeFile(join(root, "intent/a.md"), "A");
+		await writeFile(join(root, "intent/b.md"), "B");
 		const { provider, model } = await fixture();
 		provider.setResponses([
-			fauxAssistantMessage(fauxToolCall("edit", { path: "intent/a.md", oldText: "A", newText: "AA" })),
-			fauxAssistantMessage("完成"),
+			fauxAssistantMessage([
+				fauxToolCall("edit", { path: "intent/a.md", oldText: "A", newText: "A2" }),
+				fauxToolCall("edit", { path: "intent/b.md", oldText: "B", newText: "B2" }),
+			]),
+			async (context) => {
+				const texts = context.messages
+					.filter((message) => message.role === "toolResult")
+					.map((message) => message.content.map((part) => (part.type === "text" ? part.text : "")).join(""));
+				assert.equal(texts.length, 2);
+				assert.match(texts[0] ?? "", /执行时被打断/u);
+				assert.match(texts[1] ?? "", /没有执行/u);
+				return fauxAssistantMessage("先读一下再说");
+			},
 		]);
 		let checkpoint: LoopCheckpoint | undefined;
 		let crash = true;
@@ -91,17 +103,19 @@ test("进程在文件已改、结果未保存时退出：原动作 journal 续�
 			},
 		};
 		await assert.rejects(runTaskLoop(options), /process exited/u);
-		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "AA");
-		assert.equal(checkpoint?.actions[0]?.state, "effect_pending");
-		const actionId = checkpoint?.actions[0]?.id;
+		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "A2");
+		assert.deepEqual(
+			checkpoint?.actions.map((action) => action.state),
+			["effect_pending", "planned"],
+		);
 		crash = false;
 		assert.ok(checkpoint);
 		const result = await runTaskLoop({ ...options, checkpoint });
 		assert.equal(result.stop, "model_stopped");
-		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "AA");
-		assert.equal(checkpoint?.actions[0]?.id, actionId);
+		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "A2", "执行到一半的动作不再执行第二次");
+		assert.equal(await readFile(join(root, "intent/b.md"), "utf8"), "B", "没开始的动作不替模型补做");
 		assert.equal(provider.state.callCount, 2);
-		assert.equal(result.messages.filter((message) => message.role === "toolResult").length, 1);
+		assert.ok(result.messages.filter((message) => message.role === "toolResult").every((message) => message.isError));
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}
@@ -117,20 +131,23 @@ test("准备写入之后作者改了同一个文件：写冲突作为工具错�
 			fauxAssistantMessage(fauxToolCall("edit", { path: "intent/a.md", oldText: "A", newText: "AA" })),
 			fauxAssistantMessage("完成"),
 		]);
+		const env = new ConfinedExecutionEnv({ rootPath: root, policy: "write" });
+		const apply = env.applyMutation.bind(env);
 		let authorEdited = false;
+		// 算好要写的内容之后、落盘之前，作者在编辑器里存了同一个文件。
+		env.applyMutation = async (mutation, signal) => {
+			if (!authorEdited) {
+				authorEdited = true;
+				await writeFile(join(root, "intent/a.md"), "作者改的");
+			}
+			return apply(mutation, signal);
+		};
 		const result = await runTaskLoop({
 			model,
-			tools: fileTools(new ConfinedExecutionEnv({ rootPath: root, policy: "write" }), "write"),
+			tools: fileTools(env, "write"),
 			systemPrompt: "修改",
 			prompt: "执行",
 			budget: { maxTurns: 3 },
-			saveCheckpoint: async (next: LoopCheckpoint) => {
-				// 动作已落 journal、还没落盘时，作者在编辑器里存了同一个文件。
-				if (!authorEdited && next.actions.some((action) => action.state === "effect_pending")) {
-					authorEdited = true;
-					await writeFile(join(root, "intent/a.md"), "作者改的");
-				}
-			},
 		});
 		assert.equal(result.stop, "model_stopped");
 		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "作者改的");
@@ -140,48 +157,6 @@ test("准备写入之后作者改了同一个文件：写冲突作为工具错�
 		const text = toolResult?.content.map((part) => (part.type === "text" ? part.text : "")).join("");
 		assert.match(text ?? "", /file_write_conflict/u);
 		assert.match(text ?? "", /重新读取/u);
-	} finally {
-		await rm(root, { recursive: true, force: true });
-	}
-});
-
-test("动作已落 journal 时进程退出、重启前作者改了同一个文件：续接报写冲突给模型，不会每个 turn 撞同一个冲突", async () => {
-	const root = await mkdtemp(join(tmpdir(), "suiming-loop-conflict-resume-"));
-	try {
-		await mkdir(join(root, "intent"));
-		await writeFile(join(root, "intent/a.md"), "A");
-		const { provider, model } = await fixture();
-		provider.setResponses([
-			fauxAssistantMessage(fauxToolCall("edit", { path: "intent/a.md", oldText: "A", newText: "AA" })),
-			fauxAssistantMessage("完成"),
-		]);
-		let checkpoint: LoopCheckpoint | undefined;
-		let crash = true;
-		const options = {
-			model,
-			loopId: "loop-conflict",
-			tools: fileTools(new ConfinedExecutionEnv({ rootPath: root, policy: "write" }), "write"),
-			systemPrompt: "修改",
-			prompt: "执行",
-			budget: { maxTurns: 3 },
-			saveCheckpoint: async (next: LoopCheckpoint) => {
-				checkpoint = structuredClone(next);
-				if (crash && next.actions.some((action) => action.state === "effect_pending"))
-					throw new Error("process exited after journal");
-			},
-		};
-		await assert.rejects(runTaskLoop(options), /process exited/u);
-		assert.equal(checkpoint?.actions[0]?.state, "effect_pending");
-		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "A");
-		await writeFile(join(root, "intent/a.md"), "作者改的");
-		crash = false;
-		assert.ok(checkpoint);
-		const result = await runTaskLoop({ ...options, checkpoint });
-		assert.equal(result.stop, "model_stopped");
-		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "作者改的");
-		assert.equal(provider.state.callCount, 2);
-		const toolResult = result.messages.find((message) => message.role === "toolResult");
-		assert.equal(toolResult?.isError, true);
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}
@@ -202,7 +177,6 @@ test("已保存的终止结果可在新闭包中交付，不重复执行提交�
 			{
 				name: "submit",
 				description: "提交",
-				replay: "read" as const,
 				parameters: Type.Object({}),
 				execute: async () => {
 					executions++;
@@ -232,11 +206,18 @@ test("已保存的终止结果可在新闭包中交付，不重复执行提交�
 	assert.equal(provider.state.callCount, 1);
 });
 
-test("未知模型结果默认停下；显式重试保留旧调用记录与同一 loop", async () => {
+test("模型回复没收到就退出：续跑作废那次请求，用当前消息重新组装（带上新的话），不停下等作者", async () => {
 	const { provider, model } = await fixture();
-	provider.setResponses([fauxAssistantMessage("first"), fauxAssistantMessage("retry")]);
+	provider.setResponses([
+		fauxAssistantMessage("first"),
+		async (context) => {
+			assert.ok(JSON.stringify(context.messages).includes("补一句"));
+			return fauxAssistantMessage("retry");
+		},
+	]);
 	let checkpoint: LoopCheckpoint | undefined;
 	let crash = true;
+	let inbox: { sequence: number; text: string }[] = [];
 	const options = {
 		model,
 		loopId: "loop-unknown",
@@ -244,6 +225,7 @@ test("未知模型结果默认停下；显式重试保留旧调用记录与同�
 		prompt: "执行",
 		tools: [],
 		budget: { maxTurns: 3 },
+		steering: () => inbox,
 		saveCheckpoint: async (next: LoopCheckpoint) => {
 			if (crash && next.calls.some((call) => call.state === "received"))
 				throw new Error("process exited before response persistence");
@@ -251,33 +233,42 @@ test("未知模型结果默认停下；显式重试保留旧调用记录与同�
 		},
 	};
 	await assert.rejects(runTaskLoop(options), /process exited/u);
-	assert.ok(checkpoint);
+	assert.equal(checkpoint?.calls[0]?.state, "effect_pending");
+	const oldCallId = checkpoint?.calls[0]?.id;
 	crash = false;
-	await assert.rejects(runTaskLoop({ ...options, checkpoint }), { code: "model_call_unknown" });
-	assert.equal(provider.state.callCount, 1);
+	inbox = [{ sequence: 1, text: "补一句" }];
 	assert.ok(checkpoint);
-	const oldCallId = checkpoint.calls[0]?.id;
-	const result = await runTaskLoop({ ...options, checkpoint, retryUnknownModelCall: true });
+	const result = await runTaskLoop({ ...options, checkpoint });
 	assert.equal(result.stop, "model_stopped");
-	assert.equal(checkpoint?.loopId, "loop-unknown");
-	assert.equal(checkpoint?.calls[0]?.state, "unknown");
 	assert.equal(checkpoint?.calls[0]?.id, oldCallId);
-	assert.notEqual(checkpoint?.calls[1]?.id, oldCallId);
+	assert.equal(checkpoint?.calls[0]?.state, "unknown", "可能已计费的那次请求留下记录");
+	assert.equal(checkpoint?.calls[1]?.state, "received");
 	assert.equal(provider.state.callCount, 2);
 });
 
-test("换绑只在没有未决副作用的边界发生；停在动作中间时报 binding_mismatch", async () => {
+test("停在一批动作中间时工具面变了：照样续上，被打断的动作补结果，新请求用新的工具声明", async () => {
 	const { provider, model } = await fixture();
-	provider.setResponses([fauxAssistantMessage(fauxToolCall("slow", {})), fauxAssistantMessage("完成")]);
+	provider.setResponses([
+		fauxAssistantMessage(fauxToolCall("slow", {})),
+		async (context) => {
+			// faux 拿到的是折好的 transcript，工具声明在开头那条 system 消息里。
+			assert.ok(JSON.stringify(context).includes("v2"));
+			assert.ok(!JSON.stringify(context).includes("v1"));
+			return fauxAssistantMessage("完成");
+		},
+	]);
 	let checkpoint: LoopCheckpoint | undefined;
 	let crash = true;
+	let executions = 0;
 	const tools = (label: string) => [
 		{
 			name: "slow",
 			description: label,
-			replay: "read" as const,
 			parameters: Type.Object({}),
-			execute: async () => ({ content: [{ type: "text" as const, text: "done" }] }),
+			execute: async () => {
+				executions++;
+				return { content: [{ type: "text" as const, text: "done" }] };
+			},
 		},
 	];
 	const options = {
@@ -287,38 +278,27 @@ test("换绑只在没有未决副作用的边界发生；停在动作中间时�
 		prompt: "执行",
 		budget: { maxTurns: 5 },
 		saveCheckpoint: async (next: LoopCheckpoint) => {
+			checkpoint = structuredClone(next);
 			if (crash && next.actions.some((action) => action.state === "effect_pending"))
 				throw new Error("process exited during the action");
-			checkpoint = structuredClone(next);
 		},
 	};
 	await assert.rejects(runTaskLoop({ ...options, tools: tools("v1") }), /process exited/u);
+	assert.equal(checkpoint?.actions[0]?.state, "effect_pending");
 	crash = false;
 	assert.ok(checkpoint);
-	// 工具声明变了 = 绑定变了；动作还没确认，不能带着新绑定续。
-	await assert.rejects(runTaskLoop({ ...options, checkpoint, tools: tools("v2") }), { code: "binding_mismatch" });
-	const result = await runTaskLoop({ ...options, checkpoint, tools: tools("v1") });
+	const result = await runTaskLoop({ ...options, checkpoint, tools: tools("v2") });
 	assert.equal(result.stop, "model_stopped");
-	assert.ok(checkpoint);
-	const settled = checkpoint;
-	// 停下之后没有未决副作用：下一次可以带新声明续跑。
-	provider.setResponses([fauxAssistantMessage("新声明下继续")]);
-	const rebound = await runTaskLoop({
-		...options,
-		checkpoint: settled,
-		tools: tools("v2"),
-		steering: () => [{ sequence: 1, text: "再说一句" }],
-	});
-	assert.equal(rebound.stop, "model_stopped");
-	assert.equal(provider.state.callCount, 3);
+	assert.equal(executions, 0, "被打断的动作不重做");
+	assert.equal(provider.state.callCount, 2);
 });
 
-test("子任务完成后父 checkpoint 确认丢失：重启续跑只交还保存的结果，同一 action 不创建第二个子任务", async (t) => {
+test("子任务完成后父 checkpoint 确认丢失：父 Agent 看到子任务其实已做完，resume_task 交回保存的结果，不建第二个子任务", async (t) => {
 	const { LocalProjectService, materializeOpenStoryDirectorySnapshot, SuimingHarness } = await import(
 		"../src/index.js"
 	);
+	const { agentTurn } = await import("../src/harness/agent.js");
 	const { sampleWorkFiles } = await import("./sample-work.js");
-	const { submitTool } = await import("../src/harness/tools.js");
 	const root = await mkdtemp(join(tmpdir(), "suiming-child-handoff-"));
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	const project = await LocalProjectService.init({ checkoutPath: root, projectId: "project-handoff" });
@@ -331,11 +311,18 @@ test("子任务完成后父 checkpoint 确认丢失：重启续跑只交还保�
 			project,
 			models: new ModelGateway(models, { profiles: { main: profile, reviewer: profile } }),
 		});
+		const textOf = (context: { messages: unknown[] }) => JSON.stringify(context.messages);
 		provider.setResponses([
-			fauxAssistantMessage(fauxToolCall("delegate", {})),
-			fauxAssistantMessage(fauxToolCall("submit_child", { report: "已校验的完整报告" })),
+			fauxAssistantMessage(fauxToolCall("delegate", { goal: "核对黄盖的人物档", profile: "main" })),
+			fauxAssistantMessage(fauxToolCall("submit_task", { summary: "已校验的完整报告" })),
 			async (context) => {
-				assert.ok(JSON.stringify(context.messages).includes("已校验的完整报告"));
+				const taskId = /子任务 (task_[0-9a-f-]+)/u.exec(textOf(context))?.[1];
+				assert.ok(textOf(context).includes("其实已经做完了"));
+				assert.ok(taskId);
+				return fauxAssistantMessage(fauxToolCall("resume_task", { taskId }));
+			},
+			async (context) => {
+				assert.ok(textOf(context).includes("已校验的完整报告"));
 				return fauxAssistantMessage("已采用报告");
 			},
 		]);
@@ -356,59 +343,11 @@ test("子任务完成后父 checkpoint 确认丢失：重启续跑只交还保�
 				throw new Error("lost parent checkpoint acknowledgement");
 			apply(delta);
 		});
-		const body = (handle: HarnessSession) =>
-			handle.runRoot({
-				systemPrompt: "自主决定是否委派",
-				tools: (parent) => {
-					const delegate = async (actionId: string) => {
-						let report: unknown;
-						const child = await handle.executeChild(parent, actionId, {
-							profileId: "reviewer",
-							policy: "read",
-							systemPrompt: "独立审查",
-							prompt: "审查",
-							maxTurns: 3,
-							tools: () => [
-								submitTool({
-									name: "submit_child",
-									description: "交付",
-									parameters: Type.Object({ report: Type.String() }),
-									onSubmit: (params) => {
-										report = params;
-										return params.report;
-									},
-								}),
-							],
-							result: () => report,
-							resultMediaType: "application/json",
-						});
-						return {
-							content: [
-								{
-									type: "text" as const,
-									text: JSON.stringify({
-										taskId: child.taskId,
-										resultObjectId: child.resultObjectId,
-										result: child.result,
-									}),
-								},
-							],
-						};
-					};
-					return [
-						{
-							name: "delegate",
-							description: "独立审查",
-							parameters: Type.Object({}),
-							replay: "reconcile" as const,
-							execute: delegate,
-							reconcile: delegate,
-						},
-					];
-				},
-			});
 		project.queueInbox(session.id, "委派并回收报告");
-		await assert.rejects(harness.turn(session.id, {}, body), /lost parent checkpoint/u);
+		await assert.rejects(
+			harness.turn(session.id, {}, (handle: HarnessSession) => agentTurn(handle)),
+			/lost parent checkpoint/u,
+		);
 		let state = project.loadExecutionState();
 		const childId = state.tasks.find((task) => task.parent !== undefined)?.id;
 		assert.ok(childId);
@@ -416,21 +355,21 @@ test("子任务完成后父 checkpoint 确认丢失：重启续跑只交还保�
 		assert.equal(state.sessions[0]?.status, "running", "确认丢失的实例不能再记账，留给重开收敛");
 		crash = false;
 		project.createExecutionState().recoverUnfinished("test:crash", { holderAlive: () => false });
-		const outcome = await harness.turn(session.id, {}, body);
+		const outcome = await harness.turn(session.id, {}, (handle: HarnessSession) => agentTurn(handle));
 		assert.equal(outcome.failure, undefined);
 		assert.equal(outcome.value?.reply, "已采用报告");
 		state = project.loadExecutionState();
 		assert.equal(state.tasks.length, 1);
 		assert.equal(state.tasks[0]?.id, childId);
 		assert.equal(state.sessions[0]?.status, "idle");
-		assert.equal(provider.state.callCount, 3);
+		assert.equal(provider.state.callCount, 4);
 	} finally {
 		project.close();
 		await rm(root, { recursive: true, force: true });
 	}
 });
 
-test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结果丢失时，重启续接不重复提交", async (t) => {
+test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结果丢失时，续跑按回执告诉模型已经提交，不重复提交", async (t) => {
 	const { LocalProjectService, materializeOpenStoryDirectorySnapshot, SuimingHarness } = await import(
 		"../src/index.js"
 	);
@@ -454,12 +393,16 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 				fauxToolCall("write", { path: "intent/计谋的代价.md", content: "主角必须为真相承担代价。" }),
 			),
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "第一阶段" })),
-			fauxAssistantMessage(
-				fauxToolCall("write", {
-					path: "world/characters/黄盖.md",
-					content: "黄盖相信证据，愿意为自己的选择承担后果。",
-				}),
-			),
+			async (context) => {
+				// 被打断的提交按回执说清已经提交成了哪个版本，模型不必再提交一次。
+				assert.match(JSON.stringify(context.messages), /这次提交其实已经完成：版本 r2/u);
+				return fauxAssistantMessage(
+					fauxToolCall("write", {
+						path: "world/characters/黄盖.md",
+						content: "黄盖相信证据，愿意为自己的选择承担后果。",
+					}),
+				);
+			},
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "第二阶段" })),
 			fauxAssistantMessage("已完成两阶段修改"),
 		]);

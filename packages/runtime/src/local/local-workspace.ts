@@ -34,7 +34,7 @@ import { LocalModelSettings } from "../model/local-model-settings.js";
 import type { ModelGateway } from "../model/model-gateway.js";
 import { checkSummary } from "./check-summary.js";
 import type { LocalProjectService } from "./local-project-service.js";
-import { abandonPausedSession, LocalSessionController } from "./local-session-controller.js";
+import { LocalSessionController } from "./local-session-controller.js";
 import {
 	listProjectFiles,
 	readProjectFile,
@@ -490,37 +490,11 @@ export class LocalWorkspace implements LocalCommandClient {
 					return result;
 				});
 			}
-			case "session.resume": {
-				const args = input as LocalCommandInput<"session.resume">;
-				return this.#once(args.commandId, { command, args }, async () => {
-					const controller = await this.#controller();
-					const gateway = args.model && this.#modelsChanged ? await this.#models() : this.#gateway;
-					const binding = args.model ? (await gateway?.bind("main", args.model))?.snapshot : undefined;
-					const result = await controller.resume({
-						commandId: args.commandId,
-						sessionId: args.sessionId,
-						retryUnknownModelCall: args.retryUnknown ?? false,
-						...(binding === undefined ? {} : { binding }),
-						onEvent: () => this.#changed("stream"),
-					});
-					this.#changed();
-					void controller
-						.completion(result.sessionId)
-						.catch(() => undefined)
-						.finally(() => this.#changed());
-					return result;
-				});
-			}
 			case "session.interrupt": {
 				const args = input as LocalCommandInput<"session.interrupt">;
 				const state = project.loadExecutionEntities();
 				const session = state.sessions.find((item) => item.id === args.sessionId);
 				if (!session) throw new ArtifactError("session_not_found", args.sessionId);
-				if (session.status === "paused") {
-					const settled = abandonPausedSession(project, session.id);
-					this.#changed();
-					return { status: settled.status };
-				}
 				if (this.#sessions?.activeSessionIds().includes(args.sessionId)) {
 					this.#sessions.interrupt(args.sessionId);
 					// 作者在等这条命令返回，界限要短。收不了口时如实回 running，作者可以再点一次。

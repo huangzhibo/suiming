@@ -12,7 +12,6 @@ import {
 	fauxText,
 	fauxToolCall,
 	type JsonObject,
-	Type,
 } from "@earendil-works/pi-ai";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
 import { EventType, type SessionEventBody } from "@suiming/sdk";
@@ -22,10 +21,8 @@ import { agentTurn } from "../src/harness/agent.js";
 import { productEventSnapshot } from "../src/harness/event-snapshot.js";
 import type { LoopCheckpoint } from "../src/harness/loop.js";
 import type { TurnOptions } from "../src/harness/suiming-harness.js";
-import type { HarnessTool } from "../src/harness/tool.js";
 import type { ExecutionStateDelta, SessionRecord } from "../src/index.js";
 import {
-	AuthorStop,
 	InMemoryExecutionState,
 	LocalProjectService,
 	ModelGateway,
@@ -97,6 +94,12 @@ async function fixture(
 }
 const call = (name: string, args: JsonObject) => fauxAssistantMessage(fauxToolCall(name, args));
 const reply = (text: string) => fauxAssistantMessage(text);
+/** 根 Agent 看到被打断的子任务后用 resume_task 接着做；taskId 取自那条「被打断」结果里给的提示。 */
+const resumeInterrupted = (context: { messages: unknown[] }) => {
+	const taskId = /taskId: \\"(task_[0-9a-f-]+)\\"/u.exec(JSON.stringify(context.messages))?.[1];
+	assert.ok(taskId, "被打断的委派结果里给出 taskId 与续做的办法");
+	return call("resume_task", { taskId });
+};
 
 test("write / edit 带 check: true：写完一并返回 Checker 结论，省掉紧跟着的一次 check 来回", async () => {
 	// 斗破运行里 Writer 写一节要 write 三四次、每次后面再来一次 check；合并之后一次观察拿到两者。
@@ -705,7 +708,11 @@ test("子任务按 AG-UI 的 subagent 发事件：开始、完成、挂起与续
 		await f.say("先读黄盖", id);
 		const stopped = await f.say("再读阚泽", id);
 		assert.equal(stopped.failure?.code, "turn_usage_checkpoint");
-		f.provider.setResponses([call("submit_task", { summary: "阚泽读过了" }), reply("第二件也做完了")]);
+		f.provider.setResponses([
+			async (context) => resumeInterrupted(context),
+			call("submit_task", { summary: "阚泽读过了" }),
+			reply("第二件也做完了"),
+		]);
 		const resumed = await f.say("继续", id);
 		assert.equal(resumed.failure, undefined);
 
@@ -763,7 +770,7 @@ test("子任务按 AG-UI 的 subagent 发事件：开始、完成、挂起与续
 	}
 });
 
-test("用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时从它自己的 checkpoint 接着跑", async () => {
+test("用量检查点与模型价格无关、根与子任务合计；落在子任务里不算失败，继续时根 Agent 用 resume_task 让它从自己的 checkpoint 接着跑", async () => {
 	// 缺省的 faux 模型目录价为 0：按花费算的检查点在这里永远不触发，换成 DeepSeek 这类便宜模型也差不多。
 	const f = await fixture({ turnUsageCheckpointTokens: 50_000 });
 	try {
@@ -780,6 +787,10 @@ test("用量检查点与模型价格无关、根与子任务合计；落在子�
 		assert.equal(task?.status, "interrupted", "不是子任务失败：父模型收到失败会重派一个，从头再花一遍");
 		f.provider.setResponses([
 			async (context) => {
+				assert.match(JSON.stringify(context.messages), /执行时被打断/u, "根 Agent 先看到委派被打断");
+				return resumeInterrupted(context);
+			},
+			async (context) => {
 				assert.match(JSON.stringify(context.messages), /name: 黄盖/u, "子任务停下之前读到的内容还在");
 				return call("submit_task", { summary: "黄盖的人物档读过了" });
 			},
@@ -795,7 +806,7 @@ test("用量检查点与模型价格无关、根与子任务合计；落在子�
 		const tasks = f.project.loadExecutionState().tasks;
 		assert.equal(tasks.length, 1, "续跑的是同一个子任务，不是重派一个");
 		assert.equal(tasks[0]?.status, "completed");
-		assert.equal(f.provider.state.callCount, 4);
+		assert.equal(f.provider.state.callCount, 5);
 	} finally {
 		await f.close();
 	}
@@ -1049,7 +1060,7 @@ test("委派的子任务没交付：失败回到父模型手里作为工具错�
 	}
 });
 
-test("模型结果未知才 paused；不授权重发就一直停着；换模型要先核对；重发后才能在边界换绑", async () => {
+test("模型回复没收到进程就退出：下一句作废那次请求、记一次未确认调用，不停下等作者；换了模型照样接着原对话", async () => {
 	const f = await fixture();
 	try {
 		const id = (await f.harness.createSession()).id;
@@ -1065,45 +1076,31 @@ test("模型结果未知才 paused；不授权重发就一直停着；换模型�
 			}
 			return save(mediaType, bytes);
 		};
-		f.provider.setResponses([reply("第一次回答"), reply("重发后的回答")]);
+		f.provider.setResponses([reply("没存上的回答")]);
 		const first = await f.say("讨论作品", id);
 		assert.equal(first.session.status, "idle", "普通故障回 idle 记一句");
 		assert.match(first.failure?.message ?? "", /process exited/);
 
-		// 下一个 turn 读到 checkpoint 里停在 effect_pending 的调用：远端结果未知，不问作者不能继续。
-		const paused = await f.say(undefined, id);
-		assert.equal(paused.session.status, "paused");
-		assert.equal(paused.session.pause?.code, "model_call_unknown");
-		assert.equal(paused.session.lease, undefined);
-		assert.throws(() => f.project.queueInbox(id, "paused 不收消息"), { code: "session_paused" });
-		await assert.rejects(f.say(undefined, id), { code: "session_paused" });
-		const stillPaused = await f.say(undefined, id, { fromPaused: true });
-		assert.equal(stillPaused.session.status, "paused", "恢复 checkpoint 本身不表示再次调用");
 		const alternate = (
 			await f.gateway.bind("main", { provider: f.alternate.provider.id, model: f.alternate.getModel().id })
 		).snapshot;
-		await assert.rejects(f.say(undefined, id, { fromPaused: true, model: alternate }), { code: "binding_mismatch" });
-		assert.equal(f.provider.state.callCount, 1);
-
-		const resumed = await f.say(undefined, id, { fromPaused: true, retryUnknownModelCall: true });
-		assert.equal(resumed.session.status, "idle");
-		assert.equal(resumed.value?.reply, "重发后的回答");
-		assert.equal(f.provider.state.callCount, 2);
-		assert.equal(resumed.session.model?.provider, f.provider.provider.id);
-
-		// 没有未决副作用的边界才能换绑；inbox 空时不开新的模型调用。
-		const switched = await f.say(undefined, id, { model: alternate });
-		assert.equal(switched.session.model?.provider, f.alternate.provider.id);
-		assert.equal(f.alternate.state.callCount, 0);
 		f.alternate.setResponses([
 			async (context) => {
-				assert.match(JSON.stringify(context.messages), /重发后的回答/);
+				const encoded = JSON.stringify(context.messages);
+				assert.match(encoded, /讨论作品/);
+				assert.match(encoded, /换个模型接着说/);
+				assert.doesNotMatch(encoded, /没存上的回答/);
 				return reply("新模型接着原对话");
 			},
 		]);
-		const next = await f.say("换了模型再聊", id);
+		const next = await f.say("换个模型接着说", id, { model: alternate });
+		assert.equal(next.failure, undefined);
+		assert.equal(next.session.status, "idle");
 		assert.equal(next.value?.reply, "新模型接着原对话");
-		assert.equal(f.alternate.state.callCount, 1);
+		assert.equal(next.session.model?.provider, f.alternate.provider.id);
+		assert.equal(f.provider.state.callCount, 1, "作废的请求不按旧输入补发");
+		assert.equal(next.session.usage?.calls, 2, "作废的那次可能已经计费，照记一次调用");
+		assert.equal(next.session.usage?.confirmedCalls, 1);
 	} finally {
 		await f.close();
 	}
@@ -1162,59 +1159,6 @@ test("执行命令只写自己改动的行：一个 turn 里整份导出与整�
 	// 2 轮对 6 轮就看得出次数随不随轮数变；原来跑 20 轮，只是多花时间（2026-10-04 测试审查）。
 	const few = await run(2);
 	assert.deepEqual(await run(6), few);
-});
-
-test("半途恢复按这一轮冻结的工具声明：两轮之间升级过工具面也能续上，参数半途变了仍报 binding_mismatch", async () => {
-	const f = await fixture();
-	try {
-		const probe = (description: string, parameters = Type.Object({}, { additionalProperties: false })) => ({
-			name: "probe",
-			description,
-			replay: "reconcile" as const,
-			parameters,
-			prepare: async () => ({}),
-			execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-			reconcile: async () => ({ content: [{ type: "text" as const, text: "已核对" }] }),
-		});
-		const turn = (id: string, tool: HarnessTool, options: TurnOptions = {}) =>
-			f.harness.turn(id, options, (session) => session.runRoot({ systemPrompt: "测试", tools: () => [tool] }));
-		const id = (await f.harness.createSession()).id;
-		f.provider.setResponses([reply("第一轮")]);
-		f.project.queueInbox(id, "第一轮");
-		assert.equal((await turn(id, probe("v1"))).session.status, "idle");
-
-		// 第二轮工具描述升级成 v2；动作停在 effect_pending 时进程退出。
-		const save = f.project.saveExecutionObject.bind(f.project);
-		let crash = true;
-		f.project.saveExecutionObject = async (mediaType, bytes) => {
-			if (crash && mediaType === CHECKPOINT_MEDIA_TYPE) {
-				const checkpoint = (await f.harness.checkpoints.read(bytes)) as { loop: LoopCheckpoint };
-				if (checkpoint.loop.actions.some((action) => action.state === "result_ready")) {
-					crash = false;
-					throw new Error("process exited before the action result was saved");
-				}
-			}
-			return save(mediaType, bytes);
-		};
-		f.provider.setResponses([call("probe", {}), reply("第二轮完成")]);
-		f.project.queueInbox(id, "第二轮");
-		assert.match((await turn(id, probe("v2"))).failure?.message ?? "", /process exited/);
-
-		// 参数在半途变了：不能拿新参数去解释旧动作，要大声失败。
-		const changed = await turn(
-			id,
-			probe("v2", Type.Object({ extra: Type.Optional(Type.String()) }, { additionalProperties: false })),
-		);
-		assert.equal(changed.session.status, "paused");
-		assert.equal(changed.session.pause?.code, "binding_mismatch");
-
-		const resumed = await turn(id, probe("v2"), { fromPaused: true });
-		assert.equal(resumed.session.status, "idle", "第一轮的 v1 声明不该参与第二轮的恢复");
-		assert.equal(resumed.value?.reply, "第二轮完成");
-		assert.equal(f.provider.state.callCount, 3, "恢复不重新请求模型决定那个动作");
-	} finally {
-		await f.close();
-	}
 });
 
 test("interrupt：打断的 turn 回 idle 不记故障；消息列表与候选文件保留，下一句接着跑", async () => {
@@ -1295,7 +1239,7 @@ test("interrupt：停止落在请求记为已发出、实际还没发出时，�
 	}
 });
 
-test("作者停下正在跑的子任务再说一句：根 Agent 先看到子任务被停下和新的话，不先按旧目标把它跑完", async () => {
+test("作者停下正在跑的子任务再说一句：根 Agent 先看到子任务被打断和新的话，由它决定续不续，不先按旧目标把它跑完", async () => {
 	// 2026-10-05 审查：Harness 设计第 4 节说「要改子任务的方向就 interrupt」，实际下一条消息一到，被打断的子任务
 	// 先按旧目标续跑完，根 Agent 之后才读到新消息。作者停下一个要写十几分钟的 writer 说「换个写法」，它照旧写完。
 	const f = await fixture();
@@ -1305,14 +1249,15 @@ test("作者停下正在跑的子任务再说一句：根 Agent 先看到子任�
 		f.provider.setResponses([
 			call("delegate", { goal: "按原来的思路改黄盖的人物档", profile: "main" }),
 			async () => {
-				controller.abort(new AuthorStop());
+				controller.abort(new Error("作者停止了当前回复"));
 				return call("read", { path: "world/characters/黄盖.md" });
 			},
 			async (context) => {
 				const encoded = JSON.stringify(context.messages);
-				const stoppedAt = encoded.indexOf("作者停下了这个子任务");
-				assert.ok(stoppedAt >= 0, "委派的结果是子任务被作者停下");
-				assert.ok(stoppedAt < encoded.indexOf("改成写阚泽"), "先是停下的结果，再是作者的新话");
+				const stoppedAt = encoded.indexOf("执行时被打断");
+				assert.ok(stoppedAt >= 0, "委派的结果是子任务被打断");
+				assert.match(encoded, /resume_task/u, "告诉根 Agent 怎么接着做");
+				assert.ok(stoppedAt < encoded.indexOf("改成写阚泽"), "先是被打断的结果，再是作者的新话");
 				return reply("好，改写阚泽");
 			},
 		]);
@@ -1358,7 +1303,7 @@ test("作者在模型输出到一半时按停止：半截的话先收尾成一�
 					if (event.type === EventType.TEXT_MESSAGE_START && event.role === "assistant")
 						replies.add(event.messageId);
 					if (event.type === EventType.TEXT_MESSAGE_CONTENT && replies.has(event.messageId))
-						controller.abort(new AuthorStop());
+						controller.abort(new Error("作者停止了当前回复"));
 				},
 			},
 			(handle) => agentTurn(handle),
@@ -1380,8 +1325,8 @@ test("作者在模型输出到一半时按停止：半截的话先收尾成一�
 	}
 });
 
-test("应用退出打断的子任务不算作者停下：下一句从它自己的 checkpoint 接着跑完，再轮到根 Agent", async () => {
-	// 与上一条对照：退出应用、CLI 收到 SIGINT、用量检查点都不是作者要改方向，子任务照旧续跑，不从头再花一遍。
+test("应用退出打断的子任务与作者停下走同一条路：下一句根 Agent 看到它被打断，用 resume_task 从它自己的 checkpoint 接着跑完", async () => {
+	// 退出应用、CLI 收到 SIGINT、用量检查点与作者停止一样：子任务停在原处，续不续由根 Agent 定；续的话不从头再花一遍。
 	const f = await fixture();
 	try {
 		const id = (await f.harness.createSession()).id;
@@ -1392,6 +1337,7 @@ test("应用退出打断的子任务不算作者停下：下一句从它自己�
 				controller.abort(new Error("应用退出，已请求保存进度"));
 				return call("read", { path: "world/characters/黄盖.md" });
 			},
+			async (context) => resumeInterrupted(context),
 			call("submit_task", { summary: "黄盖的人物档读过了" }),
 			async (context) => {
 				assert.match(JSON.stringify(context.messages), /黄盖的人物档读过了/u);

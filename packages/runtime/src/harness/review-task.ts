@@ -14,7 +14,7 @@ import { formatSourceCheck } from "./source-context.js";
 import { storyGuideTool } from "./source-tools.js";
 import type { TaskHandle, TaskSpec } from "./suiming-harness.js";
 import { type HarnessTool, ToolRejection } from "./tool.js";
-import { checkTool, fileTools, frameTool, freezeReadTool, searchTool, submitTool } from "./tools.js";
+import { checkTool, fileTools, frameTool, readTool, searchTool, submitTool } from "./tools.js";
 
 export type { ReviewLayer, ReviewScope } from "./review-context.js";
 
@@ -47,9 +47,7 @@ export interface ReviewTaskHandle {
 }
 
 function sourceCheckTool(handle: TaskHandle, sourceId: string): HarnessTool {
-	// 与 design / text 分支的 checkTool 一样必须冻结：停在 effect_pending 的 check 动作靠 prepare 的结果收口，
-	// 否则恢复落到 action_effect_unknown，每次续跑都在同一点暂停。
-	return freezeReadTool({
+	return readTool({
 		name: "check",
 		label: "check",
 		description: `对 source/${sourceId} 运行 Source Checker。`,

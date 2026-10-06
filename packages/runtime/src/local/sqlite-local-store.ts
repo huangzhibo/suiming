@@ -222,8 +222,7 @@ export class SqliteLocalStore {
 		for (const item of delta.changed) {
 			if (item.type !== "session") continue;
 			const record = item.record as SessionRecord;
-			// 只拦有活着的进程来驱动的 turn：放弃 paused 的核对是瞬间开一个 turn 再结束的簿记（lease 的 hostname 留空），
-			// 不碰 checkout，另一个 session 在跑时也照样能做。
+			// 只拦有活着的进程来驱动的 turn。
 			if (record.status !== "running" || record.lease === undefined || !leaseHolderAlive(record.lease)) continue;
 			const rows = this.#database
 				.prepare("SELECT data_json FROM sessions WHERE project_id = ? AND status = 'running' AND id <> ?")
@@ -485,7 +484,7 @@ export class SqliteLocalStore {
 
 	/**
 	 * 作者的收件箱：第一条消息和后续补充走同一条通道，根 loop 在 `ready` 阶段第一步取走。
-	 * running 排队、idle 由调用方开 turn；只有 paused 拒绝——那三种情况要作者先处理原因。
+	 * running 排队、idle 由调用方开 turn。
 	 */
 	queueInbox(sessionId: string, text: string, commandId?: string, fingerprintInput?: unknown): { sequence: number } {
 		const value = nonempty(text, "inbox.text");
@@ -510,12 +509,6 @@ export class SqliteLocalStore {
 				| { data_json: string }
 				| undefined;
 			if (!row) throw new ArtifactError("execution_not_found", `Session not found: ${sessionId}`);
-			const session = json<SessionRecord>(row.data_json, "sessions");
-			if (session.status === "paused")
-				throw new ArtifactError(
-					"session_paused",
-					`需要先处理：${session.pause?.message ?? session.pause?.code ?? "paused"}`,
-				);
 			const last = this.#database
 				.prepare("SELECT COALESCE(MAX(sequence), 0) AS last FROM session_inbox WHERE session_id = ?")
 				.get(sessionId) as { last: number };

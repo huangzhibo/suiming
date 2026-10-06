@@ -4,36 +4,28 @@ import { formatDiagnostic, SuimError } from "@suiming/story";
 /** 工具结果的 details 随 ToolResultMessage 进 checkpoint 与 pi-ai，必须是 JSON 值（pi-ai 0.99 起类型上要求）。 */
 export type ToolDetails = JsonValue | undefined;
 
-/** 模型可见声明复用 pi-ai；执行和恢复策略由 Suiming 拥有。 */
+/** 模型可见声明复用 pi-ai；执行由 Suiming 拥有。 */
 export interface HarnessTool<TParameters extends TSchema = TSchema, TDetails extends ToolDetails = ToolDetails>
 	extends Tool<TParameters> {
 	label?: string;
 	/** 此工具校验并交付 Task；自然语言停下不能替代它。 */
 	submission?: boolean;
 	/**
-	 * 进程在动作 effect_pending 时退出后如何收口：read 复用 prepare 的结果，reconcile 由工具自己核对，
-	 * never 表示不可重放。必填——漏写会让恢复落到 action_effect_unknown，session 每次续跑都在同一点暂停。
+	 * 同样的参数再调一次就能拿回（当前的）结果：只读，不依赖外部时刻。边界折叠只折这类工具的大结果
+	 * （loop 的 FOLD_BYTES）；调研的 fetch 拿不回同样的东西，不标。
 	 */
-	replay: "read" | "reconcile" | "never";
+	rereadable?: boolean;
 	/**
 	 * 同一次模型回复里相邻的、都判为可并行的动作同时执行，结果仍按派出顺序交付。只给输出互不重叠、
-	 * 也不读彼此产物的动作（各读一段原文、各写各的笔记）；同一文件被两个动作写，第二次落盘时由 journal 报冲突。
+	 * 也不读彼此产物的动作（各读一段原文、各写各的笔记）；同一文件被两个动作写，第二次落盘时报写冲突。
 	 */
-	parallel?(params: Static<TParameters>): boolean;
-	prepare?(params: Static<TParameters>, signal?: AbortSignal): Promise<unknown>;
-	execute(
-		actionId: string,
-		params: Static<TParameters>,
-		signal?: AbortSignal,
-		onUpdate?: (result: HarnessToolResult<TDetails>) => void,
-		prepared?: unknown,
-	): Promise<HarnessToolResult<TDetails>>;
-	reconcile?(
-		actionId: string,
-		params: Static<TParameters>,
-		prepared: unknown,
-		signal?: AbortSignal,
-	): Promise<HarnessToolResult<TDetails>>;
+	parallel?(params: Static<TParameters>): boolean | Promise<boolean>;
+	execute(actionId: string, params: Static<TParameters>, signal?: AbortSignal): Promise<HarnessToolResult<TDetails>>;
+	/**
+	 * 动作执行到一半被打断（作者停止、应用退出、进程中断）后，loop 给模型补一条「被打断」的结果，不重做、不核对；
+	 * 工具可以在后面补一句模型做决定用得上的事实，比如子任务做到哪、提交成了哪个版本。只读，不产生副作用。
+	 */
+	interrupted?(actionId: string, params: Static<TParameters>): Promise<string | undefined>;
 }
 
 export interface HarnessToolResult<TDetails extends ToolDetails = ToolDetails> {

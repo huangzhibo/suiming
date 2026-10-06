@@ -23,15 +23,11 @@ export type SuimErrorCategory =
 
 const OVERRIDES: Readonly<Record<string, SuimErrorCategory>> = {
 	session_running: "conflict",
-	session_paused: "conflict",
 	command_required: "usage",
 	invalid_cli_usage: "usage",
 	run_interrupted: "interrupted",
 	run_no_progress: "interrupted",
 	turn_usage_checkpoint: "interrupted",
-	model_call_unknown: "interrupted",
-	action_effect_unknown: "interrupted",
-	binding_mismatch: "interrupted",
 	session_owner_lost: "conflict",
 	dirty_checkout: "conflict",
 	review_quote_not_found: "validation",

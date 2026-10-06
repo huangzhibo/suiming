@@ -43,17 +43,14 @@ export interface StartTurnInput {
 	lease: SessionLease;
 	/** 本 turn 的 AG-UI runId；缺省用 lease.ownerId。 */
 	turnId?: string;
-	/** 在 turn 边界换绑；有 pause 时由调用方先核对再传。 */
+	/** 从这个 turn 起换用的模型。 */
 	model?: ModelBindingSnapshot;
-	/** paused 的 session 只有显式 resume 才能开 turn。 */
-	fromPaused?: boolean;
 }
 
 export interface EndTurnInput {
 	commandId: string;
 	sessionId: string;
-	status: "idle" | "paused";
-	/** paused 时必填（要作者处理的原因）；idle 时可选（记为 lastFailure）。 */
+	/** turn 非正常结束的原因，记为 lastFailure；作者一句话就能续。 */
 	failure?: ExecutionFailure;
 }
 
@@ -233,38 +230,30 @@ export class InMemoryExecutionState {
 		});
 	}
 
-	/** idle（或显式从 paused）→ running：拿 lease、开新 turn；换模型只在这里发生。 */
+	/** idle → running：拿 lease、开新 turn；换模型只在这里发生。 */
 	startTurn(input: StartTurnInput): SessionRecord {
 		return this.#execute(input.commandId, input, () => {
 			const session = this.#requireSession(input.sessionId);
 			if (session.status === "running")
 				throw new ExecutionStateError("session_running", `Session ${session.id} 已有 turn 在跑`);
-			if (session.status === "paused" && !input.fromPaused)
-				throw new ExecutionStateError(
-					"session_paused",
-					`Session ${session.id} 需要作者处理：${session.pause?.code ?? "paused"}`,
-				);
 			const timestamp = this.#timestamp();
 			session.status = "running";
 			session.turn += 1;
 			session.lease = { ...input.lease };
 			session.turnId = nonempty(input.turnId ?? input.lease.ownerId ?? "", "turn.id");
 			if (input.model !== undefined) session.model = clone(input.model);
-			delete session.pause;
 			delete session.lastFailure;
 			touch(session, timestamp);
 			return clone(session);
 		});
 	}
 
-	/** running → idle | paused。仍在跑的子任务标 interrupted；lease 释放。 */
+	/** running → idle。仍在跑的子任务标 interrupted；lease 释放。 */
 	endTurn(input: EndTurnInput): SessionRecord {
 		return this.#execute(input.commandId, input, () => {
 			const session = this.#requireSession(input.sessionId);
 			if (session.status !== "running")
 				throw new ExecutionStateError("invalid_execution_transition", `Session ${session.id} 没有在跑的 turn`);
-			if (input.status === "paused" && input.failure === undefined)
-				throw new ExecutionStateError("invalid_execution_input", "paused 必须带原因");
 			const timestamp = this.#timestamp();
 			for (const task of this.#tasks.values()) {
 				if (task.sessionId !== session.id || task.status !== "running") continue;
@@ -272,14 +261,10 @@ export class InMemoryExecutionState {
 				task.status = "interrupted";
 				touch(task, timestamp);
 			}
-			session.status = input.status;
+			session.status = "idle";
 			delete session.lease;
-			delete session.pause;
 			delete session.lastFailure;
-			if (input.failure !== undefined) {
-				if (input.status === "paused") session.pause = failure(input.failure);
-				else session.lastFailure = failure(input.failure);
-			}
+			if (input.failure !== undefined) session.lastFailure = failure(input.failure);
 			touch(session, timestamp);
 			return clone(session);
 		});
@@ -465,8 +450,9 @@ export class InMemoryExecutionState {
 
 	/**
 	 * 把没有活着的持有者的 running session 收敛回 idle，并记一句 process_restart；子任务标 interrupted。
-	 * 有没有停在 effect_pending 的调用或动作要等下一个 turn 开始时读 checkpoint 才知道，那时才会落进 paused。
+	 * 停在半途的调用与动作不在这里管：下一个 turn 从 checkpoint 接着跑时补「被打断」的结果（Harness 设计第 5 节）。
 	 * holderAlive 缺省视所有持有者为已死；LocalProjectService.open 传入 pid 存活判断，避免误判别的进程正在跑的。
+	 * 2026-10-06 之前还有 paused 状态，那时落盘的 paused session 在这里一并收敛成 idle，原因转记为 lastFailure。
 	 */
 	recoverUnfinished(
 		commandId: string,
@@ -477,6 +463,16 @@ export class InMemoryExecutionState {
 			const recoveredSessionIds: string[] = [];
 			for (const candidate of [...this.#sessions.values()].sort((a, b) => a.id.localeCompare(b.id))) {
 				const session = this.#requireSession(candidate.id);
+				const legacy = session as Omit<SessionRecord, "status"> & { status: string; pause?: ExecutionFailure };
+				if (legacy.status === "paused") {
+					session.status = "idle";
+					delete session.lease;
+					if (legacy.pause !== undefined) session.lastFailure = legacy.pause;
+					delete legacy.pause;
+					touch(session, timestamp);
+					recoveredSessionIds.push(session.id);
+					continue;
+				}
 				if (session.status !== "running") continue;
 				if (session.lease !== undefined && options.holderAlive?.(session.lease) === true) continue;
 				for (const task of this.#tasks.values()) {

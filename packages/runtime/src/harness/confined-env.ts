@@ -32,7 +32,7 @@ export interface FileMutation {
 	path: string;
 	before: string | null;
 	after: string | null;
-	/** 写入字节的 base64（不是原文），先随动作 journal 保存；删除为 null。 */
+	/** 写入字节的 base64（不是原文）；删除为 null。 */
 	content: string | null;
 }
 
@@ -176,7 +176,7 @@ export class ConfinedExecutionEnv {
 		};
 	}
 
-	/** 调用方必须先持久保存整个 mutation；恢复读取原 journal，不能重新计算 before。 */
+	/** 落盘前一刻核对 before：准备写入之后有人改过同一个文件就报写冲突，已经是 after 的当作写过。 */
 	async applyMutation(mutation: FileMutation, signal?: AbortSignal): Promise<void> {
 		signal?.throwIfAborted();
 		const { absolute } = await this.#confine(mutation.path, true);

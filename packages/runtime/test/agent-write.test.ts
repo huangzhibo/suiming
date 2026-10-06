@@ -360,7 +360,7 @@ changes:
 	assert.match(state, /人物 黄盖：secret:苦肉计\.revealed = true/u);
 	assert.match(state, /客观：character:黄盖\.location = "place:赤壁"/u);
 	const frame = frameTool(async () => candidate);
-	const result = (await frame.prepare?.({ storyBeatId: "beat-0002" })) as { content: { text: string }[] };
+	const result = (await frame.execute("call", { storyBeatId: "beat-0002" })) as { content: { text: string }[] };
 	assert.match(result.content[0]?.text ?? "", /人物 黄盖：secret:苦肉计\.revealed = true/u);
 });
 

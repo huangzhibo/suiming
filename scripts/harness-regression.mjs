@@ -98,7 +98,7 @@ const delegatedWriter = (r) =>
  * 模型服务出了问题的那一次不能算 Agent 退化：记成「作废」，不进通过率。原来记成未通过，要靠人看 lastFailure 才分得开，
  * 记录里至少六次是这样重跑的。判据只看错误码与网络层的原文，不看 Agent 做了什么。
  */
-const VOID_CODES = new Set(["model_call_failed", "model_call_unknown"]);
+const VOID_CODES = new Set(["model_call_failed"]);
 const VOID_MESSAGE =
 	/fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|rate limit|too many requests|overloaded|service unavailable|bad gateway|gateway timeout|(?:status|HTTP)\D{0,3}(?:429|5\d\d)\b/iu;
 

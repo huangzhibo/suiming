@@ -26,18 +26,11 @@ function text(value: string): HarnessToolResult<undefined> {
 	return { content: [{ type: "text", text: value }] };
 }
 
-/** 只读 / 派生结果在动作确认前冻结，恢复时不重新查询已变化的作品。 */
-export function freezeReadTool<T extends TSchema, D extends ToolDetails>(
-	tool: Omit<HarnessTool<T, D>, "replay" | "prepare"> & Partial<Pick<HarnessTool<T, D>, "replay" | "prepare">>,
+/** 只读工具：同样的参数再调一次就拿回当前结果，边界折叠可以折它的大结果。 */
+export function readTool<T extends TSchema, D extends ToolDetails>(
+	tool: Omit<HarnessTool<T, D>, "rereadable">,
 ): HarnessTool<T, D> {
-	return {
-		...tool,
-		replay: "read",
-		prepare: (params, signal) => tool.execute("read", params, signal),
-		async execute(_id, _params, _signal, _update, prepared) {
-			return prepared as HarnessToolResult<D>;
-		},
-	};
+	return { ...tool, rereadable: true };
 }
 
 const ReadSchema = Type.Object(
@@ -130,7 +123,7 @@ const MAX_LIST_ENTRIES = 300;
 /** 写入后的字数，与正文检查（checkStoryText 的 codePoints）同一口径：按码点计，含标点与换行。 */
 function sizeAfter(mutation: FileMutation): string {
 	if (mutation.content === null) return "";
-	// journal 里的 content 是 base64 字节，不是原文。
+	// mutation 里的 content 是 base64 字节，不是原文。
 	return `，${Array.from(Buffer.from(mutation.content, "base64").toString("utf8")).length} 字`;
 }
 
@@ -186,7 +179,10 @@ async function storyTextShape(mutation: FileMutation, scan?: CandidateScanner): 
 	return `；段落 ${own.count}，平均段长 ${own.average} 字${previous === undefined ? "" : `（${reference} ${previous.average} 字）`}`;
 }
 
-/** 文件动作由 Suiming 执行；相对修改先冻结为绝对字节 journal，再允许产生副作用。 */
+/**
+ * 文件动作由 Suiming 执行：先算出要写的字节与写前的 hash（FileMutation），落盘前一刻再核对一次，
+ * 作者或别的程序在这中间改过同一个文件就报写冲突，交给模型重读再改。
+ */
 export function fileTools(
 	env: ConfinedExecutionEnv,
 	policy: ConfinedEnvPolicy,
@@ -199,8 +195,8 @@ export function fileTools(
 		name: "read",
 		description: "读取作品中的 UTF-8 文件。offset 从 1 开始，默认最多 2000 行。",
 		parameters: ReadSchema,
-		replay: "read",
-		async prepare(params, signal) {
+		rereadable: true,
+		async execute(_id, params, signal) {
 			const content = await env.readTextFile(params.path, signal);
 			const lines = content.split("\n");
 			const start = (params.offset ?? 1) - 1;
@@ -213,17 +209,14 @@ export function fileTools(
 					.join("\n") + (end < lines.length ? `\n[还有 ${lines.length - end} 行；用 offset 继续读取]` : ""),
 			);
 		},
-		async execute(_id, params, signal, _update, prepared) {
-			return (prepared as HarnessToolResult) ?? ((await read.prepare?.(params, signal)) as HarnessToolResult);
-		},
 	};
 	// 没有 shell，找审稿、资料、正文这类文件的准确路径只能靠它；Frame 只列 Design，search 只按内容找。
 	const list: HarnessTool<typeof ListSchema> = {
 		name: "list",
 		description: "列出作品目录里一层的文件与子目录（子目录以 / 结尾），用来找文件的准确路径；不读内容。",
 		parameters: ListSchema,
-		replay: "read",
-		async prepare(params) {
+		rereadable: true,
+		async execute(_id, params) {
 			const entries = await env.listEntries(params.path || ".");
 			const shown = entries.slice(0, MAX_LIST_ENTRIES);
 			return text(
@@ -233,26 +226,19 @@ export function fileTools(
 							(entries.length > shown.length ? `\n[还有 ${entries.length - shown.length} 项未列出]` : ""),
 			);
 		},
-		async execute(_id, _params, _signal, _update, prepared) {
-			return prepared as HarnessToolResult;
-		},
 	};
 	const write: HarnessTool<typeof WriteSchema> = {
 		name: "write",
 		description:
 			"创建或完整替换允许范围内的作品文件。结果给出写入后的字数（按码点计，含标点与换行，与正文检查同一口径）；汇报篇幅以它为准，不要估算。带 check: true 时一并返回对整个候选的确定性检查结论，省掉紧跟着的一次 check。",
 		parameters: WriteSchema,
-		replay: "reconcile",
-		prepare: (params) => env.prepareWrite(params.path, params.content),
-		async execute(_id, params, signal, _update, prepared) {
-			await env.applyMutation(prepared as FileMutation, signal);
+		async execute(_id, params, signal) {
+			const mutation = await env.prepareWrite(params.path, params.content);
+			await env.applyMutation(mutation, signal);
 			return written(
-				`已写入 ${(prepared as FileMutation).path}${sizeAfter(prepared as FileMutation)}${await storyTextShape(prepared as FileMutation, scan)}`,
+				`已写入 ${mutation.path}${sizeAfter(mutation)}${await storyTextShape(mutation, scan)}`,
 				params.check,
 			);
-		},
-		async reconcile(id, params, prepared, signal) {
-			return write.execute(id, params, signal, undefined, prepared);
 		},
 	};
 	const edit: HarnessTool<typeof EditSchema> = {
@@ -260,8 +246,7 @@ export function fileTools(
 		description:
 			"在作品文件中精确替换唯一一段 oldText；必须先读取文件。结果给出改后的字数；带 check: true 时一并返回确定性检查结论。",
 		parameters: EditSchema,
-		replay: "reconcile",
-		async prepare(params, signal) {
+		async execute(_id, params, signal) {
 			const original = await env.readTextFile(params.path, signal);
 			if (
 				!original.includes(params.oldText) ||
@@ -272,36 +257,23 @@ export function fileTools(
 			// 在读和准备之间有外部修改时不能把新文件当成刚才读到的输入。
 			if (mutation.before !== sha256Hex(original))
 				throw new ToolRejection("file_write_conflict", conflictMessage(params.path));
-			return mutation;
-		},
-		async execute(_id, params, signal, _update, prepared) {
-			await env.applyMutation(prepared as FileMutation, signal);
+			await env.applyMutation(mutation, signal);
 			return written(
-				`已修改 ${(prepared as FileMutation).path}${sizeAfter(prepared as FileMutation)}${await storyTextShape(prepared as FileMutation, scan)}`,
+				`已修改 ${mutation.path}${sizeAfter(mutation)}${await storyTextShape(mutation, scan)}`,
 				params.check,
 			);
-		},
-		async reconcile(id, params, prepared, signal) {
-			return edit.execute(id, params, signal, undefined, prepared);
 		},
 	};
 	const remove: HarnessTool<typeof DeleteSchema> = {
 		name: "delete",
 		description: "删除允许范围内的作品文件。删除只改当前候选；提交时 Checker 会检查是否有引用指向它。",
 		parameters: DeleteSchema,
-		replay: "reconcile",
-		async prepare(params) {
+		async execute(_id, params, signal) {
 			const mutation = await env.prepareWrite(params.path, null);
 			// 删一个本来就不存在的文件不是「成功」，是模型记错了路径：如实拒绝，别让它以为删掉了。
 			if (mutation.before === null) throw new ToolRejection("file_not_found", params.path);
-			return mutation;
-		},
-		async execute(_id, _params, signal, _update, prepared) {
-			await env.applyMutation(prepared as FileMutation, signal);
-			return text(`已删除 ${(prepared as FileMutation).path}`);
-		},
-		async reconcile(id, params, prepared, signal) {
-			return remove.execute(id, params, signal, undefined, prepared);
+			await env.applyMutation(mutation, signal);
+			return text(`已删除 ${mutation.path}`);
 		},
 	};
 	// 2026-10-02 斗破抽取：没有它时「原样提升」只能逐个 read 再让模型整篇重打一遍 write，一百多个文件、半个多小时，还可能抄走样。
@@ -310,8 +282,7 @@ export function fileTools(
 		description:
 			"把允许范围内的一个文件或整个目录原样复制到新路径：目录按相对路径整棵复制，同名文件覆盖。内容不经过你，比 read 再 write 快，也不会抄错；Source 原样提升为 Target 用它（如 source/<id>/world → world）。带 check: true 时一并返回确定性检查结论。",
 		parameters: CopySchema,
-		replay: "reconcile",
-		async prepare(params, signal) {
+		async execute(_id, params, signal) {
 			const from = logicalPath(params.from);
 			const to = logicalPath(params.to);
 			if (to === from || to.startsWith(`${from}/`))
@@ -328,10 +299,6 @@ export function fileTools(
 			const mutations: FileMutation[] = [];
 			for (const [source, target] of pairs)
 				mutations.push(await env.prepareWrite(target, await env.readBinaryFile(source, signal)));
-			return { from, to, mutations };
-		},
-		async execute(_id, params, signal, _update, prepared) {
-			const { from, to, mutations } = prepared as { from: string; to: string; mutations: FileMutation[] };
 			for (const mutation of mutations) await env.applyMutation(mutation, signal);
 			const created = mutations.filter((mutation) => mutation.before === null).length;
 			const unchanged = mutations.filter((mutation) => mutation.before === mutation.after).length;
@@ -340,9 +307,6 @@ export function fileTools(
 				params.check,
 			);
 		},
-		async reconcile(id, params, prepared, signal) {
-			return copy.execute(id, params, signal, undefined, prepared);
-		},
 	};
 	// 2026-10-03 斗破 120 章：整合给 153 节分卷，只能逐个 copy 再 delete。换卷是改 index.yaml 加 mv 文件两步。
 	const move: HarnessTool<typeof MoveSchema> = {
@@ -350,8 +314,7 @@ export function fileTools(
 		description:
 			"把允许范围内的文件或目录挪到新位置，原处不留：from 只有一个时 to 是它的新路径（改名），多个时 to 是目录、各自保留文件名。把 Beat 换卷就是改 index.yaml 再 move 文件。目标已有不同内容时拒绝，不覆盖。带 check: true 时一并返回确定性检查结论。",
 		parameters: MoveSchema,
-		replay: "reconcile",
-		async prepare(params, signal) {
+		async execute(_id, params, signal) {
 			const to = logicalPath(params.to);
 			const pairs: (readonly [string, string])[] = [];
 			for (const raw of params.from) {
@@ -375,15 +338,8 @@ export function fileTools(
 					);
 				mutations.push(write, await env.prepareWrite(source, null));
 			}
-			return { to, moved: pairs.length, mutations };
-		},
-		async execute(_id, params, signal, _update, prepared) {
-			const { to, moved, mutations } = prepared as { to: string; moved: number; mutations: FileMutation[] };
 			for (const mutation of mutations) await env.applyMutation(mutation, signal);
-			return written(`已挪到 ${to}：${moved} 个文件`, params.check);
-		},
-		async reconcile(id, params, prepared, signal) {
-			return move.execute(id, params, signal, undefined, prepared);
+			return written(`已挪到 ${to}：${pairs.length} 个文件`, params.check);
 		},
 	};
 	return policy === "write" ? [read, list, edit, write, copy, move, remove] : [read, list];
@@ -422,13 +378,12 @@ function snippet(
 
 /** 结构化 Story Search：缺省查 Target，带 sourceId 查那份 Source 的抽取；返回路径、命中词与片段。 */
 export function searchTool(scan: CandidateScanner): HarnessTool<typeof SearchSchema, undefined> {
-	return freezeReadTool({
+	return readTool({
 		name: "search",
 		label: "search",
 		description:
 			"在当前作品目录中做精确文本 / 标识检索，返回命中的 artifact 路径与片段；带 sourceId 查那份 Source 的抽取（原文按字找用 search_source）。语义检索不可用。",
 		parameters: SearchSchema,
-		replay: "read",
 		async execute(_toolCallId, params) {
 			const candidate = await scan();
 			const result = searchStoryCandidate(
@@ -473,13 +428,12 @@ const ImpactSchema = Type.Object(
  * 抽取读到后文揭示、要回头补前面的铺垫时，靠它找前文。
  */
 export function impactTool(scan: CandidateScanner): HarnessTool<typeof ImpactSchema, undefined> {
-	return freezeReadTool({
+	return readTool({
 		name: "impact",
 		label: "impact",
 		description:
 			"改一个人物、物品、地点、World、Contract 或 Beat 之前，按 refs 与 refs.beat 召回可能受影响的 Beat 与文件路径（改 Beat 时也带上紧接着的下一节）；带 sourceId 查那份 Source 的抽取。只召回，不判断语义。",
 		parameters: ImpactSchema,
-		replay: "read",
 		async execute(_toolCallId, params) {
 			const candidate = await scan();
 			try {
@@ -507,13 +461,12 @@ const CheckSchema = Type.Object({}, { additionalProperties: false });
 
 /** 提交用同一个 Checker；这里让模型随时看到会被拒的问题、拦不住但要修的问题与 warning。 */
 export function checkTool(scan: CandidateScanner): HarnessTool<typeof CheckSchema, undefined> {
-	return freezeReadTool({
+	return readTool({
 		name: "check",
 		label: "check",
 		description:
 			"对当前工作目录运行确定性 Checker（schema、引用、顺序、Contract、硬状态、已有正文）。结论三种：PASSED 没有问题；ISSUES 可以提交，但列出的设计或正文问题要修，阶段提交时先留着也要在回复里告诉作者；FAILED 提交会被拒绝，先修。",
 		parameters: CheckSchema,
-		replay: "read",
 		async execute() {
 			return text(formatCheck(await scan()));
 		},
@@ -564,12 +517,11 @@ const FrameSchema = Type.Object(
 
 /** Frame(t)：某个 Beat 前后的确定性硬状态与它的 refs / Contract；只投影事实，不做解读。 */
 export function frameTool(scan: CandidateScanner): HarnessTool<typeof FrameSchema, undefined> {
-	return freezeReadTool({
+	return readTool({
 		name: "frame",
 		label: "frame",
 		description: "查看某个 StoryBeat 之前与之后的硬状态（位置、持有、生死等），以及它引用的实体与 Contract。",
 		parameters: FrameSchema,
-		replay: "read",
 		async execute(_toolCallId, params) {
 			const candidate = await scan();
 			let inspected: ReturnType<typeof inspectStoryDesignCandidate>;
@@ -620,8 +572,7 @@ export function submitTool<TParameters extends TSchema>(
 		submission: true,
 		description: options.description,
 		parameters: options.parameters,
-		replay: "read",
-		async prepare(params) {
+		async execute(_id, params) {
 			let summary: string;
 			try {
 				summary = await options.onSubmit(params);
@@ -638,9 +589,6 @@ export function submitTool<TParameters extends TSchema>(
 				throw error;
 			}
 			return { ...text(summary), terminate: true };
-		},
-		async execute(_toolCallId, _params, _signal, _update, prepared) {
-			return prepared as HarnessToolResult<undefined>;
 		},
 	};
 }
@@ -659,8 +607,7 @@ export function compactContextTool(opening?: () => Promise<string>): HarnessTool
 		description:
 			"将已处理的执行上下文压缩为带来源的摘要。保留目标、作者指令、尚未交付的计划、结果引用和待验证判断。原始消息仍持久保存，summary 不成为 Canon。",
 		parameters,
-		replay: "read",
-		async prepare(params: { summary: string }) {
+		async execute(_id, params: { summary: string }) {
 			return {
 				...(opening === undefined ? {} : { contextOpening: await opening() }),
 				content: [
@@ -671,9 +618,6 @@ export function compactContextTool(opening?: () => Promise<string>): HarnessTool
 				],
 				contextSummary: params.summary,
 			};
-		},
-		async execute(_id, _params, _signal, _update, prepared) {
-			return prepared as HarnessToolResult;
 		},
 	};
 }

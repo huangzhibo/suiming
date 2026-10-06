@@ -51,7 +51,6 @@ export function updateComposerDraft<T extends ComposerState>(
 	// 开始输入即选定当前对话，重载不能因后台新出现 session 而切走这份草稿。
 	return { ...state, composerDrafts, sessionChosen: true };
 }
-/** paused 的 session 不收消息（inbox 会拒绝）；作者要先处理原因或停止。 */
 export function stageSubmission(
 	draft: ComposerDraft,
 	session?: { id: string; status: string; model?: ModelChoice },
@@ -59,8 +58,7 @@ export function stageSubmission(
 	if (
 		draft.pending ||
 		draft.attachments.some((item) => item.status !== "ready") ||
-		composerReferenceBytes(draft) > MAX_INPUT_BYTES ||
-		session?.status === "paused"
+		composerReferenceBytes(draft) > MAX_INPUT_BYTES
 	)
 		return draft;
 	const text = composerText(draft);

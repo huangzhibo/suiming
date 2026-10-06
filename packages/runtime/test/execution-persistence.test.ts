@@ -211,7 +211,7 @@ test("SQLite 删除 session 时把子任务、inbox 与事件一起删", async (
 				event: { type: EventType.RUN_STARTED, threadId: "session-a", runId: "owner-1" },
 			},
 		]);
-		state.endTurn({ commandId: "end", sessionId: "session-a", status: "idle" });
+		state.endTurn({ commandId: "end", sessionId: "session-a" });
 		state.deleteSession("delete", "session-a");
 		const persisted = store.loadExecutionState();
 		assert.deepEqual(persisted.sessions, []);
@@ -249,7 +249,7 @@ test("SQLite 同一事件序号内容冲突使整个事件批次回滚", async (
 	});
 });
 
-test("inbox：paused 拒绝，idle 与 running 都排队，相同命令返回原序号", async () => {
+test("inbox：idle 与 running 都排队，turn 非正常结束后照样收，相同命令返回原序号", async () => {
 	await fixture((store) => {
 		const state = execution(store);
 		createSession(state, "a");
@@ -264,16 +264,12 @@ test("inbox：paused 拒绝，idle 与 running 都排队，相同命令返回原
 		state.endTurn({
 			commandId: "end",
 			sessionId: "session-a",
-			status: "paused",
-			failure: { code: "model_call_unknown", message: "结果未知", retryable: true },
+			failure: { code: "model_call_failed", message: "模型调用失败", retryable: true },
 		});
-		assert.throws(
-			() => store.queueInbox("session-a", "paused 不收"),
-			(error) => error instanceof ArtifactError && error.code === "session_paused",
-		);
+		assert.deepEqual(store.queueInbox("session-a", "继续"), { sequence: 3 });
 		assert.deepEqual(
 			store.readInbox("session-a").map((item) => item.text),
-			["第一句", "跑着也能排"],
+			["第一句", "跑着也能排", "继续"],
 		);
 	});
 });

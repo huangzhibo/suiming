@@ -394,8 +394,8 @@ export const LOCAL_COMMANDS = {
 		Type.Array(taskSummarySchema),
 	),
 	/**
-	 * 作者说一句话。没有 sessionId 就新建 session；idle 则开一个 turn，running 则排进 inbox 在下一边界注入；
-	 * paused 拒绝并带原因。`model` 只在 turn 边界生效。
+	 * 作者说一句话。没有 sessionId 就新建 session；idle 则开一个 turn，running 则排进 inbox 在下一边界注入。
+	 * `model` 只在 turn 边界生效。
 	 */
 	"session.send": command(
 		Type.Object(
@@ -404,20 +404,7 @@ export const LOCAL_COMMANDS = {
 		),
 		Type.Object({ sessionId: id, sequence: Type.Integer({ minimum: 1 }) }, { additionalProperties: false }),
 	),
-	/** 从 paused 继续：作者已核对原因；retryUnknown 显式授权重发结果未知的模型请求。 */
-	"session.resume": command(
-		Type.Object(
-			{
-				commandId: id,
-				sessionId: id,
-				retryUnknown: Type.Optional(Type.Boolean()),
-				model: Type.Optional(modelChoiceSchema),
-			},
-			{ additionalProperties: false },
-		),
-		Type.Object({ sessionId: id }, { additionalProperties: false }),
-	),
-	/** 中止当前 turn：消息列表原样，回 idle。paused 上也可用。 */
+	/** 中止当前 turn：消息列表原样，回 idle，下一句接着跑。 */
 	"session.interrupt": command(
 		Type.Object({ sessionId: id }, { additionalProperties: false }),
 		Type.Object({ status: id }, { additionalProperties: false }),

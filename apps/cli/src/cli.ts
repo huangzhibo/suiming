@@ -5,7 +5,6 @@ import { basename, dirname, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import {
 	ArtifactError,
-	abandonPausedSession,
 	type CheckDiagnostic,
 	type CloudProjectStore,
 	checkDiagnostic,
@@ -26,7 +25,6 @@ import {
 	loadModelRoutingConfig,
 	loadUsageCheckpoint,
 	type ModelGateway,
-	notActiveInProcess,
 	parseStoryImpactSubject,
 	productEventSnapshot,
 	publishRelease,
@@ -1144,80 +1142,6 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 				);
 			},
 		);
-
-	session
-		.command("resume")
-		.description("作者核对过暂停原因之后，继续一个 paused 的 session")
-		.argument("<session-id>")
-		.option("--retry-unknown", "显式重发一个结果未知的模型请求")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.option("--auth <path>", "覆盖 ~/.suiming/auth.json")
-		.option("--events", "在最终响应之前逐行流式输出 SessionEvent NDJSON")
-		.action(
-			async (
-				sessionId: string,
-				options: { retryUnknown?: boolean; config?: string; auth?: string; events?: boolean },
-			) => {
-				await execute("session.resume", () =>
-					withProject(projectPath(program), async (service) => {
-						const models = await modelGateway(io, options);
-						const controller = new LocalSessionController({
-							project: service,
-							models,
-							telemetryContext: cliTelemetry(io).context,
-							usageCheckpoint: usageCheckpoint(options),
-						});
-						const onEvent = eventWriter(io, "session.resume", options.events === true);
-						await controller.resume({
-							commandId: randomUUID(),
-							sessionId,
-							retryUnknownModelCall: options.retryUnknown === true,
-							...(onEvent === undefined ? {} : { onEvent }),
-						});
-						await withInterrupt(io, async (signal) => {
-							signal.addEventListener(
-								"abort",
-								() => {
-									try {
-										controller.interrupt(sessionId, new Error("Interrupted by signal"));
-									} catch {
-										// 不由本进程持有时无事可停。
-									}
-								},
-								{ once: true },
-							);
-							await controller.completion(sessionId);
-							if (signal.aborted)
-								throw new ArtifactError("run_interrupted", "当前 turn 已被中断；再发一条消息即可接着跑");
-						});
-						return sessionTurnData(service, sessionId);
-					}),
-				);
-			},
-		);
-
-	session
-		.command("interrupt")
-		.description("放弃 paused session 的这次核对、回 idle；正在跑的 turn 只能在跑它的进程里停")
-		.argument("<session-id>")
-		.action(async (sessionId: string) => {
-			await execute("session.interrupt", () =>
-				withProject(projectPath(program), (service) => {
-					const snapshot = service.loadExecutionEntities();
-					const record = snapshot.sessions.find((item) => item.id === sessionId);
-					if (record === undefined) throw new ArtifactError("session_not_found", `找不到对话：${sessionId}`);
-					// 每次 suim 调用都是新进程，不可能持有一个正在跑的 turn：那只能在跑它的进程里停，如实报错。
-					if (record.status === "running") throw notActiveInProcess(sessionId);
-					abandonPausedSession(service, sessionId);
-					const settled = service.loadExecutionEntities();
-					const current = settled.sessions.find((item) => item.id === sessionId) ?? record;
-					return {
-						projectId: service.projectId,
-						session: sessionSummary(current, sessionTitle(service, sessionId)),
-					};
-				}),
-			);
-		});
 
 	session
 		.command("list")
