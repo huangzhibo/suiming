@@ -100,7 +100,7 @@ export function startDesktop(
 		return next;
 	}
 	async function openProjectNow(requested: string, create: boolean) {
-		if (workspace?.activeSessionIds().length) throw new Error("当前作品还在运行中，请先暂停再切换作品。");
+		if (workspace?.activeSessionIds().length) throw new Error("当前作品的对话还在运行，请先停止再切换作品。");
 		// macOS 的 /var 是 /private/var 的符号链接；统一成真实路径，最近列表才不会把同一作品记两次。
 		const path = await realpath(requested).catch(() => requested);
 		// 像 Obsidian 打开任意文件夹一样：目录还没有 .suiming 时就地初始化，作品仍只是目录，.suiming 只是版本库。

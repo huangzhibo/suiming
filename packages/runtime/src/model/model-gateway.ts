@@ -312,7 +312,10 @@ export class ModelGateway {
 	async bindFrozen(snapshot: ModelBindingSnapshot): Promise<BoundModelProfile> {
 		const model = this.#models.getModel(snapshot.provider, snapshot.model);
 		if (!model || model.api !== snapshot.api || model.baseUrl !== snapshot.baseUrl)
-			throw new ModelGatewayError("model_not_found", `冻结模型不可用：${snapshot.provider}/${snapshot.model}`);
+			throw new ModelGatewayError(
+				"model_not_found",
+				`模型目录里已经没有 ${snapshot.provider}/${snapshot.model}（或它的接口变了）`,
+			);
 		validateProfileOptions(model.api, snapshot.options, "binding.options");
 		const auth = await this.#models.checkAuth(snapshot.provider);
 		if (!auth) throw new ModelGatewayError("model_credentials_missing", `请重新连接 ${snapshot.provider}`);
