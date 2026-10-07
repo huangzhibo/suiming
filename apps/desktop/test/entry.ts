@@ -225,6 +225,33 @@ if (process.argv.includes("--conversation-test")) {
 		stopThenContinue,
 	]);
 }
+if (process.argv.includes("--subtask-resume-test")) {
+	// 子任务读完第一个文件停在闸门上，测试点开那一行再放行；第三次请求等作者按停止。
+	// 下一句根 Agent 从委派「被打断」的结果里取 taskId 续做。
+	provider.setResponses([
+		fauxAssistantMessage(
+			fauxToolCall("delegate", { profile: "main", goal: "读黄盖与阚泽的人物档", title: "读两个人物" }),
+		),
+		fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+		async () => {
+			await gate("subtask-second-read");
+			return fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/阚泽.md" }));
+		},
+		async (_context, options) => {
+			const signal = options?.signal;
+			if (!signal?.aborted)
+				await new Promise((resolve) => signal?.addEventListener("abort", resolve, { once: true }));
+			return fauxAssistantMessage("停止没有生效");
+		},
+		(context) => {
+			const taskId = /taskId: \\"(task_[0-9a-f-]+)\\"/u.exec(JSON.stringify(context.messages))?.[1];
+			if (taskId === undefined) throw new Error("被打断的委派没有给出 taskId");
+			return fauxAssistantMessage(fauxToolCall("resume_task", { taskId }));
+		},
+		fauxAssistantMessage(fauxToolCall("submit_task", { summary: "两个人物档都读过了" })),
+		fauxAssistantMessage("两个人物都读过了。"),
+	]);
+}
 const credentials =
 	modelTest && process.env.SUIMING_CONFIG_PATH
 		? new JsonFileCredentialStore({ path: `${process.env.SUIMING_CONFIG_PATH}.auth.json` })
