@@ -140,6 +140,34 @@ test("project lock 带等待：别人释放之后在等待期内拿到，host �
 	}
 });
 
+test("project lock 带等待：锁文件刚建好还没写完、或刚被放掉，等的一方照常等，不报「读不出是谁持有」", async () => {
+	// 2026-10-07 CI 撞上：持有者在等的一方读文件前一刻放掉了锁，读到 ENOENT 就直接失败，等待期白给了。
+	const root = await mkdtemp(join(tmpdir(), "suiming-project-lock-race-"));
+	try {
+		const lockPath = join(root, ".suiming", "project.lock");
+		await mkdir(dirname(lockPath), { recursive: true });
+		await writeFile(lockPath, "");
+		const waiting = LocalProjectLock.acquire(root, { waitMs: 3000 });
+		setTimeout(() => void rm(lockPath), 100);
+		await (await waiting).release();
+		// 同一时刻抢锁的一串：建文件、写内容、放掉的空档里总有人读到空文件或读不到文件
+		await Promise.all(
+			Array.from({ length: 20 }, async () => {
+				const lock = await LocalProjectLock.acquire(root, { waitMs: 5000 });
+				await lock.release();
+			}),
+		);
+		// 一直读不出内容的锁文件（崩在建文件与写内容之间）等到期限照旧报错，由作者处理
+		await writeFile(lockPath, "");
+		await assert.rejects(LocalProjectLock.acquire(root, { waitMs: 100 }), {
+			code: "project_locked",
+			message: /读不出是谁持有/u,
+		});
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test("SQLite 本地 Project 登记与 remote binding 跨重启保持", async () => {
 	const fixture = await createLocalFixture();
 	try {

@@ -63,10 +63,18 @@ export class LocalProjectLock {
 				return new LocalProjectLock(path, token);
 			} catch (error) {
 				if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+				// 建文件与写内容不是一步：别人刚建好还没写完时读到空的或半截的，刚放掉时读不到文件。
+				// 前者当作有人持有、照常等，后者马上再抢；等到期限还读不出才报错（崩在建文件与写内容之间留下的）。
+				// 2026-10-07 之前读不出就立刻失败，20 个同时抢锁的约有 5% 白白失败。
 				let existing: LockFile | undefined;
 				try {
 					existing = JSON.parse(await readFile(path, "utf8")) as LockFile;
-				} catch {
+				} catch (readError) {
+					if ((readError as NodeJS.ErrnoException).code === "ENOENT") continue;
+					if (Date.now() < deadline) {
+						await new Promise((resolve) => setTimeout(resolve, 50));
+						continue;
+					}
 					throw new ArtifactError("project_locked", `作品锁文件存在，但读不出是谁持有：${path}`);
 				}
 				if (existing.hostname === hostname() && Number.isInteger(existing.pid) && !processExists(existing.pid)) {
