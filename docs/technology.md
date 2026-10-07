@@ -189,6 +189,7 @@ PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、�
 
 | 技术 | 暂不采用的原因 | 重新评估条件 |
 | --- | --- | --- |
+| TypeScript 7（原生编译器） | 2026-10-07 评估：在本仓上 0 错误、182 个 JS 产物逐字节相同，`npm run check` 22.6 s → 13.5 s，只省约 10 s。7.0 没有编程接口，工作台设计系统检查用的 `@typescript-eslint/parser` 只支持到 6.0，要靠官方的两版并存（`@typescript/native` 指向 7、`typescript` 别名到 `@typescript/typescript6`）——实测不冲突，但多一个过渡状态，编辑器与命令行也不是同一个版本。同日查的主流：VS Code、typescript-eslint 自己两版并存，Electron、pi 只装 7；Playwright、Vite、Next.js、Vue、Angular、Astro、TanStack Query 与两家模型 SDK 仍在 6.0 | TypeScript 7.1 正式版（计划 2026-11-24，带稳定的编程接口）发布、typescript-eslint 也发布了支持 7.1 的版本，就直接换成只装一份 7；检查速度先成了瓶颈、或 typescript-eslint 迟迟不跟，就用并存方案 |
 | Redis / BullMQ | 增加一致性与运维边界；Cloud 现在没有执行，也就没有任务队列 | Cloud 执行解冻后，任务领取成为可测瓶颈 |
 | Tauri | Runtime 是 Node，Tauri 需要把它做成 sidecar 并经 IPC / HTTP 通信，把 Electron 主进程能直接消掉的进程边界加回来 | Runtime 不再依赖 Node，或 Electron 体积成为分发的实证障碍 |
 | Obsidian 插件 | 最快能用，但产品会绑在别人的平台、插件模型和私有状态上，与拒绝 fork coding agent 的理由相同 | 不重新评估；把目录当 vault 打开阅读不在此限 |
