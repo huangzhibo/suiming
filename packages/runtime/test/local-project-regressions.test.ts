@@ -6,7 +6,6 @@ import test from "node:test";
 import {
 	ArtifactError,
 	type ChangeSet,
-	InMemoryExecutionState,
 	inspectRelease,
 	LocalProjectService,
 	materializeOpenStoryDirectorySnapshot,
@@ -100,20 +99,14 @@ test("同一作品同时只有一个 running session，跨进程也一样；持�
 		const options = { databasePath: paths.databasePath, objectRootPath: paths.objectRootPath };
 		first = new SqliteLocalStore(options);
 		second = new SqliteLocalStore(options);
-		const desktop = new InMemoryExecutionState({
-			snapshot: first.loadExecutionState(),
-			commit: (delta) => first?.applyExecutionDelta(delta),
-		});
+		const desktop = first.createExecutionState();
 		desktop.createSession({
 			commandId: "a:session",
 			id: "session-a",
 			projectId: "one-turn",
 			baseRevisionId: genesis,
 		});
-		const cli = new InMemoryExecutionState({
-			snapshot: second.loadExecutionState(),
-			commit: (delta) => second?.applyExecutionDelta(delta),
-		});
+		const cli = second.createExecutionState();
 		cli.createSession({ commandId: "b:session", id: "session-b", projectId: "one-turn", baseRevisionId: genesis });
 		const alive = {
 			ownerId: "desktop",
@@ -128,34 +121,22 @@ test("同一作品同时只有一个 running session，跨进程也一样；持�
 			(error: unknown) =>
 				error instanceof ArtifactError && error.code === "session_running" && error.message.includes("session-a"),
 		);
-		assert.equal(
-			new InMemoryExecutionState({ snapshot: second.loadExecutionState() }).session("session-b").status,
-			"idle",
-		);
+		assert.equal(second.createExecutionState().session("session-b").status, "idle");
 
 		// 桌面那一轮结束后，命令行就能开。
 		desktop.endTurn({ commandId: "a:end", sessionId: "session-a" });
-		const retry = new InMemoryExecutionState({
-			snapshot: second.loadExecutionState(),
-			commit: (delta) => second?.applyExecutionDelta(delta),
-		});
+		const retry = second.createExecutionState();
 		retry.startTurn({ commandId: "b:start-2", sessionId: "session-b", lease: { ...alive, ownerId: "cli" } });
 		retry.endTurn({ commandId: "b:end", sessionId: "session-b" });
 
 		// 崩溃遗留：session-a 还标着 running，持有进程已经不在了，不挡别的 session。
-		const crashed = new InMemoryExecutionState({
-			snapshot: first.loadExecutionState(),
-			commit: (delta) => first?.applyExecutionDelta(delta),
-		});
+		const crashed = first.createExecutionState();
 		crashed.startTurn({
 			commandId: "a:start-2",
 			sessionId: "session-a",
 			lease: { ...alive, ownerId: "dead", pid: 2 ** 22 + 17 },
 		});
-		const after = new InMemoryExecutionState({
-			snapshot: second.loadExecutionState(),
-			commit: (delta) => second?.applyExecutionDelta(delta),
-		});
+		const after = second.createExecutionState();
 		after.startTurn({ commandId: "b:start-3", sessionId: "session-b", lease: { ...alive, ownerId: "cli" } });
 		assert.equal(after.session("session-b").status, "running");
 	} finally {

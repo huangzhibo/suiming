@@ -1,4 +1,5 @@
 // 一个 turn 里连续 N 次 read，量每轮耗时随会话增长的变化，以及 receipt 数。
+import { DatabaseSync } from "node:sqlite";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { agentTurn } from "../../../packages/runtime/src/harness/agent.ts";
 import { fixture } from "./fixture.mts";
@@ -18,12 +19,14 @@ const outcome = await f.harness.turn(id, {}, (session) => agentTurn(session));
 const total = performance.now() - t0;
 const gaps = stamps.slice(1).map((t, i) => t - (stamps[i] as number));
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-const snap = f.project.loadExecutionState();
+const db = new DatabaseSync(f.project.paths.databasePath, { readOnly: true });
+const receipts = (db.prepare("SELECT COUNT(*) AS n FROM execution_command_receipts").get() as { n: number }).n;
+db.close();
 console.log(JSON.stringify({
 	N, status: outcome.session.status, failure: outcome.failure?.code,
 	totalMs: Math.round(total),
 	firstRoundsMs: Math.round(avg(gaps.slice(0, 20)) * 10) / 10,
 	lastRoundsMs: Math.round(avg(gaps.slice(-20)) * 10) / 10,
-	receipts: snap.commandReceipts.length,
+	receipts,
 }));
 await f.close();

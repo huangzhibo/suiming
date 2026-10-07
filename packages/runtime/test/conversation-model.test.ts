@@ -96,7 +96,7 @@ test("session 的模型独立于全局默认，思考参数真实传入；turn �
 		assert.ok(workspace.activeSessionIds().includes(started.sessionId), "保存默认值不停止当前回复");
 		release();
 		await idle(workspace);
-		assert.equal(project.loadExecutionState().sessions[0]?.status, "idle");
+		assert.equal(project.loadExecutionEntities().sessions[0]?.status, "idle");
 		assert.deepEqual((await workspace.invoke("session.list", {})).sessions[0]?.model, choice);
 		const next = {
 			commandId: "switch-choice",
@@ -110,7 +110,7 @@ test("session 的模型独立于全局默认，思考参数真实传入；turn �
 		assert.deepEqual(await workspace.invoke("session.send", next), switched, "同一命令重发返回原回执，不再开 turn");
 		await idle(workspace);
 		await assert.rejects(workspace.invoke("session.send", { ...next, model: choice }), { code: "command_conflict" });
-		const state = project.loadExecutionState();
+		const state = project.loadExecutionEntities();
 		assert.equal(state.sessions.length, 1);
 		assert.equal(state.sessions[0]?.turn, 2);
 		assert.deepEqual((await workspace.invoke("session.list", {})).sessions[0]?.model, next.model);

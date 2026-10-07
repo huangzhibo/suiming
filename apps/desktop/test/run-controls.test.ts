@@ -31,9 +31,9 @@ test("一个 turn 跑完回 idle；执行更新不反复扫描作品", { timeout
 		await page.screenshot({ path: "/tmp/suiming-session-controls.png" });
 		await waitForSessionIdle(page, sent.sessionId);
 		const verified = await LocalProjectService.open(root);
-		assert.equal(verified.loadExecutionState().sessions.length, 1);
-		assert.equal(verified.loadExecutionState().sessions[0]?.usage?.calls, 1);
-		assert.deepEqual(verified.loadExecutionState().tasks, []);
+		assert.equal(verified.loadExecutionEntities().sessions.length, 1);
+		assert.equal(verified.loadExecutionEntities().sessions[0]?.usage?.calls, 1);
+		assert.deepEqual(verified.loadExecutionEntities().tasks, []);
 		verified.close();
 		const commands = await app.evaluate(
 			() => (globalThis as typeof globalThis & { productAuditCommands: string[] }).productAuditCommands,

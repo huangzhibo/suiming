@@ -32,7 +32,7 @@ import type {
 	ChangeSet,
 	ProjectRevision,
 } from "../artifact/types.js";
-import { InMemoryExecutionState } from "../execution/in-memory-execution-state.js";
+import type { InMemoryExecutionState } from "../execution/in-memory-execution-state.js";
 import type {
 	ExecutionEntities,
 	ExecutionEntitySnapshot,
@@ -571,16 +571,11 @@ export class LocalProjectService {
 		};
 	}
 
-	loadExecutionState() {
-		this.#requireOpen();
-		return this.#store.loadExecutionState();
-	}
-
-	/** 每条执行命令先持久确认；调用方无需另行保存快照。 */
+	/** 每条执行命令先持久确认；调用方无需另行保存快照。回执不读进来，重放时按 id 查。 */
 	createExecutionState(options: { now?: () => Date } = {}): InMemoryExecutionState {
-		return new InMemoryExecutionState({
-			...options,
-			snapshot: this.loadExecutionState(),
+		this.#requireOpen();
+		return this.#store.createExecutionState({
+			...(options.now === undefined ? {} : { now: options.now }),
 			commit: (delta) => this.applyExecutionDelta(delta),
 		});
 	}
@@ -825,10 +820,10 @@ export class LocalProjectService {
 	}
 
 	#recoverExecutionAfterProcessRestart(): void {
-		const snapshot = this.#store.loadExecutionState();
 		// 2026-10-06 之前落盘的 paused 也在这里收敛成 idle（recoverUnfinished）。
-		const unfinished = snapshot.sessions
-			.filter((session) => session.status === "running" || (session.status as string) === "paused")
+		const unfinished = this.#store
+			.loadExecutionEntities()
+			.sessions.filter((session) => session.status === "running" || (session.status as string) === "paused")
 			.map((session) => `${session.id}@${session.version}`)
 			.sort();
 		if (unfinished.length === 0) return;

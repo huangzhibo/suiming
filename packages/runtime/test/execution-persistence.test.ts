@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { EventType } from "@suiming/sdk";
-import { ArtifactError, InMemoryExecutionState, SqliteLocalStore } from "../src/index.js";
+import { ArtifactError, type InMemoryExecutionState, SqliteLocalStore } from "../src/index.js";
 
 const now = () => new Date("2026-09-08T00:00:00Z");
 const lease = { ownerId: "owner-1", pid: process.pid, hostname: "local", acquiredAt: now().toISOString() };
@@ -32,11 +32,7 @@ async function fixture(
 }
 
 function execution(store: SqliteLocalStore): InMemoryExecutionState {
-	return new InMemoryExecutionState({
-		snapshot: store.loadExecutionState(),
-		now,
-		commit: (delta) => store.applyExecutionDelta(delta),
-	});
+	return store.createExecutionState({ now });
 }
 
 function createSession(state: InMemoryExecutionState, suffix: string): void {
@@ -50,7 +46,7 @@ test("SQLite 双连接各自新建 session：两边的都留下，后写的不�
 		createSession(execution(reopen()), "b");
 		assert.deepEqual(
 			store
-				.loadExecutionState()
+				.loadExecutionEntities()
 				.sessions.map((session) => session.id)
 				.sort(),
 			["session-a", "session-b"],
@@ -68,7 +64,7 @@ test("SQLite 双连接修改独立 session 不因快照中无关实体过时而�
 		first.startTurn({ commandId: "start:a", sessionId: "session-a", lease });
 		second.startTurn({ commandId: "start:b", sessionId: "session-b", lease });
 		assert.deepEqual(
-			store.loadExecutionState().sessions.map((session) => session.status),
+			store.loadExecutionEntities().sessions.map((session) => session.status),
 			["running", "running"],
 		);
 		// 第二个连接已经前进到相同版本；相同目标内容也不能冒充这次陈旧命令成功。
@@ -94,19 +90,23 @@ test("SQLite 在同一个读事务里加载执行快照，并发提交不能混�
 					const rows = all();
 					interleaved = true;
 					writer.startTurn({ commandId: "interleaved-start", sessionId: "session-a", lease });
+					writer.addTask({
+						commandId: "interleaved-task",
+						id: "task",
+						sessionId: "session-a",
+						kind: "main",
+						key: "a",
+					});
 					return rows;
 				});
 			}
 			return prepared;
 		});
-		const snapshot = store.loadExecutionState();
+		const snapshot = store.loadExecutionEntities();
 		assert.equal(interleaved, true);
 		assert.equal(snapshot.sessions[0]?.status, "idle");
-		assert.equal(
-			snapshot.commandReceipts.some((receipt) => receipt.commandId === "interleaved-start"),
-			false,
-		);
-		assert.equal(store.loadExecutionState().sessions[0]?.status, "running");
+		assert.deepEqual(snapshot.tasks, [], "后读的 task 与先读的 session 是同一时刻的");
+		assert.equal(store.loadExecutionEntities().sessions[0]?.status, "running");
 	});
 });
 
@@ -119,25 +119,31 @@ test("SQLite 同 id、同版本的并发新建必须冲突，不能仅比较版�
 			() => second.createSession({ commandId: "second", id: "same", projectId: "project" }),
 			(error) => error instanceof ArtifactError && error.code === "execution_state_conflict",
 		);
-		assert.deepEqual(
-			store.loadExecutionState().commandReceipts.map((receipt) => receipt.commandId),
-			["first"],
-		);
+		assert.ok(store.readCommandReceipt("first"));
+		assert.equal(store.readCommandReceipt("second"), undefined);
 		assert.equal(second.exportSnapshot().sessions.length, 0);
 	});
 });
 
-test("SQLite command id 跨连接冲突时不能写入新实体或覆盖原回执", async () => {
+test("SQLite command id 跨连接冲突时不能写入新实体或覆盖原回执", async (t) => {
 	await fixture((store, _databasePath, reopen) => {
 		const first = execution(store);
-		const second = execution(reopen());
+		const secondStore = reopen();
+		const second = execution(secondStore);
 		first.createSession({ commandId: "same-command", id: "first", projectId: "project" });
+		// 回执按 id 点查，执行前就看得到另一个连接刚写的那条
 		assert.throws(
 			() => second.createSession({ commandId: "same-command", id: "second", projectId: "project" }),
+			(error) => (error as { code?: string }).code === "duplicate_command_conflict",
+		);
+		// 查的时候还没有、提交前另一个连接写进去了：落库那一步照样拦下
+		t.mock.method(secondStore, "readCommandReceipt", () => undefined);
+		assert.throws(
+			() => execution(secondStore).createSession({ commandId: "same-command", id: "third", projectId: "project" }),
 			(error) => error instanceof ArtifactError && error.code === "duplicate_command_conflict",
 		);
 		assert.deepEqual(
-			store.loadExecutionState().sessions.map((session) => session.id),
+			store.loadExecutionEntities().sessions.map((session) => session.id),
 			["first"],
 		);
 	});
@@ -157,12 +163,8 @@ test("SQLite 回执写入失败回滚同事务的 Task，重新加载后可以�
 				() => state.addTask({ commandId: "task", id: "task", sessionId: "session-a", kind: "main", key: "a" }),
 				/injected write failure/u,
 			);
-			const persisted = store.loadExecutionState();
-			assert.equal(persisted.tasks.length, 0);
-			assert.equal(
-				persisted.commandReceipts.some((receipt) => receipt.commandId === "task"),
-				false,
-			);
+			assert.equal(store.loadExecutionEntities().tasks.length, 0);
+			assert.equal(store.readCommandReceipt("task"), undefined);
 			injector.exec("DROP TRIGGER fail_receipt");
 			const restored = execution(reopen());
 			assert.equal(
@@ -178,8 +180,7 @@ test("SQLite 回执写入失败回滚同事务的 Task，重新加载后可以�
 test("SQLite 已提交但确认返回丢失时，旧实例停下，重开从原回执恢复", async () => {
 	await fixture((store, _databasePath, reopen) => {
 		createSession(execution(store), "a");
-		const state = new InMemoryExecutionState({
-			snapshot: store.loadExecutionState(),
+		const state = store.createExecutionState({
 			now,
 			commit: (delta) => {
 				store.applyExecutionDelta(delta);
@@ -192,6 +193,35 @@ test("SQLite 已提交但确认返回丢失时，旧实例停下，重开从原�
 		const version = restored.session("session-a").version;
 		assert.equal(restored.startTurn({ commandId: "start", sessionId: "session-a", lease }).status, "running");
 		assert.equal(restored.session("session-a").version, version);
+	});
+});
+
+test("构造执行状态不把命令回执整份读进来：回执只按 id 点查，重放仍拿回原结果、换了输入仍是冲突", async (t) => {
+	// 回执每条命令一条、从不清理，2026-10-07 三国作品上 9,108 条：原来每次构造执行状态都整份读进内存（约 160 ms），
+	// 作者发一句话要构造四次。
+	await fixture((store, _databasePath, reopen) => {
+		const state = execution(store);
+		createSession(state, "a");
+		state.startTurn({ commandId: "start", sessionId: "session-a", lease });
+		const prepare = DatabaseSync.prototype.prepare;
+		const reads: string[] = [];
+		t.mock.method(DatabaseSync.prototype, "prepare", function (this: DatabaseSync, statement: string) {
+			if (/^\s*SELECT\b/iu.test(statement) && statement.includes("execution_command_receipts"))
+				reads.push(statement);
+			return prepare.call(this, statement);
+		});
+		const restored = execution(reopen());
+		assert.deepEqual(reads, [], "构造时不读回执");
+		const version = restored.session("session-a").version;
+		assert.equal(restored.startTurn({ commandId: "start", sessionId: "session-a", lease }).status, "running");
+		assert.equal(restored.session("session-a").version, version, "重放不再执行一次");
+		assert.throws(
+			() =>
+				restored.startTurn({ commandId: "start", sessionId: "session-a", lease: { ...lease, ownerId: "owner-2" } }),
+			(error) => error instanceof Error && (error as { code?: string }).code === "duplicate_command_conflict",
+		);
+		assert.ok(reads.length > 0);
+		for (const statement of reads) assert.match(statement, /WHERE command_id = \?/u);
 	});
 });
 
@@ -213,7 +243,7 @@ test("SQLite 删除 session 时把子任务、inbox 与事件一起删", async (
 		]);
 		state.endTurn({ commandId: "end", sessionId: "session-a" });
 		state.deleteSession("delete", "session-a");
-		const persisted = store.loadExecutionState();
+		const persisted = store.loadExecutionEntities();
 		assert.deepEqual(persisted.sessions, []);
 		assert.deepEqual(persisted.tasks, []);
 		assert.deepEqual(store.readInbox("session-a"), []);

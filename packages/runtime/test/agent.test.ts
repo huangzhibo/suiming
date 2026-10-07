@@ -360,7 +360,7 @@ test("说完就停；同一 session 的下一句接着消息列表，新 session
 		]);
 		const separate = await f.say("我们聊聊叙事节奏");
 		assert.notEqual(separate.sessionId, first.sessionId);
-		assert.equal(f.project.loadExecutionState().sessions.length, 2);
+		assert.equal(f.project.loadExecutionEntities().sessions.length, 2);
 	} finally {
 		await f.close();
 	}
@@ -634,7 +634,7 @@ test("没单独配置的子任务角色跟随这次对话选的模型；单独�
 		const outcome = await f.say("写第一节，再审一遍设计", session.id);
 		assert.equal(outcome.failure, undefined);
 		const providerOf = new Map(
-			f.project.loadExecutionState().tasks.map((task) => [task.model?.modelProfileId, task.model?.provider]),
+			f.project.loadExecutionEntities().tasks.map((task) => [task.model?.modelProfileId, task.model?.provider]),
 		);
 		assert.deepEqual(Object.fromEntries(providerOf), {
 			writer: chosen.provider,
@@ -683,7 +683,7 @@ test("子任务的开场输入就过了压缩线：一次请求都不发，作�
 		assert.match(rejection, /拆小/u);
 		assert.equal(f.provider.state.callCount, 2, "子任务一次请求都没发");
 		assert.deepEqual(
-			f.project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
+			f.project.loadExecutionEntities().tasks.map((task) => [task.kind, task.status]),
 			[["reviewer", "failed"]],
 		);
 	} finally {
@@ -727,7 +727,7 @@ test("子任务按 AG-UI 的 subagent 发事件：开始、完成、挂起与续
 				...records.slice(at).map((record) => record.event),
 			]);
 
-		assert.equal(f.project.loadExecutionState().tasks.length, 2, "两个子任务，第二个续跑而不是重派");
+		assert.equal(f.project.loadExecutionEntities().tasks.length, 2, "两个子任务，第二个续跑而不是重派");
 		const [first, second] = [
 			...new Set(
 				events.flatMap((event) => (event.type === EventType.SUBAGENT_STARTED ? [event.subagentRunId] : [])),
@@ -783,7 +783,7 @@ test("用量检查点与模型价格无关、根与子任务合计；落在子�
 		assert.equal(stopped.failure?.code, "turn_usage_checkpoint");
 		assert.doesNotMatch(stopped.failure?.message ?? "", /\$/u, "目录价为 0 就不报花费");
 		assert.equal(f.provider.state.callCount, 2);
-		const [task] = f.project.loadExecutionState().tasks;
+		const [task] = f.project.loadExecutionEntities().tasks;
 		assert.equal(task?.status, "interrupted", "不是子任务失败：父模型收到失败会重派一个，从头再花一遍");
 		f.provider.setResponses([
 			async (context) => {
@@ -803,7 +803,7 @@ test("用量检查点与模型价格无关、根与子任务合计；落在子�
 		]);
 		const next = await f.say("继续", stopped.sessionId);
 		assert.equal(next.failure, undefined);
-		const tasks = f.project.loadExecutionState().tasks;
+		const tasks = f.project.loadExecutionEntities().tasks;
 		assert.equal(tasks.length, 1, "续跑的是同一个子任务，不是重派一个");
 		assert.equal(tasks[0]?.status, "completed");
 		assert.equal(f.provider.state.callCount, 5);
@@ -873,7 +873,7 @@ test("Agent 直接修改与阶段提交，不强制 Review 或子任务；不属
 		]);
 		const outcome = await f.say("强化后果，顺便写个统计脚本");
 		assert.equal(outcome.failure, undefined);
-		assert.equal(f.project.loadExecutionState().tasks.length, 0);
+		assert.equal(f.project.loadExecutionEntities().tasks.length, 0);
 		assert.equal((await f.project.history()).length, 2);
 		const files = await f.project.exportRevision();
 		assert.equal(
@@ -926,7 +926,7 @@ test("Agent 按模型决定调用独立 Review，结论随工具结果直接回�
 		]);
 		const outcome = await f.say("改好后独立审查");
 		assert.equal(outcome.failure, undefined);
-		const tasks = f.project.loadExecutionState().tasks;
+		const tasks = f.project.loadExecutionEntities().tasks;
 		assert.deepEqual(
 			tasks.map((task) => [task.kind, task.status]),
 			[["reviewer", "completed"]],
@@ -975,7 +975,7 @@ test("Reviewer 交的引文在被审文件里找不到：拒绝回到 Reviewer �
 		const outcome = await f.say("独立审一下人物档");
 		assert.equal(outcome.failure, undefined);
 		assert.deepEqual(
-			f.project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
+			f.project.loadExecutionEntities().tasks.map((task) => [task.kind, task.status]),
 			[["reviewer", "completed"]],
 		);
 		const reviews = (await readdir(join(f.root, "review"))).filter((name) => name.startsWith("design-"));
@@ -1017,7 +1017,7 @@ test("子任务带一句给作者看的标题：委派时给的 title，没给�
 		]);
 		const outcome = await f.say("分头看一下");
 		assert.equal(outcome.failure, undefined);
-		const execution = f.project.loadExecutionState();
+		const execution = f.project.loadExecutionEntities();
 		assert.deepEqual(
 			taskSummaries(execution, outcome.session.id).map((task) => [task.kind, task.title]),
 			[
@@ -1050,7 +1050,7 @@ test("委派的子任务没交付：失败回到父模型手里作为工具错�
 		assert.equal(outcome.failure, undefined);
 		assert.equal(outcome.session.status, "idle");
 		assert.equal(f.provider.state.callCount, 5);
-		const tasks = f.project.loadExecutionState().tasks;
+		const tasks = f.project.loadExecutionEntities().tasks;
 		assert.equal(tasks.length, 1);
 		assert.equal(tasks[0]?.kind, "main");
 		assert.equal(tasks[0]?.status, "failed");
@@ -1135,7 +1135,7 @@ test("执行命令只写自己改动的行：一个 turn 里整份导出与整�
 	// 每条命令都整份克隆、整份重读时，成本随项目历史平方增长：100 轮后单轮簿记从 0.1 秒涨到 0.6 秒
 	// （docs/validation/2026-10-01-harness-review F1）。计次数而不计时：与机器负载无关。
 	const exported = t.mock.method(InMemoryExecutionState.prototype, "exportSnapshot");
-	const loaded = t.mock.method(SqliteLocalStore.prototype, "loadExecutionState");
+	const loaded = t.mock.method(SqliteLocalStore.prototype, "loadExecutionEntities");
 	const run = async (rounds: number) => {
 		const f = await fixture();
 		try {
@@ -1269,7 +1269,7 @@ test("作者停下正在跑的子任务再说一句：根 Agent 先看到子任�
 		assert.equal(next.value?.reply, "好，改写阚泽");
 		assert.equal(f.provider.state.callCount, 3, "被停下的子任务没有按旧目标接着跑");
 		assert.deepEqual(
-			f.project.loadExecutionState().tasks.map((task) => task.status),
+			f.project.loadExecutionEntities().tasks.map((task) => task.status),
 			["interrupted"],
 		);
 	} finally {
@@ -1348,7 +1348,7 @@ test("应用退出打断的子任务与作者停下走同一条路：下一句�
 		assert.equal(stopped.failure, undefined);
 		const next = await f.say("继续", id);
 		assert.equal(next.value?.reply, "子任务交付了");
-		const tasks = f.project.loadExecutionState().tasks;
+		const tasks = f.project.loadExecutionEntities().tasks;
 		assert.equal(tasks.length, 1, "续跑的是同一个子任务");
 		assert.equal(tasks[0]?.status, "completed");
 	} finally {
@@ -1374,7 +1374,7 @@ test("进程重启：持有进程已死的 running session 收敛回 idle 记 pr
 			apply(delta);
 		});
 		await assert.rejects(f.say("讨论作品", id), /process exited/);
-		const stale = f.project.loadExecutionState().sessions.find((item) => item.id === id);
+		const stale = f.project.loadExecutionEntities().sessions.find((item) => item.id === id);
 		assert.equal(stale?.status, "running");
 		assert.ok(stale?.lease);
 		// 另一个进程打开作品：持有者已经不在，才收敛。
@@ -1395,7 +1395,7 @@ test("进程重启：持有进程已死的 running session 收敛回 idle 记 pr
 		const next = await f.say("接着说", id);
 		assert.equal(next.session.turn, 2);
 		assert.equal(next.session.lastFailure, undefined);
-		assert.equal(f.project.loadExecutionState().sessions.length, 1);
+		assert.equal(f.project.loadExecutionEntities().sessions.length, 1);
 	} finally {
 		await f.close();
 	}
@@ -1630,7 +1630,7 @@ test("turn 开始时读取作品失败：回 idle 记一句并释放 lease，下
 		]);
 		const next = await f.say(undefined, failed.sessionId);
 		assert.equal(next.value?.reply, "恢复后回答");
-		assert.equal(f.project.loadExecutionState().sessions.length, 1);
+		assert.equal(f.project.loadExecutionEntities().sessions.length, 1);
 	} finally {
 		await f.close();
 	}

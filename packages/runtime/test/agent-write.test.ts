@@ -37,7 +37,7 @@ test("Agent 自己写正文并提交，不需要隔离 Writer；正文时效从�
 		);
 		assert.equal(outcome.failure, undefined);
 		assert.equal(await readFile(join(checkoutPath, "text/beat-0001.md"), "utf8"), beatOneText);
-		assert.deepEqual(project.loadExecutionState().tasks, []);
+		assert.deepEqual(project.loadExecutionEntities().tasks, []);
 		const reader = project.historyReader();
 		const head = project.project().headRevisionId;
 		assert.deepEqual(
@@ -89,7 +89,7 @@ test("委派的 writer 只能改自己的 Beat；越界写是回到它手里的�
 		assert.ok(compileWriteContext(candidate, "beat-0002").text.includes(beatOneText));
 		assert.equal(await readFile(join(checkoutPath, "text/beat-0002.md"), "utf8"), beatTwoText);
 		assert.deepEqual(
-			project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
+			project.loadExecutionEntities().tasks.map((task) => [task.kind, task.status]),
 			[
 				["writer", "completed"],
 				["writer", "completed"],

@@ -26,6 +26,11 @@ export interface InMemoryExecutionStateOptions {
 	 * 只交改动的那几行：整份快照的成本随项目历史增长。
 	 */
 	commit?: (delta: ExecutionStateDelta) => void;
+	/**
+	 * 按 id 查已持久的回执。给了它，快照就不必带回执：回执每条命令一条、从不清理，整份读进来的成本随项目历史增长，
+	 * 而重放只需要查自己那一条。
+	 */
+	receipt?: (commandId: string) => ExecutionCommandReceipt | undefined;
 }
 
 export interface CreateSessionInput {
@@ -145,6 +150,7 @@ export class InMemoryExecutionState {
 	readonly #receipts = new Map<string, ExecutionCommandReceipt>();
 	readonly #now: () => Date;
 	readonly #commit: InMemoryExecutionStateOptions["commit"];
+	readonly #receipt: InMemoryExecutionStateOptions["receipt"];
 	#ownerFence: ExecutionStateSnapshot["ownerFence"];
 	#undo: Map<string, ChangedEntity | null> | undefined;
 	#persistenceFailure: { error: unknown } | undefined;
@@ -153,6 +159,7 @@ export class InMemoryExecutionState {
 	constructor(options: InMemoryExecutionStateOptions = {}) {
 		this.#now = options.now ?? (() => new Date());
 		this.#commit = options.commit;
+		this.#receipt = options.receipt;
 		if (options.snapshot !== undefined) this.#restore(options.snapshot);
 		this.#baseline = this.#currentVersions();
 	}
@@ -502,7 +509,7 @@ export class InMemoryExecutionState {
 		}
 		const commandId = nonempty(commandIdValue, "commandId");
 		const fingerprint = commandFingerprint(payload);
-		const existing = this.#receipts.get(commandId);
+		const existing = this.#receipts.get(commandId) ?? this.#receipt?.(commandId);
 		if (existing !== undefined) {
 			if (existing.fingerprint !== fingerprint) {
 				throw new ExecutionStateError(

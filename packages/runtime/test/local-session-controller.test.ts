@@ -85,7 +85,7 @@ test("waitForIdle 有界：请求收不了口时按时返回，不把调用方�
 		// 无界版本在这里永远不返回。有界版本按时交回控制权，并如实说没收口。
 		assert.equal(await controller.waitForIdle({ timeoutMs: 50 }), "timeout");
 		assert.deepEqual(controller.activeSessionIds(), [sent.sessionId]);
-		assert.equal(project.loadExecutionState().sessions[0]?.status, "running");
+		assert.equal(project.loadExecutionEntities().sessions[0]?.status, "running");
 	} finally {
 		project?.close();
 		await rm(checkoutPath, { recursive: true, force: true });
@@ -126,7 +126,7 @@ test("一句话开一个 turn；同一作品同时只跑一个；interrupt 回 i
 		assert.equal(interrupted.status, "running");
 		await controller.completion(sent.sessionId);
 
-		const snapshot = project.loadExecutionState();
+		const snapshot = project.loadExecutionEntities();
 		assert.equal(snapshot.sessions[0]?.status, "idle");
 		assert.equal(snapshot.sessions[0]?.lastFailure, undefined, "作者的停止不是故障");
 		assert.equal(snapshot.sessions[0]?.lease, undefined);

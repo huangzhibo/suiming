@@ -95,7 +95,7 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 		assert.ok(result.ranking.some((item) => item.flaws.includes("旁白替人物作证")));
 		assert.equal(result.roundResultObjectIds.length, 2);
 
-		const snapshot = project.loadExecutionState();
+		const snapshot = project.loadExecutionEntities();
 		const session = snapshot.sessions.find((item) => item.id === result.session.id);
 		assert.equal(session?.kind, "rank");
 		assert.equal(session?.status, "idle");
@@ -242,7 +242,7 @@ test("读者口径的评委：不带宪法与写作准则、不看 Design，只�
 				new TextDecoder().decode(
 					(
 						await project.readExecutionObject(
-							project.loadExecutionState().sessions.find((item) => item.id === result.session.id)?.result
+							project.loadExecutionEntities().sessions.find((item) => item.id === result.session.id)?.result
 								?.id as string,
 						)
 					).bytes,

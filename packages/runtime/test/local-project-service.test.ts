@@ -456,7 +456,7 @@ test("open 只收敛持有进程已死的 running session：回 idle 记 process
 		store.close();
 
 		service = await LocalProjectService.open(fixture.checkoutPath);
-		const recovered = service.loadExecutionState();
+		const recovered = service.loadExecutionEntities();
 		const dead = recovered.sessions.find((session) => session.id === "session-1");
 		assert.equal(dead?.status, "idle");
 		assert.equal(dead?.lease, undefined);

@@ -357,30 +357,32 @@ export class SqliteLocalStore {
 		}
 	}
 
-	loadExecutionState(): ExecutionStateSnapshot {
-		return this.#transaction(() => {
-			const commandReceipts = (
-				this.#database
-					.prepare(
-						"SELECT command_id, fingerprint, result_json FROM execution_command_receipts ORDER BY command_id",
-					)
-					.all() as { command_id: string; fingerprint: string; result_json: string }[]
-			).map(
-				(row): ExecutionCommandReceipt => ({
-					commandId: row.command_id,
+	/**
+	 * 执行命令用的执行状态：session 与 task 读进来，回执不读，重放时按 id 点查（`readCommandReceipt`）。
+	 * 回执每条命令一条、从不清理，2026-10-07 三国作品上 9,108 条、9 MB：整份读进来每次约 160 ms，作者发一句话要四次。
+	 */
+	createExecutionState(
+		options: { now?: () => Date; commit?: (delta: ExecutionStateDelta) => void } = {},
+	): InMemoryExecutionState {
+		return new InMemoryExecutionState({
+			...(options.now === undefined ? {} : { now: options.now }),
+			snapshot: { schemaVersion: 2, ...this.loadExecutionEntities(), commandReceipts: [] },
+			commit: options.commit ?? ((delta) => this.applyExecutionDelta(delta)),
+			receipt: (commandId) => this.readCommandReceipt(commandId),
+		});
+	}
+
+	readCommandReceipt(commandId: string): ExecutionCommandReceipt | undefined {
+		const row = this.#database
+			.prepare("SELECT fingerprint, result_json FROM execution_command_receipts WHERE command_id = ?")
+			.get(commandId) as { fingerprint: string; result_json: string } | undefined;
+		return row === undefined
+			? undefined
+			: {
+					commandId,
 					fingerprint: row.fingerprint,
 					result: json<unknown>(row.result_json, "execution_command_receipts"),
-				}),
-			);
-			const snapshot: ExecutionStateSnapshot = {
-				schemaVersion: 2,
-				sessions: this.#records<SessionRecord>("sessions"),
-				tasks: this.#records<TaskRecord>("tasks"),
-				commandReceipts,
-			};
-			new InMemoryExecutionState({ snapshot });
-			return snapshot;
-		}, "read");
+				};
 	}
 
 	setRemoteBinding(binding: Omit<LocalRemoteBinding, "updatedAt">): LocalRemoteBinding {

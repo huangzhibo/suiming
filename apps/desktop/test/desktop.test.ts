@@ -447,7 +447,7 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 
 		const reopened = await LocalProjectService.open(root);
 		try {
-			const state = reopened.loadExecutionState();
+			const state = reopened.loadExecutionEntities();
 			assert.equal(state.sessions.length, 1, "追问接着同一个 session");
 			assert.equal(state.sessions[0]?.turn, 2);
 			assert.equal(state.tasks.filter((task) => task.kind === "reviewer").length, 1);
@@ -522,7 +522,7 @@ test("主进程 SIGKILL 后重开：没收到回复的请求作废，再发一�
 		assert.equal(usage.calls - (usage.confirmedCalls ?? usage.calls), 1, "被杀时在途的那次可能已计费，照记");
 		const opened = await LocalProjectService.open(root);
 		try {
-			const state = opened.loadExecutionState();
+			const state = opened.loadExecutionEntities();
 			assert.equal(state.sessions.length, 1);
 			assert.equal(state.sessions[0]?.status, "idle");
 			assert.ok((state.sessions[0]?.usage?.calls ?? 0) >= 2);

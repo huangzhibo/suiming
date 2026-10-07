@@ -114,7 +114,7 @@ test("Source 阅读顺序由 Agent 决定；笔记是普通文件，覆盖率从
 	await withProject(async (project, checkoutPath) => {
 		const read = await say(new SuimingHarness({ project, models: gateway(reading()) }), "读一遍访谈材料并记笔记");
 		assert.equal(read.failure, undefined);
-		assert.deepEqual(project.loadExecutionState().tasks, [], "Agent 自己读，不必委派");
+		assert.deepEqual(project.loadExecutionEntities().tasks, [], "Agent 自己读，不必委派");
 		const coverage = sourceCoverage(await project.checkoutCandidate(), "访谈");
 		assert.deepEqual(coverage.gaps, []);
 		assert.deepEqual(
@@ -148,7 +148,7 @@ test("Source 阅读顺序由 Agent 决定；笔记是普通文件，覆盖率从
 		);
 		assert.equal(reviewed.failure, undefined);
 		assert.deepEqual(
-			project.loadExecutionState().tasks.map((task) => [task.kind, task.status]),
+			project.loadExecutionEntities().tasks.map((task) => [task.kind, task.status]),
 			[["reviewer", "completed"]],
 		);
 		const reviews = reviewsIn(await project.checkoutCandidate());
@@ -614,7 +614,7 @@ test("一次回复里委派的多个 source-reader 同时跑，各写各的笔�
 			"分两段读访谈",
 		);
 		assert.equal(outcome.failure, undefined);
-		const tasks = project.loadExecutionState().tasks;
+		const tasks = project.loadExecutionEntities().tasks;
 		assert.equal(tasks.length, 2);
 		assert.deepEqual(
 			tasks.map((task) => task.status),
@@ -699,14 +699,14 @@ test("被打断的两个 source-reader：根 Agent 一次回复里用 resume_tas
 		const stopped = await harness.turn(session.id, { signal: controller.signal }, (handle) => agentTurn(handle));
 		assert.equal(stopped.failure, undefined);
 		assert.deepEqual(
-			project.loadExecutionState().tasks.map((task) => task.status),
+			project.loadExecutionEntities().tasks.map((task) => task.status),
 			["interrupted", "interrupted"],
 		);
 		project.queueInbox(session.id, "继续");
 		const next = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
 		assert.equal(next.failure, undefined);
 		assert.equal(next.value?.reply, "两段都读完了");
-		const tasks = project.loadExecutionState().tasks;
+		const tasks = project.loadExecutionEntities().tasks;
 		assert.equal(tasks.length, 2, "续的是原来的两个，没有新建");
 		assert.deepEqual(
 			tasks.map((task) => task.status),
@@ -737,7 +737,7 @@ async function interruptedReader(project: LocalProjectService) {
 		(await harness.turn(session.id, { signal: controller.signal }, (handle) => agentTurn(handle))).failure,
 		undefined,
 	);
-	const [task] = project.loadExecutionState().tasks;
+	const [task] = project.loadExecutionEntities().tasks;
 	assert.equal(task?.status, "interrupted");
 	return { session, taskId: task.id };
 }
@@ -766,7 +766,7 @@ test("同一次回复里对同一个子任务调两次 resume_task：只续一�
 		const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
 		assert.equal(outcome.failure, undefined);
 		assert.deepEqual(
-			project.loadExecutionState().tasks.map((task) => task.status),
+			project.loadExecutionEntities().tasks.map((task) => task.status),
 			["completed"],
 		);
 		assert.equal(results.length, 2);
@@ -800,7 +800,7 @@ test("子任务当初用的模型现在用不了：resume_task 是回到根 Agen
 		assert.match(rejection, /reader-model/u);
 		assert.match(rejection, /重新委派/u);
 		assert.deepEqual(
-			project.loadExecutionState().tasks.map((task) => task.status),
+			project.loadExecutionEntities().tasks.map((task) => task.status),
 			["interrupted"],
 		);
 	});
@@ -1021,7 +1021,7 @@ test("分段抽取时还没有 index，impact 查这份 Source 是回到子任�
 		assert.match(results[1] ?? "", /search/u, "告诉它现在怎么查");
 		assert.match(results[2] ?? "", /beat-0101\.md/u, "search 不依赖 index，照常命中");
 		assert.deepEqual(
-			project.loadExecutionState().tasks.map((task) => task.status),
+			project.loadExecutionEntities().tasks.map((task) => task.status),
 			["completed"],
 		);
 	});
@@ -1141,7 +1141,7 @@ test("带号段的 source-extractor 同一次回复里并行；不带范围的�
 		assert.match(steps, /segments 的每一段各委派一个/u);
 		assert.match(steps, /不要让前一段给后一段交代状态/u);
 		const tasks = project
-			.loadExecutionState()
+			.loadExecutionEntities()
 			.tasks.filter((task) => task.status === "completed")
 			.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 		assert.equal(tasks.length, 3);
@@ -1228,7 +1228,7 @@ test("笔记没覆盖全文时 Source Review 是回到 Agent 手里的工具错�
 		);
 		assert.equal(rejected, 1);
 		assert.equal(outcome.failure, undefined);
-		assert.equal(project.loadExecutionState().sessions.length, 1);
+		assert.equal(project.loadExecutionEntities().sessions.length, 1);
 		const committed = await project.checkoutCandidate();
 		assert.deepEqual(sourceCoverage(committed, "访谈").gaps, []);
 		assert.equal(reviewsIn(committed).length, 1);

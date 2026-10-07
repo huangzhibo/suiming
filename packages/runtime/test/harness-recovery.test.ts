@@ -330,7 +330,7 @@ test("子任务完成后父 checkpoint 确认丢失：父 Agent 看到子任务�
 		const apply = project.applyExecutionDelta.bind(project);
 		let crash = true;
 		t.mock.method(project, "applyExecutionDelta", (delta: ExecutionStateDelta) => {
-			const state = project.loadExecutionState();
+			const state = project.loadExecutionEntities();
 			const child = state.tasks.find((task) => task.parent !== undefined);
 			const record = changedSession(delta, session.id);
 			const persisted = state.sessions.find((item) => item.id === session.id);
@@ -348,7 +348,7 @@ test("子任务完成后父 checkpoint 确认丢失：父 Agent 看到子任务�
 			harness.turn(session.id, {}, (handle: HarnessSession) => agentTurn(handle)),
 			/lost parent checkpoint/u,
 		);
-		let state = project.loadExecutionState();
+		let state = project.loadExecutionEntities();
 		const childId = state.tasks.find((task) => task.parent !== undefined)?.id;
 		assert.ok(childId);
 		assert.equal(state.tasks.find((task) => task.id === childId)?.status, "completed");
@@ -358,7 +358,7 @@ test("子任务完成后父 checkpoint 确认丢失：父 Agent 看到子任务�
 		const outcome = await harness.turn(session.id, {}, (handle: HarnessSession) => agentTurn(handle));
 		assert.equal(outcome.failure, undefined);
 		assert.equal(outcome.value?.reply, "已采用报告");
-		state = project.loadExecutionState();
+		state = project.loadExecutionEntities();
 		assert.equal(state.tasks.length, 1);
 		assert.equal(state.tasks[0]?.id, childId);
 		assert.equal(state.sessions[0]?.status, "idle");
@@ -411,7 +411,7 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 		let crash = true;
 		t.mock.method(project, "applyExecutionDelta", (delta: ExecutionStateDelta) => {
 			const record = changedSession(delta, session.id);
-			const persisted = project.loadExecutionState().sessions.find((item) => item.id === session.id);
+			const persisted = project.loadExecutionEntities().sessions.find((item) => item.id === session.id);
 			if (
 				crash &&
 				project.project().headRevisionId !== original &&
@@ -432,7 +432,7 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 		const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
 		assert.equal(outcome.failure, undefined);
 		assert.equal((await project.history()).length, 3, "只有两次有意提交");
-		const state = project.loadExecutionState();
+		const state = project.loadExecutionEntities();
 		assert.equal(state.tasks.length, 0);
 		assert.equal(state.sessions[0]?.baseRevisionId, project.project().headRevisionId);
 		assert.equal(state.sessions[0]?.status, "idle");
@@ -483,7 +483,7 @@ for (const [edit, content] of [
 			let crash = true;
 			t.mock.method(project, "applyExecutionDelta", (delta: ExecutionStateDelta) => {
 				const record = changedSession(delta, session.id);
-				const persisted = project.loadExecutionState().sessions.find((item) => item.id === session.id);
+				const persisted = project.loadExecutionEntities().sessions.find((item) => item.id === session.id);
 				if (
 					crash &&
 					project.project().headRevisionId !== original &&

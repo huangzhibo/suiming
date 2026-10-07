@@ -227,11 +227,7 @@ test("SQLite execution state 可跨进程恢复，并保留 command idempotency 
 		store.close();
 
 		store = openStore(fixture);
-		const restored = new InMemoryExecutionState({
-			now: () => new Date("2026-09-03T04:00:00.000Z"),
-			snapshot: store.loadExecutionState(),
-			commit: (delta) => store.applyExecutionDelta(delta),
-		});
+		const restored = store.createExecutionState({ now: () => new Date("2026-09-03T04:00:00.000Z") });
 		assert.deepEqual(restored.session("session-1").checkpointRef, { kind: "object", id: "checkpoint-object" });
 		const recovery = restored.recoverUnfinished("recover-after-restart");
 		assert.deepEqual(recovery, { recoveredSessionIds: ["session-1"] });
@@ -239,7 +235,7 @@ test("SQLite execution state 可跨进程恢复，并保留 command idempotency 
 		store.close();
 
 		store = openStore(fixture);
-		const twiceRestored = new InMemoryExecutionState({ snapshot: store.loadExecutionState() });
+		const twiceRestored = store.createExecutionState();
 		assert.equal(twiceRestored.session("session-1").status, "idle");
 		assert.equal(twiceRestored.session("session-1").lastFailure?.code, "process_restart");
 		assert.equal(twiceRestored.session("session-1").inboxSequence, 1);

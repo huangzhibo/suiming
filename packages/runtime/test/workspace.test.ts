@@ -178,7 +178,7 @@ test("状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先
 			"CREATE TRIGGER fail_terminal BEFORE INSERT ON session_events WHEN json_extract(NEW.event_json, '$.event.type') = 'RUN_FINISHED' BEGIN SELECT RAISE(ABORT, 'event storage failed'); END",
 		);
 		assert.throws(() => execution.endTurn({ commandId: "end", sessionId: "s" }), /event storage failed/);
-		assert.equal(project.loadExecutionState().sessions[0]?.status, "running");
+		assert.equal(project.loadExecutionEntities().sessions[0]?.status, "running");
 		assert.equal(
 			project.readSessionEvents("s").some((record) => record.event.type === "RUN_FINISHED"),
 			false,
@@ -186,7 +186,7 @@ test("状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先
 		database.exec("DROP TRIGGER fail_terminal");
 		database.close();
 		project.createExecutionState().endTurn({ commandId: "end", sessionId: "s" });
-		assert.equal(project.loadExecutionState().sessions[0]?.status, "idle");
+		assert.equal(project.loadExecutionEntities().sessions[0]?.status, "idle");
 		const workspace = new LocalWorkspace(project, async () => {
 			throw new Error("attach 不应启动模型");
 		});
@@ -256,8 +256,8 @@ test("idle 的 session：interrupt 原样返回；delete 带走子任务与执�
 			["interrupted"],
 		);
 		await workspace.invoke("session.delete", { sessionId: "s" });
-		assert.deepEqual(project.loadExecutionState().sessions, []);
-		assert.deepEqual(project.loadExecutionState().tasks, []);
+		assert.deepEqual(project.loadExecutionEntities().sessions, []);
+		assert.deepEqual(project.loadExecutionEntities().tasks, []);
 		await assert.rejects(workspace.invoke("session.tasks", { sessionId: "s" }), { code: "session_not_found" });
 	}));
 
@@ -519,7 +519,7 @@ test("send 前预检模型与凭据：缺凭据的 profile 在建 session 前按
 				return true;
 			},
 		);
-		assert.equal(project.loadExecutionState().sessions.length, 0);
+		assert.equal(project.loadExecutionEntities().sessions.length, 0);
 		assert.equal(workspace.activeSessionIds().length, 0);
 	}));
 
