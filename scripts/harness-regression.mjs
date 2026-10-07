@@ -88,6 +88,17 @@ const untested = (name) => ({ name, pass: true, untested: true });
  */
 const namesUnpaidContract = (reply) => /诈降/u.test(reply) && /兑现|resolve|期限|到期|deadline/iu.test(reply);
 /**
+ * 另一条对的路：把出题时删掉的那一行补回去——beat-0002 重新 `resolve` 诈降（样例本来就由火烧赤壁兑现它），
+ * 回复里说了改的是第二节。2026-10-07 delegate-writer-issues 四次都这么做，三次说「兑现标记」、一次说
+ * 「收束标记」，后者只因用词被 namesUnpaidContract 判错。看文件内容，不放宽用词。
+ */
+const restoredPayoff = (r) =>
+	/resolve:[^\n]*诈降|resolve:\s*\n(?:\s+-[^\n]*\n)*?\s+-\s*诈降/u.test(
+		r.changedFiles["outline/story/vol-0001/beat-0002.md"] ?? "",
+	) &&
+	/诈降/u.test(r.reply) &&
+	/第二节|beat-0002/u.test(r.reply);
+/**
  * 根 Agent 委派了写 beat-0001 的 writer，且写手子任务完成：原来只看「有子任务完成」，任何子任务都满足。
  * 子任务的 kind 就是角色（2026-10-05 之前是 subagent / review / rank.round）。
  */
@@ -214,7 +225,7 @@ const TASKS = [
 			expect("提交了版本", r.summary.revisions > 0),
 			expect("正文过检查", r.textCheck?.data?.passed === true),
 			expect("没有遗留未提交", r.summary.uncommitted === 0),
-			expect("回复点名诈降还没兑现", namesUnpaidContract(r.reply)),
+			expect("回复点名诈降还没兑现，或补回了兑现并说明", namesUnpaidContract(r.reply) || restoredPayoff(r)),
 		],
 	},
 	{

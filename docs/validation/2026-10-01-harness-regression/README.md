@@ -291,3 +291,16 @@ Write Context 补上 world/core 与只在硬状态变化里出现的参与者（
 | `2a8e3ab`（dist `e13e32e96638ad61`） | writer 组 3 个 | 3 / 3，$0.26；review 84 s、write-text 181 s、delegate-writer-issues 209 s |
 
 写正文与委派写手比基线（326–398 s、336–384 s）快，与「委派前不必先取写作依据」的改动方向一致；只各跑 1 次，记作观察，不当结论。作者停下子任务的新路径与委派超窗的拦截在回归里触发不到，由 `agent.test.ts` 的 faux 测试守着。
+
+## pi-ai 1.0.4 与 Electron 44（2026-10-07）
+
+pi-ai 与 pi-telemetry 从 0.99.2 升到 1.0.4，同一天还有 Electron 44 与审查后的几处修正（续跑的三处缺陷、`HarnessTool.label` 等删除；提示词与工具说明没改）。模型调用层换了大版本，跑一遍全套。
+
+| 构建 | 范围 | 结果 |
+| --- | --- | --- |
+| `268fd87`（dist `92d1c173df6c53ee`） | 全套 6 个 | 5 / 6，$0.56；discuss 49 s、check-issues 59 s、design-edit 60 s、review 101 s、write-text 282 s、delegate-writer-issues 424 s ✖ |
+| `268fd87`（dist `032aeddea6a170ee`） | delegate-writer-issues × 3 | 3 / 3，$0.52；260–381 s |
+
+delegate-writer-issues 那一次只差「回复点名诈降还没兑现」。四次（全套一次加重跑三次）根 Agent 都没有只报告，而是把出题时从 beat-0002 删掉的 `resolve: [诈降]` 补了回去，回复里说了改的是第二节；三次说「兑现标记」，判分认得，一次说「收束标记」，判分只认「兑现 / resolve / 期限 / 到期」，判错了。这是 10-02 记过的「#2 顺手补了 `contracts.resolve` 并在回复里说明」，10-04 收紧判分后它只靠用词过关。判分改成两条路都算：回复点名没兑现，或 beat-0002 的文件里确实重新 `resolve` 了诈降、回复提到第二节（`restoredPayoff`，看文件内容，不放宽用词）。check-issues 要求不改作品，那条照旧只认回复。
+
+两次的 dist 指纹不同，源码相同：之间只改了 `packages/runtime/AGENTS.md`，脚本因此标了「有未提交修改」。ChatGPT 订阅的 OAuth 调用在 1.0.4 上照常，两次共 9 次运行都没有凭据或模型调用错误。
