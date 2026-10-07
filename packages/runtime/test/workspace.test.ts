@@ -317,6 +317,27 @@ test("session.action：点开对话里的动作，从跑它的 loop 的 checkpoi
 		);
 	}));
 
+test("session.action：模型给的参数不是对象（pi-ai 把 null、[] 原样解析出来），点开照样看得到原样的参数与拒绝原因", async () =>
+	fixture(async (project) => {
+		const { gateway } = fauxGateway([
+			fauxAssistantMessage(fauxToolCall("project_status", null as never)),
+			fauxAssistantMessage("好了"),
+		]);
+		const workspace = new LocalWorkspace(project, async () => gateway);
+		const { sessionId } = await workspace.invoke("session.send", { commandId: "send", text: "看看状态" });
+		await untilIdle(workspace);
+		const action = project
+			.readSessionEvents(sessionId)
+			.map((record) => record.event)
+			.find((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.action");
+		assert.ok(action?.type === "ACTIVITY_SNAPSHOT");
+		const detail = await workspace.invoke("session.action", { sessionId, actionId: action.messageId });
+		assert.equal(detail.tool, "project_status");
+		assert.deepEqual(detail.input, { arguments: null });
+		assert.equal(detail.isError, true);
+		assert.match(detail.output ?? "", /invalid_tool_arguments/u);
+	}));
+
 test("命令重发校验输入：并发 send 只有一个 controller，跑完后的重发返回原回执不再开 turn", async () =>
 	fixture(async (project) => {
 		const { provider, gateway } = fauxGateway([

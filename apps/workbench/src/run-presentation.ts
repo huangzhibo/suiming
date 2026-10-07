@@ -128,18 +128,45 @@ export function actionRuns<A extends { label: string; status: string }>(
 }
 
 /**
- * 子任务那一行已经代表了建它的那次委派或审稿，根 Agent 里那一行就不再单独列：点开子任务那一行，先看到的就是
- * 委派的内容与交回的结果。只收起对话里确实有子任务那一行的；子任务一个动作都没做就失败了（开场就放不下），
- * 委派那一行照常显示，否则这件事在对话里就看不见了。
+ * 子任务每一段的开头。一个子任务被打断、用 resume_task 续上，在对话里就是先后两段（中间隔着作者的话）：
+ * 第一段的开头是建它的委派或审稿（id 是 task.key），之后每一段的开头是续它的那次 resume_task（target 是 taskId）。
+ * 动作做完才交回，所以开头那个动作排在这一段的步骤之后：取这段最后一步之后第一个还没认领的；还在跑的那段没有。
+ * 认领了的动作放进子任务那一行，点开先看到委派的内容与交回的结果，根 Agent 里不再单列；没认领的照常列出——
+ * 一个动作都没做就失败的委派（开场就放不下）、被拒绝的续做，否则这件事在对话里就看不见了。
+ * 后面还有同一个子任务的一段，这一段就是停下了；子任务现在的状态只属于最后一段。
  */
-export function delegatingActions(
-	groups: readonly { kind: string; taskId?: string }[],
+export function subtaskSegments(
+	groups: readonly {
+		kind: string;
+		taskId?: string;
+		rows?: readonly { id: string; sequence: number; label?: string; target?: string }[];
+	}[],
 	tasks: readonly { id: string; key: string }[],
-): Set<string> {
-	const shown = new Set(
-		groups.flatMap((group) => (group.kind === "activities" && group.taskId ? [group.taskId] : [])),
-	);
-	return new Set(tasks.filter((task) => shown.has(task.id)).map((task) => task.key));
+): { opener: Map<number, string>; stopped: Set<number>; claimed: Set<string> } {
+	const keys = new Map(tasks.map((task) => [task.id, task.key]));
+	const resumes = groups
+		.flatMap((group) => (group.kind === "activities" && group.taskId === undefined ? (group.rows ?? []) : []))
+		.filter((row) => row.label === "resume_task");
+	const opener = new Map<number, string>();
+	const stopped = new Set<number>();
+	const claimed = new Set<string>();
+	const latest = new Map<string, number>();
+	groups.forEach((group, index) => {
+		if (group.kind !== "activities" || group.taskId === undefined) return;
+		const previous = latest.get(group.taskId);
+		latest.set(group.taskId, index);
+		let id: string | undefined;
+		if (previous === undefined) id = keys.get(group.taskId);
+		else {
+			stopped.add(previous);
+			const end = group.rows?.at(-1)?.sequence ?? Number.POSITIVE_INFINITY;
+			id = resumes.find((row) => row.target === group.taskId && row.sequence > end && !claimed.has(row.id))?.id;
+		}
+		if (id === undefined) return;
+		opener.set(index, id);
+		claimed.add(id);
+	});
+	return { opener, stopped, claimed };
 }
 
 export interface DetailField {

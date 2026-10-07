@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	actionRuns,
-	delegatingActions,
 	detailFields,
 	internalId,
 	isSessionActive,
 	messageReferences,
 	outputView,
 	sessionProblem,
+	subtaskSegments,
 	taskRoleLabel,
 	transcriptGroups,
 	turnSummaryText,
@@ -238,7 +238,41 @@ test("子任务那一行代表建它的委派：根 Agent 那边的委派与审�
 		// 开场就放不下、一步没做就失败的子任务：对话里没有它那一行。
 		{ id: "task-b", key: "action-delegate-b" },
 	];
-	assert.deepEqual([...delegatingActions(groups, tasks)], ["action-delegate-a"]);
+	const segments = subtaskSegments(groups, tasks);
+	assert.deepEqual([...segments.claimed], ["action-delegate-a"]);
+	assert.deepEqual([...segments.opener], [[1, "action-delegate-a"]]);
+	assert.deepEqual([...segments.stopped], []);
+});
+
+test("子任务被打断后用 resume_task 续上：续的那一段以那次 resume_task 开头，委派只在第一段；前一段标停下，状态只在最后一段", () => {
+	const act = (id: string, sequence: number, label = "read", target?: string) => ({
+		id,
+		sequence,
+		label,
+		...(target === undefined ? {} : { target }),
+	});
+	const groups = [
+		{ kind: "message", id: "读访谈" },
+		{ kind: "activities", taskId: "task-a", rows: [act("a1", 2), act("a2", 3)] },
+		{ kind: "message", id: "继续" },
+		// 被打断的委派在下一轮开头补上结果；同一次回复里重复的续做被拒，交回在续跑的动作之前
+		{ kind: "activities", rows: [act("action-delegate-a", 5, "delegate"), act("r-dup", 6, "resume_task", "task-a")] },
+		{ kind: "activities", taskId: "task-a", rows: [act("a3", 7), act("a4", 8)] },
+		{ kind: "activities", rows: [act("r-1", 9, "resume_task", "task-a")] },
+		{ kind: "message", id: "再继续" },
+		// 还在跑：这次续做还没交回
+		{ kind: "activities", taskId: "task-a", rows: [act("a5", 11)] },
+	];
+	const segments = subtaskSegments(groups, [{ id: "task-a", key: "action-delegate-a" }]);
+	assert.deepEqual(
+		[...segments.opener],
+		[
+			[1, "action-delegate-a"],
+			[4, "r-1"],
+		],
+	);
+	assert.deepEqual([...segments.stopped], [1, 4]);
+	assert.deepEqual([...segments.claimed].sort(), ["action-delegate-a", "r-1"], "被拒的那次续做照常在根 Agent 里列出");
 });
 
 test("点开动作：逐项「名：值」，长文本与多行单独成块，短数组一行；JSON 对象结果按字段列、嵌套展开、换行保留", () => {

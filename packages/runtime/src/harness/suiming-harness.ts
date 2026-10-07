@@ -1040,11 +1040,11 @@ export class SuimingHarness {
 
 export type { SessionEvent };
 
-/** 只投影对象标识；文件内容和完整工具参数不进入活动摘要。 */
+/** 只投影对象标识；文件内容和完整工具参数不进入活动摘要。resume_task 的 taskId 让对话把它放进续的那个子任务那一行。 */
 function actionTarget(args: unknown): { target?: string } {
 	if (!args || typeof args !== "object") return {};
 	const fields = args as Record<string, unknown>;
-	for (const key of ["path", "storyBeatId", "query", "messageId", "resultObjectId"]) {
+	for (const key of ["path", "storyBeatId", "query", "messageId", "resultObjectId", "taskId"]) {
 		if (typeof fields[key] === "string" && fields[key]) return { target: [...fields[key]].slice(0, 160).join("") };
 	}
 	return {};

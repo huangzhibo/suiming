@@ -37,7 +37,8 @@ export class ActionDetailReader {
 		const truncated = codePoints.length > MAX_OUTPUT_CODE_POINTS;
 		return {
 			tool: action.call.name,
-			input: action.call.arguments,
+			// 模型给的参数可能不是对象（pi-ai 把 null、[] 原样解析出来，动作以 invalid_tool_arguments 失败），原样放进一项
+			input: isRecord(action.call.arguments) ? action.call.arguments : { arguments: action.call.arguments },
 			...(text === undefined
 				? {}
 				: { output: truncated ? codePoints.slice(0, MAX_OUTPUT_CODE_POINTS).join("") : text }),
@@ -48,7 +49,11 @@ export class ActionDetailReader {
 
 	#loop(checkpointId: string): Promise<LoopCheckpoint> {
 		let loop = this.#loops.get(checkpointId);
-		if (loop === undefined) {
+		// 命中的挪到最新，挤掉的是最久没点的
+		if (loop !== undefined) {
+			this.#loops.delete(checkpointId);
+			this.#loops.set(checkpointId, loop);
+		} else {
 			loop = this.#objects
 				.readExecutionObject(checkpointId)
 				.then(async ({ bytes }) => ((await this.#archive.read(bytes)) as { loop: LoopCheckpoint }).loop);
@@ -61,4 +66,8 @@ export class ActionDetailReader {
 		}
 		return loop;
 	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

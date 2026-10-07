@@ -1,18 +1,18 @@
 import type { SessionEvent, SuimingTurnSummary } from "@suiming/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronRight, Copy, Quote } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
 import {
 	actionRuns,
 	type DetailField,
-	delegatingActions,
 	detailFields,
 	internalId,
 	messageReferences,
 	outputView,
+	subtaskSegments,
 	taskRoleLabel,
 	transcriptGroups,
 	turnSummaryText,
@@ -241,6 +241,12 @@ function DetailFields({ fields, error = false }: { fields: DetailField[]; error?
 	);
 }
 
+/**
+ * 作者点开过的动作。对话进行中，单个动作在下一个同类动作到来时并成「读取文件 2 次」，换了组件，展开状态跟着丢；
+ * 记在整个对话上，重新挂上时照旧展开。
+ */
+const OpenedActions = createContext(new Set<string>());
+
 /** 一个动作一行「名称 · 对象」，点开看完整输入与输出；失败的默认展开。 */
 function ActionRow({
 	sessionId,
@@ -258,7 +264,8 @@ function ActionRow({
 	/** 在「修改文件 24 次」这样的行里：动作名已经在上面，只写对象。 */
 	compact?: boolean;
 }) {
-	const [expanded, setExpanded] = useState(activity.status === "failed");
+	const opened = useContext(OpenedActions);
+	const [expanded, setExpanded] = useState(activity.status === "failed" || opened.has(activity.id));
 	const label = actionLabels[activity.label] ?? activity.label;
 	// 内部编号（执行对象、子任务的 id）不给作者看，2026-10-05 之前的 read_result 就以它为对象。
 	const target = activity.target && !internalId(activity.target) ? activity.target : undefined;
@@ -267,7 +274,12 @@ function ActionRow({
 			className="activity leading-relaxed"
 			data-action-id={activity.id}
 			open={expanded}
-			onToggle={(event) => setExpanded(event.currentTarget.open)}
+			onToggle={(event) => {
+				const isOpen = event.currentTarget.open;
+				if (isOpen) opened.add(activity.id);
+				else opened.delete(activity.id);
+				setExpanded(isOpen);
+			}}
 		>
 			<summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
 				<ChevronRight className="shrink-0" />
@@ -302,7 +314,8 @@ function ActionRun({
 	titles: ReadonlyMap<string, string>;
 	open(path: string): void;
 }) {
-	const [expanded, setExpanded] = useState(run.failed > 0);
+	const opened = useContext(OpenedActions);
+	const [expanded, setExpanded] = useState(run.failed > 0 || run.rows.some((row) => opened.has(row.id)));
 	return (
 		<details
 			className="activity-run leading-relaxed"
@@ -382,7 +395,7 @@ function SubtaskGroup({
 	taskId: string;
 	heading: string;
 	status: string | undefined;
-	/** 建这个子任务的那次委派或审稿（根 Agent 的动作）；子任务列表还没读到时没有。 */
+	/** 这一段的开头：建这个子任务的委派或审稿，或续它的那次 resume_task（根 Agent 的动作）；子任务列表还没读到、续做还没交回时没有。 */
 	delegation: Activity | undefined;
 	rows: Activity[];
 	showLog: boolean;
@@ -462,6 +475,7 @@ export function Transcript({
 	});
 	const [, setVersion] = useState(0);
 	const frame = useRef(0);
+	const opened = useRef(new Set<string>());
 	useEffect(() => () => cancelAnimationFrame(frame.current), []);
 	const [connectionState, setConnectionState] = useState("loading");
 	const onEvent = useCallback((record: SessionEvent) => {
@@ -528,93 +542,100 @@ export function Transcript({
 	const groups = transcriptGroups(rows, sessionId);
 	const tasks = useQuery({ queryKey: ["tasks", sessionId], queryFn: () => invoke("session.tasks", { sessionId }) });
 	const taskOf = (taskId: string) => tasks.data?.find((task) => task.id === taskId);
-	// 有子任务那一行的委派与审稿不在根 Agent 的动作里重复列，放进子任务那一行。
-	const delegating = delegatingActions(groups, tasks.data ?? []);
-	const delegationOf = (taskId: string): Activity | undefined => {
+	// 子任务每一段的开头（委派、审稿或续做）放进子任务那一行，不在根 Agent 的动作里重复列。
+	const segments = subtaskSegments(groups, tasks.data ?? []);
+	const delegating = segments.claimed;
+	const delegationOf = (index: number, taskId: string): Activity | undefined => {
+		const id = segments.opener.get(index);
+		if (id === undefined) return undefined;
 		const task = taskOf(taskId);
-		if (task === undefined) return undefined;
-		// 子任务还在跑时，委派那个动作还没交回、事件还没来。
+		// 第一段还在跑时，委派那个动作还没交回、事件还没来。
 		return (
-			store.current.activities.get(task.key) ?? {
-				id: task.key,
-				sequence: 0,
-				label: task.kind === "reviewer" ? "review" : "delegate",
-				status: "running",
-			}
+			store.current.activities.get(id) ??
+			(task === undefined || id !== task.key
+				? undefined
+				: {
+						id,
+						sequence: 0,
+						label: task.kind === "reviewer" ? "review" : "delegate",
+						status: "running",
+					})
 		);
 	};
 	return (
-		<div className="transcript flex flex-col gap-3">
-			{connectionState === "loading" && !messages.length && (
-				<p role="status" className="text-xs text-muted-foreground">
-					正在读取对话…
-				</p>
-			)}
-			{groups.map((group) =>
-				group.kind === "summary" ? (
-					<p key={group.id} data-turn-summary="" className="text-xs text-muted-foreground">
-						{group.text}
+		<OpenedActions.Provider value={opened.current}>
+			<div className="transcript flex flex-col gap-3">
+				{connectionState === "loading" && !messages.length && (
+					<p role="status" className="text-xs text-muted-foreground">
+						正在读取对话…
 					</p>
-				) : group.kind === "message" ? (
-					<article
-						key={group.id}
-						data-message-id={group.id}
-						data-latest={!history && group.id === latest}
-						className={`message ${group.role} ${group.role === "user" ? "max-w-[90%] self-end" : "min-w-0"}`}
-					>
-						<div className="sr-only">{group.role === "user" ? "你" : "燧明"}</div>
-						{group.role === "user" ? (
-							<UserMessage text={group.text} titles={titles} links={links} />
-						) : (
-							<Markdown
-								className="msg-text"
-								content={group.text}
-								// 打开或切到一个已结束的会话要重放历史事件，重放到一半 generating 也是真的：
-								// 最后一条消息因此按流式挂载、逐词淡入，长回复要三秒多才显示全（2026-10-05 走查，706 个词）。
-								// 是否在生成以执行库的 session 状态为准，事件流只决定流到哪里。
-								streaming={running && generating && group.id === latest}
-								links={links}
-							/>
-						)}
-						<MessageActions text={group.text} onReference={() => onReference(group.id, group.text)} />
-					</article>
-				) : group.taskId === undefined ? (
-					// 根 Agent 的动作直接排在对话里，同类连着的并成一行；点开任何一行看完整输入与输出。
-					group.rows.some((row) => !delegating.has(row.id)) && (
-						<div key={group.rows[0]?.id} className="actions grid gap-1 text-xs text-muted-foreground">
-							<ActionList
-								sessionId={sessionId}
-								taskId={undefined}
-								rows={group.rows.filter((row) => !delegating.has(row.id))}
-								titles={titles}
-								open={open}
-							/>
-						</div>
-					)
-				) : (
-					<SubtaskGroup
-						key={group.rows[0]?.id}
-						sessionId={sessionId}
-						taskId={group.taskId}
-						heading={[taskRoleLabel(taskOf(group.taskId)?.kind), taskOf(group.taskId)?.title]
-							.filter(Boolean)
-							.join(" · ")}
-						status={taskOf(group.taskId)?.status}
-						delegation={delegationOf(group.taskId)}
-						rows={group.rows}
-						showLog={showLog}
-						titles={titles}
-						open={open}
-					/>
-				),
-			)}
-			{!history && <InboxStatus sessionId={sessionId} />}
-			{connectionState === "disconnected" && (
-				<p role="status" className="text-xs text-muted-foreground">
-					对话连接暂时中断，正在重新连接；Agent 的进度不会丢。
-				</p>
-			)}
-		</div>
+				)}
+				{groups.map((group, index) =>
+					group.kind === "summary" ? (
+						<p key={group.id} data-turn-summary="" className="text-xs text-muted-foreground">
+							{group.text}
+						</p>
+					) : group.kind === "message" ? (
+						<article
+							key={group.id}
+							data-message-id={group.id}
+							data-latest={!history && group.id === latest}
+							className={`message ${group.role} ${group.role === "user" ? "max-w-[90%] self-end" : "min-w-0"}`}
+						>
+							<div className="sr-only">{group.role === "user" ? "你" : "燧明"}</div>
+							{group.role === "user" ? (
+								<UserMessage text={group.text} titles={titles} links={links} />
+							) : (
+								<Markdown
+									className="msg-text"
+									content={group.text}
+									// 打开或切到一个已结束的会话要重放历史事件，重放到一半 generating 也是真的：
+									// 最后一条消息因此按流式挂载、逐词淡入，长回复要三秒多才显示全（2026-10-05 走查，706 个词）。
+									// 是否在生成以执行库的 session 状态为准，事件流只决定流到哪里。
+									streaming={running && generating && group.id === latest}
+									links={links}
+								/>
+							)}
+							<MessageActions text={group.text} onReference={() => onReference(group.id, group.text)} />
+						</article>
+					) : group.taskId === undefined ? (
+						// 根 Agent 的动作直接排在对话里，同类连着的并成一行；点开任何一行看完整输入与输出。
+						group.rows.some((row) => !delegating.has(row.id)) && (
+							<div key={group.rows[0]?.id} className="actions grid gap-1 text-xs text-muted-foreground">
+								<ActionList
+									sessionId={sessionId}
+									taskId={undefined}
+									rows={group.rows.filter((row) => !delegating.has(row.id))}
+									titles={titles}
+									open={open}
+								/>
+							</div>
+						)
+					) : (
+						<SubtaskGroup
+							key={group.rows[0]?.id}
+							sessionId={sessionId}
+							taskId={group.taskId}
+							heading={[taskRoleLabel(taskOf(group.taskId)?.kind), taskOf(group.taskId)?.title]
+								.filter(Boolean)
+								.join(" · ")}
+							status={segments.stopped.has(index) ? "interrupted" : taskOf(group.taskId)?.status}
+							delegation={delegationOf(index, group.taskId)}
+							rows={group.rows}
+							showLog={showLog}
+							titles={titles}
+							open={open}
+						/>
+					),
+				)}
+				{!history && <InboxStatus sessionId={sessionId} />}
+				{connectionState === "disconnected" && (
+					<p role="status" className="text-xs text-muted-foreground">
+						对话连接暂时中断，正在重新连接；Agent 的进度不会丢。
+					</p>
+				)}
+			</div>
+		</OpenedActions.Provider>
 	);
 }
 function InboxStatus({ sessionId }: { sessionId: string }) {
