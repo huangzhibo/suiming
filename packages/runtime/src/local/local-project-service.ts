@@ -390,7 +390,7 @@ export class LocalProjectService {
 	/**
 	 * 作者、host agent 与 Agent 共用的提交路径：扫 checkout diff → Checker → 推进 canon ref → 同步 checkout。
 	 * 系统生成的 ChangeSet（导入原作、发布、Cloud pull）走 `commitManagedChangeSet`，要求 checkout 干净。带 `command` 时
-	 * 额外写一条回执，崩溃后 `recoverCommittedAction` 用它认领已经完成的提交，不会重复提交。
+	 * 额外写一条回执，动作结果没存上就被打断时，续跑用 `committedRevision` 查它，告诉模型这次提交其实成了。
 	 */
 	async commitCheckout(command?: ProjectCommitCommand): Promise<LocalProjectCommitResult> {
 		this.#requireOpen();
@@ -650,24 +650,14 @@ export class LocalProjectService {
 		return { revision, source };
 	}
 
-	async recoverCommittedAction(commandId: string): Promise<ProjectRevision | undefined> {
+	/**
+	 * 只读回执，不同步作品目录：提交时作品目录已经是提交的内容，之后作者可能又改了它，那是新的候选。
+	 * 2026-10-07 之前这里还按「父版本 → 这个版本」重写一遍作品目录，作者在两轮之间改过那些文件时，
+	 * 要么整轮以 checkout_write_conflict 失败、每轮都卡在同一处，要么悄悄盖掉作者的修改。
+	 */
+	async committedRevision(commandId: string): Promise<ProjectRevision | undefined> {
 		this.#requireOpen();
-		const lock = await LocalProjectLock.acquire(this.paths.checkoutPath, { waitMs: PROJECT_LOCK_WAIT_MS });
-		try {
-			const revision = await this.#canon.readCommitReceipt(this.projectId, commandId);
-			if (!revision) return undefined;
-			const head = await this.refreshHead();
-			if (head !== revision.id) {
-				// 回执证明动作已完成；后来的作者提交不能使它再次执行，也不能倒写 checkout。
-				await this.#checkout.recover(head);
-				return revision;
-			}
-			const parentFiles = revision.parentId === null ? [] : await this.#filesForRevision(revision.parentId);
-			await this.#checkout.sync(parentFiles, await this.#filesForRevision(revision.id), revision.id);
-			return revision;
-		} finally {
-			await lock.release();
-		}
+		return this.#canon.readCommitReceipt(this.projectId, commandId);
 	}
 
 	async #buildCheckoutCandidate(): Promise<BuiltCheckoutCandidate> {

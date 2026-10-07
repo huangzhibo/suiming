@@ -53,7 +53,8 @@ export async function assertAgUiConformance(project: LocalProjectService): Promi
 
 /**
  * 一个 faux provider 按顺序给出 responses；profiles 是「profile → 模型 id」。模型 id 照写在调用处，因为有的测试断言
- * 子任务用的是哪个模型。
+ * 子任务用的是哪个模型。api 按 provider 固定（faux 默认每次随机）：同一 provider 再建一个网关，就是重启后换了模型目录，
+ * 冻结的绑定照样对得上。
  */
 export function fauxGateway(
 	providerId: string,
@@ -62,6 +63,7 @@ export function fauxGateway(
 ): ModelGateway {
 	const provider = fauxProvider({
 		provider: providerId,
+		api: `faux:${providerId}`,
 		models: [...new Set(Object.values(profiles))].map((id) => ({ id })),
 	});
 	provider.setResponses(responses);

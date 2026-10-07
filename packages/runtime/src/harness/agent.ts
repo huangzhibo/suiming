@@ -115,6 +115,7 @@ function requireDomain(error: unknown): never {
  */
 const CHILD_FAILURE_CODES = new Set([
 	"delegation_too_large",
+	"task_model_unavailable",
 	"task_not_submitted",
 	"model_call_failed",
 	"model_output_truncated",
@@ -385,6 +386,7 @@ function childProgress(session: HarnessSession, actionId: string): string {
  * 已完成的直接读回结果。能不能并行也照原工具的判定。
  */
 function resumeTask(session: HarnessSession, tools: HarnessTool[]): HarnessTool<typeof ResumeTaskSchema> {
+	const resuming = new Set<string>();
 	const original = async (taskId: string) => {
 		const task = session.execution.tasksOf(session.sessionId).find((item) => item.id === taskId);
 		if (task === undefined) throw new ToolRejection("task_not_found", `这个对话里没有子任务 ${taskId}`);
@@ -412,8 +414,15 @@ function resumeTask(session: HarnessSession, tools: HarnessTool[]): HarnessTool<
 			}
 		},
 		async execute(_id, params, signal) {
-			const { task, tool, args } = await original(params.taskId);
-			return tool.execute(task.key, args, signal);
+			// 同一次回复里续同一个子任务两次时，两次都在它转成 running 之前查过状态；先占上再查，第二次就是「正在跑」。
+			if (resuming.has(params.taskId)) throw new ToolRejection("task_running", `子任务 ${params.taskId} 正在跑`);
+			resuming.add(params.taskId);
+			try {
+				const { task, tool, args } = await original(params.taskId);
+				return await tool.execute(task.key, args, signal);
+			} finally {
+				resuming.delete(params.taskId);
+			}
 		},
 		async interrupted(_id, params) {
 			const task = session.execution.tasksOf(session.sessionId).find((item) => item.id === params.taskId);

@@ -39,6 +39,7 @@ const OVERRIDES: Readonly<Record<string, SuimErrorCategory>> = {
 	cloud_no_changes: "conflict",
 	model_call_failed: "configuration",
 	model_provider_disabled: "configuration",
+	task_model_unavailable: "configuration",
 	model_output_truncated: "configuration",
 	context_overflow: "configuration",
 	revision_project_mismatch: "not_found",

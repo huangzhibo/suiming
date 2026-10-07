@@ -442,3 +442,73 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 		await rm(root, { recursive: true, force: true });
 	}
 });
+
+for (const [edit, content] of [
+	["改成了别的内容", "作者又改了一版。"],
+	["改回了提交前的内容", undefined],
+] as const) {
+	test(`提交成了、动作结果没存上，重开前作者把那个文件${edit}：续跑只读回执告诉模型，作品目录里作者的修改不动`, async (t) => {
+		const { LocalProjectService, materializeOpenStoryDirectorySnapshot, SuimingHarness } = await import(
+			"../src/index.js"
+		);
+		const { agentTurn } = await import("../src/harness/agent.js");
+		const { sampleWorkFiles } = await import("./sample-work.js");
+		const root = await mkdtemp(join(tmpdir(), "suiming-commit-hook-"));
+		await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
+		const project = await LocalProjectService.init({ checkoutPath: root, projectId: "project-commit-hook" });
+		try {
+			const provider = fauxProvider({ provider: "commit-hook" });
+			const models = createModels();
+			models.setProvider(provider.provider);
+			const profile = { provider: provider.provider.id, model: provider.getModel().id };
+			const harness = new SuimingHarness({
+				project,
+				models: new ModelGateway(models, { profiles: { main: profile, reviewer: profile } }),
+			});
+			const path = join(root, "intent/计谋的代价.md");
+			const authored = content ?? (await readFile(path, "utf8"));
+			const original = project.project().headRevisionId;
+			provider.setResponses([
+				fauxAssistantMessage(
+					fauxToolCall("write", { path: "intent/计谋的代价.md", content: "主角必须为真相承担代价。" }),
+				),
+				fauxAssistantMessage(fauxToolCall("commit", { summary: "第一阶段" })),
+				async (context) => {
+					assert.match(JSON.stringify(context.messages), /这次提交其实已经完成：版本 r2/u);
+					return fauxAssistantMessage("第一阶段已经提交");
+				},
+			]);
+			const session = await harness.createSession();
+			const apply = project.applyExecutionDelta.bind(project);
+			let crash = true;
+			t.mock.method(project, "applyExecutionDelta", (delta: ExecutionStateDelta) => {
+				const record = changedSession(delta, session.id);
+				const persisted = project.loadExecutionState().sessions.find((item) => item.id === session.id);
+				if (
+					crash &&
+					project.project().headRevisionId !== original &&
+					record !== undefined &&
+					record.checkpointRef?.id !== persisted?.checkpointRef?.id
+				)
+					throw new Error("exit after revision commit");
+				apply(delta);
+			});
+			project.queueInbox(session.id, "改了就提交");
+			await assert.rejects(
+				harness.turn(session.id, {}, (handle) => agentTurn(handle)),
+				/exit after revision commit/u,
+			);
+			crash = false;
+			project.createExecutionState().recoverUnfinished("test:restart", { holderAlive: () => false });
+			await writeFile(path, authored);
+			project.queueInbox(session.id, "继续");
+			const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+			assert.equal(outcome.failure, undefined);
+			assert.equal(await readFile(path, "utf8"), authored, "作者在两轮之间的修改原样留着");
+			assert.equal(provider.state.callCount, 3);
+		} finally {
+			project.close();
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+}

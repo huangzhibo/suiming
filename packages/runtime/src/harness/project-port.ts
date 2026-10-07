@@ -41,5 +41,6 @@ export interface HarnessProjectPort {
 	readSessionEvents(sessionId: string, afterSequence?: number): SessionEvent[];
 	/** 作者的收件箱：第一条消息和后续补充走同一条通道，根 loop 在 `ready` 阶段第一步取走。入队不经过 Harness。 */
 	readInbox(sessionId: string): { sequence: number; text: string }[];
-	recoverCommittedAction(commandId: string): Promise<ProjectRevision | undefined>;
+	/** 带这个 commandId 的提交成了没有：提交与回执是同一个 git 提交。只读，不碰作品目录。 */
+	committedRevision(commandId: string): Promise<ProjectRevision | undefined>;
 }

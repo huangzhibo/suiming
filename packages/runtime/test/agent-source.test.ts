@@ -718,6 +718,94 @@ test("被打断的两个 source-reader：根 Agent 一次回复里用 resume_tas
 	});
 });
 
+/** 委派一个 source-reader，它读了一步就被打断；返回 session 与被打断的 taskId。 */
+async function interruptedReader(project: LocalProjectService) {
+	const controller = new AbortController();
+	const harness = new SuimingHarness({
+		project,
+		models: gateway([
+			call("delegate", { profile: "source-reader", sourceId: "访谈", goal: "读访谈" }),
+			async () => {
+				controller.abort(new Error("应用退出，已请求保存进度"));
+				return call("source_coverage", { sourceId: "访谈" });
+			},
+		]),
+	});
+	const session = await harness.createSession();
+	project.queueInbox(session.id, "读访谈");
+	assert.equal(
+		(await harness.turn(session.id, { signal: controller.signal }, (handle) => agentTurn(handle))).failure,
+		undefined,
+	);
+	const [task] = project.loadExecutionState().tasks;
+	assert.equal(task?.status, "interrupted");
+	return { session, taskId: task.id };
+}
+
+test("同一次回复里对同一个子任务调两次 resume_task：只续一次，另一次是「正在跑」的工具错误，turn 不崩", async () => {
+	await withProject(async (project) => {
+		const { session, taskId } = await interruptedReader(project);
+		const results: string[] = [];
+		const harness = new SuimingHarness({
+			project,
+			models: gateway([
+				fauxAssistantMessage([fauxToolCall("resume_task", { taskId }), fauxToolCall("resume_task", { taskId })]),
+				call("submit_task", { summary: "读完一段" }),
+				(context) => {
+					results.push(
+						...context.messages
+							.slice(-2)
+							.filter((message) => message.role === "toolResult")
+							.map((message) => JSON.stringify(message.content)),
+					);
+					return reply("读完了");
+				},
+			]),
+		});
+		project.queueInbox(session.id, "继续");
+		const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+		assert.equal(outcome.failure, undefined);
+		assert.deepEqual(
+			project.loadExecutionState().tasks.map((task) => task.status),
+			["completed"],
+		);
+		assert.equal(results.length, 2);
+		assert.equal(results.filter((text) => text.includes("读完一段")).length, 1);
+		assert.equal(results.filter((text) => text.includes("task_running")).length, 1);
+	});
+});
+
+test("子任务当初用的模型现在用不了：resume_task 是回到根 Agent 手里的工具错误，指向重新委派；turn 不崩，子任务原样留着", async () => {
+	await withProject(async (project) => {
+		const { session, taskId } = await interruptedReader(project);
+		let rejection = "";
+		// 模型目录里不再有 reader-model（provider 升级改了 id 之类），对话的模型还在
+		const harness = new SuimingHarness({
+			project,
+			models: fauxGateway(
+				"suiming-source-faux",
+				[
+					call("resume_task", { taskId }),
+					(context) => {
+						rejection = lastToolText(context);
+						return reply("改成重新委派");
+					},
+				],
+				{ main: "agent-model", reviewer: "reviewer-model", "source-reader": "agent-model" },
+			),
+		});
+		project.queueInbox(session.id, "继续");
+		const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+		assert.equal(outcome.failure, undefined);
+		assert.match(rejection, /reader-model/u);
+		assert.match(rejection, /重新委派/u);
+		assert.deepEqual(
+			project.loadExecutionState().tasks.map((task) => task.status),
+			["interrupted"],
+		);
+	});
+});
+
 test("Source 审稿锚在抽取文件上的 finding 可以引原作：「抽取写成 A、原作是 B」要修的是那个文件", async () => {
 	// 10-03 斗破 Source 审稿：一条 finding 锚在 加列毕.md、引的是原作那句，被 review_quote_not_found 拒掉；重交时 8 条全改锚
 	// 原文区间，要修的文件只剩 issue 里的一句话，审稿页锚不到文件上。Source 层的真源是原作，引它与引被审文件一样能逐字核对。

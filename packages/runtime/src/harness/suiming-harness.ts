@@ -28,6 +28,7 @@ import type {
 	TaskRecord,
 } from "../execution/types.js";
 import type { ModelProfileId } from "../model/config.js";
+import { ModelGatewayError } from "../model/errors.js";
 import type { BoundModelProfile, ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
 import { CheckpointArchive } from "./checkpoint-archive.js";
 import { type ConfinedEnvPolicy, ConfinedExecutionEnv } from "./confined-env.js";
@@ -431,6 +432,7 @@ export class HarnessSession {
 		span: TelemetrySpan,
 	): Promise<TaskOutcome> {
 		let task: TaskRecord;
+		let model: BoundModelProfile | undefined;
 		if (existing === undefined) {
 			const bound = await this.#bindForTask(spec.profileId);
 			task = this.#execution.addTask({
@@ -444,6 +446,18 @@ export class HarnessSession {
 				model: bound.snapshot,
 			});
 		} else {
+			if (!existing.model) throw new SuimingHarnessError("model_binding_missing", `Task ${taskId} 没有模型绑定`);
+			// 续跑沿用当初冻结的模型。它用不了了（模型目录变了、凭据删了）就在改状态之前交回父模型，由它重新委派，
+			// 不掀掉整轮——否则下一轮的「被打断」提示又叫它续，每轮都撞在同一处。
+			try {
+				model = await this.#engine.bindModel(spec.profileId, existing.model);
+			} catch (error) {
+				if (!(error instanceof ModelGatewayError)) throw error;
+				throw new SuimingHarnessError(
+					"task_model_unavailable",
+					`它当初用的模型现在用不了（${error.message}），没法接着做；要做就重新委派`,
+				);
+			}
 			task =
 				existing.status === "running"
 					? existing
@@ -451,7 +465,7 @@ export class HarnessSession {
 		}
 		this.throwIfInterrupted();
 		if (!task.model) throw new SuimingHarnessError("model_binding_missing", `Task ${taskId} 没有模型绑定`);
-		const model = await this.#engine.bindModel(spec.profileId, task.model);
+		model ??= await this.#engine.bindModel(spec.profileId, task.model);
 		const env = new ConfinedExecutionEnv({
 			rootPath: this.checkoutPath,
 			policy: spec.policy,
@@ -741,7 +755,7 @@ export class HarnessSession {
 
 	/** 这个 commit 动作有没有提交成：提交与回执是同一个 git 提交，查得到回执就是成了。 */
 	committedRevision(actionId: string): Promise<ProjectRevision | undefined> {
-		return this.#engine.project.recoverCommittedAction(`${this.sessionId}:commit:${actionId}`);
+		return this.#engine.project.committedRevision(`${this.sessionId}:commit:${actionId}`);
 	}
 
 	/** 建这个子任务的那次动作（委派、审稿）：从父 loop 已保存的 checkpoint 里读，续跑时沿用它的参数。 */

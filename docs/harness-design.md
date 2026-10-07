@@ -129,10 +129,10 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 **留下的三样**，各有与崩溃无关的用处：
 
 - 文件写入前后的 hash：同一次执行里，准备写入时的内容与落盘前一刻的不一致就报 `file_write_conflict`，交给模型重读再改，作者与 Agent 同时改一个文件靠它发现。不再持久化的只是 journal。
-- 提交回执：写在作品提交的 trailer 里（`Suiming-Command-Id` / `Suiming-Fingerprint`），与提交是同一个 git 提交。被打断的 `commit` 由 `interrupted` 钩子按它告诉模型提交成了哪个版本，模型不用再提交一次，也不会以为没存上。
+- 提交回执：写在作品提交的 trailer 里（`Suiming-Command-Id` / `Suiming-Fingerprint`），与提交是同一个 git 提交。被打断的 `commit` 由 `interrupted` 钩子按它告诉模型提交成了哪个版本，模型不用再提交一次，也不会以为没存上。钩子只读回执、不碰作品目录：作者可能在两轮之间又改了那些文件，那是新的候选（2026-10-07 之前它还按「父版本 → 这个版本」重写一遍作品目录，作者改过就整轮 `checkout_write_conflict`、每轮卡在同一处，改回原样的则被悄悄盖掉）。
 - 子 Task 的 `key`（父动作 id）：`resume_task` 按它找回子任务；`suim rank` 也按 key 复用已完成的轮次。
 
-**子任务续做是模型的动作。**委派或审稿被打断时，父动作的结果里是子任务的 id、标题、做了几次模型调用，以及「要接着做就调用 `resume_task`」。`resume_task({ taskId })` 从父 loop 的 checkpoint 读出当初那次委派的参数，用同一个动作 id 再执行那个工具：`executeTask` 按 key 找到子 Task，从它自己的 checkpoint 接着跑，已完成的直接交回保存的结果，不新建子任务。参数不让模型转抄。能不能并行沿用原工具的判定，一起被打断的几个读原文或分段抽取的子任务可以在一次回复里同时续。这与 Claude Code 用 SendMessage 带着原上下文续一个子代理是同一个形状。
+**子任务续做是模型的动作。**委派或审稿被打断时，父动作的结果里是子任务的 id、标题、做了几次模型调用，以及「要接着做就调用 `resume_task`」。`resume_task({ taskId })` 从父 loop 的 checkpoint 读出当初那次委派的参数，用同一个动作 id 再执行那个工具：`executeTask` 按 key 找到子 Task，从它自己的 checkpoint 接着跑，已完成的直接交回保存的结果，不新建子任务。参数不让模型转抄。能不能并行沿用原工具的判定，一起被打断的几个读原文或分段抽取的子任务可以在一次回复里同时续；同一次回复里把同一个子任务续两次，第二次是 `task_running` 的工具错误。续跑沿用子任务当初冻结的模型，它用不了了（模型目录变了、凭据删了）就以 `task_model_unavailable` 交回模型、由它重新委派，不掀掉整轮。这与 Claude Code 用 SendMessage 带着原上下文续一个子代理是同一个形状。
 
 **请求结果未知不再停下。**原来请求发出后没收到回复，Session 进 `paused` 让作者决定要不要重发（重发可能重复计费）。现在作废重发：能多花的只是一次请求的钱，作者在用量里看得见（`calls` 与 `confirmedCalls` 之差），不承诺 exactly-once。流本身抛出异常（pi-ai 通常把错误转成回复，抛出很少见）时同样作废，turn 以 `model_call_failed` 回 idle。
 
@@ -403,9 +403,9 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 响应已保存、工具尚未执行 | 使用原消息、动作 id 与参数，不重新请求模型决定 | `agent-loop-persistence`「用量持久确认失败时不执行该响应中的任何工具」 |
 | 多工具批次中途退出、结果乱序到达 | 复用已保存结果，没有结果的补「被打断」或「没有执行」，按模型原始顺序交还 | `agent-loop-persistence`「工具事件保存失败时停止同批次后续工具和下一次模型调用」；`run-event-stream`「恢复对话保留消息与工具的原始次序，工具更新不移到末尾，也不修改持久事件」 |
 | 动作执行到一半进程退出 | 不重做，补「执行时被打断」；同一批没开始的补「没有执行」，由模型决定 | `harness-recovery`「进程在动作执行时退出：续跑不重做它，补「执行时被打断」；同一批还没开始的补「没有执行」，由模型决定」 |
-| ProjectRevision 已提交、Action 未确认 | 不重做提交；被打断的 commit 按回执告诉模型已提交成哪个版本，提交数不增加 | `harness-recovery`「同一 turn 两次阶段提交；第一次 revision 已确认但动作结果丢失时，续跑按回执告诉模型已经提交，不重复提交」；`local-project-service`「open 以 head 快照恢复 managed commit 崩溃窗口」 |
+| ProjectRevision 已提交、Action 未确认 | 不重做提交；被打断的 commit 按回执告诉模型已提交成哪个版本，提交数不增加；只读回执，作者在两轮之间对那些文件的修改原样留着 | `harness-recovery`「同一 turn 两次阶段提交；第一次 revision 已确认但动作结果丢失时，续跑按回执告诉模型已经提交，不重复提交」「提交成了、动作结果没存上，重开前作者把那个文件改成了别的内容 / 改回了提交前的内容：…」；`local-project-service`「open 能恢复数据库已提交但 checkout 尚未 materialize 的崩溃窗口」 |
 | 子 Task 已完成、父未收到 | 父动作的「被打断」结果说子任务已做完；`resume_task` 交回保存的结果，不建第二个子任务 | `harness-recovery`「子任务完成后父 checkpoint 确认丢失：父 Agent 看到子任务其实已做完，resume_task 交回保存的结果，不建第二个子任务」 |
-| 子任务被打断（作者停止、应用退出、用量检查点） | 父动作结果给出子任务 id、进度与续做的办法；`resume_task` 从子任务自己的 checkpoint 续，一起被打断的可在一次回复里同时续；不存在的 id 是工具错误 | `agent`「作者停下正在跑的子任务再说一句…」「应用退出打断的子任务与作者停下走同一条路…」；`agent-source`「被打断的两个 source-reader：根 Agent 一次回复里用 resume_task 同时续上…」 |
+| 子任务被打断（作者停止、应用退出、用量检查点） | 父动作结果给出子任务 id、进度与续做的办法；`resume_task` 从子任务自己的 checkpoint 续，一起被打断的可在一次回复里同时续；不存在的 id、同一次回复里续第二次、当初的模型用不了，都是工具错误，turn 不崩 | `agent`「作者停下正在跑的子任务再说一句…」「应用退出打断的子任务与作者停下走同一条路…」；`agent-source`「被打断的两个 source-reader：根 Agent 一次回复里用 resume_task 同时续上…」「同一次回复里对同一个子任务调两次 resume_task…」「子任务当初用的模型现在用不了…」 |
 | interrupt 时子 Task 已确认的结果与用量 | 留在执行存储里，父不因此继续推进；不回滚已提交作品 | `execution-state`「子任务只能在 running 的 turn 里建；turn 结束把还在跑的子任务标 interrupted，续跑接着来」；`agent`「interrupt：打断的 turn 回 idle 不记故障；消息列表与候选文件保留，下一句接着跑」。「父已取消、子结果迟到」仍没有测试——委派同步，无异步迟到路径 |
 | 重复发送同一条作者消息 | command receipt 去重，返回原序号 | `workspace`「命令重发校验输入：并发 send 只有一个 controller，跑完后的重发返回原回执不再开 turn」；`execution-persistence`「inbox：idle 与 running 都排队，turn 非正常结束后照样收，相同命令返回原序号」 |
 | **turn 结束后作者再发消息** | 同一 session、同一消息列表续接；checkout 里的候选仍在 | `agent`「作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的 commit 一起进版本，没有合并步骤」（第二个 turn 提交的正是第一个 turn 留在 checkout 里的改动）、「说完就停；同一 session 的下一句接着消息列表，新 session 隔离；只讨论不产生作品版本」 |
