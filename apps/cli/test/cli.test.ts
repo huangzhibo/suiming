@@ -1209,7 +1209,8 @@ test("update 发现已安装接入并保留作者模型配置；损坏的配置�
 		const config = parse(await readFile(agentPath, "utf8"));
 		assert.equal(config.model, "author-model");
 		assert.equal(config.model_reasoning_effort, "high");
-		assert.deepEqual(config.author_options, { keep: true });
+		// smol-toml 1.9 起解析出的表没有原型（防原型污染），比内容
+		assert.deepEqual({ ...(config.author_options as object) }, { keep: true });
 		assert.equal(config.description, parse(original).description);
 		assert.equal(config.developer_instructions, parse(original).developer_instructions);
 		assert.deepEqual((await jsonCommand(root, ["status"])).value.data, before, "接入刷新不改变 Canon 或候选");
