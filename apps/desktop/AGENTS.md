@@ -9,6 +9,12 @@
 - 桌面「打开作品」对没有 `.suiming` 的目录就地 init（scaffold 幂等，只补缺失的 index.yaml）；既非空又没有作品文件的目录拒绝，避免误选 `~/Documents` 时往里写东西。`openProject` 串成一条 promise 链，连续切换作品不会交错。
 - **自定义属性过不了 contextBridge。**preload 抛给 renderer 的 Error 会被复制，只留 message 与 stack（2026-10-02 在 Electron 42 上实测：`code`、`diagnostics` 都丢）。preload 一直给 Error 挂 `code`，renderer 从来没拿到过，只是没人读所以没发现；做桌面检查诊断时撞上。所以 `suiming:command` 失败时 preload 抛的是普通对象 `DesktopCommandFailure`（普通对象按键复制，能过），`apps/workbench/src/bridge.ts` 的 `invoke` 再还原成带 `code` / `diagnostics` 的 `CommandError`。renderer 只经那个 `invoke` 调命令；E2E 里直接 `window.suiming.invoke` 时拒绝值不是 Error，按 `{code, message}` 读。其余几个 bridge 方法只需要 message，仍抛 Error。
 
+## 升级 Electron
+
+- 根目录 `package.json` 的 `allowScripts` 按「包名@版本」放行安装脚本：升级时要把 `electron@<旧版本>` 改成新版本，否则 npm 静默跳过下载二进制，`node_modules/electron/dist` 是空的，桌面与 E2E 都起不来；改完跑 `npm rebuild electron`（2026-10-07 升 44 时撞上）。
+- Electron 的下载器（`@electron/get`）不读 `HTTPS_PROXY`。机器要走代理时，带上 `ELECTRON_GET_USE_PROXY=1` 与 `GLOBAL_AGENT_HTTPS_PROXY` 跑 `node node_modules/electron/install.js`，否则它直连，可能慢到下不完。
+- Electron 只支持最近三个大版本，升级前看两份破坏性变更：发布说明的 Breaking Changes 与仓库里的 `docs/breaking-changes.md`。
+
 ## 桌面 E2E
 
 - **启动一律经 `apps/desktop/test/launch.ts` 的 `launchDesktop`。**它把 `SUIMING_CONFIG_PATH` / `SUIMING_AUTH_PATH` 指到这次测试的临时目录，去掉开发 shell 里的 `SUIMING_*`、各家 API key 与 Langfuse / OTel 变量：2026-10-04 之前只有设置页这样做，其余用例读的是维护者本机的 `~/.suiming`，结果随本机配置变。渲染层报错用 `collectPageErrors` 收、结尾断言为空；断言「提示没出现」用 `assertNoTooltip`（等一会儿再数会在 Tooltip 的 400ms 延迟下空过）；等主进程状态用 `eventually` / `waitForSessionIdle`——**`page.waitForFunction` 不 await 异步谓词**，返回的 Promise 是真值，立刻放行，模型选择测试里两处等待因此一直是空等。

@@ -15,7 +15,7 @@
 	},
 	"devDependencies": {
 		"@earendil-works/pi-ai": "0.99.2",
-		"electron": "42.11.2",
+		"electron": "44.6.0",
 		"playwright": "1.63.0"
 	}
 }

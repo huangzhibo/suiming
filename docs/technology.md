@@ -16,7 +16,7 @@
 | 工作台前端 | React 19 + Vite + TanStack Query + shadcn/ui + Streamdown（Markdown 渲染，含流式）+ CodeMirror 6（源码编辑与 merge 比较） | 桌面首先实现，后续 Cloud Web 复用作品编辑与复杂视图；正文、设计文档与 Agent 消息共用一条 Markdown 管线 |
 | 基础 UI 控件 | shadcn/ui（`base-vega` 样式，底层原语是 Base UI；2026-10-06 由 Radix 换过来）+ Tailwind v4；已接入 `apps/workbench`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护，`shadcn` 作开发依赖钉住版本并提供组件用到的 `shadcn/tailwind.css`） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么换见下文 |
 | AI 交互客户端 | AG-UI 官方客户端 `@ag-ui/client`（2026-10-05 起，替换 TanStack AI）；已接 typed IPC | 把 AG-UI 事件拼成消息、按运行生命周期校验整条流；只实现长连接的 `connect()`，不用它的 `run()` 与 HTTP 传输 |
-| Desktop | Electron 42；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
+| Desktop | Electron 44；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
 | CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation 与 Cloud sync |
 | Host integrations | Codex / Claude Code / Grok 原生 instructions、Skills 与 `suim --json` | 在现有 coding-agent 产品中直接创作同一个 Local Project |
 | Cloud Database | PostgreSQL + Kysely | Cloud Canon 事务（Project、ArtifactVersion、ProjectRevision）、权限与同步；没有执行数据，也不做数据库搜索 |
