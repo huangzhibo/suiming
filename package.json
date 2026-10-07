@@ -45,7 +45,7 @@
 		"node": ">=24.0.0"
 	},
 	"allowScripts": {
-		"@google/genai@1.52.0": false,
+		"@google/genai@2.21.0": false,
 		"esbuild@0.28.2": true,
 		"fsevents@2.3.3": true,
 		"protobufjs@7.6.6": false,
