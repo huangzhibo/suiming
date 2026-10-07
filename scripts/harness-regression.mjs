@@ -267,9 +267,12 @@ async function runTask(task, root, trial) {
 	const actions = events
 		.map((record) => record.event)
 		.filter((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.action")
-		.map((event) => event.content);
+		// 执行者在事件的 subagentRunId 上；2026-10-05 之前在内容的 taskId 里，根 Agent 的是 sessionId
+		.map((event) => ({ ...event.content, taskId: event.subagentRunId ?? event.content.taskId }));
 	// 子任务各读了几次文件：Writer 的 prompt 说它只靠 Write Context，这个数看它实际怎么做。
-	const subagentReads = actions.filter((action) => action.label === "read" && action.taskId !== session.id).length;
+	const subagentReads = actions.filter(
+		(action) => action.label === "read" && action.taskId !== undefined && action.taskId !== session.id,
+	).length;
 	const hostFileActions = actions
 		.filter((action) => HOST_FILE.test(action.target ?? ""))
 		.map((action) => `${action.label} ${action.target}${action.isError ? "（被拒）" : ""}`);
