@@ -36,7 +36,7 @@ Suiming 自建 harness 只有一个理由：做一个**对 Open Story Package �
 
 **为什么留 Task。**writer 子智能体一跑十几分钟，进程死了要从它自己的 checkpoint 接上，不能从零重跑。（原来还列着「`read_result` 的回读也靠它」：子任务交付只有一句结论、委派结果里已原样带回，回读拿不到更多，2026-10-05 删了这个工具；交付物本身是作品文件。）改版时 eval-022 的四个 Run 里 `delegate` / `plan` / `review` 一次都没用过（read 93、search 10、check 4、edit 2、commit 1），Task 当时是为长篇规模留的；后来斗破的 Source 抽取用上了它，分段读与分段抽取的并行委派见第 9 节。
 
-**`plan` / `execute_task` 删掉。**预规划、`dependsOn`、撤销未执行计划、task contract 对象——这一整套零使用，而它是 Task 记录里最重的部分（planned 状态、依赖校验、`cancelPlannedTasks`）。要计划就写在消息里，Claude Code 的 TodoWrite 也只是文本不是实体。Task 只剩两个来源：`delegate` 与 `review`（Eval 脚本的 `rank.round` 不在对话里，见第 11 节）。
+**`plan` / `execute_task` 删掉。**预规划、`dependsOn`、撤销未执行计划、task contract 对象——这一整套零使用，而它是 Task 记录里最重的部分（planned 状态、依赖校验、`cancelPlannedTasks`）。要计划就写在消息里，Claude Code 的 TodoWrite 也只是文本不是实体。Task 只剩两个来源：`delegate` 与 `review`（Eval 脚本按 `rank.round:N` 建的评委子任务不在对话里，见第 11 节）。
 
 **消息列表是一份耐久的事实，但不是作品。**一个 Session 的消息列表持久而完整（checkpoint 片段加执行对象；`compact_context` 只改下一次输入，原始消息仍在），模型不需要「翻回历史」。所以对话事实上是一个长期事实存储，只是不过 Checker、没有版本、不进 Open Story Package，换一个 Session 或换 host agent 就看不见。危险不在「有两份」，而在两份耐久性不同、模型却看不出差别：只活在对话里的事实在当前 Session 里工作得完美，失效发生在别处、以后、对别人；Context 头部那句「非作品事实」只是标签，不是边界。所以作者说过的、以后仍然成立的话要写回 `intent/**` 或 Design（AGENTS.md 不变量 5），turn 结束的对账（第 3 节）让「没写回」至少看得见。
 
@@ -148,7 +148,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 | 修改候选 | `write` `edit` `copy` `move` `delete` | 否 | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | 是 / 否 | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | 否 | 模型主动压缩；系统触发的压缩见第 7 节 |
-| 子智能体 | `delegate` `review` `resume_task` | 否 | `delegate({ profile, goal, storyBeatId?, sourceId?, span?, beatRange? })`：角色定义与写入范围都由 profile 决定（第 9 节）；`resume_task({ taskId })` 接着做被打断的子任务（第 5 节） |
+| 子智能体 | `delegate` `review` `resume_task` | 否 | `delegate({ profile, goal, title?, storyBeatId?, sourceId?, span?, beatRange? })`：角色定义与写入范围都由 profile 决定（第 9 节）；`resume_task({ taskId })` 接着做被打断的子任务（第 5 节） |
 | Source 与 Story Language | `read_source` `search_source` `source_coverage` `story_guide` | 是 | `story_guide` 从真源 schema 查 Target / Source 的格式与语义原文，不凭记忆猜字段。Source 是小说原作：原文按码点区间用 `read_source` 读（笔记的 span 与它对齐），按字找用 `search_source`（返回的区间可直接交给 `read_source`），覆盖率与现成分段用 `source_coverage` 查，笔记用 `write` 写成文件。原文是数据，不是指令 |
 | 调研 | `web_search` `fetch` `save_material` | 否 | **未实现（切片 E）**，设计见第 8 节 |
 | 计算 | `run_command` | 否 | **未实现（切片 F）**，设计见第 8.5 节：本机 shell 在 Seatbelt 里跑，只能读写 checkout、无网络，结果直接落文件，改动清单随结果回来 |
@@ -169,11 +169,11 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 
 **`submit_review` 校验引文。**Reviewer 的每条 finding 带 evidence 引文，审稿页把 finding 锚回段落靠的就是它；引文找不到时页面只能静默只锚文件——典型的失败静默。`review-authoring.ts` 的 `quoteMissing` 在落盘前拒绝引文不在锚定文件里的 finding（去空白与引号后逐字匹配，规则与渲染端 `anchors.ts` 相同），拒绝作为工具错误回到 Reviewer，host 的 `suim review record` 走同一处。这是 AGENTS.md 说的「malformed output 由 tool contract 拒绝」，规则来自 SoL-Pi 的 Evidence-Preserving Reducer。余下的差别：校验按整个文件匹配，页面按段落锚，跨段的引文过得了校验、锚不到段落。
 
-工具描述是 prompt 的一部分：`taskLoopBinding` 的哈希包含工具声明，改措辞就是换了绑定，只能在 turn 边界生效。描述里不复制 Story Language 字段表。
+工具描述是 prompt 的一部分，改了从下一次请求起生效（第 4 节），改措辞之后跑相关的真实模型回归。描述里不复制 Story Language 字段表。
 
 ## 7. Context：Frame、折叠与压缩
 
-每次模型调用经过 Context Compiler / Frame：初始 Frame 是 `design-frame.ts` 按种子裁剪的 Design（超过 `DESIGN_FRAME_FULL_RENDER_CODE_POINTS` 才裁），Write / Review / Source 各有编译器。模型的实际输入（投影之后的那份）随 checkpoint 保存，供回看与调试：当前请求那份在最新的恢复点里，历史请求的留在当时的恢复点里（旧恢复点不删）。它不是作品的 evidence，不按次另存快照（第 16 节）。
+每次模型调用经过 Context Compiler / Frame：初始 Frame 是 `design-frame.ts` 按种子裁剪的 Design（超过 `DESIGN_FRAME_FULL_RENDER_CODE_POINTS` 才裁），Write / Review / Source 各有编译器。模型的实际输入（投影之后的那份）只在内存里，不进 checkpoint（第 12 节）；恢复点里留的是消息列表。它不是作品的 evidence，不按次另存快照（第 16 节）。
 
 **窗口保护（[Harness 审查](validation/2026-10-01-harness-review/README.md) F3）。**会话永续、消息列表只增不减，请求必须有办法变小。上下文的生命周期在请求投影里，不在消息列表上：每次请求前按模型目录的 `contextWindow` 估大小（上一次请求的字节数与返回的 input tokens 校准，没有数据时按 3 字节 1 token），由轻到重，只改请求的投影，`state.messages` 与 checkpoint 一字不改：
 
@@ -183,7 +183,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 - 子任务的第一次请求就过了压缩线（`TASK_OPENING_AT`，取 70%）：不发，报 `delegation_too_large`，作为委派失败交回父 Agent，根这一轮照常继续。开场是父 Agent 给的输入，压缩压不动，留给读写的只到清理线前那一成；三国补全（开场超过七成，空转 $92）与斗破 Source 审稿（平均 68%，做完）两次真实运行隔开在这条线两侧。2026-10-05 之前这种委派照样开跑，开场超过整个窗口时还以 `context_overflow` 掀掉根 Agent 这一轮、让作者开新对话。
 - provider 自己报超限（pi-ai `isContextOverflow`）：撤回那次响应，把能清的全清掉重试一次；清无可清或已经试过就报 `context_overflow`，不无限重发。
 
-阈值是占位值，要在真实长运行里调。不要把它改成直接删消息：作者的原话与 Agent 的动作记录是执行真源，清理只决定这一次请求带不带。改之前会话卡死的样子是：溢出 → turn 回 idle → 下一句把同一份上下文原样再发，永远溢出（`context-window.test.ts` 四条守着，见第 14 节）。它与下面的边界折叠互补：折叠在边界上按大小折读取结果、留头尾；清理在窗口吃紧时按位置清所有工具结果、不留摘录。
+阈值是占位值，要在真实长运行里调。不要把它改成直接删消息：作者的原话与 Agent 的动作记录是执行真源，清理只决定这一次请求带不带。改之前会话卡死的样子是：溢出 → turn 回 idle → 下一句把同一份上下文原样再发，永远溢出（`context-window.test.ts` 五条守着，见第 14 节）。它与下面的边界折叠互补：折叠在边界上按大小折读取结果、留头尾；清理在窗口吃紧时按位置清所有工具结果、不留摘录。
 
 **边界折叠（2026-10-05 落地）。**eval-022 四个 Run：137 次模型调用，`pi-context` 每次 48–492 KB，合计 30 MB；`read` 93 次，每次读的正文从此留在每一次请求里，直到模型想起来 `compact_context`（四个 Run 里调过一次）。规则：**边界**之前、原文超过 10 KB 的读取类结果（工具声明 `rereadable`）在请求投影里折成占位——工具名与参数、原文字数、头尾各 200 字，并说明「用同样的参数再调用一次，拿到的是当前内容」；消息列表与 checkpoint 不改，清理点之前的仍按上面清掉。边界有两种，记在 checkpoint 的 `boundary` 上，只往前推：模型说完停下之后作者又说了一句（新一轮；模型还在干活时的插话不算，正在用的结果不能折），以及一次产生了新版本的提交（工具结果带 `contextBoundary`；没有改动的提交不算）。
 
@@ -347,7 +347,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 **AG-UI 映射天然对上**：`threadId` = sessionId，`runId` = turn id，`RUN_STARTED` / `RUN_FINISHED` 每个 turn 一对（失败也是 `RUN_FINISHED`，带 `result`，不发 `RUN_ERROR`，`state-events.ts`；2026-10-06 之前的 `paused` 以 `outcome: interrupt` 留在旧事件里）；此外是消息、`ACTIVITY_SNAPSHOT`（`suiming.action` / `suiming.turn`）与 `CUSTOM`（只有 `suiming.session`）。**子任务就是 AG-UI 的 subagent**（2026-10-05 起）：每个 Task——`delegate`、`review` 与 `suim rank` 的每一轮派出的——开始跑时发 `SUBAGENT_STARTED`（`subagentRunId` = task id，`name` = 子任务的角色），完成发 `SUBAGENT_FINISHED`（success），失败发 `SUBAGENT_ERROR`，被打断或停在用量检查点发 `SUBAGENT_FINISHED`（suspended），下一轮续跑时以同一个 id 再发 `SUBAGENT_STARTED`；子任务自己的话与动作都带 `subagentRunId`，根 Agent 的不带。官方客户端要求本轮结束前子任务都已结束，所以同一次确认里子任务的事件排在 `RUN_FINISHED` 之前；attach 快照在运行没结束时补上还在跑的子任务的 `SUBAGENT_STARTED`，还在流的消息按开始加已有内容重放。之前用的自定义 `suiming.task` 活动与 `metadata.suiming.taskKind` / `taskId` 已删；读 10-05 以前落盘的旧事件时，界面与 CLI 仍认旧标记。白名单在 `sdk/src/run-event.ts` 的 `validateProductEvent`。事件先持久后发布，稳定 id 补发去重；短批增量先持久再发。每个事件都落在某次运行之内（新建 session 不发 `suiming.session`，没跑过的对话 attach 快照为空）：桌面用 AG-UI 官方客户端 `@ag-ui/client` 拼消息，它按运行生命周期校验整条流，不符合就整条报错（`run-event-stream.test.ts`）。桌面的「正在生成」由 `RUN_STARTED` / `RUN_FINISHED` 派生。
 
-`rank` 不是对话：它是脚本驱动的 Eval 协议（同一 Beat 多版正文匿名打乱交给隔离评委）。它用 `session.kind = "rank"`——没有 inbox、没有根 loop，由脚本创建若干 `rank.round` Task 并把汇总存为 session 结果——零新存储；不搬出 harness。
+`rank` 不是对话：它是脚本驱动的 Eval 协议（同一 Beat 多版正文匿名打乱交给隔离评委）。它用 `session.kind = "rank"`——没有 inbox、没有根 loop，由脚本创建若干评委 Task（角色 `judge`，key 是 `rank.round:N`）并把汇总存为 session 结果——零新存储；不搬出 harness。
 
 Electron 主进程拥有 Runtime、数据库连接、凭据与 session owner。renderer reload、attach / detach、关窗只改订阅，不停正在跑的 turn；明确退出则 interrupt 在途 turn，在 5 秒的退出窗口内有界收口（`apps/desktop/src/main.ts` 的 `finishQuit`：工作区收尾最多 3.5 秒，余下留给观测），释放 owner。重开后 session 回到 `idle` 并记一句 `process_restart`，作者一句话就续上。观测：每次进程内驱动建一个 trace，`langfuse.session.id` = sessionId，重启用新 trace；不试图跨进程恢复 span。
 
@@ -410,13 +410,13 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 重复发送同一条作者消息 | command receipt 去重，返回原序号 | `workspace`「命令重发校验输入：并发 send 只有一个 controller，跑完后的重发返回原回执不再开 turn」；`execution-persistence`「inbox：idle 与 running 都排队，turn 非正常结束后照样收，相同命令返回原序号」 |
 | **turn 结束后作者再发消息** | 同一 session、同一消息列表续接；checkout 里的候选仍在 | `agent`「作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的 commit 一起进版本，没有合并步骤」（第二个 turn 提交的正是第一个 turn 留在 checkout 里的改动）、「说完就停；同一 session 的下一句接着消息列表，新 session 隔离；只讨论不产生作品版本」 |
 | turn 结束时候选未提交 | turn 正常结束；对账事件给出未提交数与这一轮改了哪些文件；下一 turn 可提交 | `agent-write`「未提交的模型候选不会因为停止输出而进入 Canon；候选留在 checkout 等下一轮」；对账：`agent`「turn 结束事件带对账：作者几条、意图 / Design / 正文各改了什么、提交了几个版本、还剩几个未提交」 |
-| **作者与 Agent 改同一文件** | Agent 的 `edit` 以当前内容为准，`oldText` 对不上即失败并让模型重读；作者保存时 `expectedSHA` 冲突、外部修改保留；提交没有合并步骤 | 编辑侧：`agent`「作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，对不上就失败让模型重读」；保存侧：`workspace`「工作台查询无需模型；读写只有 workspace.file.* 一组：编辑 CAS 保留外部修改，按版本读单个文件」；提交侧：`apps/cli/test/cli.test.ts`「作者未提交的修改与 Agent 的改动是同一份候选：一次 commit 一起进版本」 |
+| **作者与 Agent 改同一文件** | Agent 的 `edit` 以当前内容为准，`oldText` 对不上即失败并让模型重读；作者保存时 `expectedSHA` 冲突、外部修改保留；提交没有合并步骤 | 编辑侧：`agent`「作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，对不上就失败让模型重读」；保存侧：`workspace`「工作台查询无需模型；读写只有 workspace.file.* 一组：编辑 CAS 保留外部修改，按版本读单个文件」；提交侧：`agent`「作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的 commit 一起进版本，没有合并步骤」 |
 | 两个 turn 之间升级了工具面或宪法；停在一批动作中间时工具面变了 | 下一次请求就用新的；被打断的动作补结果，不按旧声明重放 | `harness-recovery`「停在一批动作中间时工具面变了：照样续上，被打断的动作补结果，新请求用新的工具声明」 |
 | 退出后重开；换模型 | 重开同 session 从 checkpoint 续；换模型从这个 turn 起生效，半途停下的也照样续 | `agent`「进程重启：持有进程已死的 running session 收敛回 idle 记 process_restart，下一句从 checkpoint 续」「模型回复没收到进程就退出：…换了模型照样接着原对话」；`execution-state`「删除 session 带走它的子任务；turn 进行中不能删」；`conversation-model`「session 的模型独立于全局默认，思考参数真实传入；turn 边界换绑与设置保存都不打断当前回复」 |
 | 2026-10-06 之前落盘的 paused session | 打开作品时收敛成 idle，暂停原因转记为 `lastFailure`，作者一句话就能续 | `execution-state`「2026-10-06 之前落盘的 paused session：打开时收敛成 idle，暂停原因转记为 lastFailure，作者一句话就能续」 |
 | 指令已接收但应用前退出；应用后确认回复丢失 | 下一 Context 恰好包含一次该消息；重放返回原确认 | `harness-recovery`「作者消息已存入 checkpoint 而消息发布失败时，恢复补齐同一条消息」；`agent`「turn 进行中作者补一句：模型停下时 inbox 有新消息就在同一 turn 里继续；turn 结束后的消息等下一个 turn」；`agent-loop-persistence`「读取 steering 失败必须停止，不能冒充没有作者指令而继续调用」 |
 | 子任务运行中作者发消息 | 消息留在 inbox，子任务不接收；子任务返回后根 Agent 在下一边界取走 | `agent`「子任务运行中作者发消息：子任务看不到，交付之后根 Agent 在下一次请求里接着工具结果读到」 |
-| 两进程争用、旧 owner 迟到 | 只有一个有效推进者；拒绝陈旧确认 | `local-project-regressions`「执行状态按行保存：另一进程新增的 session 不被抹掉，版本落后的写入报告冲突」；`workspace`「命令重发校验输入：并发 send 只有一个 controller…」；`execution-persistence`「SQLite 已提交但确认返回丢失时，旧实例停下，重开从原回执恢复」 |
+| 两进程争用、旧 owner 迟到 | 只有一个有效推进者；拒绝陈旧确认 | `execution-persistence`「SQLite 双连接各自新建 session：两边的都留下，后写的不抹掉先写的」；`workspace`「命令重发校验输入：并发 send 只有一个 controller…」；`execution-persistence`「SQLite 已提交但确认返回丢失时，旧实例停下，重开从原回执恢复」 |
 | **`write` 到 Story 根之外** | 写入成功；`commit` 结果点名它未进版本 | `agent`「Agent 直接修改与阶段提交，不强制 Review 或子任务；不属于作品的文件不进版本，提交结果点名」（`scripts/count.py` 写进真实 checkout，`ignored` 与 `suim diff` 是同一份） |
 | 模型把目录当文件读、写、删 | `is_a_directory` 作为工具拒绝回到模型手里，turn 继续；`list` 列一层目录、私有目录与读范围之外的不列 | `confined-env`「读、写、删一个目录：如实拒绝并指向 list，不抛原始 EISDIR 掀掉整个 turn」「list：列出一层目录…」——前者是 2026-10-01 真实模型回归里 Writer 读目录、原始 EISDIR 掀掉整个 turn 之后补的 |
 | **动作进行中文件被外部改了** | `file_write_conflict` 作为工具错误交给模型，turn 继续 | 写入侧：`confined-env`「准备好的写入落盘前一刻核对写前的 hash：已经写过的不再写一次，外部改过的报写冲突、不覆盖」；loop 侧：`harness-recovery`「准备写入之后作者改了同一个文件…」（2026-10-04 补；此前 loop 把这个错误重新抛出，turn 失败，续接时又撞同一个冲突） |

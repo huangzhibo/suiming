@@ -81,7 +81,7 @@ Checker 只在 promote 时跑。候选 commit 按定义就是未检查的，这�
 
 ChangeSet 只从 diff 构造：人类、host agent 与 Suiming Agent 改的是同一个 checkout，`commit` 扫描实际文件、按 identity 计算候选、运行 Checker、原子推进 canon ref。没有第二种提交方式，也没有 `rename` 操作：identity 变了就是 delete 加 create，Checker 的引用检查兜底，Beat id 本身不可变（`artifact.test.ts`「identity 改名表现为 delete 加 create；未同步确定性引用时不能提交」）；同一 identity 换了路径是 `replace`（4.1）。验证失败不产生部分写入。基线陈旧的 ChangeSet 被 `change_set_stale` 拒绝，不静默覆盖（`canon-store-contract.ts`）。本地提交没有合并步骤——只有一份候选，就不存在两份候选要 rebase；`mergeOpenStoryFiles` 只在 Cloud 同步里用。回退是一个新 ChangeSet，不删除历史。
 
-**一份候选、一条提交路径。**作者、host agent 与 Suiming Agent 改的是同一个 checkout，没有 per-session worktree（为什么去掉、带来哪些后果，见 [Harness 设计](harness-design.md)第 2 节）。`project.diff` 是三方改动的合集，`commit` 把它整个推进 Canon；作者未提交的修改会随 Agent 的下一次 `commit` 一起进版本，这是「一份候选」的直接后果，`commit` 的结果如实列出进版本的每个文件（`agent.test.ts`「作者与 Agent 共用一份候选」、`cli.test.ts`「作者未提交的修改与 Agent 的改动是同一份候选」）。冲突在动作发生的当下解决，不攒到提交：Agent 的 `edit` 在 prepare 阶段读当前内容，`oldText` 对不上就是可修复的工具错误，模型重读再改（`agent.test.ts`「作者与 Agent 改同一文件：edit 以 checkout 当前内容为准」）；作者在编辑器保存走 `workspace.file.save` 的 `expectedSHA`，文件被 Agent 改过就报冲突并保留外部修改（`workspace.test.ts`「编辑 CAS 保留外部修改」）。同一 Project 同一时刻只有一个 `running` session；作品锁只锁 open 与 commit，所以 host 与 Agent 同时大改同一部作品会互相覆盖，不要并行跑。
+**一份候选、一条提交路径。**作者、host agent 与 Suiming Agent 改的是同一个 checkout，没有 per-session worktree（为什么去掉、带来哪些后果，见 [Harness 设计](harness-design.md)第 2 节）。`project.diff` 是三方改动的合集，`commit` 把它整个推进 Canon；作者未提交的修改会随 Agent 的下一次 `commit` 一起进版本，这是「一份候选」的直接后果，`commit` 的结果如实列出进版本的每个文件（`agent.test.ts`「作者与 Agent 共用一份候选」）。冲突在动作发生的当下解决，不攒到提交：Agent 的 `edit` 在 prepare 阶段读当前内容，`oldText` 对不上就是可修复的工具错误，模型重读再改（`agent.test.ts`「作者与 Agent 改同一文件：edit 以 checkout 当前内容为准」）；作者在编辑器保存走 `workspace.file.save` 的 `expectedSHA`，文件被 Agent 改过就报冲突并保留外部修改（`workspace.test.ts`「编辑 CAS 保留外部修改」）。同一 Project 同一时刻只有一个 `running` session；作品锁只锁 open 与 commit，所以 host 与 Agent 同时大改同一部作品会互相覆盖，不要并行跑。
 
 **三方合并刻意停在文件级。**git 默认是内容级（diff3），同一文件不同位置会自动合并。对散文这是风险不是升级：两侧各改一章的不同段落，git 合出来的那一版**谁都没写过**，而 Checker 只验结构与硬状态，验不了散文的连贯。规则是：内容级自动合并只用在 Checker 能验证结果的文件上。落地分两处——Runtime 自己的合并只剩 Cloud 同步一处，用文件级的 `mergeOpenStoryFiles`（本地提交没有合并步骤，见上）；作者自己在仓里 `git merge` 时由建仓写入的 `.gitattributes` 约束，`text/**` 标 `merge=binary`。两者治的不是同一条路径，不能互相替代。
 
@@ -89,7 +89,7 @@ ChangeSet 只从 diff 构造：人类、host agent 与 Suiming Agent 改的是�
 
 没有 evidence 层。审稿是 `review/<id>.md`、读材料的笔记是 `source/<id>/notes/<n>.md`，都是普通 Story artifact（字段见 [Story Language](../story-language/artifacts.md)），走同一条 diff → ChangeSet → Checker 路径进版本；Checker 只查它们的形状（`packages/story` 的 `review-file.ts` / `source-note.ts`）。「这份审稿对当前稿还算不算数」「材料读到哪了」「能不能发布」都是 `artifact/derived.ts` 按需算的投影，不落盘，定义见[派生状态](derived-evidence-design.md) 3.2。审稿时效比的是审稿 frontmatter 里 `subjects` 记下的主体文件摘要，不是审稿进版本的时间（`derived.test.ts`「审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间」）。
 
-判定逐条按路径进行，无关修改不让整批失效（`local-project-regressions.test.ts`「host 修改一章正文只让审查该章的审稿失效」）。stale Release 只是不能发布，不阻塞作品继续提交（同文件「发布 Release 后 host 修改正文仍能提交」）。派生层只依赖 `RevisionHistoryReader`（`history` / `fileDigests` / `snapshot`），目前只有 git 实现（`derived.test.ts` 用一串快照冒充历史）；Cloud 不算这些派生状态，也还没接上 `CanonStore` 契约（不变量 3）。
+判定逐条按路径进行，无关修改不让整批失效（`derived.test.ts`「审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间」）。stale Release 只是不能发布，不阻塞作品继续提交（同文件「发布 Release 后 host 修改正文仍能提交」）。派生层只依赖 `RevisionHistoryReader`（`history` / `fileDigests` / `snapshot`），目前只有 git 实现（`derived.test.ts` 用一串快照冒充历史）；Cloud 不算这些派生状态，也还没接上 `CanonStore` 契约（不变量 3）。
 
 portable package 是导入导出格式，不是运行时持久化载体：Open Story Package 是没有历史的快照，导入即一次提交，此后时效从导入版本起算；导入必须重新解析、核对 hash、运行 Checker，不信任包内的成功声明。本地 Open Story Directory 本身是 git 仓，历史随 clone / bundle 走。
 
@@ -123,15 +123,15 @@ Design / Write / Source / Review 不是带权限预设的入口，只是桌面�
 
 ### 6.2 候选与工具
 
-Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径（4.3）。Agent 与子任务只拥有限制在 checkout 根内的工具，清单与每个工具的重放策略见 [Harness 设计](harness-design.md)第 6 节。`.git`、`.suiming` 与 host 接入目录（`.agents` / `.claude` / `.codex` / `.grok`）由 `ConfinedExecutionEnv` 挡在读写之外，其余整个 checkout 可写，是不是作品文件由 codec 与 Checker 在 `commit` 判。**没有 shell，也没有 `rg`**——`search` 背后是纯函数 `searchStoryCandidate`，不调用任何外部二进制（`confined-env.test.ts`「受限环境：路径逃逸、symlink 与只读策略都被拒绝，没有 shell」）。**子任务拿不到 `commit`，也不能再委派**，它的交付出口只有 `submit_task`（Reviewer 是 `submit_review`）。可修复的工具 / 领域错误作为反馈；持久化失败或 owner 失效立即停止推进，`stopReason === "length"` 单独处理。
+Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径（4.3）。Agent 与子任务只拥有限制在 checkout 根内的工具，清单与哪些可重读见 [Harness 设计](harness-design.md)第 6 节。`.git`、`.suiming` 与 host 接入目录（`.agents` / `.claude` / `.codex` / `.grok`）由 `ConfinedExecutionEnv` 挡在读写之外，其余整个 checkout 可写，是不是作品文件由 codec 与 Checker 在 `commit` 判。**没有 shell，也没有 `rg`**——`search` 背后是纯函数 `searchStoryCandidate`，不调用任何外部二进制（`confined-env.test.ts`「受限环境：路径逃逸、symlink 与只读策略都被拒绝，没有 shell」）。**子任务拿不到 `commit`，也不能再委派**，它的交付出口只有 `submit_task`（Reviewer 是 `submit_review`）。可修复的工具 / 领域错误作为反馈；持久化失败或 owner 失效立即停止推进，`stopReason === "length"` 单独处理。
 
-候选不是 Canon。Agent 的阶段提交走与作者的「提交」按钮、host 的 `suim commit` 完全相同的 `commitCheckout`，只多一个 commandId 回执，用于崩溃后按回执认领已完成的提交。成功后 session 基线推到新版本，同一 turn 可以继续工作；一次提交不会自动结束这一轮。提交与恢复以 receipt 和 checkout journal 核对实际效果，不能因工具回复缺失重复 edit 或 commit。
+候选不是 Canon。Agent 的阶段提交走与作者的「提交」按钮、host 的 `suim commit` 完全相同的 `commitCheckout`，只多一个 commandId 回执：动作结果没存上就被打断时，续跑按它告诉模型这次提交其实成了。成功后 session 基线推到新版本，同一 turn 可以继续工作；一次提交不会自动结束这一轮。被打断的动作不重做也不核对，补一条「执行时被打断」交给模型（[Harness 设计](harness-design.md)第 5 节）；重复提交的第二次 diff 为空，不会多出版本。
 
 ### 6.3 Context 与 Frame
 
 Context 由四个维度决定：语义层（Source、Design、StoryText）、观察入口（Book、Volume、Beat、Character、读者、Contract、Place、Resource）、时间边界、证据边界。它们形式化为纯函数 `Frame(layer, camera, t, evidence)`：`t` 只使用 StoryBeat 展示顺序，系统不维护故事内年代；Frame 只投影确定性事实，包括在场、`refs` 闭包、重放到 `t` 的硬状态、人物与读者的知情、Contract 生命周期、真实前文；人物此刻相信什么是模型推断，不是 Frame 的字段。
 
-Frame 决定每次 loop 的初始 Context，模型在 loop 中用只读工具按需补读。模型实际输入不是作品的 evidence，只留在执行对象里供调试。Frame 同时是桌面端的渲染单元，作者看到的人物证据与模型读到的来自同一实现。
+Frame 决定每次 loop 的初始 Context，模型在 loop 中用只读工具按需补读。模型实际输入不是作品的 evidence，只在内存里，不另存。Frame 同时是桌面端的渲染单元，作者看到的人物证据与模型读到的来自同一实现。
 
 角色读取边界由具体任务契约决定：Agent 在 checkout 上渐进发现；独立 Reviewer 在指定审查域内补查；采用隔离 Writer 时防止无关父会话影响，Source Reader 不被 Target 创作目标污染。作者打开同一视图不等于模型读过它。
 
@@ -143,7 +143,7 @@ Story Search 是正式的发现能力，也是 artifact 检索的**唯一函数*
 
 调用前保存决定与预期输入；子结果校验、写入执行对象并确认完成后，父调用才消费。子任务把正文、审稿这类大交付物写成作品文件，交回父 Agent 的只有路径与一句结论，不让主模型转录完整结果。执行消息复用 pi-ai 类型并保存在执行存储，Langfuse 和 UI transcript 不承担恢复真源。
 
-Local SQLite 使用版本检查、幂等 command receipt 与 owner / lease 边界，以每次领取的唯一 ownerId 作 fencing，拒绝旧 owner 的迟到确认（`local-project-regressions.test.ts`「执行状态按行保存：另一进程新增的 session 不被抹掉，版本落后的写入报告冲突」）。作品事务与对应 receipt 同事务确认，文件系统用 journal 恢复。外部模型请求在崩溃时可能结果未知，不承诺 exactly-once。提交 fence 只覆盖单次事务，不能使后续 turn 永久失去中断能力。Cloud 没有执行（第 9 节），不能把 Local 故障验收记为 Cloud 引擎验收。
+Local SQLite 使用版本检查、幂等 command receipt 与 owner / lease 边界，以每次领取的唯一 ownerId 作 fencing，拒绝旧 owner 的迟到确认（`execution-persistence.test.ts`「SQLite 双连接各自新建 session：两边的都留下，后写的不抹掉先写的」）。作品事务与对应 receipt 同事务确认，文件系统用 journal 恢复。外部模型请求在崩溃时可能结果未知，不承诺 exactly-once。提交 fence 只覆盖单次事务，不能使后续 turn 永久失去中断能力。Cloud 没有执行（第 9 节），不能把 Local 故障验收记为 Cloud 引擎验收。
 
 ### 6.5 唯一界面事件契约
 
@@ -207,7 +207,7 @@ Cloud 按 ADR-0008 冻结投入：共享契约变了，已有 adapter 随之修�
 ## 11. 代码形态
 
 ```text
-apps/{api,cli,desktop,web}
+apps/{api,cli,desktop,workbench}
 packages/{story,runtime,sdk,cloud-postgres,cloud-s3}
 integrations/{codex,claude-code,grok}
 ```

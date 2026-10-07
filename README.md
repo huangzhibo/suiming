@@ -205,7 +205,7 @@ Cloud（PostgreSQL / S3 上的作品存储与显式同步）目前冻结：`npm 
 ```text
 apps/
   desktop/   Electron 主进程：持有 Runtime 与凭据
-  web/       React 作者工作台，经 typed IPC 接入桌面
+  workbench/ React 作者工作台，经 typed IPC 接入桌面
   cli/       suim 命令行与给程序用的 JSON 契约
   api/       Cloud Domain API（冻结）
 

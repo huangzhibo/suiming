@@ -48,7 +48,7 @@ renderer 用 `@ag-ui/client` 管理对外消息（`apps/workbench/src/desktop-ag
 
 **为什么从 Radix 换成 Base UI（2026-10-06）。**10-05 评估时决定暂不换，三条触发条件之一是「shadcn 不再给 Radix 出新组件」。实际撞上的是它的变体：shadcn 的样式改成「原语-样式」八种（`radix-vega`、`base-vega` 等），我们 `components.json` 里的旧样式 `new-york` 不在其中，8 月的新组件在 `new-york-v4` 下取不到（CLI 报 404）。迁样式迟早要做，顺带换原语只多一份替换工作，换成 Base UI（shadcn 7 月起的默认）就不必再迁第二次。作者定的原则是适配 Base UI 的行为与界面，而不是让它逐处复刻 Radix：浮层的退出动画恢复（Radix 下为连按两次 Esc 去掉的，Base UI 没有那个层栈问题，`model-picker.test.ts` 守着）、菜单勾选项点了不收起、对话框遮罩换成浅色加模糊，都用 Base UI 的默认；只在一致性与可访问性上改：单选菜单项点了就收起（它们都是「选一个就切过去」），视图切换用 RadioGroup 保住 radio 语义，提示补 `role="tooltip"`、关上立即消失。逐项的坑记在 [apps/workbench/AGENTS.md](../apps/workbench/AGENTS.md)。`cn` 仍用本地的 clsx + tailwind-merge，没跟着换成 shadcn 9 月的官方 `cn` 包：那是换类名合并引擎，和换原语是两件事，放在一起改出了样式差异分不清是谁引起的。
 
-**为什么从 TanStack AI 换成 `@ag-ui/client`（2026-10-05）。**TanStack AI 在本仓只用来拼消息：`useChat` 的 `send` 抛错、`isLoading` 恒为 false，它还内嵌另一份 `@ag-ui/core`（0.1.1-canary），`bridge.ts` 靠一次类型强转把两边接起来。AG-UI 的 core 与 client 到了 1.0，换过来之后全链路只剩一份协议版本，拼消息用协议自带的那份逻辑。代价是多了 RxJS 等依赖、没有官方 React 层（自己写了 `useConversation`）；以及官方客户端按运行生命周期校验整条流，Runtime 因此改成每个事件都落在某次运行之内（新建 session 不再发 `suiming.session`，没跑过的对话快照为空，`run-event-stream.test.ts` 守着）。sdk 与 web 的 AG-UI 版本要一起升。
+**为什么从 TanStack AI 换成 `@ag-ui/client`（2026-10-05）。**TanStack AI 在本仓只用来拼消息：`useChat` 的 `send` 抛错、`isLoading` 恒为 false，它还内嵌另一份 `@ag-ui/core`（0.1.1-canary），`bridge.ts` 靠一次类型强转把两边接起来。AG-UI 的 core 与 client 到了 1.0，换过来之后全链路只剩一份协议版本，拼消息用协议自带的那份逻辑。代价是多了 RxJS 等依赖、没有官方 React 层（自己写了 `useConversation`）；以及官方客户端按运行生命周期校验整条流，Runtime 因此改成每个事件都落在某次运行之内（新建 session 不再发 `suiming.session`，没跑过的对话快照为空，`run-event-stream.test.ts` 守着）。sdk 与 workbench 的 AG-UI 版本要一起升。
 
 首期不采用 Next.js，也不依赖仍在演进的 TanStack Start 全栈层。未来营销站、公开 Reader 或需要 SSR 的产品入口独立评估，不能反向改变作者端 Domain API。
 
