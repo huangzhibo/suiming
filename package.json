@@ -34,11 +34,11 @@
 		"check:design-system": "npm run lint -w @suiming/workbench"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.5.8",
-		"@types/node": "24.13.3",
+		"@biomejs/biome": "2.5.15",
+		"@types/node": "24.19.1",
 		"esbuild": "0.28.2",
 		"playwright": "1.63.0",
-		"tsx": "4.23.12",
+		"tsx": "4.23.15",
 		"typescript": "6.0.3"
 	},
 	"engines": {
