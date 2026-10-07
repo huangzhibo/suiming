@@ -32,8 +32,8 @@ export interface FileMutation {
 	path: string;
 	before: string | null;
 	after: string | null;
-	/** 写入字节的 base64（不是原文）；删除为 null。 */
-	content: string | null;
+	/** 要写入的字节；删除为 null。只在一次动作的内存里传，不落盘。 */
+	bytes: Uint8Array | null;
 }
 
 function missing(error: unknown): boolean {
@@ -172,7 +172,7 @@ export class ConfinedExecutionEnv {
 			path: logical,
 			before: before === null ? null : sha256Buffer(before),
 			after: bytes === null ? null : sha256Buffer(bytes),
-			content: bytes === null ? null : Buffer.from(bytes).toString("base64"),
+			bytes,
 		};
 	}
 
@@ -180,9 +180,7 @@ export class ConfinedExecutionEnv {
 	async applyMutation(mutation: FileMutation, signal?: AbortSignal): Promise<void> {
 		signal?.throwIfAborted();
 		const { absolute } = await this.#confine(mutation.path, true);
-		const bytes = mutation.content === null ? null : Buffer.from(mutation.content, "base64");
-		if ((bytes === null ? null : sha256Buffer(bytes)) !== mutation.after)
-			throw new Error("File journal content is corrupt");
+		const { bytes } = mutation;
 		const current = await this.#readExisting(absolute);
 		const currentHash = current === null ? null : sha256Buffer(current);
 		if (currentHash === mutation.after) return;

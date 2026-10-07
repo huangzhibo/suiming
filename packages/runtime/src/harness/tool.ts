@@ -7,7 +7,6 @@ export type ToolDetails = JsonValue | undefined;
 /** 模型可见声明复用 pi-ai；执行由 Suiming 拥有。 */
 export interface HarnessTool<TParameters extends TSchema = TSchema, TDetails extends ToolDetails = ToolDetails>
 	extends Tool<TParameters> {
-	label?: string;
 	/** 此工具校验并交付 Task；自然语言停下不能替代它。 */
 	submission?: boolean;
 	/**

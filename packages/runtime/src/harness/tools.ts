@@ -122,9 +122,8 @@ const MAX_LIST_ENTRIES = 300;
 
 /** 写入后的字数，与正文检查（checkStoryText 的 codePoints）同一口径：按码点计，含标点与换行。 */
 function sizeAfter(mutation: FileMutation): string {
-	if (mutation.content === null) return "";
-	// mutation 里的 content 是 base64 字节，不是原文。
-	return `，${Array.from(Buffer.from(mutation.content, "base64").toString("utf8")).length} 字`;
+	if (mutation.bytes === null) return "";
+	return `，${Array.from(Buffer.from(mutation.bytes).toString("utf8")).length} 字`;
 }
 
 const STORY_TEXT_PATH = /^text\/(.+)\.md$/u;
@@ -147,8 +146,8 @@ function paragraphStats(content: string): { count: number; average: number } {
  */
 async function storyTextShape(mutation: FileMutation, scan?: CandidateScanner): Promise<string> {
 	const beat = STORY_TEXT_PATH.exec(mutation.path)?.[1];
-	if (beat === undefined || mutation.content === null) return "";
-	const own = paragraphStats(Buffer.from(mutation.content, "base64").toString("utf8"));
+	if (beat === undefined || mutation.bytes === null) return "";
+	const own = paragraphStats(Buffer.from(mutation.bytes).toString("utf8"));
 	let previous: { count: number; average: number } | undefined;
 	let reference = "前一节";
 	if (scan !== undefined) {
@@ -380,7 +379,6 @@ function snippet(
 export function searchTool(scan: CandidateScanner): HarnessTool<typeof SearchSchema, undefined> {
 	return readTool({
 		name: "search",
-		label: "search",
 		description:
 			"在当前作品目录中做精确文本 / 标识检索，返回命中的 artifact 路径与片段；带 sourceId 查那份 Source 的抽取（原文按字找用 search_source）。语义检索不可用。",
 		parameters: SearchSchema,
@@ -430,7 +428,6 @@ const ImpactSchema = Type.Object(
 export function impactTool(scan: CandidateScanner): HarnessTool<typeof ImpactSchema, undefined> {
 	return readTool({
 		name: "impact",
-		label: "impact",
 		description:
 			"改一个人物、物品、地点、World、Contract 或 Beat 之前，按 refs 与 refs.beat 召回可能受影响的 Beat 与文件路径（改 Beat 时也带上紧接着的下一节）；带 sourceId 查那份 Source 的抽取。只召回，不判断语义。",
 		parameters: ImpactSchema,
@@ -463,7 +460,6 @@ const CheckSchema = Type.Object({}, { additionalProperties: false });
 export function checkTool(scan: CandidateScanner): HarnessTool<typeof CheckSchema, undefined> {
 	return readTool({
 		name: "check",
-		label: "check",
 		description:
 			"对当前工作目录运行确定性 Checker（schema、引用、顺序、Contract、硬状态、已有正文）。结论三种：PASSED 没有问题；ISSUES 可以提交，但列出的设计或正文问题要修，阶段提交时先留着也要在回复里告诉作者；FAILED 提交会被拒绝，先修。",
 		parameters: CheckSchema,
@@ -519,7 +515,6 @@ const FrameSchema = Type.Object(
 export function frameTool(scan: CandidateScanner): HarnessTool<typeof FrameSchema, undefined> {
 	return readTool({
 		name: "frame",
-		label: "frame",
 		description: "查看某个 StoryBeat 之前与之后的硬状态（位置、持有、生死等），以及它引用的实体与 Contract。",
 		parameters: FrameSchema,
 		async execute(_toolCallId, params) {
@@ -568,7 +563,6 @@ export function submitTool<TParameters extends TSchema>(
 ): HarnessTool<TParameters, undefined> {
 	return {
 		name: options.name,
-		label: options.name,
 		submission: true,
 		description: options.description,
 		parameters: options.parameters,

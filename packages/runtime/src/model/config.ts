@@ -34,7 +34,7 @@ export interface ModelProfileConfig {
 }
 
 export interface ModelRoutingConfig {
-	/** 禁止新绑定；已经冻结了绑定的 turn 续跑时照旧使用。 */
+	/** 禁止新绑定；已有的对话与子任务按它们自己的绑定照旧使用。 */
 	disabledProviders?: readonly string[];
 	profiles: Readonly<
 		Record<RequiredModelProfileId, ModelProfileConfig> & Partial<Record<ModelProfileId, ModelProfileConfig>>

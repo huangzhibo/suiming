@@ -68,7 +68,7 @@ export const reviewVerdictSchema = Type.Union([
 ]);
 
 /**
- * 一份审稿文件（`review/<id>.md`）的摘要与它对当前稿还算不算数，与 `committedReviews()` 投影成对。
+ * 一份审稿文件（`review/<id>.md`）的摘要与它对当前稿还算不算数，与 runtime 的 `reviewSummary()` 投影成对。
  * CLI 的 review list / show 与桌面的 workspace.reviews 共用；桌面在上面多带 paths 与 findings。
  */
 export const reviewSummarySchema = Type.Object(

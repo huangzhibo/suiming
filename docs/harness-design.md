@@ -419,7 +419,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 两进程争用、旧 owner 迟到 | 只有一个有效推进者；拒绝陈旧确认 | `local-project-regressions`「执行状态按行保存：另一进程新增的 session 不被抹掉，版本落后的写入报告冲突」；`workspace`「命令重发校验输入：并发 send 只有一个 controller…」；`execution-persistence`「SQLite 已提交但确认返回丢失时，旧实例停下，重开从原回执恢复」 |
 | **`write` 到 Story 根之外** | 写入成功；`commit` 结果点名它未进版本 | `agent`「Agent 直接修改与阶段提交，不强制 Review 或子任务；不属于作品的文件不进版本，提交结果点名」（`scripts/count.py` 写进真实 checkout，`ignored` 与 `suim diff` 是同一份） |
 | 模型把目录当文件读、写、删 | `is_a_directory` 作为工具拒绝回到模型手里，turn 继续；`list` 列一层目录、私有目录与读范围之外的不列 | `confined-env`「读、写、删一个目录：如实拒绝并指向 list，不抛原始 EISDIR 掀掉整个 turn」「list：列出一层目录…」——前者是 2026-10-01 真实模型回归里 Writer 读目录、原始 EISDIR 掀掉整个 turn 之后补的 |
-| **动作进行中文件被外部改了** | `file_write_conflict` 作为工具错误交给模型，turn 继续 | 写入侧：`confined-env`「文件 journal 恢复识别未应用、已应用和外部冲突，重复 edit 不会再替换一次」；loop 侧：`harness-recovery`「准备写入之后作者改了同一个文件…」（2026-10-04 补；此前 loop 把这个错误重新抛出，turn 失败，续接时又撞同一个冲突） |
+| **动作进行中文件被外部改了** | `file_write_conflict` 作为工具错误交给模型，turn 继续 | 写入侧：`confined-env`「准备好的写入落盘前一刻核对写前的 hash：已经写过的不再写一次，外部改过的报写冲突、不覆盖」；loop 侧：`harness-recovery`「准备写入之后作者改了同一个文件…」（2026-10-04 补；此前 loop 把这个错误重新抛出，turn 失败，续接时又撞同一个冲突） |
 | DB 写入失败、对象写入失败、IPC 发出失败 | 前两者不发布未保存结果或继续副作用；后者从持久游标重放 | `execution-state`「持久确认失败回滚命令，并禁止该实例继续推进」；`run-event-stream`「事件保存失败后不发布、不给后续事件放行」；`workspace`「状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先收口」 |
 | renderer reload / 重复 attach / 消息截断后重连 | 快照和游标一致，补齐已保存内容，模型调用与提交计数不增加 | `workspace`「状态与产品事件原子确认…」里的 `session.attach` 快照与 `afterSequence` 续读；`run-event-stream`「合批消息先保存，恢复用完整响应补齐尾部并按 id 去重」；`apps/desktop/test/desktop.test.ts`「Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、作者回应、正文与独立审稿贯通」 |
 | 模型主动压缩 | 只改变下一次输入，原消息、动作与作者指令保留；写摘要的那次回复里顺带调的工具，结果照常发 | `agent`「Context 压缩只改变下一次输入，原消息与动作在 checkpoint 里保留」；`context-window`「压缩和别的工具在同一次回复里：同一批读到的结果压缩后照常发，之前的才由摘要代表」 |

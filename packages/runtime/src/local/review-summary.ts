@@ -44,7 +44,7 @@ export function reviewSummary(review: CommittedReview, currency: ReviewCurrency)
 
 /**
  * 候选里的审稿逐份算时效，基线是候选自己的 `baseRevisionId`。CLI 的 review list / show 在 checkout 上算
- * （刚 record、还没提交的也在），桌面按它选中的已提交版本算。2026-10-02 之前这段循环在桌面 IPC、
+ * （刚 record、还没提交的也在），桌面按 head 算。2026-10-02 之前这段循环在桌面 IPC、
  * CLI review list 与 review show 各写一遍。调用方在结果上再投影各自要的东西（桌面要挂回页面的 paths 与 finding 细节）。
  */
 export async function reviewSummaries(
@@ -62,12 +62,10 @@ export async function reviewSummaries(
 
 /** head 里的审稿与它们的时效；桌面的 workspace.reviews 用。 */
 export async function committedReviews(project: LocalProjectService): Promise<{
-	revisionId: string;
 	candidate: ArtifactCandidate;
 	reviews: { review: CommittedReview; summary: ReviewSummary }[];
 }> {
-	const revisionId = project.project().headRevisionId;
 	const reader = project.historyReader();
-	const candidate = await reader.snapshot(revisionId);
-	return { revisionId, candidate, reviews: await reviewSummaries(reader, candidate) };
+	const candidate = await reader.snapshot(project.project().headRevisionId);
+	return { candidate, reviews: await reviewSummaries(reader, candidate) };
 }

@@ -3,7 +3,6 @@ export {
 	type SessionEventBody,
 	type SessionEventListener,
 	SessionEventSchema,
-	type SessionEventType,
 } from "@suiming/sdk";
 
 import { randomUUID } from "node:crypto";

@@ -97,7 +97,6 @@ export const SessionEventSchema: TUnsafe<SessionEvent> = Type.Unsafe<SessionEven
 	),
 );
 export type SessionEventBody = AGUIEvent;
-export type SessionEventType = AGUIEvent["type"];
 export type SessionEventListener = (event: SessionEvent) => void;
 
 export function validateProductEvent(event: AGUIEvent): void {

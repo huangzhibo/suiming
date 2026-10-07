@@ -48,7 +48,7 @@ test("受限环境：路径逃逸、symlink 与只读策略都被拒绝，没有
 		const read = new ConfinedExecutionEnv({ rootPath: root, policy: "read" });
 		assert.equal(await read.readTextFile("intent/a.md"), "intent\n");
 		await assert.rejects(read.writeFile("intent/a.md", "changed"), { code: "permission_denied" });
-		// 删除走的是同一条 journal 路径；只读环境连准备删除都不允许。
+		// 删除走的是同一条写入路径；只读环境连准备删除都不允许。
 		await assert.rejects(read.prepareWrite("intent/a.md", null), { code: "permission_denied" });
 		assert.equal("exec" in read, false);
 		assert.equal("createTempDir" in read, false);
@@ -57,7 +57,7 @@ test("受限环境：路径逃逸、symlink 与只读策略都被拒绝，没有
 	}
 });
 
-test("文件 journal 恢复识别未应用、已应用和外部冲突，重复 edit 不会再替换一次", async () => {
+test("准备好的写入落盘前一刻核对写前的 hash：已经写过的不再写一次，外部改过的报写冲突、不覆盖", async () => {
 	const { root } = await sandbox();
 	try {
 		const env = new ConfinedExecutionEnv({ rootPath: root, policy: "write" });
@@ -189,7 +189,7 @@ test("读、写、删一个目录：如实拒绝并指向 list，不抛原始 EI
 		};
 		const env = new ConfinedExecutionEnv({ rootPath: root, policy: "write" });
 		await assert.rejects(env.readTextFile("intent"), directoryRejected);
-		// 写或删一个目录的路径同理：准备 journal 时要读原内容。
+		// 写或删一个目录的路径同理：准备写入时要读原内容。
 		await assert.rejects(env.prepareWrite("intent", "x"), directoryRejected);
 		await assert.rejects(env.prepareWrite("intent", null), directoryRejected);
 	} finally {

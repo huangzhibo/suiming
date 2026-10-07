@@ -593,7 +593,7 @@ export class HarnessSession {
 		// 从 checkpoint 接着跑也用当前的工具面与 systemPrompt：半途的动作不重做，不需要冻结当时的声明。
 		const tools = input.tools(handle);
 		let loop = restored?.loop;
-		// 未交付是可继续的协议暂停；显式续跑仍沿用原消息列表，而非返回旧 settled 结果。
+		// 上次停下而没有交付的 loop（子任务停下没交、根 Agent 说完停下），再跑时沿用原消息列表回到 ready，不返回旧结果。
 		if (loop && loop.phase === "settled" && loop.stop !== "terminated") {
 			loop = { ...loop, phase: "ready" };
 			delete loop.stop;

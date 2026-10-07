@@ -56,9 +56,8 @@ export interface ModelCallRuntimeOptions {
 
 export interface BoundModelProfile {
 	readonly snapshot: ModelBindingSnapshot;
-	/** 绑定的 pi-ai Model；只供 SuimingHarness 计算用量与能力边界，不要绕过 stream / complete 自行调用。 */
+	/** 绑定的 pi-ai Model；只供 SuimingHarness 计算用量与能力边界，不要绕过 stream 自行调用。 */
 	readonly model: Model<Api>;
-	readonly telemetryContext: TelemetryContext;
 	/** 唯一的调用入口；引擎内循环与所有观测都走它。需要整条消息时 `await stream(...).result()`。 */
 	stream(context: Context, runtime?: ModelCallRuntimeOptions): AssistantMessageEventStream;
 }
@@ -309,12 +308,12 @@ export class ModelGateway {
 		);
 	}
 
-	/** 普通恢复使用 turn 冻结的模型与参数，不被新配置隐式换绑。 */
+	/** 对话与子任务按自己绑定的模型与参数跑（每个 turn、每次续跑都走这里），不被新配置隐式换绑。 */
 	async bindFrozen(snapshot: ModelBindingSnapshot): Promise<BoundModelProfile> {
 		const model = this.#models.getModel(snapshot.provider, snapshot.model);
 		if (!model || model.api !== snapshot.api || model.baseUrl !== snapshot.baseUrl)
 			throw new ModelGatewayError("model_not_found", `冻结模型不可用：${snapshot.provider}/${snapshot.model}`);
-		validateProfileOptions(model.api, snapshot.options, "attempt.options");
+		validateProfileOptions(model.api, snapshot.options, "binding.options");
 		const auth = await this.#models.checkAuth(snapshot.provider);
 		if (!auth) throw new ModelGatewayError("model_credentials_missing", `请重新连接 ${snapshot.provider}`);
 		return this.#boundProfile(
@@ -354,7 +353,6 @@ export class ModelGateway {
 		return Object.freeze({
 			snapshot,
 			model,
-			telemetryContext: this.#telemetryContext,
 			stream: (context: Context, runtime?: ModelCallRuntimeOptions) =>
 				tracedStream(runtime?.telemetryContext ?? this.#telemetryContext, snapshot, (span) =>
 					this.#models.stream(model, context, callOptions(options, { ...runtime, telemetryContext: span }, span)),

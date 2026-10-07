@@ -379,7 +379,7 @@ export class InMemoryExecutionState {
 		});
 	}
 
-	/** interrupted 的子任务在父动作重放时接着跑。 */
+	/** 被打断或失败的子任务接着跑：根 Agent 调 resume_task 时。 */
 	resumeTask(commandId: string, taskId: string): TaskRecord {
 		return this.#execute(commandId, { commandId, taskId, operation: "resume" }, () => {
 			const task = this.#requireTask(taskId);

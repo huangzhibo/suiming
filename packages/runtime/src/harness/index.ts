@@ -13,7 +13,6 @@ export {
 	type SessionEventListener,
 	SessionEventSchema,
 	SessionEventStream,
-	type SessionEventType,
 } from "./events.js";
 export {
 	type CompiledHostContext,

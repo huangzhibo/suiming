@@ -49,7 +49,6 @@ export interface ReviewTaskHandle {
 function sourceCheckTool(handle: TaskHandle, sourceId: string): HarnessTool {
 	return readTool({
 		name: "check",
-		label: "check",
 		description: `对 source/${sourceId} 运行 Source Checker。`,
 		parameters: EmptySchema,
 		async execute() {

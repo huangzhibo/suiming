@@ -232,11 +232,10 @@ export type {
 export {
 	DEFAULT_IDLE_TIMEOUT_MS,
 	LocalSessionController,
-	notActiveInProcess,
 } from "./local/local-session-controller.js";
 export { LocalWorkspace } from "./local/local-workspace.js";
 export { LocalProjectLock } from "./local/project-lock.js";
-export { committedReviews, type ReviewSummary, reviewSummaries, reviewSummary } from "./local/review-summary.js";
+export { type ReviewSummary, reviewSummaries, reviewSummary } from "./local/review-summary.js";
 export type {
 	LocalExecutionObject,
 	LocalProjectRecord,
