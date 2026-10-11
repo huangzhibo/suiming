@@ -18,7 +18,8 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0012](0012-own-suiming-harness.md) | Accepted，已实现 | 自建唯一的 SuimingHarness、只依赖 pi-ai 仍有效；Run / Task / Attempt 与同 Attempt 恢复由 Session / Task 取代 |
 | [0013](0013-cli-init-and-update.md) | Accepted | CLI 用 init 开工作品、update 维护接入；保留作者模型配置，初始化失败撤回补写文件 |
 | [0015](0015-desktop-send-rejection.md) | Accepted | 首次发送明确被模型预检拒绝时退回草稿；结果不明与确认重试仍保留原命令 ID |
-| [0016](0016-page-information-hierarchy.md) | Accepted | 按页面工作目的组织信息：版本核对、人物概览与情节设计保持各自顺序，共享基础控件 |
+| [0016](0016-page-information-hierarchy.md) | Amended；人物折叠由 0018 取代 | 按页面工作目的组织信息：版本核对、人物概览与情节设计保持各自顺序，共享基础控件 |
 | [0017](0017-check-review-state-workflows.md) | Accepted | 检查按诊断筛选，审稿按意见核对，状态查询保留观察边界，设置精简重复说明 |
+| [0018](0018-character-experience-visibility.md) | Accepted | 人物经历直接可读，情节引用与状态变化合并为按卷排列的节点，其他文档去重 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。

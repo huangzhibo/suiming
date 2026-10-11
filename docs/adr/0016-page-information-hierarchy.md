@@ -1,7 +1,7 @@
 # ADR-0016：按工作目的组织页面信息
 
 - 日期：2026-10-10
-- 状态：Accepted
+- 状态：Amended；人物轨迹与文档引用默认折叠由 [ADR-0018](0018-character-experience-visibility.md) 取代，其余决定保留
 
 ## 背景
 
