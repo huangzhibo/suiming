@@ -1,6 +1,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { CircleX, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { invoke } from "./bridge.js";
 import {
 	blockingTextFailures,
@@ -11,7 +12,8 @@ import {
 	runCheck,
 } from "./check-result.js";
 import { type Book, filePage, textPathFor } from "./model.js";
-import { Hint, Tag } from "./ui-bits.js";
+import { Hint, Segmented, Tag } from "./ui-bits.js";
+import type { PageState } from "./view-state.js";
 
 /**
  * 检查结果按作品缓存在 query 里：检查按钮与这个页面共用一份，页面不在时也保留，
@@ -101,6 +103,8 @@ export function CheckPage({
 	open,
 	disabledReason,
 	onRecheck,
+	filter,
+	onFilter,
 }: {
 	book: Book;
 	open(page: string): void;
@@ -108,6 +112,8 @@ export function CheckPage({
 	disabledReason?: string | undefined;
 	/** 页面自己重新检查时，上一次检查留下的一句话提示就过时了，由外面收掉。 */
 	onRecheck(): void;
+	filter: PageState["checkFilter"];
+	onFilter(value: PageState["checkFilter"]): void;
 }) {
 	const query = useQuery({ ...checkQuery(book.data.projectId), enabled: disabledReason === undefined });
 	const outcome = query.data;
@@ -147,10 +153,26 @@ export function CheckPage({
 			</div>
 		);
 	const result = outcome.result;
-	const diagnostics = outcome.failure?.diagnostics ?? result?.diagnostics ?? [];
+	const blocking = result ? blockingTextFailures(result) : [];
+	const diagnostics: CheckDiagnostic[] = [
+		...(outcome.failure?.diagnostics ?? result?.diagnostics ?? []),
+		...blocking.map((failure) => ({
+			severity: "error" as const,
+			path: textPathFor(failure.storyBeatId),
+			detail: failure.message,
+			message: `${failure.storyBeatId}:${failure.code}:${failure.message}`,
+		})),
+	];
+	const search = filter.query.trim().toLocaleLowerCase();
+	const visible = diagnostics.filter(
+		(item) =>
+			(filter.severity === "all" || item.severity === filter.severity) &&
+			`${item.path ?? ""} ${item.pointer ?? ""} ${item.detail} ${book.title(book.byPath.get(item.path ?? ""))}`
+				.toLocaleLowerCase()
+				.includes(search),
+	);
 	const errors = diagnostics.filter((item) => item.severity === "error").length;
 	const warnings = diagnostics.length - errors;
-	const blocking = result ? blockingTextFailures(result) : [];
 	const missing = result ? result.storyTextFailures.filter((failure) => failure.code === "missing_text") : [];
 	const verdict = outcome.failure
 		? { tone: "red" as const, label: "无法检查" }
@@ -195,59 +217,50 @@ export function CheckPage({
 				</p>
 			) : (
 				result && (
-					<dl className="mb-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs leading-[1.7]">
-						<dt className="text-muted-foreground">设计</dt>
-						<dd>{passLabel(result.designPassed)}</dd>
-						<dt className="text-muted-foreground">硬状态</dt>
-						<dd>{passLabel(result.statePassed)}</dd>
-						<dt className="text-muted-foreground">正文</dt>
-						<dd>
-							{passLabel(blocking.length === 0)}
-							{missing.length > 0 && (
-								<span className="ml-2 text-muted-foreground">
-									还有 {missing.length} 个情节没有正文，不阻塞提交
-								</span>
-							)}
-						</dd>
+					<div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-[1.7]">
+						<span>设计 {passLabel(result.designPassed)}</span>
+						<span>硬状态 {passLabel(result.statePassed)}</span>
+						<span>正文 {passLabel(blocking.length === 0)}</span>
 						{result.sourceCount > 0 && (
-							<>
-								<dt className="text-muted-foreground">原作</dt>
-								<dd>{result.sourceCount} 份，诊断路径在 source/ 下</dd>
-							</>
+							<span className="text-muted-foreground">原作 {result.sourceCount} 份</span>
 						)}
-					</dl>
+						{missing.length > 0 && (
+							<span className="text-muted-foreground">还有 {missing.length} 个情节没有正文，不阻塞提交</span>
+						)}
+					</div>
 				)
 			)}
-			{blocking.length > 0 && (
-				<section aria-label="正文问题" className="border-t border-hair-2 py-2.5">
-					<div className="mb-1 text-[13px] font-semibold">正文</div>
-					<ul>
-						{blocking.map((failure) => (
-							<li
-								key={`${failure.storyBeatId}:${failure.code}`}
-								className="flex gap-2 py-1 text-[12.5px] leading-[1.7]"
-							>
-								<CircleX aria-label="错误" className="mt-[4px] size-3.5 shrink-0 text-red-ink" />
-								<span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-									<Button
-										variant="link"
-										size="xs"
-										className="mr-1.5 h-auto p-0 text-[12.5px]"
-										data-page={textPathFor(failure.storyBeatId)}
-										onClick={() => open(textPathFor(failure.storyBeatId))}
-									>
-										{book.beatTitle(failure.storyBeatId)}
-									</Button>
-									{failure.message}
-								</span>
-							</li>
-						))}
-					</ul>
-				</section>
-			)}
-			<DiagnosticList book={book} diagnostics={diagnostics} open={open} />
-			{diagnostics.length === 0 && blocking.length === 0 && (
-				<p className="border-t border-hair-2 py-3 text-xs text-muted-foreground">没有诊断。</p>
+			<div className="mb-2 flex flex-wrap items-center gap-2">
+				<Segmented
+					value={filter.severity}
+					options={[
+						{ id: "all", label: `全部 ${diagnostics.length}` },
+						{ id: "error", label: `错误 ${errors}` },
+						{ id: "warning", label: `警告 ${warnings}` },
+					]}
+					onChange={(severity) => onFilter({ ...filter, severity })}
+				/>
+				<Input
+					aria-label="筛选诊断"
+					placeholder="搜索文件、字段或内容"
+					className="h-8 min-w-40 flex-1"
+					value={filter.query}
+					onChange={(event) => onFilter({ ...filter, query: event.target.value })}
+				/>
+				<span className="text-xs text-muted-foreground" role="status">
+					显示 {visible.length} / {diagnostics.length} 条
+				</span>
+				{(filter.query || filter.severity !== "all") && (
+					<Button size="xs" variant="ghost" onClick={() => onFilter({ severity: "all", query: "" })}>
+						清除筛选
+					</Button>
+				)}
+			</div>
+			<DiagnosticList book={book} diagnostics={visible} open={open} />
+			{visible.length === 0 && (
+				<p className="border-t border-hair-2 py-3 text-xs text-muted-foreground">
+					{diagnostics.length === 0 ? "没有诊断。" : "没有符合筛选条件的诊断。"}
+				</p>
 			)}
 		</div>
 	);

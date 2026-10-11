@@ -125,7 +125,11 @@ export interface PageState {
 	axisVolume: string | null;
 	axisColumn: number | null;
 	review: { anchor: string; active: number };
+	reviewPane: "current" | "reviewed";
+	checkFilter: { severity: "all" | "error" | "warning"; query: string };
 	versionFile: string;
+	characterTrackOpen: boolean;
+	characterRelationsOpen: boolean;
 }
 export interface WorkbenchTab {
 	id: string;
@@ -165,7 +169,11 @@ export function pageState(page = EMPTY_PAGE): PageState {
 		axisVolume: null,
 		axisColumn: null,
 		review: { anchor: "", active: -1 },
+		reviewPane: "current",
+		checkFilter: { severity: "all", query: "" },
 		versionFile: "",
+		characterTrackOpen: false,
+		characterRelationsOpen: false,
 	};
 }
 export function createTab(location = pageState()): WorkbenchTab {

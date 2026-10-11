@@ -38,6 +38,7 @@ test("故事状态按幕前 / 变化 / 幕后区分人物与读者知情，复�
 		const query = (task: string) => workspace.invoke("workspace.context", { task, revisionId });
 		const before = await query("design:state:beat-0001:before");
 		assert.equal(before.revisionId, revisionId);
+		assert.match(before.text, /### 读者期待/);
 		assert.doesNotMatch(before.text, /连环计 · 已揭示/);
 		assert.match(before.text, /火船 · 持有者：黄盖/);
 		// 有人拿着的物品，位置是原子规则隐含清空的「无」，单列一行只是噪声。

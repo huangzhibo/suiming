@@ -17,6 +17,7 @@ import { AgentPanel } from "./agent-panel.js";
 import { bridge, invoke } from "./bridge.js";
 import { checkQuery } from "./check-page.js";
 import { checkNotice } from "./check-result.js";
+import { CommandError } from "./command-error.js";
 import { DocumentGroup } from "./document-group.js";
 import { FilePane } from "./file-pane.js";
 import { HelpDialog } from "./help.js";
@@ -231,7 +232,12 @@ function WorkspaceShell() {
 	if (surface === "welcome" || !shown || !book)
 		return (
 			<WelcomeScreen
-				error={error || projection.error?.message}
+				error={
+					error ||
+					(projection.error instanceof CommandError && projection.error.code === "workspace_not_open"
+						? undefined
+						: projection.error?.message)
+				}
 				onChoose={(create) =>
 					act(async () => {
 						await bridge().chooseProject(create);
@@ -536,7 +542,7 @@ function WorkspaceShell() {
 								selection={view.observation}
 								change={observe}
 								open={open}
-								allowPositionChange={!file || !(isBeat || file.kind === "story-text")}
+								currentBeatId={file && (isBeat || file.kind === "story-text") ? file.localId : undefined}
 								pendingSubject={
 									file &&
 									(file.kind === "character" || file.kind === "resource" || file.kind === "story-contract")

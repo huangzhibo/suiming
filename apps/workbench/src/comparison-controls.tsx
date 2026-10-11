@@ -21,12 +21,14 @@ export function ComparisonActions({
 	identical,
 	layout,
 	onLayout,
+	readOnly = false,
 }: {
 	controller: RefObject<ComparisonController | null>;
 	status: ComparisonStatus | null;
 	identical: string;
 	layout: ComparisonLayout;
 	onLayout(value: ComparisonLayout): void;
+	readOnly?: boolean;
 }) {
 	return (
 		<div role="toolbar" className="flex min-w-0 items-center gap-1" aria-label="差异导航">
@@ -40,7 +42,7 @@ export function ComparisonActions({
 			<ToolButton
 				label="上一处差异"
 				disabled={!status?.count}
-				disabledReason="两侧内容相同，没有差异"
+				disabledReason={status ? "两侧内容相同，没有差异" : "差异尚未就绪"}
 				onClick={() => controller.current?.previous()}
 			>
 				<ArrowUp />
@@ -48,20 +50,22 @@ export function ComparisonActions({
 			<ToolButton
 				label="下一处差异"
 				disabled={!status?.count}
-				disabledReason="两侧内容相同，没有差异"
+				disabledReason={status ? "两侧内容相同，没有差异" : "差异尚未就绪"}
 				onClick={() => controller.current?.next()}
 			>
 				<ArrowDown />
 			</ToolButton>
-			<ToolButton
-				label="还原当前差异"
-				description="把选中的变更块恢复为比较基线，写入当前草稿"
-				disabled={!status?.active}
-				disabledReason={status?.count ? "先用上一处 / 下一处选中一处差异" : "两侧内容相同，没有差异"}
-				onClick={() => controller.current?.restore()}
-			>
-				<RotateCcw />
-			</ToolButton>
+			{!readOnly && (
+				<ToolButton
+					label="还原当前差异"
+					description="把选中的变更块恢复为比较基线，写入当前草稿"
+					disabled={!status?.active}
+					disabledReason={status?.count ? "先用上一处 / 下一处选中一处差异" : "两侧内容相同，没有差异"}
+					onClick={() => controller.current?.restore()}
+				>
+					<RotateCcw />
+				</ToolButton>
+			)}
 			<ToolButton
 				label={layout === "split" ? "切换为单栏差异" : "切换为并排差异"}
 				onClick={() => onLayout(layout === "split" ? "unified" : "split")}

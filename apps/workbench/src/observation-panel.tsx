@@ -13,7 +13,7 @@ export function ObservationPanel({
 	book,
 	selection,
 	change,
-	allowPositionChange,
+	currentBeatId,
 	pendingSubject,
 	open,
 	reference,
@@ -21,7 +21,7 @@ export function ObservationPanel({
 	book: Book;
 	selection: ObservationSelection | null;
 	change(value: ObservationSelection): void;
-	allowPositionChange: boolean;
+	currentBeatId: string | undefined;
 	pendingSubject: ObservationSelection["subject"];
 	open(path: string): void;
 	reference(text: string): void;
@@ -40,15 +40,9 @@ export function ObservationPanel({
 			<PanelToolbar>
 				<h2 className="text-xs font-medium">故事状态</h2>
 			</PanelToolbar>
-			<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
-				<div className="flex items-start justify-between gap-2">
-					<div className="min-w-0">
-						<p className="mb-1 text-xs text-muted-foreground">观察位置</p>
-						<p className="text-sm font-medium">
-							{storyBeatId ? book.beatTitle(storyBeatId) : "尚未选择故事位置"}
-						</p>
-					</div>
-					{(allowPositionChange || !selection) && (
+			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-3">
+				<div>
+					{!currentBeatId || currentBeatId !== storyBeatId ? (
 						<Select
 							value={storyBeatId}
 							onValueChange={(storyBeatId) =>
@@ -56,11 +50,13 @@ export function ObservationPanel({
 							}
 						>
 							<SelectTrigger
-								className="h-6 w-auto shrink-0 gap-1 border-0 bg-transparent px-1 text-xs shadow-none"
+								className="h-auto min-h-8 w-full text-left text-sm"
 								size="sm"
 								aria-label="选择观察位置"
 							>
-								<span>{selection ? "更换位置" : "选择位置"}</span>
+								<span className="min-w-0 whitespace-normal">
+									{storyBeatId ? book.beatTitle(storyBeatId) : "尚未选择故事位置"}
+								</span>
 							</SelectTrigger>
 							<SelectContent alignItemWithTrigger={false} align="end" className="max-h-80 w-64">
 								{book.data.volumes.map((volume) => (
@@ -77,8 +73,20 @@ export function ObservationPanel({
 								))}
 							</SelectContent>
 						</Select>
+					) : (
+						<p className="text-sm font-medium">{book.beatTitle(storyBeatId)}</p>
 					)}
 				</div>
+				{currentBeatId && currentBeatId !== storyBeatId && (
+					<Button
+						size="xs"
+						variant="outline"
+						className="self-start"
+						onClick={() => change({ storyBeatId: currentBeatId, phase })}
+					>
+						查看当前情节
+					</Button>
+				)}
 				{!selection && (
 					<p className="text-xs leading-relaxed text-muted-foreground">
 						从大纲或故事轴定位一幕，再点击「故事状态」；也可以在这里选择观察位置。
@@ -104,9 +112,12 @@ export function ObservationPanel({
 					)}
 				</div>
 				{selection && (
-					<p className="text-xs text-muted-foreground">
-						{book.headLabel} 已提交的设计；没写下的不等于没发生，也不等于人物不知道。
-					</p>
+					<details className="text-xs text-muted-foreground">
+						<summary className="cursor-pointer">{book.headLabel} 已提交的设计 · 状态说明</summary>
+						<p className="mt-2 leading-relaxed">
+							没写下的不等于没发生，也不等于人物不知道。这里不包含尚未提交的设计修改。
+						</p>
+					</details>
 				)}
 				{query.error && (
 					<p role="alert" className="text-sm text-destructive">

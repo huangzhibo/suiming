@@ -43,6 +43,13 @@ test("检查结果页：按文件列出诊断，绑定失败也列全，作品�
 			"按文件归类后，每行不再重复路径",
 		);
 		await page.getByText("还有 2 个情节没有正文，不阻塞提交", { exact: true }).waitFor();
+		const filter = page.getByRole("textbox", { name: "筛选诊断" });
+		await filter.fill("找不到的文件");
+		await page.getByText("没有符合筛选条件的诊断。", { exact: true }).waitFor();
+		await page.getByText("显示 0 / 1 条", { exact: true }).waitFor();
+		await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+		await contract.getByRole("listitem").waitFor();
+
 		await mkdir("/tmp/suiming-desktop-qa", { recursive: true });
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/check-design.png" });
 		// 文件组的标题打开那份文件，后退回到同一份结果。

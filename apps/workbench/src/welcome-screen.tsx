@@ -52,7 +52,11 @@ export function WelcomeScreen({
 				</Button>
 			</div>
 			<p className="text-[11px] text-muted-foreground">作品保存在你的电脑上，不需要云端账号。</p>
-			{error && <p className="mt-2 text-[11.5px] leading-[1.7] whitespace-pre-wrap text-[#a06443]">{error}</p>}
+			{error && (
+				<p role="alert" className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-destructive">
+					{error}
+				</p>
+			)}
 		</main>
 	);
 }

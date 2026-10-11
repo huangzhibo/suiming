@@ -61,6 +61,26 @@ Object.assign(globalThis, {
 });
 
 const modelTest = process.argv.includes("--model-picker-test");
+if (process.argv.includes("--version-page-test")) {
+	let failedList = false;
+	let failedFile = false;
+	const handle = ipcMain.handle.bind(ipcMain);
+	ipcMain.handle = (channel, listener) =>
+		handle(channel, async (event, request, ...args) => {
+			if (channel === "suiming:command") {
+				if (request.command === "revision.diff" && !failedList) {
+					failedList = true;
+					await gate("version-list");
+					return { ok: false, error: { code: "test_read_failed", message: "测试：版本清单读取失败" } };
+				}
+				if (request.command === "workspace.file.read" && request.input.revisionId && !failedFile) {
+					failedFile = true;
+					return { ok: false, error: { code: "test_read_failed", message: "测试：版本正文读取失败" } };
+				}
+			}
+			return listener(event, request, ...args);
+		});
+}
 const provider = fauxProvider(
 	modelTest
 		? {
@@ -328,7 +348,8 @@ if (modelTest) {
 	await settings.save({ profile: "main", ...profile, thinking: "low" });
 	await settings.save({ profile: "reviewer", ...profile });
 	startDesktop({ settings, models: async () => new ModelGateway(models, (await loadModelRoutingConfig()).config) });
-} else
+} else if (process.argv.includes("--unconfigured-model-test")) startDesktop();
+else
 	startDesktop({
 		models: async () => new ModelGateway(models, { profiles: { main: profile, reviewer: profile } }),
 	});

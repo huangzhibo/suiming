@@ -120,6 +120,15 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 		await page.getByRole("button", { name: "故事状态", exact: true }).click();
 		await panel.getByText("只看 黄盖", { exact: true }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/observation-character.png" });
+		// 保留显式查询的位置；转看另一幕时仍能换位置，也能一键查询当前情节。
+		await page.locator("[data-navigation-icons]").getByRole("button", { name: "搜索", exact: true }).click();
+		await page.getByRole("textbox", { name: "搜索作品", exact: true }).fill("outline/story/vol-0001/beat-0002.md");
+		await page.locator("button[data-page='outline/story/vol-0001/beat-0002.md']").click();
+		await panel.getByRole("combobox", { name: "选择观察位置", exact: true }).waitFor();
+		await panel.getByRole("button", { name: "查看当前情节", exact: true }).click();
+		await panel.getByRole("paragraph").filter({ hasText: /^beat-0002$/ }).waitFor();
+		await panel.getByText("全部人物、资源与读者期待", { exact: true }).waitFor();
+		assert.equal(await panel.getByRole("combobox").count(), 0);
 		await page.getByRole("button", { name: "对话", exact: true }).click();
 		await panel.waitFor({ state: "hidden" });
 		// 后续浏览不改写已准备的引用；发送时携带当时的边界、版本与状态结果。
@@ -224,7 +233,10 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/diff.png" });
 		// 底栏的「N 个文件未提交」就是看这份改动的入口；Agent 面板原来另有一条常驻的「候选」横幅，与底栏、本轮对账说同一件事。
 		await page.getByRole("button", { name: "1 个文件未提交", exact: true }).click();
-		await page.getByRole("heading", { name: "未提交的修改" }).waitFor();
+		await page
+			.getByRole("button", { name: "选择作品版本", exact: true })
+			.filter({ hasText: "未提交的修改" })
+			.waitFor();
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();
 		await page.locator(".cm-mergeView").waitFor();
 		await page.getByRole("button", { name: "提交版本", exact: true }).click();
@@ -280,6 +292,9 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			.click();
 		await page.getByRole("heading", { name: "审稿报告 · 6 条问题" }).waitFor();
 		const findings = page.getByRole("region", { name: "审稿结论与问题" });
+		assert.equal(await page.locator("[data-review-summary]").getAttribute("open"), null);
+		await page.getByRole("radio", { name: "当前稿", exact: true }).waitFor();
+
 		const currentBox = await page.locator(".issue-current").boundingBox();
 		const mainBox = await page.locator("main").boundingBox();
 		assert.ok(
@@ -288,14 +303,43 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 				currentBox.height > 200 &&
 				currentBox.y + currentBox.height <= mainBox.y + mainBox.height,
 		);
-		// finding 标题按钮里还带「第 N 段」标签：引文现在都锚得到段落，名字不再是纯标题。
-		await findings.getByRole("button", { name: /^补充审读问题 5/ }).click();
+		// 问题列表只负责选择；证据、段号与操作跟随当前意见。
+		await findings.getByRole("button", { name: /补充审读问题 5/ }).click();
 		await findings.getByRole("button", { name: /取信动作略显概括/ }).click();
+		await page.getByRole("radio", { name: "被审的稿", exact: true }).click();
 		await page.locator(".evidence-text").filter({ hasText: "他没有喊" }).waitFor();
+		await page.getByRole("radio", { name: "当前稿", exact: true }).click();
 		// finding 的引文对回当前稿：标出第 2 段，当前稿里那一段带 data-mark。
 		await page.getByText("第 2 段", { exact: true }).first().waitFor();
 		await page.locator(".issue-current p[data-mark='true']").filter({ hasText: "他没有喊" }).waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/review.png" });
+		// 窄窗按单条意见核对，选择与稿件视图在重载后仍然保留。
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
+		const chooser = page.getByRole("combobox", { name: "选择审稿意见", exact: true });
+		await chooser.waitFor();
+		await chooser.click();
+		await page.getByRole("option", { name: /补充审读问题 5/ }).click();
+		const selectedEvidence = await page.getByRole("region", { name: "当前审稿意见" }).boundingBox();
+		const recheckAction = await page.getByRole("button", { name: "复核这条意见", exact: true }).boundingBox();
+		const manuscript = await page.locator(".issue-current").boundingBox();
+		assert.ok(selectedEvidence && recheckAction && manuscript);
+		assert.ok(recheckAction.y >= selectedEvidence.y + selectedEvidence.height - 1);
+		assert.ok(recheckAction.y + recheckAction.height <= manuscript.y);
+		assert.ok(manuscript.height > 100);
+		await page.getByRole("radio", { name: "被审的稿", exact: true }).click();
+		await page.reload();
+		await chooser.filter({ hasText: "补充审读问题 5" }).waitFor();
+		await page.locator(".evidence-text").filter({ hasText: "他没有喊" }).waitFor();
+		assert.equal(
+			await page.getByRole("radio", { name: "被审的稿", exact: true }).getAttribute("aria-checked"),
+			"true",
+		);
+		await chooser.click();
+		await page.getByRole("option", { name: /取信动作略显概括/ }).click();
+		await page.getByRole("radio", { name: "当前稿", exact: true }).click();
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1460, 940));
+		await findings.getByRole("button", { name: /取信动作略显概括/ }).waitFor();
+
 		await page
 			.getByRole("button", { name: /在正文中打开/ })
 			.first()
@@ -319,7 +363,9 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			.first()
 			.click();
 		await page.getByText("稿子已改，需重新核对", { exact: true }).waitFor();
+		await page.getByRole("radio", { name: "被审的稿", exact: true }).click();
 		await page.locator(".evidence-text").filter({ hasText: "他没有喊" }).waitFor();
+		await page.getByRole("radio", { name: "当前稿", exact: true }).click();
 		// 专注阅读 = 收起两侧面板；重新展开后回到原对象。
 		await page
 			.getByRole("button", { name: /在正文中打开/ })

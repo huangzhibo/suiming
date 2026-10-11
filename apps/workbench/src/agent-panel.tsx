@@ -377,7 +377,9 @@ export function AgentPanel({
 			{!session && agentBlocked && (
 				<p role="status" className="px-4 pb-2 text-xs text-muted-foreground">
 					{agent.detail}
-					从模型菜单打开设置后配置提供商。
+					<Button variant="link" size="xs" onClick={openSettings}>
+						配置模型
+					</Button>
 				</p>
 			)}
 		</div>

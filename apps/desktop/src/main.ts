@@ -259,7 +259,8 @@ export function startDesktop(
 			ipcMain.handle("suiming:command", async (event, request: { command: LocalCommandName; input: unknown }) => {
 				if (!event.senderFrame || !trusted(event.senderFrame.url)) throw new Error("Untrusted renderer");
 				try {
-					if (!workspace) throw new Error("请先打开或创建作品");
+					if (!workspace)
+						return { ok: false, error: { code: "workspace_not_open", message: "请先打开或创建作品" } };
 					if (!Object.hasOwn(LOCAL_COMMANDS, request.command)) throw new Error("Unknown command");
 					return { ok: true, value: await workspace.invoke(request.command, request.input as never) };
 				} catch (error) {

@@ -28,7 +28,8 @@ const LANE_H = 26;
 const DEFAULT_COL_W = 18;
 const MIN_COL_W = 4;
 const MAX_COL_W = 120;
-const clampColumn = (value: number) => Math.min(MAX_COL_W, Math.max(MIN_COL_W, Math.round(value)));
+const clampColumn = (value: number, fit: number) =>
+	Math.min(MAX_COL_W, Math.max(Math.min(MIN_COL_W, Math.max(Number.EPSILON, fit)), value));
 const LEFT = 8;
 
 type Row = { key: string; label: string; h: number; y: number } & (
@@ -187,12 +188,12 @@ export function StoryAxis({
 	const beats = model.beats.slice(range.start, range.end + 1);
 	const [available, setAvailable] = useState(0);
 	const LABEL_W = Math.min(MAX_LABEL_W, Math.max(MIN_LABEL_W, labelWidth || DEFAULT_LABEL_W));
-	// 适应窗口保留小数列宽，避免逐列取整后在右侧累积出空白。
+	// 适应窗口保留小数列宽，也不受手动缩放的 4px 下限约束；长篇才能完整落在视口内。
 	const fitW = available > 0 ? (available - LABEL_W - LEFT - 24) / Math.max(beats.length, 1) : DEFAULT_COL_W;
-	const colW = column ?? Math.min(MAX_COL_W, Math.max(MIN_COL_W, fitW));
+	const colW = column ?? Math.min(MAX_COL_W, Math.max(Number.EPSILON, fitW));
 	// 列变窄时标记按比例缩小，刻度改为每隔几列一个；卷标题始终保留。
-	const dotR = Math.min(4.5, Math.max(2, colW * 0.25));
-	const glyphSize = Math.min(10, Math.max(6, colW * 0.55));
+	const dotR = Math.min(4.5, colW * 0.25);
+	const glyphSize = Math.min(10, colW * 0.55);
 	const list = rows(model, expanded.characters, expanded.worlds, expanded.resources);
 	const totalH = (list.at(-1)?.y ?? HEAD_H) + (list.at(-1)?.h ?? 0);
 	const columnsEnd = LEFT + beats.length * colW;
@@ -206,6 +207,8 @@ export function StoryAxis({
 	const svgRef = useRef<SVGSVGElement>(null);
 	const onColumnRef = useRef(onColumn);
 	onColumnRef.current = onColumn;
+	const fitWRef = useRef(fitW);
+	fitWRef.current = fitW;
 	const colWRef = useRef(DEFAULT_COL_W);
 	colWRef.current = colW;
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -220,7 +223,7 @@ export function StoryAxis({
 		const onWheel = (event: WheelEvent) => {
 			if (!(event.metaKey || event.ctrlKey)) return;
 			event.preventDefault();
-			onColumnRef.current(clampColumn(colWRef.current * (event.deltaY < 0 ? 1.15 : 0.87)));
+			onColumnRef.current(clampColumn(colWRef.current * (event.deltaY < 0 ? 1.15 : 0.87), fitWRef.current));
 		};
 		container.addEventListener("wheel", onWheel, { passive: false });
 		return () => {
@@ -278,7 +281,7 @@ export function StoryAxis({
 							variant="outline"
 							size="icon-xs"
 							aria-label="缩小"
-							onClick={() => onColumn(clampColumn(colW * 0.8))}
+							onClick={() => onColumn(clampColumn(colW * 0.8, fitW))}
 						>
 							<Minus />
 						</Button>
@@ -288,7 +291,7 @@ export function StoryAxis({
 							variant="outline"
 							size="icon-xs"
 							aria-label="放大"
-							onClick={() => onColumn(clampColumn(colW * 1.25))}
+							onClick={() => onColumn(clampColumn(colW * 1.25, fitW))}
 						>
 							<Plus />
 						</Button>
@@ -351,6 +354,7 @@ export function StoryAxis({
 			) : (
 				<div
 					ref={scrollRef}
+					data-axis-scroll
 					className="grid min-h-0 flex-1 overflow-auto"
 					style={{ gridTemplateColumns: `${LABEL_W}px 1fr` }}
 				>
@@ -581,7 +585,7 @@ export function StoryAxis({
 									<circle
 										cx={cx(beat.ordinal)}
 										cy={HEAD_H - 12}
-										r={Math.min(3, Math.max(1.5, colW * 0.22))}
+										r={Math.min(3, colW * 0.22)}
 										fill="none"
 										stroke="var(--faint)"
 										strokeWidth={1.2}

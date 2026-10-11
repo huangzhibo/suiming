@@ -184,11 +184,11 @@ export function compileStoryStateContext(candidate: ArtifactCandidate, task: Sto
 	return {
 		text: [
 			`## ${target.title ?? target.id} · ${phaseLabels[task.phase]}`,
-			`观察范围：${subject ? subject.id : "全部人物、资源与承诺"}。按故事顺序读取已声明的 Design；未记录不等于没有发生，也不等于人物不知道。`,
+			`观察范围：${subject ? subject.id : "全部人物、资源与读者期待"}。按故事顺序读取已声明的 Design；未记录不等于没有发生，也不等于人物不知道。`,
 			"### 硬状态",
 			lines.join("\n") || (task.phase === "changes" ? "没有已声明的硬状态变化。" : "没有相关硬状态记录。"),
-			"### 承诺",
-			contracts.join("\n") || (task.phase === "changes" ? "本幕没有相关承诺动作。" : "没有相关承诺。"),
+			"### 读者期待",
+			contracts.join("\n") || (task.phase === "changes" ? "本幕没有相关读者期待变化。" : "没有相关读者期待。"),
 		].join("\n\n"),
 		artifacts: identities.map((identity) => ({ identity })),
 		view: {

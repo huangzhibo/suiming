@@ -124,7 +124,7 @@ export function DocumentToolbar({
 			className="document-toolbar grid gap-1 text-xs text-muted-foreground"
 			aria-label="文档工具"
 			data-content-switch={beat}
-			data-comparison={kind === "diff"}
+			data-comparison={kind === "diff" || kind === "version"}
 		>
 			<div className="flex min-w-0 items-center gap-1">
 				<ToolButton
@@ -188,7 +188,7 @@ export function DocumentToolbar({
 				})}
 			</nav>
 			<div className="flex min-w-0 items-center justify-end gap-1">
-				{kind === "diff" ? (
+				{kind === "diff" || kind === "version" ? (
 					comparisonActions
 				) : (
 					<>

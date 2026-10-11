@@ -76,6 +76,20 @@ export function stageSubmission(
 		},
 	};
 }
+/** 仅用于本次请求已明确在入 inbox 前被拒绝；未知结果继续保留原命令 ID。 */
+export function rejectSubmission(current: ComposerDraft, id: string, original: ComposerDraft): ComposerDraft {
+	if (current.pending?.id !== id) return current;
+	const { pending: _pending, ...next } = current;
+	return {
+		...next,
+		goal: [original.goal, current.goal].filter(Boolean).join("\n\n"),
+		attachments: [
+			...original.attachments.filter((a) => !current.attachments.some((b) => a.id === b.id)),
+			...current.attachments,
+		],
+	};
+}
+
 export function acknowledgeSubmission<T extends ComposerState>(
 	state: T,
 	key: string,

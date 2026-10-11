@@ -124,7 +124,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	const [comparisonStatus, setComparisonStatus] = useState<ComparisonStatus | null>(null);
 	const [comparisonWidth, setComparisonWidth] = useState(window.innerWidth);
 	useEffect(() => {
-		if (kind !== "diff" || !mainRef.current) return;
+		if ((kind !== "diff" && kind !== "version") || !mainRef.current) return;
 		const observer = new ResizeObserver(([entry]) => setComparisonWidth(entry?.contentRect.width ?? 0));
 		observer.observe(mainRef.current);
 		return () => observer.disconnect();
@@ -351,24 +351,29 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					})
 				}
 				comparisonActions={
-					kind === "diff" ? (
+					kind === "diff" || kind === "version" ? (
 						<ComparisonActions
+							readOnly={kind === "version"}
 							controller={comparisonController}
 							layout={comparisonLayout}
 							onLayout={(diffLayout) => patch({ diffLayout })}
-							status={comparisonLoading || comparisonError ? null : comparisonStatus}
+							status={kind === "diff" && (comparisonLoading || comparisonError) ? null : comparisonStatus}
 							identical={
-								view.diffExternal
-									? "与外部文件内容相同"
-									: view.diffRevision === shown?.revisionId
-										? "没有未提交修改"
-										: "与所选版本内容相同"
+								kind === "version"
+									? "两侧内容相同"
+									: view.diffExternal
+										? "与外部文件内容相同"
+										: view.diffRevision === shown?.revisionId
+											? "没有未提交修改"
+											: "与所选版本内容相同"
 							}
 						/>
 					) : undefined
 				}
 				comparisonOptions={
-					kind === "diff" ? <ComparisonOptions view={view} patch={patch} layout={comparisonLayout} /> : undefined
+					kind === "diff" || kind === "version" ? (
+						<ComparisonOptions view={view} patch={patch} layout={comparisonLayout} />
+					) : undefined
 				}
 				diff={beginDiff}
 				finish={finishTask}
@@ -625,6 +630,10 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					)}
 					{kind === "artifact" && file && !view.resolveContent && (
 						<ArtifactPage
+							characterRelationsOpen={view.characterRelationsOpen}
+							onCharacterRelationsOpen={(characterRelationsOpen) => patch({ characterRelationsOpen })}
+							characterTrackOpen={view.characterTrackOpen}
+							onCharacterTrackOpen={(characterTrackOpen) => patch({ characterTrackOpen })}
 							book={book}
 							reviews={reviews}
 							file={file}
@@ -707,6 +716,8 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					)}
 					{kind === "check" && (
 						<CheckPage
+							filter={view.checkFilter}
+							onFilter={(checkFilter) => patch({ checkFilter })}
 							book={book}
 							open={open}
 							disabledReason={busy ? "正在处理，请稍候" : anyChanged ? "请先保存未保存的修改" : undefined}
@@ -718,6 +729,8 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							key={`${tab?.id}:${report.id}`}
 							scrolls={view.scrolls}
 							selection={view.review}
+							pane={view.reviewPane}
+							onPane={(reviewPane) => patch({ reviewPane })}
 							onSelection={(review) => patch({ review })}
 							book={book}
 							report={report}
@@ -740,6 +753,15 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					)}
 					{kind === "version" && (
 						<VersionPage
+							comparison={{
+								layout: comparisonLayout,
+								controller: comparisonController,
+								onStatus: setComparisonStatus,
+								ratio: view.diffRatio,
+								onRatio: (diffRatio) => patch({ diffRatio }),
+								sync: view.diffSync,
+								changesOnly: view.diffChangesOnly,
+							}}
 							positions={view.editors}
 							positionChange={(path, position) => patch({ editors: { ...view.editors, [path]: position } })}
 							selected={view.versionFile}

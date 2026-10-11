@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -10,12 +11,15 @@ import {
 	DropdownMenuRadioItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { anchorParagraphs } from "./anchors.js";
-import { propertyRows } from "./artifact-properties.js";
+import { type PropertyRow, propertyRows } from "./artifact-properties.js";
 import { axisModel } from "./axis/layout.js";
 import { CharacterTrack, ContractTrack } from "./axis/MiniTrack.js";
 import { NeighborhoodView } from "./axis/NeighborhoodView.js";
 import { invoke } from "./bridge.js";
+import type { ComparisonConfig } from "./code-editor.js";
 import { Markdown } from "./markdown.js";
 import {
 	type Book,
@@ -31,51 +35,57 @@ import {
 	versionPage,
 } from "./model.js";
 import { verdictLabel, verdictTone } from "./review-verdict.js";
-import { ActionButton, EmptyNote, reviewCurrencyLabel, reviewLayerLabel, Tag, toneText } from "./ui-bits.js";
+import { ActionButton, EmptyNote, reviewCurrencyLabel, reviewLayerLabel, Segmented, Tag, toneText } from "./ui-bits.js";
 import type { OpenPage, PageState } from "./view-state.js";
 
 const CodeEditor = lazy(() => import("./code-editor.js"));
 
-function Props({ book, file, open }: { book: Book; file: FileEntry; open(page: string): void }) {
-	const rows = propertyRows(book, file);
+function Props({ rows, open, plain = false }: { rows: PropertyRow[]; open(page: string): void; plain?: boolean }) {
 	if (!rows.length) return null;
-	return (
-		<details className="properties mb-6" data-properties open key={file.path}>
+	const values = (
+		<dl aria-label="属性">
+			{rows.map((row) => (
+				<div className="props-row" key={row.key}>
+					<dt className="min-w-0 text-muted-foreground">{row.label}</dt>
+					<dd className={row.multiline ? "property-lines" : "property-values"}>
+						{row.values.map((value, index) =>
+							value.path ? (
+								<button
+									type="button"
+									// biome-ignore lint/suspicious/noArrayIndexKey: 只读字段数组允许重复值，序号区分源文件中的不同项。
+									key={`${index}:${value.path}`}
+									className="navigation-link property-link"
+									data-page={value.path}
+									onClick={() => value.path && open(value.path)}
+								>
+									{value.text}
+								</button>
+							) : (
+								<span
+									className="property-text"
+									// biome-ignore lint/suspicious/noArrayIndexKey: 只读字段数组允许重复值，序号区分源文件中的不同项。
+									key={`${index}:${value.text}`}
+								>
+									{value.text}
+								</span>
+							),
+						)}
+					</dd>
+				</div>
+			))}
+		</dl>
+	);
+	return plain ? (
+		<section className="properties mb-4" data-properties>
+			{values}
+		</section>
+	) : (
+		<details className="properties mb-6" data-properties open>
 			<summary className="navigation-link -ml-1.5 mb-1 flex w-fit items-center gap-1.5 text-[13px] font-medium text-sub [&::-webkit-details-marker]:hidden">
 				<ChevronDown className="size-3.5" aria-hidden="true" />
 				属性
 			</summary>
-			<dl aria-label="属性">
-				{rows.map((row) => (
-					<div className="props-row" key={row.key}>
-						<dt className="min-w-0 text-muted-foreground">{row.label}</dt>
-						<dd className={row.multiline ? "property-lines" : "property-values"}>
-							{row.values.map((value, index) =>
-								value.path ? (
-									<button
-										type="button"
-										// biome-ignore lint/suspicious/noArrayIndexKey: 只读字段数组允许重复值，序号区分源文件中的不同项。
-										key={`${index}:${value.path}`}
-										className="navigation-link property-link"
-										data-page={value.path}
-										onClick={() => value.path && open(value.path)}
-									>
-										{value.text}
-									</button>
-								) : (
-									<span
-										className="property-text"
-										// biome-ignore lint/suspicious/noArrayIndexKey: 只读字段数组允许重复值，序号区分源文件中的不同项。
-										key={`${index}:${value.text}`}
-									>
-										{value.text}
-									</span>
-								),
-							)}
-						</dd>
-					</div>
-				))}
-			</dl>
+			{values}
 		</details>
 	);
 }
@@ -137,6 +147,10 @@ export interface ArtifactPageProps {
 	open(page: string): void;
 	delegateWrite(): void;
 	openEditor(): void;
+	characterTrackOpen: boolean;
+	onCharacterTrackOpen(value: boolean): void;
+	characterRelationsOpen: boolean;
+	onCharacterRelationsOpen(value: boolean): void;
 }
 /** 正文页只展示阅读内容；设计与对象页补充属性、轨迹和邻域图。 */
 export function ArtifactPage(props: ArtifactPageProps) {
@@ -160,6 +174,12 @@ export function ArtifactPage(props: ArtifactPageProps) {
 		file.kind === "story-contract" ? axis.contracts.find((lane) => lane.path === file.path) : undefined;
 	const characterLane =
 		file.kind === "character" ? axis.characters.find((lane) => lane.path === file.path) : undefined;
+	const rows = propertyRows(book, file);
+	const identityRows = rows.filter((row) => row.key === JSON.stringify(["aliases"]));
+	const relatedPaths = new Set(
+		book.links.flatMap((link) => (link.from === file.path ? [link.to] : link.to === file.path ? [link.from] : [])),
+	);
+	const hasRelations = relatedPaths.size > 0;
 	const [expandedKinds, setExpandedKinds] = useState<Set<string>>(new Set());
 	const status: { text: string; color: string }[] = [
 		{
@@ -187,11 +207,40 @@ export function ArtifactPage(props: ArtifactPageProps) {
 						<span className={item.color}>{item.text}</span>
 					</span>
 				))}
+				{file.kind === "character" && identityRows.length > 0 && (
+					<>
+						<span className="text-faint">·</span>
+						<span>别名：{identityRows.flatMap((row) => row.values.map((value) => value.text)).join("、")}</span>
+					</>
+				)}
 			</div>
 			{contractLane && <ContractTrack model={axis} lane={contractLane} open={open} />}
-			{characterLane && <CharacterTrack model={axis} lane={characterLane} open={open} />}
-			{!showText && <Props book={book} file={file} open={open} />}
+			{!showText && file.kind !== "character" && <Props key={file.path} plain={isBeat} rows={rows} open={open} />}
 			{!showText && <Body content={content} />}
+			{file.kind === "character" && (
+				<Props plain rows={rows.filter((row) => !identityRows.includes(row))} open={open} />
+			)}
+			{characterLane && (
+				<details
+					className="properties mt-5 border-t border-hair pt-3"
+					data-character-track
+					open={props.characterTrackOpen}
+					onToggle={(event) => {
+						if (event.currentTarget.open !== props.characterTrackOpen)
+							props.onCharacterTrackOpen(event.currentTarget.open);
+					}}
+				>
+					<summary className="navigation-link -ml-1.5 flex w-fit items-center gap-1.5 text-[13px] [&::-webkit-details-marker]:hidden">
+						<ChevronDown className="size-3.5" aria-hidden="true" />
+						全书轨迹 · {characterLane.present.length} 个情节引用 · {characterLane.events.length} 条状态变化
+					</summary>
+					{props.characterTrackOpen && (
+						<div className="mt-3">
+							<CharacterTrack model={axis} lane={characterLane} open={open} />
+						</div>
+					)}
+				</details>
+			)}
 			{showText &&
 				(hasText ? (
 					<>
@@ -225,18 +274,45 @@ export function ArtifactPage(props: ArtifactPageProps) {
 					<NoText delegateWrite={props.delegateWrite} openEditor={props.openEditor} />
 				))}
 			{/* 邻域图辅助理解设计结构，不接在小说正文后；承诺页顶部已有完整轨迹。 */}
-			{!showText && !contractLane && (
-				<section className="mt-9 border-t border-hair pt-3.5" data-relations>
-					<h2 className="mb-1 text-[11.5px] text-muted-foreground">关系</h2>
-					<NeighborhoodView
-						book={book}
-						path={file.path}
-						open={open}
-						expandedKinds={expandedKinds}
-						onExpand={(kind) => setExpandedKinds(new Set([...expandedKinds, kind]))}
-					/>
-				</section>
-			)}
+			{!showText &&
+				!contractLane &&
+				hasRelations &&
+				(file.kind === "character" ? (
+					<details
+						className="properties mt-3 border-t border-hair pt-3"
+						data-character-relations
+						open={props.characterRelationsOpen}
+						onToggle={(event) => {
+							if (event.currentTarget.open !== props.characterRelationsOpen)
+								props.onCharacterRelationsOpen(event.currentTarget.open);
+						}}
+					>
+						<summary className="navigation-link -ml-1.5 flex w-fit items-center gap-1.5 text-[13px] [&::-webkit-details-marker]:hidden">
+							<ChevronDown className="size-3.5" aria-hidden="true" />
+							文档引用 · {relatedPaths.size} 个关联文档
+						</summary>
+						{props.characterRelationsOpen && (
+							<NeighborhoodView
+								book={book}
+								path={file.path}
+								open={open}
+								expandedKinds={expandedKinds}
+								onExpand={(kind) => setExpandedKinds(new Set([...expandedKinds, kind]))}
+							/>
+						)}
+					</details>
+				) : (
+					<section className="mt-9 border-t border-hair pt-3.5" data-relations>
+						<h2 className="mb-1 text-[11.5px] text-muted-foreground">关系</h2>
+						<NeighborhoodView
+							book={book}
+							path={file.path}
+							open={open}
+							expandedKinds={expandedKinds}
+							onExpand={(kind) => setExpandedKinds(new Set([...expandedKinds, kind]))}
+						/>
+					</section>
+				))}
 		</article>
 	);
 }
@@ -265,7 +341,11 @@ export function IssuePage({
 	selection,
 	onSelection,
 	scrolls,
+	pane,
+	onPane,
 }: {
+	pane: PageState["reviewPane"];
+	onPane(value: PageState["reviewPane"]): void;
 	book: Book;
 	report: ReviewReport;
 	open(page: string): void;
@@ -283,7 +363,9 @@ export function IssuePage({
 		enabled: !!anchor,
 		staleTime: Number.POSITIVE_INFINITY,
 	});
-	const active = selection.active;
+	const active = report.findings.length ? Math.max(0, Math.min(selection.active, report.findings.length - 1)) : -1;
+	const finding = report.findings[active];
+	const root = useRef<HTMLDivElement>(null);
 	const setAnchor = (anchor: string) => onSelection({ ...selection, anchor });
 	const current = useQuery({
 		queryKey: ["file", anchor],
@@ -311,10 +393,9 @@ export function IssuePage({
 	}, [anchored, active, report.findings]);
 	// 选中一条 finding 后把它的第一段滚进视野。
 	useEffect(() => {
-		if (active < 0 || marks.size === 0) return;
-		document.querySelector(".issue-current p[data-mark='true']")?.scrollIntoView({ block: "center" });
-	}, [active, marks]);
-	const root = useRef<HTMLDivElement>(null);
+		if (active < 0 || marks.size === 0 || pane !== "current") return;
+		root.current?.querySelector(".issue-current p[data-mark='true']")?.scrollIntoView({ block: "center" });
+	}, [active, marks, pane]);
 	const restored = useRef(false);
 	useEffect(() => {
 		if (restored.current || reviewed.isLoading || current.isLoading) return;
@@ -331,153 +412,197 @@ export function IssuePage({
 		return () => cancelAnimationFrame(frame);
 	}, [reviewed.isLoading, current.isLoading, scrolls]);
 	const paragraphLabel = (indexes: number[]) => indexes.map((index) => `第 ${index + 1} 段`).join("、");
+	const choose = (index: number) => {
+		root.current?.querySelector("[data-scroll-key='review-selected']")?.scrollTo({ top: 0 });
+		onSelection({ ...selection, active: index, anchor: report.findings[index]?.paths[0] ?? anchor });
+	};
+	const indexes = anchored[active] ?? [];
 	return (
-		<div ref={root} className="flex min-h-0 flex-1 flex-col">
-			<section
-				data-scroll-key="review-findings"
-				aria-label="审稿结论与问题"
-				className="max-h-[45%] shrink-0 overflow-auto border-b border-hair-2 px-5 py-3"
-			>
-				<div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+		<div ref={root} className="@container/review flex min-h-0 flex-1 flex-col">
+			<header className="shrink-0 border-b border-hair-2 px-4 py-2">
+				<div className="flex flex-wrap items-center gap-2 text-xs">
 					<Tag tone={verdictTone(report.verdict)}>{verdictLabel(report.verdict)}</Tag>
-					{report.paths[0] && (
-						<Button
-							variant="link"
-							size="xs"
-							className="h-auto p-0"
-							data-page={report.paths[0] ?? ""}
-							onClick={() => open(report.paths[0] ?? "")}
-						>
-							{subject}
-						</Button>
-					)}
 					<span className={report.current ? "text-primary" : "text-amber"}>
 						{reviewCurrencyLabel(report.current)}
 					</span>
-					<span className="flex-1" />
-					<span className="text-[11.5px] text-muted-foreground">
-						{reviewLayerLabel(report.layer)}审稿 {shortId(report.id)} · 审的是{" "}
-						{book.revisionLabel(report.revision)}
+					<span className="text-muted-foreground">
+						{reviewLayerLabel(report.layer)} · 审的是 {book.revisionLabel(report.revision)}
 					</span>
+					<Button
+						size="xs"
+						variant="outline"
+						className="ml-auto"
+						onClick={() =>
+							sendToAgent(`请复核审稿 ${report.id}（${verdictLabel(report.verdict)}）：${report.summary}`)
+						}
+					>
+						复核整份审稿
+					</Button>
 				</div>
-				<h1 className="mb-2 text-base font-semibold">审稿报告 · {report.findings.length} 条问题</h1>
-				<p className="mb-3 text-[12.5px] leading-[1.7] whitespace-pre-wrap text-ink-3">{report.summary}</p>
-				{report.findings.map((finding, findingIndex) => {
-					const indexes = anchored[findingIndex] ?? [];
-					return (
-						<div
-							className="border-t border-hair-2 py-2.5 data-[on=true]:bg-amber-bg/60"
-							data-on={active === findingIndex}
-							key={`${finding.title}:${finding.paths.join(";")}`}
-						>
-							<button
-								type="button"
-								className="mb-1 flex cursor-pointer items-center gap-2 text-left text-[13.5px] font-semibold"
-								aria-pressed={active === findingIndex}
-								onClick={() => {
-									onSelection({
-										...selection,
-										active: active === findingIndex ? -1 : findingIndex,
-										anchor: finding.paths[0] ?? anchor,
-									});
-								}}
+				<details data-review-summary className="mt-2 text-xs">
+					<summary className="cursor-pointer text-muted-foreground">
+						<h1 className="inline font-medium">审稿报告 · {report.findings.length} 条问题</h1> · 结论与范围
+					</summary>
+					<div className="mt-2 max-h-48 overflow-auto" data-scroll-key="review-summary">
+						<p className="mb-2 whitespace-pre-wrap leading-relaxed">{report.summary}</p>
+						<p className="text-muted-foreground">范围：{subject || "未指定文件"}</p>
+						{report.paths.map((path) => (
+							<Button key={path} variant="link" size="xs" data-page={path} onClick={() => open(path)}>
+								{path}
+							</Button>
+						))}
+					</div>
+				</details>
+			</header>
+			<div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] @min-[640px]/review:grid-cols-[200px_minmax(0,1fr)] @min-[640px]/review:grid-rows-1">
+				<section
+					aria-label="审稿结论与问题"
+					className="min-h-0 border-b border-hair-2 @min-[640px]/review:overflow-auto @min-[640px]/review:border-r @min-[640px]/review:border-b-0"
+					data-scroll-key="review-findings"
+				>
+					<div className="p-2 @min-[640px]/review:hidden">
+						<Select value={String(active)} onValueChange={(value) => value !== null && choose(Number(value))}>
+							<SelectTrigger aria-label="选择审稿意见" className="h-auto min-h-8 w-full">
+								<span className="min-w-0 whitespace-normal text-left">
+									{finding ? `${active + 1} / ${report.findings.length} · ${finding.title}` : "没有审稿意见"}
+								</span>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectGroup>
+									{report.findings.map((item, index) => (
+										<SelectItem key={`${item.title}:${item.paths.join(";")}`} value={String(index)}>
+											{index + 1}. {item.title}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="hidden p-2 @min-[640px]/review:block">
+						<p className="px-2 py-1 text-xs text-muted-foreground">审稿意见 · {report.findings.length}</p>
+						{report.findings.map((item, index) => (
+							<Button
+								key={`${item.title}:${item.paths.join(";")}`}
+								variant="ghost"
+								className="mb-1 h-auto w-full justify-start whitespace-normal px-2 py-2 text-left text-xs aria-pressed:bg-muted"
+								aria-pressed={active === index}
+								onClick={() => choose(index)}
 							>
-								{finding.title}
-								{indexes.length > 0 && (
-									<Tag tone="amber" className="font-medium">
-										{paragraphLabel(indexes)}
-									</Tag>
+								{index + 1}. {item.title}
+							</Button>
+						))}
+					</div>
+				</section>
+				<div className="flex min-h-0 min-w-0 flex-col">
+					<section
+						aria-label="当前审稿意见"
+						className="max-h-[40%] shrink-0 overflow-auto border-b border-hair-2 px-4 py-3"
+						data-scroll-key="review-selected"
+					>
+						{finding ? (
+							<>
+								<h2 className="mb-1 text-sm font-semibold">
+									{finding.title} {indexes.length > 0 && <Tag tone="amber">{paragraphLabel(indexes)}</Tag>}
+								</h2>
+								<p className="text-[12.5px] leading-[1.7] whitespace-pre-wrap">{finding.evidence.trim()}</p>
+								{finding.suggestion.trim() && (
+									<p className="mt-1 text-[12.5px] leading-[1.7] whitespace-pre-wrap text-ink-3">
+										建议 · {finding.suggestion.trim()}
+									</p>
 								)}
-							</button>
-							<p className="mb-0.5 text-[12.5px] leading-[1.7] whitespace-pre-wrap text-ink-3">
-								{finding.evidence.trim()}
+							</>
+						) : (
+							<p className="text-xs text-muted-foreground">没有意见：审稿人判断被审内容成立。</p>
+						)}
+					</section>
+					{finding && (
+						<div className="flex shrink-0 flex-wrap gap-1.5 border-b border-hair-2 px-4 py-2">
+							{finding.paths.map((path) => (
+								<Button
+									key={path}
+									size="xs"
+									variant="outline"
+									data-page={path}
+									onClick={() => {
+										setAnchor(path);
+										openInText(path);
+									}}
+								>
+									在正文中打开 · {path.split("/").at(-1)}
+								</Button>
+							))}
+							<Button
+								size="xs"
+								variant="outline"
+								onClick={() =>
+									sendToAgent(
+										`请复核这条审稿意见的修复是否充分：${finding.title}${indexes.length > 0 ? `（${anchor} ${paragraphLabel(indexes)}）` : ""}\n${finding.evidence}${finding.suggestion ? `\n建议：${finding.suggestion}` : ""}`,
+									)
+								}
+							>
+								复核这条意见
+							</Button>
+						</div>
+					)}
+					<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hair-2 px-4 py-2">
+						<div className="@min-[960px]/review:hidden">
+							<Segmented
+								value={pane}
+								options={[
+									{ id: "current", label: "当前稿" },
+									{ id: "reviewed", label: "被审的稿" },
+								]}
+								onChange={onPane}
+							/>
+						</div>
+						<span className="min-w-0 break-all text-xs text-muted-foreground">
+							{anchor || "没有指向具体文件"}
+						</span>
+					</div>
+					<div className="grid min-h-0 flex-1 @min-[960px]/review:grid-cols-2">
+						<div
+							data-scroll-key="review-evidence"
+							className={`${pane === "reviewed" ? "" : "hidden"} min-w-0 overflow-auto px-4 py-3 @min-[960px]/review:block @min-[960px]/review:border-r`}
+						>
+							<p className="mb-2 text-xs text-muted-foreground">
+								被审的稿 · {book.revisionLabel(report.revision)}
 							</p>
-							{finding.suggestion.trim() && (
-								<p className="mb-1.5 text-[12.5px] leading-[1.7] whitespace-pre-wrap text-ink-3">
-									<span className="text-muted-foreground">建议 · </span>
-									{finding.suggestion.trim()}
+							{reviewed.data ? (
+								<pre className="evidence-text">{stripFrontmatter(reviewed.data.content)}</pre>
+							) : (
+								<p className="text-xs text-muted-foreground">
+									{reviewed.error
+										? reviewed.error.message
+										: anchor
+											? "正在读取被审的稿…"
+											: "这份审稿没有指向具体文件"}
 								</p>
 							)}
-							<div className="flex flex-wrap gap-1.5">
-								{finding.paths.map((path) => (
-									<Button
-										variant="outline"
-										size="xs"
-										key={path}
-										data-page={path}
-										onClick={() => {
-											setAnchor(path);
-											openInText(path);
-										}}
-									>
-										在正文中打开 · {path.split("/").at(-1)}
-									</Button>
-								))}
-								<Button
-									variant="outline"
-									size="xs"
-									onClick={() =>
-										sendToAgent(
-											`请复核这条审稿意见的修复是否充分：${finding.title}${indexes.length > 0 ? `（${anchor} ${paragraphLabel(indexes)}）` : ""}\n${finding.evidence}${finding.suggestion ? `\n建议：${finding.suggestion}` : ""}`,
-										)
-									}
-								>
-									复核这条意见
-								</Button>
-							</div>
 						</div>
-					);
-				})}
-				{report.findings.length === 0 && (
-					<p className="text-[11.5px] text-muted-foreground">没有意见：审稿人判断被审内容成立。</p>
-				)}
-			</section>
-			<div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden">
-				<div data-scroll-key="review-evidence" className="min-w-0 overflow-auto border-r border-hair px-5 py-3">
-					<div className="mb-2.5 flex flex-wrap justify-between gap-1 text-[11px] text-muted-foreground">
-						<span>被审的稿 · {book.revisionLabel(report.revision)}</span>
-						<span>{anchor || "—"}</span>
+						<div
+							data-scroll-key="review-current"
+							className={`issue-current ${pane === "current" ? "" : "hidden"} min-w-0 overflow-auto px-4 py-3 @min-[960px]/review:block`}
+						>
+							<p
+								className={`${report.current ? "hidden @min-[960px]/review:block" : ""} mb-2 text-xs text-muted-foreground`}
+							>
+								<span className="hidden @min-[960px]/review:inline">当前稿</span>{" "}
+								{!report.current && <span className="text-amber">段号可能已错位</span>}
+							</p>
+							{current.data ? (
+								body ? (
+									<Prose content={body} selected={-1} compact marks={marks} />
+								) : (
+									<p className="text-xs text-muted-foreground">（当前没有内容）</p>
+								)
+							) : (
+								<p className="text-xs text-muted-foreground">
+									{current.error ? current.error.message : anchor ? "正在读取…" : "这份报告没有指向具体文件"}
+								</p>
+							)}
+						</div>
 					</div>
-					{reviewed.data ? (
-						<pre className="evidence-text">{stripFrontmatter(reviewed.data.content)}</pre>
-					) : (
-						<p className="text-[11.5px] text-muted-foreground">
-							{reviewed.error
-								? reviewed.error.message
-								: anchor
-									? "正在读取被审的稿…"
-									: "这份审稿没有指向具体文件"}
-						</p>
-					)}
 				</div>
-				<div data-scroll-key="review-current" className="issue-current min-w-0 overflow-auto px-5 py-3">
-					<div className="mb-2.5 flex flex-wrap justify-between gap-1 text-[11px] text-muted-foreground">
-						<span>当前稿 · {anchor || "—"}</span>
-						{/* 是否对应当前稿已在顶部说过；这里只在过时时补一句段号的后果。 */}
-						{!report.current && <span className="text-amber">段号可能已错位</span>}
-					</div>
-					{current.data ? (
-						body ? (
-							<Prose content={body} selected={-1} compact marks={marks} />
-						) : (
-							<p className="text-[11.5px] text-muted-foreground">（当前没有内容）</p>
-						)
-					) : (
-						<p className="text-[11.5px] text-muted-foreground">
-							{anchor ? "正在读取…" : "这份报告没有指向具体文件"}
-						</p>
-					)}
-				</div>
-			</div>
-			<div className="flex shrink-0 flex-wrap items-center gap-1.5 border-t px-5 py-2 text-[11.5px] text-muted-foreground">
-				<Button
-					size="sm"
-					onClick={() =>
-						sendToAgent(`请复核审稿 ${report.id}（${verdictLabel(report.verdict)}）：${report.summary}`)
-					}
-				>
-					复核整份审稿
-				</Button>
 			</div>
 		</div>
 	);
@@ -485,6 +610,7 @@ export function IssuePage({
 
 /** 版本页：某个 ProjectRevision 相对父版本的差分，或候选相对当前版本。 */
 export function VersionPage({
+	comparison,
 	book,
 	revisionId,
 	open,
@@ -493,6 +619,7 @@ export function VersionPage({
 	positions,
 	positionChange,
 }: {
+	comparison: Omit<ComparisonConfig, "before" | "after">;
 	book: Book;
 	revisionId: string;
 	open: OpenPage;
@@ -503,6 +630,7 @@ export function VersionPage({
 }) {
 	// 版本页有两种目标：具体 revision，或 checkout 里尚未提交的候选（作者与 Agent 共用同一份）。
 	const candidate = revisionId === "candidate";
+	const [filesOpen, setFilesOpen] = useState(false);
 	const [confirming, setConfirming] = useState(false);
 	const [rolling, setRolling] = useState(false);
 	const [rollbackNote, setRollbackNote] = useState<{ text: string; failed: boolean } | null>(null);
@@ -551,12 +679,16 @@ export function VersionPage({
 		enabled: !!entry,
 		retry: false,
 	});
+	const onStatus = comparison.onStatus;
+	useEffect(() => {
+		if (!entry || sides.error || sides.data?.path !== entry.path) onStatus(null);
+	}, [entry, sides.error, sides.data, onStatus]);
 	const label = candidate ? CANDIDATE_TITLE : book.revisionLabel(revisionId);
 	const previous = candidate ? book.headLabel : revision?.parentId ? book.revisionLabel(revision.parentId) : "空作品";
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="shrink-0 px-7 pt-[22px]">
-				<div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+			<div className="shrink-0 border-b border-hair-2 px-4 py-2" data-version-context>
+				<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 					<DropdownMenu>
 						<DropdownMenuTrigger
 							render={
@@ -579,9 +711,75 @@ export function VersionPage({
 							</DropdownMenuRadioGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<span>{candidate ? `相对 ${previous}` : `${shortId(revisionId)} · 父版本 ${previous}`}</span>
-					<span className="flex-1" />
-					<span>{diff.data ? `${diff.data.length} 个文件变更` : ""}</span>
+					<Popover open={filesOpen} onOpenChange={setFilesOpen}>
+						<PopoverTrigger
+							render={
+								<Button
+									size="xs"
+									variant="ghost"
+									aria-label="选择变更文件"
+									disabled={!diff.data?.length}
+									className="h-auto min-h-7 min-w-0 flex-1 justify-between text-left"
+								>
+									<span className="min-w-0 break-all whitespace-normal">
+										{entry?.path ?? (selected || "选择文件")}
+									</span>
+									<span className="shrink-0 text-muted-foreground">
+										{diff.data ? `${diff.data.length} 个文件` : ""}
+									</span>
+									<ChevronDown className="shrink-0" />
+								</Button>
+							}
+						/>
+						<PopoverContent align="start" className="w-[480px] max-w-[calc(100vw-32px)] p-0">
+							<Command>
+								<CommandInput aria-label="搜索变更文件" placeholder="搜索路径…" />
+								<CommandList>
+									<CommandEmpty>没有匹配的变更文件</CommandEmpty>
+									{diff.data?.map((item) => (
+										<CommandItem
+											key={item.path}
+											value={item.path}
+											onSelect={() => {
+												setSelected(item.path);
+												setFilesOpen(false);
+											}}
+										>
+											<span className="shrink-0 text-muted-foreground">
+												{item.kind === "added" ? "新增" : item.kind === "deleted" ? "删除" : "修改"}
+											</span>
+											<span className="min-w-0 break-all">{item.path}</span>
+											{entry?.path === item.path && <span className="ml-auto shrink-0">当前</span>}
+										</CommandItem>
+									))}
+								</CommandList>
+							</Command>
+						</PopoverContent>
+					</Popover>
+					<Popover>
+						<PopoverTrigger
+							render={
+								<Button size="xs" variant="ghost">
+									详情
+								</Button>
+							}
+						/>
+						<PopoverContent align="end" className="text-xs">
+							<p className="break-all">
+								{candidate ? `作品目录 · 基线 ${previous}` : `${label} · ${revisionId}`}
+							</p>
+							{!candidate && (
+								<p className="break-all">
+									父版本：{previous} · {revision?.parentId ?? "无"}
+								</p>
+							)}
+							{entry && (
+								<Button size="xs" variant="outline" onClick={() => open(entry.path)}>
+									打开当前作品中的文件
+								</Button>
+							)}
+						</PopoverContent>
+					</Popover>
 					{!candidate && !isHead && !confirming && (
 						<ActionButton
 							variant="outline"
@@ -594,7 +792,7 @@ export function VersionPage({
 					)}
 					{confirming && (
 						<>
-							<span className="text-amber">把 {label} 的内容作为当前版本的新子版本提交，历史不倒拨。</span>
+							<span className="text-amber">将整个作品恢复到 {label} 的内容并提交为新版本，历史保留。</span>
 							<Button size="xs" disabled={rolling} onClick={() => void rollback()}>
 								确认恢复
 							</Button>
@@ -607,48 +805,39 @@ export function VersionPage({
 						<span className={rollbackNote.failed ? "text-destructive" : "text-success"}>{rollbackNote.text}</span>
 					)}
 				</div>
-				<h1 className="mb-3.5 text-lg font-semibold">{candidate ? CANDIDATE_TITLE : `版本 ${label}`}</h1>
-			</div>
-			<div className="flex shrink-0 gap-1.5 overflow-auto px-7 pb-3">
-				{diff.data?.map((item) => (
-					<Button
-						variant="outline"
-						size="xs"
-						key={item.path}
-						className={entry?.path === item.path ? "border-primary-line bg-primary-soft" : ""}
-						onClick={() => setSelected(item.path)}
-					>
-						{item.kind === "added" ? "+ " : item.kind === "deleted" ? "− " : ""}
-						{item.path}
-					</Button>
-				))}
 			</div>
 			{entry ? (
-				<>
-					<div className="grid shrink-0 grid-cols-2 border-t border-b border-hair bg-[#fafafa] text-[11px] text-muted-foreground">
-						<span className="px-7 py-1.5">之前 · {previous}</span>
-						<span className="border-l border-hair px-7 py-1.5">之后 · {label}</span>
-					</div>
-					<div className="min-h-0 flex-1">
-						{sides.error ? (
-							<p role="alert" className="p-5 text-[11.5px] text-destructive">
+				<div className="min-h-0 flex-1">
+					{sides.error ? (
+						<div className="space-y-3 p-5">
+							<p role="alert" className="text-xs text-destructive">
 								{sides.error.message}
 							</p>
-						) : sides.data?.path !== entry.path ? (
-							<p className="p-5 text-[11.5px] text-muted-foreground">正在计算差异…</p>
-						) : (
-							<Suspense fallback={<p className="p-5 text-[11.5px] text-muted-foreground">正在计算差异…</p>}>
-								<CodeEditor
-									original={sides.data.before}
-									content={sides.data.after}
-									path={entry.path}
-									position={positions[`version:${entry.path}`]}
-									onPosition={(position) => positionChange(`version:${entry.path}`, position)}
-								/>
-							</Suspense>
-						)}
-					</div>
-				</>
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={sides.isFetching}
+								onClick={() => void sides.refetch()}
+							>
+								重新读取正文
+							</Button>
+						</div>
+					) : sides.data?.path !== entry.path ? (
+						<p className="p-5 text-[11.5px] text-muted-foreground">正在计算差异…</p>
+					) : (
+						<Suspense fallback={<p className="p-5 text-[11.5px] text-muted-foreground">正在计算差异…</p>}>
+							<CodeEditor
+								comparison={{ ...comparison, before: `之前 · ${previous}`, after: `之后 · ${label}` }}
+								autoFocus={false}
+								original={sides.data.before}
+								content={sides.data.after}
+								path={entry.path}
+								position={positions[`version:${entry.path}`]}
+								onPosition={(position) => positionChange(`version:${entry.path}`, position)}
+							/>
+						</Suspense>
+					)}
+				</div>
 			) : (
 				<div className="px-8 py-20 text-center text-muted-foreground">
 					<h2 className="mb-2 text-base font-medium">
@@ -660,28 +849,27 @@ export function VersionPage({
 									? "当前文件在这个版本没有变更"
 									: "没有待比较的变更"}
 					</h2>
-					<p className="text-xs text-faint">
+					<p role={diff.error ? "alert" : undefined} className="text-xs text-faint">
 						{diff.error
 							? diff.error.message
-							: selected ||
-								(candidate ? "作品目录与当前版本一致，没有未提交的修改。" : "这个版本与父版本内容相同。")}
+							: diff.isLoading
+								? "正在读取变更清单，请稍候。"
+								: selected ||
+									(candidate ? "作品目录与当前版本一致，没有未提交的修改。" : "这个版本与父版本内容相同。")}
 					</p>
+					{diff.error && (
+						<Button
+							className="mt-3"
+							variant="outline"
+							size="sm"
+							disabled={diff.isFetching}
+							onClick={() => void diff.refetch()}
+						>
+							重新读取版本
+						</Button>
+					)}
 				</div>
 			)}
-			<div className="shrink-0 border-t border-hair-2 px-7 py-2.5 text-[11.5px] leading-[1.7] text-muted-foreground">
-				差分是事实；提交摘要是解释。
-				{entry && (
-					<Button
-						variant="link"
-						size="xs"
-						className="ml-2 h-auto p-0"
-						data-page={entry.path}
-						onClick={() => open(entry.path)}
-					>
-						打开 {entry.path.split("/").at(-1)} →
-					</Button>
-				)}
-			</div>
 		</div>
 	);
 }

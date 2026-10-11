@@ -59,9 +59,8 @@ export function ModelSettings() {
 				<p className="mt-auto px-3 pt-6 text-[11px] text-muted-foreground">应用偏好 · 本机</p>
 			</aside>
 			<TabsContent keepMounted value="models" className="min-h-0 min-w-0 overflow-auto px-7 py-6 data-hidden:hidden">
-				<div className="mb-6">
+				<div className="mb-4">
 					<h2 className="text-base font-semibold">模型配置</h2>
-					<p className="mt-1 text-xs text-muted-foreground">设置新对话的默认模型。对话中的临时选择独立生效。</p>
 				</div>
 				<ProfileSettings profile="main" settings={data} />
 				<div className="mt-6 border-t pt-6">

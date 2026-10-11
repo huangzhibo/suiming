@@ -127,3 +127,24 @@ test("发起窗格关闭后，共享输入仍接收发送回执与附件内容",
 	assert.equal(layout.composerDrafts.new, undefined);
 	assert.equal(layout.groups.length, 1);
 });
+
+test("明确拒绝只退回本次发送，保留等待期间的补充与引用；迟到拒绝不动其他提交", async () => {
+	const { rejectSubmission } = await import("../src/composer-state.js");
+	const original = {
+		goal: "原要求",
+		attachments: [{ id: "a", label: "原引用", kind: "text" as const, status: "ready" as const, content: "原文" }],
+	};
+	const staged = stageSubmission(original);
+	const id = staged.pending?.id ?? "";
+	const attachment = original.attachments[0];
+	assert.ok(attachment);
+	const current = { ...staged, goal: "补充要求", attachments: [{ ...attachment, id: "b" }] };
+	const restored = rejectSubmission(current, id, original);
+	assert.equal(restored.goal, "原要求\n\n补充要求");
+	assert.deepEqual(
+		restored.attachments.map((a) => a.id),
+		["a", "b"],
+	);
+	assert.equal(restored.pending, undefined);
+	assert.equal(rejectSubmission(current, "other", original), current);
+});

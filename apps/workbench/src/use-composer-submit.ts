@@ -2,7 +2,8 @@ import type { ModelChoice } from "@suiming/sdk";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "./bridge.js";
-import { type ComposerDraft, type ComposerSubmission, stageSubmission } from "./composer-state.js";
+import { CommandError } from "./command-error.js";
+import { type ComposerDraft, type ComposerSubmission, rejectSubmission, stageSubmission } from "./composer-state.js";
 
 export interface ComposerSubmitBinding {
 	composer: ComposerDraft;
@@ -39,12 +40,14 @@ export function useComposerSubmit({
 
 	async function send(retry?: ComposerSubmission, draft?: ComposerDraft) {
 		if (inFlight.current || !isCurrentProject()) return;
-		const staged = retry ? latest.current : stageSubmission(draft ?? latest.current, session);
+		const original = draft ?? latest.current;
+		const staged = retry ? latest.current : stageSubmission(original, session);
 		const pending = retry ?? staged.pending;
 		if (!pending || (!retry && latest.current.pending)) return;
 		inFlight.current = true;
 		setBusy(true);
 		setError("");
+		let stagedLocally = false;
 		const changePending = (change: Partial<ComposerSubmission>) =>
 			update(
 				(current) =>
@@ -55,6 +58,7 @@ export function useComposerSubmit({
 			);
 		try {
 			flushSync(() => (retry ? changePending({ error: "" }) : update(() => staged, true)));
+			stagedLocally = true;
 			const receipt = await invoke("session.send", {
 				commandId: pending.id,
 				text: pending.text,
@@ -66,7 +70,26 @@ export function useComposerSubmit({
 		} catch (reason) {
 			const message = reason instanceof Error ? reason.message : String(reason);
 			try {
-				changePending({ error: message });
+				// 这些错误只来自 LocalWorkspace 的模型预检，发生在建 session / 入 inbox 之前。
+				// 重试可能是在取一条已接收消息的回执，不能仅凭这次预检失败就断言此前没发送。
+				const rejected =
+					!retry &&
+					reason instanceof CommandError &&
+					[
+						"model_config_not_found",
+						"missing_model_config",
+						"invalid_model_config",
+						"invalid_model_config_file",
+						"invalid_model_options",
+						"model_provider_disabled",
+						"model_not_found",
+						"model_credentials_missing",
+					].includes(reason.code);
+				if (!stagedLocally) setError(message);
+				else if (rejected) {
+					update((current) => rejectSubmission(current, pending.id, original), true);
+					setError(`未发送，内容已退回草稿。${message}`);
+				} else changePending({ error: message });
 			} catch {
 				setError(message);
 			}

@@ -3,8 +3,8 @@ import type { AxisModel, CharacterLane, ContractLane } from "./layout.js";
 import { contractStatus } from "./layout.js";
 
 /**
- * 单行轨迹：故事轴上某一条泳道的横向全书版本，嵌在承诺页 / 人物页标题下。
- * 横轴仍是 index.yaml 的顺序，卷名做刻度；点击锚点打开对应 Beat。
+ * 单行轨迹：故事轴上某一条泳道的横向全书版本，嵌在读者期待页的进展区或人物页的可展开轨迹区。
+ * 横轴仍是 index.yaml 的顺序，卷边界做刻度；点击锚点打开对应 Beat。
  */
 const W = 900;
 const H = 64;
@@ -21,9 +21,6 @@ function Volumes({ model, x }: { model: AxisModel; x: (ordinal: number) => numbe
 			{model.volumes.map((volume) => (
 				<g key={volume.id}>
 					<line x1={x(volume.start)} y1={8} x2={x(volume.start)} y2={H - 14} stroke="var(--hair)" />
-					<text x={x(volume.start) + 3} y={H - 3} className="fill-faint text-[9.5px]">
-						{volume.title}
-					</text>
 				</g>
 			))}
 		</>
@@ -107,7 +104,7 @@ export function ContractTrack({
 							strokeWidth={1.5}
 						/>
 						<text x={x(lane.deadlineIndex) + 4} y={y - 14} className="fill-amber text-[10px]">
-							deadline {lane.deadline?.replace("beat-", "") ?? ""}
+							期限 {lane.deadline?.replace("beat-", "") ?? ""}
 						</text>
 					</g>
 				)}
@@ -164,14 +161,12 @@ export function CharacterTrack({
 	const title = (ordinal: number) => model.beats[ordinal]?.title ?? "";
 	const openBeat = (ordinal: number) => open(model.beats[ordinal]?.path ?? "");
 	const y = 30;
-	const known = lane.events.filter((event) => event.kind === "secret");
 	const volumeOf = (ordinal: number) =>
 		model.volumes.find((volume) => ordinal >= volume.start && ordinal <= volume.end)?.title ?? "";
 	const first = lane.present[0];
 	return (
 		<div className="mb-4">
 			<div className="mb-1 flex flex-wrap items-baseline gap-x-3 text-xs text-muted-foreground">
-				<span className="font-semibold text-ink-3">被 {lane.present.length} 个情节引用</span>
 				{first !== undefined && (
 					<span>
 						最早用到 {volumeOf(first)} · {title(first)}
@@ -229,16 +224,16 @@ export function CharacterTrack({
 					</Hint>
 				))}
 			</svg>
-			{known.length > 0 && (
+			{lane.events.length > 0 && (
 				<ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-3">
-					{known.map((event) => (
+					{lane.events.map((event) => (
 						<li key={`${event.ordinal}:${event.note}`}>
 							<button
 								type="button"
 								className="navigation-link -ml-1.5 text-left"
 								onClick={() => openBeat(event.ordinal)}
 							>
-								◆ {event.note.replace("秘密揭示：", "")} · {title(event.ordinal)}
+								{event.note} · {volumeOf(event.ordinal)} · {title(event.ordinal)}
 							</button>
 						</li>
 					))}

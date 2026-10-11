@@ -132,11 +132,11 @@ test("内容意图与通用分屏：空正文回退、独立导航、共享草�
 		const properties = pane().locator("[data-properties]");
 		assert.ok(await properties.locator("dt").count());
 		assert.equal(await properties.getByText("title", { exact: true }).count(), 0);
-		await properties.locator("summary").click();
-		assert.equal(await properties.locator("dl").isVisible(), false, "属性可折叠，保留正文阅读空间");
-		await properties.locator("summary").focus();
-		await page.keyboard.press("Enter");
-		assert.equal(await properties.locator("dl").isVisible(), true, "键盘可展开属性");
+		// 情节设计的参与者、依赖与状态变化属于工作内容，直接显示，取消整块属性折叠。
+		assert.equal(await properties.locator("summary").count(), 0);
+		assert.equal(await properties.locator("dl").isVisible(), true);
+		await properties.getByText("相关人物", { exact: true }).waitFor();
+		await properties.getByText("本节变化", { exact: true }).waitFor();
 		await selectBeat("beat-0002");
 		assert.equal(await pane().getByRole("radio", { name: "设计", exact: true }).getAttribute("aria-checked"), "true");
 		await selectBeat("beat-0001");
