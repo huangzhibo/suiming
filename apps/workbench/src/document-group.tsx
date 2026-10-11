@@ -630,10 +630,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					)}
 					{kind === "artifact" && file && !view.resolveContent && (
 						<ArtifactPage
-							characterRelationsOpen={view.characterRelationsOpen}
-							onCharacterRelationsOpen={(characterRelationsOpen) => patch({ characterRelationsOpen })}
-							characterTrackOpen={view.characterTrackOpen}
-							onCharacterTrackOpen={(characterTrackOpen) => patch({ characterTrackOpen })}
 							book={book}
 							reviews={reviews}
 							file={file}

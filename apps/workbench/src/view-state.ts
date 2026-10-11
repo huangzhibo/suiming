@@ -128,8 +128,6 @@ export interface PageState {
 	reviewPane: "current" | "reviewed";
 	checkFilter: { severity: "all" | "error" | "warning"; query: string };
 	versionFile: string;
-	characterTrackOpen: boolean;
-	characterRelationsOpen: boolean;
 }
 export interface WorkbenchTab {
 	id: string;
@@ -172,8 +170,6 @@ export function pageState(page = EMPTY_PAGE): PageState {
 		reviewPane: "current",
 		checkFilter: { severity: "all", query: "" },
 		versionFile: "",
-		characterTrackOpen: false,
-		characterRelationsOpen: false,
 	};
 }
 export function createTab(location = pageState()): WorkbenchTab {

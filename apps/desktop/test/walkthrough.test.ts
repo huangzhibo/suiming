@@ -78,7 +78,7 @@ test("未配置模型发送被拒绝：文字与引用退回可编辑草稿，�
 	}
 });
 
-test("长篇工作面：故事轴适应全书，人物介绍先于轨迹，展开选择重载保留", { timeout: 60000 }, async () => {
+test("长篇工作面：故事轴适应全书，人物经历直接可读，状态事件不依赖人物引用", { timeout: 60000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-long-axis-"));
 	const root = join(directory, "work");
 	await cp(resolve("examples/sanguo"), root, { recursive: true });
@@ -101,33 +101,54 @@ test("长篇工作面：故事轴适应全书，人物介绍先于轨迹，展�
 		const viewport = await page.locator("[data-axis-scroll]").boundingBox();
 		assert.ok(last && viewport && last.x + last.width <= viewport.x + viewport.width + 1);
 		await page.locator("[data-navigation-icons]").getByRole("button", { name: "搜索", exact: true }).click();
-		await page.getByRole("textbox", { name: "搜索作品", exact: true }).fill("world/characters/刘备.md");
+		const search = page.getByRole("textbox", { name: "搜索作品", exact: true });
+		await search.fill("world/characters/丁原.md");
+		await page.locator('.item-btn[data-page="world/characters/丁原.md"]').click();
+		const track = page.locator("[data-character-track]");
+		await track.getByRole("button", { name: "赤兔诱吕布杀丁原", exact: true }).waitFor();
+		assert.equal(
+			await track.locator("[data-character-event]").count(),
+			2,
+			"引用与状态变化取并集，不能漏掉没有 refs 的死亡情节",
+		);
+		await track.getByText("死亡", { exact: true }).waitFor();
+		assert.equal(
+			await page.locator('[data-character-relations] [data-page$="beat-0017.md"]').count(),
+			0,
+			"经历中已有的情节不重复列为文档引用",
+		);
+		const events = await track.locator("[data-character-event]").all();
+		const first = await events[0]?.boundingBox();
+		const second = await events[1]?.boundingBox();
+		assert.ok(first && second && first.y + first.height <= second.y, "经历节点不能相互重叠");
+		assert.ok(second.y + second.height < 640, "稀疏人物的两条经历应在首屏可见");
+		await track.getByRole("button", { name: "赤兔诱吕布杀丁原", exact: true }).click();
+		await page.getByRole("heading", { name: "赤兔诱吕布杀丁原", exact: true }).waitFor();
+		await search.fill("world/characters/刘备.md");
 		await page.locator('.item-btn[data-page="world/characters/刘备.md"]').click();
 		await page.getByRole("heading", { name: "刘备", exact: true }).waitFor();
-		const relations = page.locator("[data-character-relations]");
-		await relations.waitFor();
-		assert.equal(await page.locator("[data-neighborhood]").count(), 0, "人物文档引用图默认按需展开");
-		await relations.locator("summary").click();
-		await page.locator("[data-neighborhood]").waitFor();
+		await track.locator("[data-character-event]").first().waitFor();
+		assert.ok((await track.locator("[data-character-volume]").count()) > 1, "密集人物按卷组织，内容全部直接呈现");
+		await track.getByRole("navigation", { name: "按卷定位人物经历" }).getByRole("button").last().click();
+		assert.equal(
+			await track
+				.locator("[data-character-volume]")
+				.last()
+				.evaluate((element) => element === element.ownerDocument.activeElement),
+			true,
+		);
+		await page.getByRole("heading", { name: "刘备", exact: true }).scrollIntoViewIfNeeded();
 		await page.reload();
-		await page.locator("[data-neighborhood]").waitFor();
-		await relations.locator("summary").click();
+		await track.locator("[data-character-event]").first().waitFor();
 		const intro = page.locator(".document-page .design-body").first();
-		const track = page.locator("[data-character-track]");
-		await track.waitFor();
-		assert.equal(await track.getAttribute("open"), null);
 		const introBox = await intro.boundingBox();
 		const trackBox = await track.boundingBox();
-		assert.ok(introBox && trackBox && introBox.y + introBox.height <= trackBox.y, "人物介绍必须先于全书轨迹");
-		await track.locator("summary").click();
-		await page.getByRole("img", { name: "人物轨迹", exact: true }).waitFor();
-		await page.reload();
-		await page.getByRole("img", { name: "人物轨迹", exact: true }).waitFor();
-		await track.locator("summary").click();
+		assert.ok(introBox && trackBox && introBox.y + introBox.height <= trackBox.y);
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
 		await page.getByRole("button", { name: "展开左栏", exact: true }).waitFor();
 		const narrowIntro = await intro.boundingBox();
 		assert.ok(narrowIntro && narrowIntro.y < 400, "窄窗首屏应呈现人物介绍");
+		assert.equal(await track.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), true);
 		await page.getByRole("button", { name: "展开左栏", exact: true }).click();
 		await page.getByRole("textbox", { name: "搜索作品", exact: true }).fill("intent/book.md");
 		await page.locator('.item-btn[data-page="intent/book.md"]').click();

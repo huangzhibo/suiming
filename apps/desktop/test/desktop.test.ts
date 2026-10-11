@@ -123,10 +123,13 @@ test("状态查询：全书选择不筛选计数，幕前 / 变化 / 幕后明�
 		// 保留显式查询的位置；转看另一幕时仍能换位置，也能一键查询当前情节。
 		await page.locator("[data-navigation-icons]").getByRole("button", { name: "搜索", exact: true }).click();
 		await page.getByRole("textbox", { name: "搜索作品", exact: true }).fill("outline/story/vol-0001/beat-0002.md");
-		await page.locator("button[data-page='outline/story/vol-0001/beat-0002.md']").click();
+		await page.locator(".item-btn[data-page='outline/story/vol-0001/beat-0002.md']").click();
 		await panel.getByRole("combobox", { name: "选择观察位置", exact: true }).waitFor();
 		await panel.getByRole("button", { name: "查看当前情节", exact: true }).click();
-		await panel.getByRole("paragraph").filter({ hasText: /^beat-0002$/ }).waitFor();
+		await panel
+			.getByRole("paragraph")
+			.filter({ hasText: /^beat-0002$/ })
+			.waitFor();
 		await panel.getByText("全部人物、资源与读者期待", { exact: true }).waitFor();
 		assert.equal(await panel.getByRole("combobox").count(), 0);
 		await page.getByRole("button", { name: "对话", exact: true }).click();

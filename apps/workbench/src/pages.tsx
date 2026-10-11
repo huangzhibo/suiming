@@ -15,8 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { anchorParagraphs } from "./anchors.js";
 import { type PropertyRow, propertyRows } from "./artifact-properties.js";
+import { CharacterTrack } from "./axis/CharacterTrack.js";
 import { axisModel } from "./axis/layout.js";
-import { CharacterTrack, ContractTrack } from "./axis/MiniTrack.js";
+import { ContractTrack } from "./axis/MiniTrack.js";
 import { NeighborhoodView } from "./axis/NeighborhoodView.js";
 import { invoke } from "./bridge.js";
 import type { ComparisonConfig } from "./code-editor.js";
@@ -147,10 +148,6 @@ export interface ArtifactPageProps {
 	open(page: string): void;
 	delegateWrite(): void;
 	openEditor(): void;
-	characterTrackOpen: boolean;
-	onCharacterTrackOpen(value: boolean): void;
-	characterRelationsOpen: boolean;
-	onCharacterRelationsOpen(value: boolean): void;
 }
 /** 正文页只展示阅读内容；设计与对象页补充属性、轨迹和邻域图。 */
 export function ArtifactPage(props: ArtifactPageProps) {
@@ -179,11 +176,22 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	const relatedPaths = new Set(
 		book.links.flatMap((link) => (link.from === file.path ? [link.to] : link.to === file.path ? [link.from] : [])),
 	);
+	const experiencePaths = new Set(
+		characterLane
+			? [...characterLane.present, ...characterLane.events.map((event) => event.ordinal)].map(
+					(ordinal) => axis.beats[ordinal]?.path,
+				)
+			: [],
+	);
+	const extraCharacterPaths = [...relatedPaths].filter((path) => !experiencePaths.has(path));
 	const hasRelations = relatedPaths.size > 0;
 	const [expandedKinds, setExpandedKinds] = useState<Set<string>>(new Set());
 	const status: { text: string; color: string }[] = [
 		{
-			text: `${codePoints(stripFrontmatter(showText ? textContent : content)).toLocaleString()} 字`,
+			text:
+				file.kind === "character"
+					? ""
+					: `${codePoints(stripFrontmatter(showText ? textContent : content)).toLocaleString()} 字`,
 			color: "text-muted-foreground",
 		},
 		(showText || !hasText) && lineage
@@ -193,7 +201,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 				}
 			: undefined,
 		displayFile?.dirty ? { text: "未提交", color: "text-amber" } : undefined,
-	].filter((item): item is { text: string; color: string } => !!item);
+	].filter((item): item is { text: string; color: string } => !!item?.text);
 	return (
 		<article className="document-page" data-measure={showText ? "reading" : "document"}>
 			<h1 className="mb-1 text-[26px] leading-[1.4] font-semibold tracking-[.5px]">
@@ -220,26 +228,9 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			{file.kind === "character" && (
 				<Props plain rows={rows.filter((row) => !identityRows.includes(row))} open={open} />
 			)}
-			{characterLane && (
-				<details
-					className="properties mt-5 border-t border-hair pt-3"
-					data-character-track
-					open={props.characterTrackOpen}
-					onToggle={(event) => {
-						if (event.currentTarget.open !== props.characterTrackOpen)
-							props.onCharacterTrackOpen(event.currentTarget.open);
-					}}
-				>
-					<summary className="navigation-link -ml-1.5 flex w-fit items-center gap-1.5 text-[13px] [&::-webkit-details-marker]:hidden">
-						<ChevronDown className="size-3.5" aria-hidden="true" />
-						全书轨迹 · {characterLane.present.length} 个情节引用 · {characterLane.events.length} 条状态变化
-					</summary>
-					{props.characterTrackOpen && (
-						<div className="mt-3">
-							<CharacterTrack model={axis} lane={characterLane} open={open} />
-						</div>
-					)}
-				</details>
+			{characterLane && <CharacterTrack model={axis} lane={characterLane} open={open} />}
+			{file.kind === "character" && !characterLane && (
+				<p className="mt-6 text-sm text-muted-foreground">尚无相关情节或状态变化记录。</p>
 			)}
 			{showText &&
 				(hasText ? (
@@ -278,29 +269,25 @@ export function ArtifactPage(props: ArtifactPageProps) {
 				!contractLane &&
 				hasRelations &&
 				(file.kind === "character" ? (
-					<details
-						className="properties mt-3 border-t border-hair pt-3"
-						data-character-relations
-						open={props.characterRelationsOpen}
-						onToggle={(event) => {
-							if (event.currentTarget.open !== props.characterRelationsOpen)
-								props.onCharacterRelationsOpen(event.currentTarget.open);
-						}}
-					>
-						<summary className="navigation-link -ml-1.5 flex w-fit items-center gap-1.5 text-[13px] [&::-webkit-details-marker]:hidden">
-							<ChevronDown className="size-3.5" aria-hidden="true" />
-							文档引用 · {relatedPaths.size} 个关联文档
-						</summary>
-						{props.characterRelationsOpen && (
-							<NeighborhoodView
-								book={book}
-								path={file.path}
-								open={open}
-								expandedKinds={expandedKinds}
-								onExpand={(kind) => setExpandedKinds(new Set([...expandedKinds, kind]))}
-							/>
-						)}
-					</details>
+					extraCharacterPaths.length > 0 && (
+						<section className="mt-6 border-t border-hair pt-4" data-character-relations>
+							<h2 className="mb-2 text-sm font-semibold">其他关联文档</h2>
+							<ul className="space-y-1">
+								{extraCharacterPaths.map((path) => (
+									<li key={path}>
+										<button
+											type="button"
+											className="navigation-link text-sm"
+											data-page={path}
+											onClick={() => open(path)}
+										>
+											{book.title(book.byPath.get(path)) || path}
+										</button>
+									</li>
+								))}
+							</ul>
+						</section>
+					)
 				) : (
 					<section className="mt-9 border-t border-hair pt-3.5" data-relations>
 						<h2 className="mb-1 text-[11.5px] text-muted-foreground">关系</h2>

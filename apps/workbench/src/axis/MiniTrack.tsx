@@ -1,9 +1,9 @@
 import { Hint } from "../ui-bits.js";
-import type { AxisModel, CharacterLane, ContractLane } from "./layout.js";
+import type { AxisModel, ContractLane } from "./layout.js";
 import { contractStatus } from "./layout.js";
 
 /**
- * 单行轨迹：故事轴上某一条泳道的横向全书版本，嵌在读者期待页的进展区或人物页的可展开轨迹区。
+ * 单行轨迹：故事轴上某一条泳道的横向全书版本，嵌在读者期待页的进展区。
  * 横轴仍是 index.yaml 的顺序，卷边界做刻度；点击锚点打开对应 Beat。
  */
 const W = 900;
@@ -144,101 +144,6 @@ export function ContractTrack({
 					),
 				)}
 			</svg>
-		</div>
-	);
-}
-
-export function CharacterTrack({
-	model,
-	lane,
-	open,
-}: {
-	model: AxisModel;
-	lane: CharacterLane;
-	open(page: string): void;
-}) {
-	const x = useScale(model);
-	const title = (ordinal: number) => model.beats[ordinal]?.title ?? "";
-	const openBeat = (ordinal: number) => open(model.beats[ordinal]?.path ?? "");
-	const y = 30;
-	const volumeOf = (ordinal: number) =>
-		model.volumes.find((volume) => ordinal >= volume.start && ordinal <= volume.end)?.title ?? "";
-	const first = lane.present[0];
-	return (
-		<div className="mb-4">
-			<div className="mb-1 flex flex-wrap items-baseline gap-x-3 text-xs text-muted-foreground">
-				{first !== undefined && (
-					<span>
-						最早用到 {volumeOf(first)} · {title(first)}
-					</span>
-				)}
-				{lane.deadAt >= 0 && (
-					<span>
-						✕ 死于 {volumeOf(lane.deadAt)} · {title(lane.deadAt)}
-					</span>
-				)}
-				{/* 图例讲语义，不搬字段名（可视化设计 3.4）：● 是 refs.character，✕ ◆ ⌖ 是 changes。 */}
-				<span>● 是这一节的设计用到了此人，不等于出场或视角；✕ ◆ ⌖ 是设计里记下的状态变化，没记下不等于没发生</span>
-			</div>
-			<svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="人物轨迹" className="block max-w-[900px]">
-				<title>人物轨迹</title>
-				<Volumes model={model} x={x} />
-				{lane.present.map((ordinal) => (
-					<Hint
-						content={`${volumeOf(ordinal)} · ${title(ordinal)}（${model.beats[ordinal]?.id ?? ""}）${lane.deadAt >= 0 && ordinal > lane.deadAt ? "\n此时已死亡，仍被引用（回忆或遗产）" : ""}`}
-						key={`p:${ordinal}`}
-					>
-						<circle
-							aria-label={`${volumeOf(ordinal)} · ${title(ordinal)}（${model.beats[ordinal]?.id ?? ""}）${lane.deadAt >= 0 && ordinal > lane.deadAt ? "\n此时已死亡，仍被引用（回忆或遗产）" : ""}`}
-							cx={x(ordinal)}
-							cy={y}
-							r={4}
-							fill={lane.deadAt >= 0 && ordinal > lane.deadAt ? "#fff" : "var(--ink-2)"}
-							stroke="var(--ink-2)"
-							strokeWidth={1.4}
-							data-page={model.beats[ordinal]?.path}
-							{...press(() => openBeat(ordinal))}
-						></circle>
-					</Hint>
-				))}
-				{lane.events.map((event) => (
-					<Hint content={`${title(event.ordinal)}\n${event.note}`} key={`e:${event.kind}:${event.ordinal}`}>
-						<text
-							aria-label={`${title(event.ordinal)}\n${event.note}`}
-							x={x(event.ordinal)}
-							y={y - 9}
-							textAnchor="middle"
-							fontSize={11}
-							fill={
-								event.kind === "dead"
-									? "var(--destructive)"
-									: event.kind === "secret"
-										? "var(--purple)"
-										: "var(--muted-foreground)"
-							}
-							data-page={model.beats[event.ordinal]?.path}
-							{...press(() => openBeat(event.ordinal))}
-						>
-							{event.kind === "dead" ? "✕" : event.kind === "secret" ? "◆" : "⌖"}
-						</text>
-					</Hint>
-				))}
-			</svg>
-			{lane.events.length > 0 && (
-				<ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-3">
-					{lane.events.map((event) => (
-						<li key={`${event.ordinal}:${event.note}`}>
-							<button
-								type="button"
-								className="navigation-link -ml-1.5 text-left"
-								onClick={() => openBeat(event.ordinal)}
-							>
-								{event.note} · {volumeOf(event.ordinal)} · {title(event.ordinal)}
-							</button>
-						</li>
-					))}
-				</ul>
-			)}
 		</div>
 	);
 }
