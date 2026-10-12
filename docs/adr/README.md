@@ -21,5 +21,6 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0016](0016-page-information-hierarchy.md) | Amended；人物折叠由 0018 取代 | 按页面工作目的组织信息：版本核对、人物概览与情节设计保持各自顺序，共享基础控件 |
 | [0017](0017-check-review-state-workflows.md) | Accepted | 检查按诊断筛选，审稿按意见核对，状态查询保留观察边界，设置精简重复说明 |
 | [0018](0018-character-experience-visibility.md) | Accepted | 人物经历直接可读，情节与状态变化合并；以语义色和形状区分，密集人物增加真实全书分布，其他文档去重 |
+| [0019](0019-preserve-visual-structure.md) | Accepted | 情节、地点、资源保留节点连线结构；各对象补充各自所需的阶段、分布与流转视图，验收同时核对图形结构 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。
