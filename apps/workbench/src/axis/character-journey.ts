@@ -48,7 +48,7 @@ export function characterJourney(model: AxisModel, lane: CharacterLane) {
 		entries,
 		groups,
 		events: entries.flatMap((entry) => entry.events),
-		// 一屏以内直接读；较多经历或五条以上跨卷经历才需要全书概览。
-		overview: entries.length > 8 || (entries.length > 4 && groups.length > 1),
+		// 全书位置不因记录少而失去价值；没有记录时才省略分布图。
+		overview: entries.length > 0,
 	};
 }

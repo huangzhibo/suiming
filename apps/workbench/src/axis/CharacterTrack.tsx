@@ -92,7 +92,7 @@ export function CharacterTrack({
 			</div>
 			{journey.overview && (
 				<div className="mb-4" data-character-overview>
-					<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+					<div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
 						<h3 className="text-xs font-medium text-sub">全书分布</h3>
 						<fieldset
 							className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
@@ -110,6 +110,7 @@ export function CharacterTrack({
 						</fieldset>
 					</div>
 					<JourneyDistribution
+						key={lane.id}
 						model={model}
 						entries={journey.entries}
 						locate={(entry) => locate(moments.current.get(entry.beat.path))}
@@ -322,16 +323,31 @@ function JourneyDistribution({
 	locate(entry: CharacterMoment): void;
 }) {
 	const [index, setIndex] = useState(0);
+	const [plotWidth, setPlotWidth] = useState(0);
 	const plot = useRef<HTMLSpanElement>(null);
 	const marker = useRef<HTMLSpanElement>(null);
+	useEffect(() => {
+		const element = plot.current;
+		if (!element) return;
+		const observer = new ResizeObserver(() => setPlotWidth(element.clientWidth));
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, []);
 	const entry = entries[Math.min(index, entries.length - 1)];
 	if (!entry) return null;
 	const volume = model.volumes.find((volume) => volume.id === entry.beat.volumeId);
+	// 同一分布带的普通记录使用相同画法，避免把孤立圆点误读成更重要的事件。
+	const crowded = entries.some(
+		(moment, index) =>
+			index > 0 && ((moment.position - (entries[index - 1]?.position ?? moment.position)) * plotWidth) / 100 < 12,
+	);
+	const splitMarks =
+		entries.some((moment) => moment.kind !== "related") && entries.some((moment) => moment.kind === "related");
 	return (
 		<Hint
 			anchor={marker}
 			side="top"
-			content={`${volume?.title} · 第 ${entry.beat.ordinal + 1} 个情节\n${entry.beat.title}${entry.events.map((event) => `\n${event.note}`).join("")}\n点击定位 · ← → 切换情节`}
+			content={`${volume?.title} · 第 ${entry.beat.ordinal + 1} 个情节\n${entry.beat.title}${entry.events.map((event) => `\n${event.note}`).join("")}\n点击定位${entries.length > 1 ? " · ← → 切换情节" : ""}`}
 		>
 			<button
 				type="button"
@@ -342,7 +358,7 @@ function JourneyDistribution({
 				aria-valuenow={entry.beat.ordinal + 1}
 				aria-valuetext={`${entry.beat.title}，${volume?.title}，${entry.events.map((event) => event.note).join("；")}`}
 				data-character-distribution
-				className="group relative block h-8 w-full rounded-md bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				className="group relative block h-7 w-full rounded-md bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				onPointerMove={(event) => {
 					const bounds = plot.current?.getBoundingClientRect();
 					if (!bounds) return;
@@ -390,14 +406,17 @@ function JourneyDistribution({
 					))}
 					{entries.map((moment) => {
 						const style = momentStyle[moment.kind];
-						const Icon = moment.kind === "related" ? Minus : style.Icon;
+						const Icon = moment.kind === "related" && crowded ? Minus : style.Icon;
 						return (
 							<Icon
 								key={moment.beat.path}
+								data-character-distribution-marker
+								data-kind={moment.kind}
 								aria-hidden="true"
 								className={cn(
-									"pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2",
-									moment.kind === "related" ? "size-2.5 rotate-90" : "size-3.5",
+									"pointer-events-none absolute -translate-x-1/2 -translate-y-1/2",
+									splitMarks ? (moment.kind === "related" ? "top-3/4" : "top-1/4") : "top-1/2",
+									moment.kind === "related" ? (crowded ? "size-2.5 rotate-90" : "size-2") : "size-3.5",
 									style.color,
 									style.mark,
 								)}

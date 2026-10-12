@@ -49,10 +49,10 @@ test("人物经历取顺序并集，保留同节多种变化和没有引用的�
 		journey.groups.map((group) => group.entries.length),
 		[2, 1],
 	);
-	assert.equal(journey.overview, false, "少量经历不增加概览负担，即使分散到不同卷");
+	assert.equal(journey.overview, true, "少量跨卷经历也保留全书位置");
 });
 
-test("密集人物概览保留全部记录，空记录与单点都不画空分布图", () => {
+test("全书分布覆盖所有有记录人物，空记录不画图，单点不拉伸坐标", () => {
 	const dense = characterJourney(model, { ...lane, present: model.beats.map((beat) => beat.ordinal) });
 	assert.equal(dense.overview, true);
 	assert.equal(dense.entries.length, 20);
@@ -62,5 +62,14 @@ test("密集人物概览保留全部记录，空记录与单点都不画空分�
 	assert.equal(empty.groups.length, 0);
 	const single = characterJourney({ ...model, beats: model.beats.slice(0, 1) }, { ...lane, present: [0], events: [] });
 	assert.equal(single.entries[0]?.position, 50);
-	assert.equal(single.overview, false);
+	assert.equal(single.overview, true);
+	for (const count of [1, 4, 5, 8, 9]) {
+		const sparse = characterJourney(model, {
+			...lane,
+			present: model.beats.slice(-count).map((beat) => beat.ordinal),
+			events: [],
+		});
+		assert.equal(sparse.overview, true, `${count} 条记录均能查看全书位置`);
+		assert.equal(sparse.entries.at(-1)?.position, 97.5, "末端单点保留全书坐标，不移到正中间");
+	}
 });

@@ -113,9 +113,30 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 			2,
 			"引用与状态变化取并集，不能漏掉没有 refs 的死亡情节",
 		);
-		await track.getByText("死亡", { exact: true }).waitFor();
+		await track.locator("[data-character-event]").getByText("死亡", { exact: true }).waitFor();
 		assert.equal(await track.getByText("引用", { exact: true }).count(), 0);
-		assert.equal(await track.locator("[data-character-overview]").count(), 0, "稀疏人物不增加空泛概览");
+		await track.getByRole("slider", { name: "全书分布" }).waitFor();
+		assert.equal(await track.getByRole("navigation", { name: "按卷定位人物经历" }).count(), 0, "单卷不提供跨卷目录");
+		const sparsePlot = track.locator("[data-character-plot]");
+		assert.equal(await sparsePlot.locator("[data-character-distribution-marker]").count(), 2);
+		const relatedMark = await sparsePlot.locator('[data-kind="related"]').boundingBox();
+		const deathMark = await sparsePlot.locator('[data-kind="dead"]').boundingBox();
+		assert.ok(
+			relatedMark && deathMark && deathMark.y + deathMark.height <= relatedMark.y,
+			"相邻死亡图标不能遮住普通记录；仅错开纵向位置，不改变全书坐标",
+		);
+		const sparseSlider = track.getByRole("slider", { name: "全书分布" });
+		await page.keyboard.press("Shift");
+		await sparseSlider.focus();
+		await sparseSlider.press("End");
+		await page.getByRole("tooltip").filter({ hasText: "死亡" }).waitFor();
+		await sparseSlider.press("Enter");
+		assert.equal(
+			await track
+				.locator('[data-character-event][data-kind="dead"]')
+				.evaluate((element) => element === element.ownerDocument.activeElement),
+			true,
+		);
 		assert.equal(await track.locator('[data-character-event][data-kind="dead"]').count(), 1);
 
 		assert.equal(
@@ -130,6 +151,23 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		assert.ok(second.y + second.height < 640, "稀疏人物的两条经历应在首屏可见");
 		await track.getByRole("button", { name: "赤兔诱吕布杀丁原", exact: true }).click();
 		await page.getByRole("heading", { name: "赤兔诱吕布杀丁原", exact: true }).waitFor();
+		await search.fill("world/characters/典满.md");
+		await page.locator('.item-btn[data-page="world/characters/典满.md"]').click();
+		await page.getByRole("heading", { name: "典满", exact: true }).waitFor();
+		const singlePlot = track.locator("[data-character-plot]");
+		await singlePlot.locator('[data-kind="related"] circle').waitFor();
+		assert.equal(await singlePlot.locator("[data-character-distribution-marker]").count(), 1);
+		const singlePoint = await singlePlot.locator("[data-character-distribution-marker]").boundingBox();
+		const wholeBook = await singlePlot.boundingBox();
+		const ordinal = Number(await track.getByRole("slider", { name: "全书分布" }).getAttribute("aria-valuenow"));
+		assert.ok(
+			singlePoint &&
+				wholeBook &&
+				Math.abs(
+					singlePoint.x + singlePoint.width / 2 - (wholeBook.x + ((ordinal - 0.5) / 231) * wholeBook.width),
+				) < 1,
+			"单点按全书顺序定位，不能居中拉伸",
+		);
 		await search.fill("world/characters/刘备.md");
 		await page.locator('.item-btn[data-page="world/characters/刘备.md"]').click();
 		await page.getByRole("heading", { name: "刘备", exact: true }).waitFor();
@@ -137,6 +175,11 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		const closeChat = page.getByRole("button", { name: "收起右栏", exact: true });
 		if (await closeChat.isVisible()) await closeChat.click();
 		const distribution = track.getByRole("slider", { name: "全书分布" });
+		assert.equal(
+			await track.locator('[data-character-plot] [data-kind="related"] circle').count(),
+			0,
+			"密集分布统一用普通刻度，不用孤立圆点暗示重要程度",
+		);
 		await distribution.hover();
 		await page.getByRole("tooltip").filter({ hasText: "点击定位" }).waitFor();
 		const stripBox = await distribution.boundingBox();
@@ -342,7 +385,21 @@ test("人物经历边界：空记录不画图，只有状态的单节点可读�
 		const track = page.locator("[data-character-track]");
 		await track.getByText("位置改为：赤壁", { exact: true }).waitFor();
 		assert.equal(await track.locator('[data-character-event][data-kind="location"]').count(), 1);
-		assert.equal(await track.locator("[data-character-overview]").count(), 0);
+		const singleDistribution = track.getByRole("slider", { name: "全书分布" });
+		await singleDistribution.waitFor();
+		assert.equal(await track.locator("[data-character-distribution-marker]").count(), 1);
+		assert.equal(await track.getByRole("navigation", { name: "按卷定位人物经历" }).count(), 0);
+		await page.keyboard.press("Shift");
+		await singleDistribution.focus();
+		await singleDistribution.press("Home");
+		await page.getByRole("tooltip").filter({ hasText: "位置改为：赤壁" }).waitFor();
+		await singleDistribution.press("Enter");
+		assert.equal(
+			await track
+				.locator("[data-character-event]")
+				.evaluate((element) => element === element.ownerDocument.activeElement),
+			true,
+		);
 		assert.equal(await track.getByText("引用", { exact: true }).count(), 0);
 		await track.locator("button[data-page]").click();
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
