@@ -130,7 +130,10 @@ export function NeighborhoodView({
 			return (
 				<g key={`n:${side}:${node.path}:${node.key}`}>
 					<path d={d} fill="none" stroke={color(node.kind)} strokeWidth={1.2} opacity={0.75} />
-					<Hint content={`${node.title}\n${KIND_LABEL[node.kind] ?? node.kind}\n引用字段：${node.key}`}>
+					<Hint
+						side={side === "up" ? "left" : "right"}
+						content={`${node.title}\n${KIND_LABEL[node.kind] ?? node.kind}\n引用字段：${node.key}`}
+					>
 						{/* biome-ignore lint/a11y/useSemanticElements: SVG 里没有 button 元素 */}
 						<g
 							aria-label={`${node.title}\n${KIND_LABEL[node.kind] ?? node.kind}\n引用字段：${node.key}`}

@@ -250,10 +250,7 @@ export function CharacterTrack({
 												)}
 												aria-hidden="true"
 											/>
-											<span
-												className="pt-1.5 text-xs tabular-nums text-muted-foreground"
-												title={`全书第 ${beat.ordinal + 1} 个情节`}
-											>
+											<span className="pt-1.5 text-xs tabular-nums text-muted-foreground">
 												{beat.ordinal + 1}
 											</span>
 											<div className="flex min-w-0 flex-col gap-x-5 @min-[600px]/moment:flex-row @min-[600px]/moment:flex-wrap @min-[600px]/moment:items-baseline">
@@ -317,11 +314,14 @@ function JourneyDistribution({
 }) {
 	const [index, setIndex] = useState(0);
 	const plot = useRef<HTMLSpanElement>(null);
+	const marker = useRef<HTMLSpanElement>(null);
 	const entry = entries[Math.min(index, entries.length - 1)];
 	if (!entry) return null;
 	const volume = model.volumes.find((volume) => volume.id === entry.beat.volumeId);
 	return (
 		<Hint
+			anchor={marker}
+			side="top"
 			content={`${volume?.title} · 第 ${entry.beat.ordinal + 1} 个情节\n${entry.beat.title}${entry.events.map((event) => `\n${event.note}`).join("")}\n点击定位 · ← → 切换情节`}
 		>
 			<button
@@ -398,7 +398,9 @@ function JourneyDistribution({
 					})}
 					<span
 						aria-hidden="true"
-						className="pointer-events-none absolute inset-y-0 hidden w-1 -translate-x-1/2 rounded-full border border-foreground group-hover:block group-focus-visible:block"
+						ref={marker}
+						data-character-selection
+						className="pointer-events-none absolute inset-y-0 w-1 -translate-x-1/2 rounded-full border border-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
 						style={{ left: `${entry.position}%` }}
 					/>
 				</span>

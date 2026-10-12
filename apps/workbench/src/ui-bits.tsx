@@ -43,6 +43,7 @@ export function EmptyNote({ className, ...props }: ComponentProps<"div">) {
 /** 简短补充说明；复用实际触发元素，不额外改变行、树或分栏布局。 */
 export function Hint({
 	content,
+	anchor,
 	children,
 	side = "bottom",
 	ref,
@@ -50,6 +51,7 @@ export function Hint({
 }: Omit<HTMLAttributes<HTMLElement>, "content" | "children"> & {
 	ref?: Ref<HTMLElement>;
 	content?: ReactNode;
+	anchor?: ComponentProps<typeof TooltipContent>["anchor"];
 	children: ReactElement;
 	side?: "top" | "bottom" | "left" | "right";
 }) {
@@ -59,7 +61,9 @@ export function Hint({
 	return (
 		<Tooltip>
 			<TooltipTrigger ref={ref as Ref<HTMLButtonElement>} render={children} {...props} />
-			<TooltipContent side={side}>{content}</TooltipContent>
+			<TooltipContent side={side} anchor={anchor}>
+				{content}
+			</TooltipContent>
 		</Tooltip>
 	);
 }
