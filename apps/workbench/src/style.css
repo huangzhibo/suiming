@@ -180,11 +180,12 @@
 		--content-width: var(--document-width);
 	}
 	.document-page {
+		--page-bottom-space: 120px;
 		width: 100%;
 		min-width: 0;
 		max-width: calc(var(--content-width) + 2 * var(--page-gutter));
 		margin-inline: auto;
-		padding: 28px var(--page-gutter) 120px;
+		padding: 28px var(--page-gutter) var(--page-bottom-space);
 		overflow-wrap: anywhere;
 	}
 	.cm-host[data-measure="reading"],

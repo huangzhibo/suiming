@@ -211,9 +211,26 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			: undefined,
 		displayFile?.dirty ? { text: "未提交", color: "text-amber" } : undefined,
 	].filter((item): item is { text: string; color: string } => !!item?.text);
+	const characterRelations = file.kind === "character" && extraCharacterPaths.length > 0 && (
+		<section className="mt-6 border-t border-hair pt-4" data-character-relations>
+			<h2 className="mb-2 text-sm font-semibold">其他关联文档</h2>
+			<ul className="space-y-1">
+				{extraCharacterPaths.map((path) => (
+					<li key={path}>
+						<button type="button" className="navigation-link text-sm" data-page={path} onClick={() => open(path)}>
+							{book.title(book.byPath.get(path)) || path}
+						</button>
+					</li>
+				))}
+			</ul>
+		</section>
+	);
 	const hasMetadata = file.kind !== "character" || status.length > 0 || identityRows.length > 0;
 	return (
-		<article className="document-page" data-measure={showText ? "reading" : "document"}>
+		<article
+			className={cn("document-page", characterLane && "pb-0")}
+			data-measure={showText ? "reading" : "document"}
+		>
 			<h1 className={cn("text-[26px] leading-[1.4] font-semibold tracking-[.5px]", hasMetadata ? "mb-1" : "mb-3")}>
 				{isText ? book.beatTitle(file.localId) : book.title(file)}
 			</h1>
@@ -247,7 +264,11 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			{file.kind === "character" && (
 				<Props plain rows={rows.filter((row) => !identityRows.includes(row))} open={open} />
 			)}
-			{characterLane && <CharacterTrack model={axis} lane={characterLane} open={open} />}
+			{characterLane && (
+				<CharacterTrack model={axis} lane={characterLane} open={open}>
+					{characterRelations}
+				</CharacterTrack>
+			)}
 			{file.kind === "character" && !characterLane && (
 				<p className="mt-6 text-sm text-muted-foreground">尚无相关情节或状态变化记录。</p>
 			)}
@@ -288,25 +309,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 				!contractLane &&
 				hasRelations &&
 				(file.kind === "character" ? (
-					extraCharacterPaths.length > 0 && (
-						<section className="mt-6 border-t border-hair pt-4" data-character-relations>
-							<h2 className="mb-2 text-sm font-semibold">其他关联文档</h2>
-							<ul className="space-y-1">
-								{extraCharacterPaths.map((path) => (
-									<li key={path}>
-										<button
-											type="button"
-											className="navigation-link text-sm"
-											data-page={path}
-											onClick={() => open(path)}
-										>
-											{book.title(book.byPath.get(path)) || path}
-										</button>
-									</li>
-								))}
-							</ul>
-						</section>
-					)
+					!characterLane && characterRelations
 				) : (
 					<section className="mt-9 border-t border-hair pt-3.5" data-relations>
 						<h2 className="mb-1 text-[11.5px] text-muted-foreground">关系</h2>

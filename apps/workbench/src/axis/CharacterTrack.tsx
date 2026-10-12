@@ -1,5 +1,5 @@
 import { ArrowUp, ArrowUpRight, Circle, Diamond, Info, MapPin, Minus, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Hint } from "../ui-bits.js";
@@ -18,10 +18,12 @@ export function CharacterTrack({
 	model,
 	lane,
 	open,
+	children,
 }: {
 	model: AxisModel;
 	lane: CharacterLane;
 	open(page: string): void;
+	children?: ReactNode;
 }) {
 	const root = useRef<HTMLElement>(null);
 	const sections = useRef(new Map<string, HTMLElement>());
@@ -58,9 +60,13 @@ export function CharacterTrack({
 			frame = requestAnimationFrame(update);
 		};
 		scroll.addEventListener("scroll", schedule, { passive: true });
-		const observer = new ResizeObserver(schedule);
+		const resize = () => {
+			root.current?.style.setProperty("--character-viewport-height", `${scroll.clientHeight}px`);
+			schedule();
+		};
+		const observer = new ResizeObserver(resize);
 		observer.observe(scroll);
-		schedule();
+		resize();
 		return () => {
 			scroll.removeEventListener("scroll", schedule);
 			observer.disconnect();
@@ -122,7 +128,7 @@ export function CharacterTrack({
 			>
 				{/* 宽窗吸顶间距与卷标题的 scroll-mt-4 一致，首卷自然位置和后续卷吸顶位置才不会跳动。 */}
 				{journey.groups.length > 1 && (
-					<aside className="sticky top-0 z-10 mb-3 min-w-0 bg-background py-2 @min-[880px]/character:top-4 @min-[880px]/character:order-2 @min-[880px]/character:mb-0">
+					<aside className="sticky top-0 z-10 mb-3 flex max-h-[calc(var(--character-viewport-height)-32px)] min-w-0 flex-col bg-background py-2 @min-[880px]/character:top-4 @min-[880px]/character:order-2 @min-[880px]/character:mb-0">
 						<div ref={compactNav} className="flex items-center gap-2 @min-[880px]/character:hidden">
 							<Select
 								value={activeVolume ?? null}
@@ -155,7 +161,7 @@ export function CharacterTrack({
 								</button>
 							</Hint>
 						</div>
-						<div className="hidden @min-[880px]/character:block">
+						<div className="hidden min-h-0 flex-col @min-[880px]/character:flex">
 							<div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
 								<span>按卷定位 · {journey.groups.length} 卷</span>
 								<Hint content="回到人物经历的全书分布">
@@ -169,7 +175,7 @@ export function CharacterTrack({
 									</button>
 								</Hint>
 							</div>
-							<nav aria-label="按卷定位人物经历" className="flex max-h-[65vh] flex-col gap-1 overflow-y-auto">
+							<nav aria-label="按卷定位人物经历" className="flex min-h-0 flex-col gap-1 overflow-y-auto">
 								{journey.groups.map(({ volume, entries }) => (
 									<Hint
 										key={volume.id}
@@ -180,7 +186,7 @@ export function CharacterTrack({
 											type="button"
 											aria-current={activeVolume === volume.id ? "location" : undefined}
 											className={cn(
-												"navigation-link flex w-full flex-col items-stretch gap-1.5 rounded-md px-3 py-2 text-left text-xs",
+												"navigation-link flex w-full shrink-0 flex-col items-stretch gap-1.5 rounded-md px-3 py-2 text-left text-xs",
 												activeVolume === volume.id && "bg-primary-soft text-primary",
 											)}
 											onClick={() => locate(sections.current.get(volume.id))}
@@ -204,7 +210,8 @@ export function CharacterTrack({
 						</div>
 					</aside>
 				)}
-				<div className="min-w-0">
+				{/* 关联文档和页尾留白也属于目录的滚动范围，防止页底把 sticky 目录向上推走。 */}
+				<div className="min-w-0 pb-[var(--page-bottom-space)]">
 					{journey.groups.map(({ volume, entries }) => (
 						<section
 							key={volume.id}
@@ -297,6 +304,7 @@ export function CharacterTrack({
 							</ol>
 						</section>
 					))}
+					{children}
 				</div>
 			</div>
 		</section>

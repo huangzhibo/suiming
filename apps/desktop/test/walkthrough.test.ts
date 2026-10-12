@@ -9,6 +9,7 @@ import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import { collectPageErrors, launchDesktop, openGate } from "./launch.js";
 
 declare const window: { suiming: DesktopBridge };
+declare const innerHeight: number;
 declare function requestAnimationFrame(callback: () => void): number;
 
 test("首次打开：正常欢迎页不报错，误选目录仍展示原因，随后可以创建作品", { timeout: 30000 }, async () => {
@@ -204,6 +205,43 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 			railBox && scrollBox && railBox.y >= scrollBox.y && railBox.y < scrollBox.y + 80,
 			"卷目录应常驻窗格顶部",
 		);
+		// 页底仍能直接跨卷、返回概览；不能被经历容器的底边向上推出窗格。
+		for (const height of [940, 640]) {
+			await app.evaluate(
+				({ BrowserWindow }, height) => BrowserWindow.getAllWindows()[0]?.setSize(1460, height),
+				height,
+			);
+			await page.waitForFunction((height) => innerHeight === height, height);
+			await page.evaluate(
+				() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+			);
+			await rail.getByRole("button").first().click();
+			const beforeBottom = await rail.boundingBox();
+			for (const index of [7, 8, 7, 8]) {
+				await rail.getByRole("button").nth(index).click();
+				await rail.getByRole("button").nth(index).and(page.locator('[aria-current="location"]')).waitFor();
+			}
+			const body = page.locator('[data-scroll-key="body:design"]');
+			await body.evaluate((element) => {
+				element.scrollTop = element.scrollHeight;
+			});
+			await page.evaluate(
+				() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+			);
+			const afterBottom = await rail.boundingBox();
+			assert.ok(
+				beforeBottom && afterBottom && Math.abs(afterBottom.y - beforeBottom.y) <= 1,
+				`页底目录不能被向上推走：${JSON.stringify({ height, beforeBottom, afterBottom })}`,
+			);
+			const pane = await body.boundingBox();
+			assert.ok(pane && afterBottom.y + afterBottom.height <= pane.y + pane.height, "矮窗口目录应完全留在窗格内");
+			await track.getByRole("button", { name: "回到经历概览", exact: true }).click();
+			const overview = await distribution.boundingBox();
+			assert.ok(
+				overview && pane && overview.y >= pane.y && overview.y + overview.height <= pane.y + pane.height,
+				"页底回到概览后，分布带应进入视口",
+			);
+		}
 		await page.getByRole("heading", { name: "刘备", exact: true }).scrollIntoViewIfNeeded();
 		await page.reload();
 		await track.locator("[data-character-event]").first().waitFor();
@@ -236,6 +274,25 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		const target = await track.getByRole("heading", { name: "新野求贤与江东进取", exact: true }).boundingBox();
 		assert.ok(narrowNav && target && target.y >= narrowNav.y + narrowNav.height, "定位不能被吸顶目录遮住");
 		await chooser.filter({ hasText: "新野求贤与江东进取" }).waitFor();
+		await page.locator('[data-scroll-key="body:design"]').evaluate((element) => {
+			element.scrollTop = element.scrollHeight;
+		});
+		await chooser.filter({ hasText: "赤壁火攻与华容放曹" }).waitFor();
+		const narrowBottom = await chooser.boundingBox();
+		assert.ok(
+			narrowNav && narrowBottom && Math.abs(narrowBottom.y - narrowNav.y) <= 1,
+			"窄窗页底选择器也应保持吸顶位置",
+		);
+		await track.getByRole("button", { name: "回到经历概览", exact: true }).click();
+		const overviewBox = await distribution.boundingBox();
+		const narrowPane = await page.locator('[data-scroll-key="body:design"]').boundingBox();
+		assert.ok(
+			overviewBox &&
+				narrowPane &&
+				overviewBox.y >= narrowPane.y &&
+				overviewBox.y + overviewBox.height <= narrowPane.y + narrowPane.height,
+			"页底返回概览应真正进入视口",
+		);
 		const expandLeft = page.getByRole("button", { name: "展开左栏", exact: true });
 		if (await expandLeft.isVisible()) await expandLeft.click();
 		await page.getByRole("textbox", { name: "搜索作品", exact: true }).fill("intent/book.md");
