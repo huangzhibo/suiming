@@ -120,8 +120,9 @@ export function CharacterTrack({
 					journey.groups.length > 1 && "@min-[880px]/character:grid-cols-[minmax(0,1fr)_220px]",
 				)}
 			>
+				{/* 宽窗吸顶间距与卷标题的 scroll-mt-4 一致，首卷自然位置和后续卷吸顶位置才不会跳动。 */}
 				{journey.groups.length > 1 && (
-					<aside className="sticky top-0 z-10 mb-3 min-w-0 bg-background py-2 @min-[880px]/character:top-3 @min-[880px]/character:order-2 @min-[880px]/character:mb-0">
+					<aside className="sticky top-0 z-10 mb-3 min-w-0 bg-background py-2 @min-[880px]/character:top-4 @min-[880px]/character:order-2 @min-[880px]/character:mb-0">
 						<div ref={compactNav} className="flex items-center gap-2 @min-[880px]/character:hidden">
 							<Select
 								value={activeVolume ?? null}

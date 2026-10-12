@@ -169,6 +169,20 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 				.evaluate((element) => element === element.ownerDocument.activeElement),
 			true,
 		);
+		// 第一卷还处于目录的自然布局起点，后续卷会触发 sticky；两种状态的目录位置必须一致。
+		const volumeNav = track.getByRole("navigation", { name: "按卷定位人物经历" });
+		const firstPosition = await volumeNav.boundingBox();
+		assert.ok(firstPosition);
+		for (const index of [1, 0, 1, 0]) {
+			const item = volumeNav.getByRole("button").nth(index);
+			await item.click();
+			await item.and(page.locator('[aria-current="location"]')).waitFor();
+			const position = await volumeNav.boundingBox();
+			assert.ok(
+				position && Math.abs(position.x - firstPosition.x) <= 1 && Math.abs(position.y - firstPosition.y) <= 1,
+				`切换前两卷不能挪动导航：${JSON.stringify({ firstPosition, position, index })}`,
+			);
+		}
 		assert.equal(await track.locator("[data-character-event]").count(), 103, "概览不能替代或截断完整经历");
 		assert.equal(await track.getByText("引用", { exact: true }).count(), 0);
 		assert.ok((await track.locator('[data-character-event][data-kind="secret"]').count()) > 0);
