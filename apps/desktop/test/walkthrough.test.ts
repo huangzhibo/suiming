@@ -112,6 +112,10 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 			"引用与状态变化取并集，不能漏掉没有 refs 的死亡情节",
 		);
 		await track.getByText("死亡", { exact: true }).waitFor();
+		assert.equal(await track.getByText("引用", { exact: true }).count(), 0);
+		assert.equal(await track.locator("[data-character-overview]").count(), 0, "稀疏人物不增加空泛概览");
+		assert.equal(await track.locator('[data-character-event][data-kind="dead"]').count(), 1);
+
 		assert.equal(
 			await page.locator('[data-character-relations] [data-page$="beat-0017.md"]').count(),
 			0,
@@ -128,6 +132,11 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		await page.locator('.item-btn[data-page="world/characters/刘备.md"]').click();
 		await page.getByRole("heading", { name: "刘备", exact: true }).waitFor();
 		await track.locator("[data-character-event]").first().waitFor();
+		await track.getByRole("img", { name: /全书分布/ }).waitFor();
+		assert.equal(await track.locator("[data-character-event]").count(), 103, "概览不能替代或截断完整经历");
+		assert.equal(await track.getByText("引用", { exact: true }).count(), 0);
+		assert.ok((await track.locator('[data-character-event][data-kind="secret"]').count()) > 0);
+
 		assert.ok((await track.locator("[data-character-volume]").count()) > 1, "密集人物按卷组织，内容全部直接呈现");
 		await track.getByRole("navigation", { name: "按卷定位人物经历" }).getByRole("button").last().click();
 		assert.equal(
@@ -141,9 +150,17 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		await page.reload();
 		await track.locator("[data-character-event]").first().waitFor();
 		const intro = page.locator(".document-page .design-body").first();
-		const introBox = await intro.boundingBox();
-		const trackBox = await track.boundingBox();
-		assert.ok(introBox && trackBox && introBox.y + introBox.height <= trackBox.y);
+		const readingOrder = await page.locator(".document-page").evaluate((element) => {
+			const introBox = element.querySelector(".design-body")?.getBoundingClientRect();
+			const trackBox = element.querySelector("[data-character-track]")?.getBoundingClientRect();
+			return { introEnd: introBox?.bottom, trackStart: trackBox?.top };
+		});
+		assert.ok(
+			readingOrder.introEnd !== undefined &&
+				readingOrder.trackStart !== undefined &&
+				readingOrder.introEnd <= readingOrder.trackStart,
+			`同一布局帧中介绍应在经历之前：${JSON.stringify(readingOrder)}`,
+		);
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
 		await page.getByRole("button", { name: "展开左栏", exact: true }).waitFor();
 		const narrowIntro = await intro.boundingBox();
@@ -168,6 +185,39 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		await page.getByRole("button", { name: "清除筛选", exact: true }).click();
 		await page.getByText("显示 437 / 437 条", { exact: true }).waitFor();
 
+		assert.deepEqual(errors, []);
+	} finally {
+		await app.close();
+		await rm(directory, { recursive: true, force: true });
+	}
+});
+
+test("人物经历边界：空记录不画图，只有状态的单节点可读可跳转", { timeout: 30000 }, async () => {
+	const directory = await mkdtemp(join(tmpdir(), "suiming-character-empty-"));
+	const root = join(directory, "work");
+	await mkdir(root);
+	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
+	await writeFile(join(root, "world/characters/旁观者.md"), "---\nname: 旁观者\n---\n尚未进入故事的渡口船夫。\n");
+	(await LocalProjectService.init({ checkoutPath: root })).close();
+	const app = await launchDesktop({ directory, project: root });
+	const page = await app.firstWindow();
+	const errors = collectPageErrors(page);
+	try {
+		await page.locator("[data-navigation-icons]").getByRole("button", { name: "搜索", exact: true }).click();
+		const search = page.getByRole("textbox", { name: "搜索作品", exact: true });
+		await search.fill("world/characters/旁观者.md");
+		await page.locator('.item-btn[data-page="world/characters/旁观者.md"]').click();
+		await page.getByText("尚无相关情节或状态变化记录。", { exact: true }).waitFor();
+		assert.equal(await page.locator("[data-character-track]").count(), 0);
+		await search.fill("world/characters/阚泽.md");
+		await page.locator('.item-btn[data-page="world/characters/阚泽.md"]').click();
+		const track = page.locator("[data-character-track]");
+		await track.getByText("位置改为：赤壁", { exact: true }).waitFor();
+		assert.equal(await track.locator('[data-character-event][data-kind="location"]').count(), 1);
+		assert.equal(await track.locator("[data-character-overview]").count(), 0);
+		assert.equal(await track.getByText("引用", { exact: true }).count(), 0);
+		await track.locator("button[data-page]").click();
+		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
 		assert.deepEqual(errors, []);
 	} finally {
 		await app.close();

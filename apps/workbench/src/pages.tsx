@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { anchorParagraphs } from "./anchors.js";
 import { type PropertyRow, propertyRows } from "./artifact-properties.js";
 import { CharacterTrack } from "./axis/CharacterTrack.js";
@@ -202,26 +203,31 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			: undefined,
 		displayFile?.dirty ? { text: "未提交", color: "text-amber" } : undefined,
 	].filter((item): item is { text: string; color: string } => !!item?.text);
+	const hasMetadata = file.kind !== "character" || status.length > 0 || identityRows.length > 0;
 	return (
 		<article className="document-page" data-measure={showText ? "reading" : "document"}>
-			<h1 className="mb-1 text-[26px] leading-[1.4] font-semibold tracking-[.5px]">
+			<h1 className={cn("text-[26px] leading-[1.4] font-semibold tracking-[.5px]", hasMetadata ? "mb-1" : "mb-3")}>
 				{isText ? book.beatTitle(file.localId) : book.title(file)}
 			</h1>
-			<div className="mb-[22px] flex flex-wrap items-baseline gap-2 text-xs text-muted-foreground">
-				{!showText && <span>{KIND_LABEL[file.kind] ?? file.kind}</span>}
-				{status.map((item, index) => (
-					<span key={item.text} className="contents">
-						{(!showText || index > 0) && <span className="text-faint">·</span>}
-						<span className={item.color}>{item.text}</span>
-					</span>
-				))}
-				{file.kind === "character" && identityRows.length > 0 && (
-					<>
-						<span className="text-faint">·</span>
-						<span>别名：{identityRows.flatMap((row) => row.values.map((value) => value.text)).join("、")}</span>
-					</>
-				)}
-			</div>
+			{hasMetadata && (
+				<div className="mb-[22px] flex flex-wrap items-baseline gap-2 text-xs text-muted-foreground">
+					{!showText && file.kind !== "character" && <span>{KIND_LABEL[file.kind] ?? file.kind}</span>}
+					{status.map((item, index) => (
+						<span key={item.text} className="contents">
+							{((!showText && file.kind !== "character") || index > 0) && <span className="text-faint">·</span>}
+							<span className={item.color}>{item.text}</span>
+						</span>
+					))}
+					{file.kind === "character" && identityRows.length > 0 && (
+						<>
+							{status.length > 0 && <span className="text-faint">·</span>}
+							<span>
+								别名：{identityRows.flatMap((row) => row.values.map((value) => value.text)).join("、")}
+							</span>
+						</>
+					)}
+				</div>
+			)}
 			{contractLane && <ContractTrack model={axis} lane={contractLane} open={open} />}
 			{!showText && file.kind !== "character" && <Props key={file.path} plain={isBeat} rows={rows} open={open} />}
 			{!showText && <Body content={content} />}
