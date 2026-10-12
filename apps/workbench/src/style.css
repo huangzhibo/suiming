@@ -532,3 +532,74 @@ html[data-pane-resizing] * {
 @media (hover: none) { .message-actions { opacity: 1; } }
 .activities > summary > svg, .activity-run > summary > svg, .activity > summary > svg { width: 12px; height: 12px; transition: transform .12s; }
 .activities[open] > summary > svg, .activity-run[open] > summary > svg, .activity[open] > summary > svg { transform: rotate(90deg); }
+
+/* 期待路径：横排需要每个节点留足读文宽度；更多记录或窄窗保持一条连续纵线。 */
+@layer components {
+	.contract-path {
+		@apply max-w-[960px];
+	}
+	.contract-event {
+		@apply relative grid min-w-0 grid-cols-[24px_minmax(0,1fr)] gap-x-3 pb-6;
+	}
+	.contract-event:last-child {
+		@apply pb-0;
+	}
+	.contract-event:not(:last-child)::after {
+		content: "";
+		@apply absolute left-3 top-6 bottom-0 border-l border-line;
+	}
+	.contract-event-label {
+		@apply col-start-2 min-h-6;
+	}
+	.contract-event-rail {
+		@apply col-start-1 row-start-1;
+	}
+	.contract-event-horizontal-order { @apply hidden; }
+	.contract-event-body {
+		@apply col-start-2 mt-2;
+	}
+	@container (min-width: 560px) {
+		.contract-path[data-count="2"] .contract-event-order { @apply hidden; }
+		.contract-path[data-count="2"] .contract-event-horizontal-order { @apply block; }
+		.contract-path[data-count="2"] .contract-event-label,
+		.contract-path[data-count="2"] .contract-event-body { @apply col-start-1 mt-0; }
+		.contract-path[data-count="2"] {
+			@apply grid max-w-[800px] grid-cols-2 gap-y-3;
+		}
+		.contract-path[data-count="2"] .contract-event {
+			@apply row-span-3 grid grid-cols-1 grid-rows-subgrid gap-x-0 pb-0 pr-6;
+		}
+		.contract-path[data-count="2"] .contract-event-rail {
+			@apply relative col-start-1 row-start-2;
+		}
+		.contract-path[data-count="2"] .contract-event:not(:last-child)::after {
+			content: none;
+		}
+		.contract-path[data-count="2"] .contract-event:not(:last-child) .contract-event-rail::after {
+			content: "";
+			@apply absolute left-6 -right-6 top-3 border-t border-line;
+		}
+	}
+	@container (min-width: 840px) {
+		.contract-path[data-count="3"] .contract-event-order { @apply hidden; }
+		.contract-path[data-count="3"] .contract-event-horizontal-order { @apply block; }
+		.contract-path[data-count="3"] .contract-event-label,
+		.contract-path[data-count="3"] .contract-event-body { @apply col-start-1 mt-0; }
+		.contract-path[data-count="3"] {
+			@apply grid grid-cols-3 gap-y-3;
+		}
+		.contract-path[data-count="3"] .contract-event {
+			@apply row-span-3 grid grid-cols-1 grid-rows-subgrid gap-x-0 pb-0 pr-6;
+		}
+		.contract-path[data-count="3"] .contract-event-rail {
+			@apply relative col-start-1 row-start-2;
+		}
+		.contract-path[data-count="3"] .contract-event:not(:last-child)::after {
+			content: none;
+		}
+		.contract-path[data-count="3"] .contract-event:not(:last-child) .contract-event-rail::after {
+			content: "";
+			@apply absolute left-6 -right-6 top-3 border-t border-line;
+		}
+	}
+}

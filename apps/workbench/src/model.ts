@@ -193,7 +193,7 @@ export class Book {
 	 * 各写一遍，与 story 的 `evaluateContractLifecycleScope` 是同一条规则。
 	 */
 	deadlineIndex(deadline: unknown): number {
-		if (deadline === "book_end") return this.data.openEnded ? -1 : this.order.length - 1;
+		if (deadline === undefined || deadline === "book_end") return this.data.openEnded ? -1 : this.order.length - 1;
 		return typeof deadline === "string" ? this.ordinal(deadline) : -1;
 	}
 	contractState(contractId: string, cursorIndex: number): { label: string; opened: boolean; resolved: boolean } {

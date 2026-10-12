@@ -27,10 +27,24 @@ test("对象页按用途展示：期待阶段、资源流转、地点情节和�
 		};
 		await visit("outline/contracts/七星刀刺董.md");
 		const contract = page.locator("[data-contract-track]");
-		await contract.getByText("已回应", { exact: true }).waitFor();
+		await page.locator("article").getByText("已回应", { exact: true }).waitFor();
 		assert.equal(await page.getByRole("heading", { name: "七星刀行刺", exact: true }).count(), 1);
-		assert.equal(await contract.locator('[data-phase="open"] [data-page]').count(), 1);
-		assert.equal(await contract.locator('[data-phase="resolve"] [data-page]').count(), 1);
+		assert.equal(
+			await contract
+				.locator("[data-contract-event]")
+				.filter({ has: page.locator('[data-phase="open"]') })
+				.locator("[data-page]")
+				.count(),
+			1,
+		);
+		assert.equal(
+			await contract
+				.locator("[data-contract-event]")
+				.filter({ has: page.locator('[data-phase="resolve"]') })
+				.locator("[data-page]")
+				.count(),
+			1,
+		);
 		await contract
 			.getByRole("button", { name: /献刀脱身与陈宫释曹/ })
 			.first()
@@ -41,7 +55,14 @@ test("对象页按用途展示：期待阶段、资源流转、地点情节和�
 		assert.ok((await graph.locator("path").count()) > 0, "情节页保留关联节点与连线，不能退化成文本列");
 
 		await visit("outline/contracts/关羽归刘.md");
-		assert.equal(await contract.locator('[data-phase="advance"] [data-page]').count(), 4);
+		assert.equal(
+			await contract
+				.locator("[data-contract-event]")
+				.filter({ has: page.locator('[data-phase="advance"]') })
+				.locator("[data-page]")
+				.count(),
+			4,
+		);
 		await visit("world/resources/传国玉玺.md");
 		const resource = page.locator("[data-resource-flow]");
 		assert.equal(await resource.locator("[data-resource-event]").count(), 3);

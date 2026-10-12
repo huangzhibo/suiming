@@ -488,3 +488,15 @@ test("因果弧的高随跨度一路增高，不在中途封顶；弧越多描�
 	assert.equal(arcOpacity(100_000), 0.2);
 	for (const count of [10, 60, 100, 200, 449, 1000]) assert.ok(arcOpacity(count * 2) <= arcOpacity(count));
 });
+
+test("省略期待期限等同全书结束，状态列表与故事轴共用完结边界", () => {
+	const files = data.files.map((entry) => (entry.localId === "未兑现" ? { ...entry, frontmatter: {} } : entry));
+	for (const openEnded of [true, false]) {
+		const book = new Book({ ...data, files, ...(openEnded ? { openEnded: true as const } : {}) });
+		const lane = axisModel(book, []).contracts.find((entry) => entry.id === "未兑现");
+		assert.ok(lane);
+		assert.equal(lane.deadlineIndex, openEnded ? -1 : 4);
+		assert.equal(contractStatus(lane, 4), openEnded ? "等待回应" : "已到期限，尚未回应");
+		assert.equal(book.contractState("未兑现", 4).label, contractStatus(lane, 4));
+	}
+});

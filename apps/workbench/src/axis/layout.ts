@@ -329,7 +329,14 @@ function characterEvents(book: Book): Map<string, CharacterEvent[]> {
 	return events;
 }
 
-function contractLane(book: Book, file: FileEntry, ordinalOfPath: (path: string) => number): ContractLane {
+export function contractLane(
+	book: Book,
+	file: FileEntry,
+	ordinalOfPath: (path: string) => number = (path) => {
+		const source = book.byPath.get(path);
+		return source?.namespace === "target" ? book.ordinal(source.localId) : -1;
+	},
+): ContractLane {
 	const anchors = (key: string) =>
 		[
 			...new Set(
@@ -343,7 +350,7 @@ function contractLane(book: Book, file: FileEntry, ordinalOfPath: (path: string)
 	const advance = anchors("advance");
 	const resolve = anchors("resolve");
 	const resolveAt = resolve[0];
-	const deadline = typeof file.frontmatter.deadline === "string" ? file.frontmatter.deadline : undefined;
+	const deadline = typeof file.frontmatter.deadline === "string" ? file.frontmatter.deadline : "book_end";
 	const subjects = file.frontmatter.subjects as { character?: unknown } | undefined;
 	return {
 		path: file.path,

@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils";
 import { anchorParagraphs } from "./anchors.js";
 import { type PropertyRow, propertyRows } from "./artifact-properties.js";
 import { CharacterTrack } from "./axis/CharacterTrack.js";
-import { axisModel } from "./axis/layout.js";
-import { ContractTrack } from "./axis/MiniTrack.js";
+import { axisModel, contractLane as buildContractLane } from "./axis/layout.js";
+import { ContractStatus, ContractTrack } from "./axis/MiniTrack.js";
 import { NeighborhoodView } from "./axis/NeighborhoodView.js";
 import { PlaceUsage, ResourceFlow } from "./axis/ObjectDetails.js";
 import { invoke } from "./bridge.js";
@@ -173,7 +173,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	// 局部事件视图与全局故事轴共用同一份投影。
 	const axis = useMemo(() => axisModel(book, reviews), [book, reviews]);
 	const contractLane =
-		file.kind === "story-contract" ? axis.contracts.find((lane) => lane.path === file.path) : undefined;
+		file.kind === "story-contract" && file.namespace === "target" ? buildContractLane(book, file) : undefined;
 	const characterLane =
 		file.kind === "character" ? axis.characters.find((lane) => lane.path === file.path) : undefined;
 	const resourceLane = file.kind === "resource" ? axis.resources.find((lane) => lane.path === file.path) : undefined;
@@ -198,7 +198,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	const status: { text: string; color: string }[] = [
 		{
 			text:
-				file.kind === "character"
+				file.kind === "character" || contractLane
 					? ""
 					: `${codePoints(stripFrontmatter(showText ? textContent : content)).toLocaleString()} 字`,
 			color: "text-muted-foreground",
@@ -225,21 +225,27 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			</ul>
 		</section>
 	);
-	const hasMetadata = file.kind !== "character" || status.length > 0 || identityRows.length > 0;
+	const showKind = file.kind !== "character" && !contractLane;
+	const hasMetadata = showKind || status.length > 0 || identityRows.length > 0;
 	return (
 		<article
 			className={cn("document-page", characterLane && "pb-0")}
 			data-measure={showText ? "reading" : "document"}
 		>
-			<h1 className={cn("text-[26px] leading-[1.4] font-semibold tracking-[.5px]", hasMetadata ? "mb-1" : "mb-3")}>
-				{isText ? book.beatTitle(file.localId) : book.title(file)}
-			</h1>
+			<div
+				className={cn(contractLane && "flex flex-wrap items-center gap-x-3 gap-y-1", hasMetadata ? "mb-1" : "mb-3")}
+			>
+				<h1 className="text-[26px] leading-[1.4] font-semibold tracking-[.5px]">
+					{isText ? book.beatTitle(file.localId) : book.title(file)}
+				</h1>
+				{contractLane && <ContractStatus model={axis} lane={contractLane} />}
+			</div>
 			{hasMetadata && (
 				<div className="mb-[22px] flex flex-wrap items-baseline gap-2 text-xs text-muted-foreground">
-					{!showText && file.kind !== "character" && <span>{KIND_LABEL[file.kind] ?? file.kind}</span>}
+					{!showText && showKind && <span>{KIND_LABEL[file.kind] ?? file.kind}</span>}
 					{status.map((item, index) => (
 						<span key={item.text} className="contents">
-							{((!showText && file.kind !== "character") || index > 0) && <span className="text-faint">·</span>}
+							{((!showText && showKind) || index > 0) && <span className="text-faint">·</span>}
 							<span className={item.color}>{item.text}</span>
 						</span>
 					))}
@@ -258,7 +264,9 @@ export function ArtifactPage(props: ArtifactPageProps) {
 				<Props key={file.path} plain={isBeat || !!contractLane} rows={rows} open={open} />
 			)}
 			{!showText && <Body content={content} title={book.title(file)} />}
-			{contractLane && <ContractTrack model={axis} lane={contractLane} open={open} />}
+			{contractLane && (
+				<ContractTrack model={axis} lane={contractLane} projectId={book.data.projectId} open={open} />
+			)}
 			{file.kind === "place" && <PlaceUsage book={book} model={axis} path={file.path} />}
 			{file.kind === "resource" && <ResourceFlow model={axis} lane={resourceLane} open={open} />}
 			{file.kind === "character" && (
