@@ -452,12 +452,12 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/spine.png" });
 		await page.locator("[data-beat='beat-0001']").dblclick();
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
-		// Beat 页末尾是以它为中心的邻域图，点节点换到那个 artifact；承诺页顶部是生命周期轨迹。
+		// 情节页保留节点连线的关系图；期待页按阶段展示所有锚点。
 		await page.getByRole("radio", { name: "设计", exact: true }).click();
 		await page.locator("[data-neighborhood]").getByText("黄盖", { exact: true }).waitFor();
 		await page.locator("[data-neighborhood] g[role='button']").filter({ hasText: "诈降" }).click();
 		await page.getByRole("heading", { name: "诈降", exact: true }).waitFor();
-		await page.locator("svg[aria-label='读者期待进展']").waitFor();
+		await page.locator("[data-contract-track]").waitFor();
 		// 支持的最小窗口必须真正容纳操作控件，仅断言 body 无横向滚动会漏掉 overflow-hidden 裁切。
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
 		await page.getByRole("button", { name: "展开左栏", exact: true }).waitFor();

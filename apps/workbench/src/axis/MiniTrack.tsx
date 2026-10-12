@@ -1,42 +1,9 @@
-import { Hint } from "../ui-bits.js";
+import { CircleCheck, Flag, MoveRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { AxisModel, ContractLane } from "./layout.js";
 import { contractStatus } from "./layout.js";
 
-/**
- * 单行轨迹：故事轴上某一条泳道的横向全书版本，嵌在读者期待页的进展区。
- * 横轴仍是 index.yaml 的顺序，卷边界做刻度；点击锚点打开对应 Beat。
- */
-const W = 900;
-const H = 64;
-const PAD = 16;
-
-function useScale(model: AxisModel) {
-	const n = Math.max(model.beats.length - 1, 1);
-	return (ordinal: number) => PAD + (ordinal * (W - PAD * 2)) / n;
-}
-
-function Volumes({ model, x }: { model: AxisModel; x: (ordinal: number) => number }) {
-	return (
-		<>
-			{model.volumes.map((volume) => (
-				<g key={volume.id}>
-					<line x1={x(volume.start)} y1={8} x2={x(volume.start)} y2={H - 14} stroke="var(--hair)" />
-				</g>
-			))}
-		</>
-	);
-}
-
-const press = (handler: () => void) => ({
-	role: "button" as const,
-	tabIndex: 0,
-	className: "cursor-pointer outline-none focus-visible:stroke-ring",
-	onClick: handler,
-	onKeyDown: (event: { key: string }) => {
-		if (event.key === "Enter") handler();
-	},
-});
-
+/** 期待页回答「怎样建立、怎样推进、在哪里回应」，不用全书比例压缩相邻锚点。 */
 export function ContractTrack({
 	model,
 	lane,
@@ -46,104 +13,107 @@ export function ContractTrack({
 	lane: ContractLane;
 	open(page: string): void;
 }) {
-	const x = useScale(model);
-	const title = (ordinal: number) => model.beats[ordinal]?.title ?? "";
-	const named = (ordinal: number) => `${title(ordinal)}（${model.beats[ordinal]?.id ?? ""}）`;
-	const openBeat = (ordinal: number) => open(model.beats[ordinal]?.path ?? "");
-	const first = lane.open[0] ?? lane.advance[0] ?? 0;
-	const last = lane.resolve[0] ?? (lane.deadlineIndex >= 0 ? lane.deadlineIndex : model.beats.length - 1);
-	const y = 30;
-	const anchors = [
-		...lane.open.map((ordinal) => ({ ordinal, kind: "open" as const })),
-		...lane.advance.map((ordinal) => ({ ordinal, kind: "advance" as const })),
-		...lane.resolve.map((ordinal) => ({ ordinal, kind: "resolve" as const })),
-	].sort((a, b) => a.ordinal - b.ordinal);
+	const status = contractStatus(lane, model.beats.length - 1).split(" · ")[0];
+	const tone =
+		lane.late.length || status === "已到期限，尚未回应"
+			? "text-red-ink"
+			: status === "已回应"
+				? "text-success"
+				: "text-amber-ink";
+	const deadline = model.beats[lane.deadlineIndex];
+	const phases = [
+		{
+			kind: "open",
+			label: "建立",
+			icon: Flag,
+			ordinals: lane.open,
+			color: "text-primary",
+			bg: "bg-accent",
+			empty: "尚无建立记录",
+		},
+		{
+			kind: "advance",
+			label: "推进",
+			icon: MoveRight,
+			ordinals: lane.advance,
+			color: "text-amber-ink",
+			bg: "bg-amber-bg",
+			empty: "没有单独的推进记录",
+		},
+		{
+			kind: "resolve",
+			label: "回应",
+			icon: CircleCheck,
+			ordinals: lane.resolve,
+			color: "text-success",
+			bg: "bg-green-bg",
+			empty: "尚未回应",
+		},
+	];
 	return (
-		<div className="mb-4">
-			<div className="mb-1 flex flex-wrap items-baseline gap-x-3 text-xs">
-				<span className={lane.late.length > 0 ? "font-semibold text-red-ink" : "font-semibold text-amber-ink"}>
-					{contractStatus(lane, model.beats.length - 1, named)}
-				</span>
-				<span className="text-muted-foreground">
-					建立于{lane.open[0] === undefined ? "—" : title(lane.open[0])} · 推进 {lane.advance.length} 次 ·
+		<section className="@container mt-6" data-contract-track aria-label="读者期待进展">
+			<div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+				<h2 className="text-sm font-semibold">期待进展</h2>
+				<span className={cn("text-xs font-medium", tone)}>{status}</span>
+				<span className="text-xs text-muted-foreground">
 					回应期限：
-					{lane.deadline === "book_end"
-						? "全书结束前"
-						: lane.deadlineIndex >= 0
-							? title(lane.deadlineIndex)
-							: (lane.deadline ?? "未设置")}
-					{lane.late.length > 0 ? ` · 回应之后仍有 ${lane.late.length} 次推进记录` : ""}
+					{deadline ? (
+						<button
+							type="button"
+							className="navigation-link"
+							data-page={deadline.path}
+							onClick={() => open(deadline.path)}
+						>
+							{deadline.title}
+						</button>
+					) : lane.deadline === "book_end" ? (
+						"全书结束前"
+					) : (
+						(lane.deadline ?? "未设置")
+					)}
 				</span>
 			</div>
-			<svg
-				width="100%"
-				viewBox={`0 0 ${W} ${H}`}
-				role="img"
-				aria-label="读者期待进展"
-				className="block max-w-[900px]"
-			>
-				<title>读者期待进展</title>
-				<Volumes model={model} x={x} />
-				<line
-					x1={x(first)}
-					y1={y}
-					x2={x(last)}
-					y2={y}
-					stroke="var(--amber)"
-					strokeWidth={2.5}
-					strokeDasharray={lane.resolve.length ? undefined : "5 4"}
-				/>
-				{lane.deadlineIndex >= 0 && (
-					<g>
-						<line
-							x1={x(lane.deadlineIndex)}
-							y1={y - 12}
-							x2={x(lane.deadlineIndex)}
-							y2={y + 12}
-							stroke="var(--amber)"
-							strokeWidth={1.5}
-						/>
-						<text x={x(lane.deadlineIndex) + 4} y={y - 14} className="fill-amber text-[10px]">
-							期限 {lane.deadline?.replace("beat-", "") ?? ""}
-						</text>
-					</g>
-				)}
-				{anchors.map(({ ordinal, kind }) =>
-					kind === "advance" ? (
-						<Hint
-							content={`推进期待 · ${title(ordinal)}${model.beats[ordinal]?.text === "none" ? "（仅设计）" : ""}${lane.late.includes(ordinal) ? "\n此前已有回应，之后仍有推进记录，请核对" : ""}`}
-							key={`${kind}:${ordinal}`}
-						>
-							<circle
-								aria-label={`推进期待 · ${title(ordinal)}${model.beats[ordinal]?.text === "none" ? "（仅设计）" : ""}${lane.late.includes(ordinal) ? "\n此前已有回应，之后仍有推进记录，请核对" : ""}`}
-								cx={x(ordinal)}
-								cy={y}
-								r={4}
-								fill={lane.late.includes(ordinal) ? "var(--destructive)" : "var(--amber)"}
-								data-page={model.beats[ordinal]?.path}
-								{...press(() => openBeat(ordinal))}
-							></circle>
-						</Hint>
-					) : (
-						<Hint
-							content={`${kind === "open" ? "建立期待" : "回应期待"} · ${title(ordinal)}${model.beats[ordinal]?.text === "none" ? "（仅设计）" : ""}`}
-							key={`${kind}:${ordinal}`}
-						>
-							<rect
-								aria-label={`${kind === "open" ? "建立期待" : "回应期待"} · ${title(ordinal)}${model.beats[ordinal]?.text === "none" ? "（仅设计）" : ""}`}
-								x={x(ordinal) - 6}
-								y={y - 6}
-								width={12}
-								height={12}
-								rx={2}
-								fill="var(--amber)"
-								data-page={model.beats[ordinal]?.path}
-								{...press(() => openBeat(ordinal))}
-							></rect>
-						</Hint>
-					),
-				)}
-			</svg>
-		</div>
+			<div className="grid items-start gap-3 @min-[600px]:grid-cols-3">
+				{phases.map((phase) => (
+					<div
+						key={phase.kind}
+						data-phase={phase.kind}
+						className="min-w-0 overflow-hidden rounded-lg border border-hair"
+					>
+						<h3 className={cn("flex items-center gap-2 px-3 py-2 text-xs font-semibold", phase.color, phase.bg)}>
+							<phase.icon className="size-3.5" aria-hidden="true" />
+							{phase.label}
+							<span className="ml-auto tabular-nums">{phase.ordinals.length}</span>
+						</h3>
+						<ul className="space-y-2 p-3">
+							{phase.ordinals.length === 0 && <li className="text-xs text-muted-foreground">{phase.empty}</li>}
+							{phase.ordinals.map((ordinal) => {
+								const beat = model.beats[ordinal];
+								if (!beat) return null;
+								return (
+									<li key={ordinal}>
+										<button
+											type="button"
+											className="navigation-link flex w-full items-start gap-2 text-left text-sm leading-relaxed"
+											data-page={beat.path}
+											onClick={() => open(beat.path)}
+										>
+											<span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground">
+												{ordinal + 1}
+											</span>
+											<span className="min-w-0 break-words">{beat.title}</span>
+										</button>
+										{beat.text === "none" && <span className="text-xs text-muted-foreground">仅设计</span>}
+										{phase.kind === "advance" && lane.late.includes(ordinal) && (
+											<p className="mt-1 text-xs text-red-ink">回应后仍有推进，请核对</p>
+										)}
+									</li>
+								);
+							})}
+						</ul>
+					</div>
+				))}
+			</div>
+		</section>
 	);
 }

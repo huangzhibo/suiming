@@ -20,6 +20,7 @@ import { CharacterTrack } from "./axis/CharacterTrack.js";
 import { axisModel } from "./axis/layout.js";
 import { ContractTrack } from "./axis/MiniTrack.js";
 import { NeighborhoodView } from "./axis/NeighborhoodView.js";
+import { PlaceUsage, ResourceFlow } from "./axis/ObjectDetails.js";
 import { invoke } from "./bridge.js";
 import type { ComparisonConfig } from "./code-editor.js";
 import { Markdown } from "./markdown.js";
@@ -93,8 +94,11 @@ function Props({ rows, open, plain = false }: { rows: PropertyRow[]; open(page: 
 }
 
 /** 设计 / 人物 / 世界 / Intent / Contract 的正文：Markdown 渲染，frontmatter 已由属性表展示。 */
-function Body({ content }: { content: string }) {
-	const body = stripFrontmatter(content).trim();
+function Body({ content, title }: { content: string; title: string }) {
+	let body = stripFrontmatter(content).trim();
+	// 首行与页面标题完全相同才省略；其他标题与源文档都保留。
+	const firstHeading = /^# +([^\n]+)(?:\n|$)/u.exec(body);
+	if (firstHeading?.[1]?.trim() === title) body = body.slice(firstHeading[0].length).trim();
 	if (!body) return <p className="design-body text-muted-foreground">这个文件还没有正文。</p>;
 	return <Markdown className="design-body" content={body} />;
 }
@@ -166,13 +170,17 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	const marks = useMemo(() => findingMarks(reports, textPath, textContent), [reports, textPath, textContent]);
 	const bound = beatId ? book.currencyLabel(beatId) : undefined;
 	const lineage = isBeat || isText ? (hasText ? (bound?.text ?? "") : "尚无正文") : "";
-	// 承诺页 / 人物页 / Beat 页顶部的轨迹与前因后果都取自故事轴同一份模型。
+	// 局部事件视图与全局故事轴共用同一份投影。
 	const axis = useMemo(() => axisModel(book, reviews), [book, reviews]);
 	const contractLane =
 		file.kind === "story-contract" ? axis.contracts.find((lane) => lane.path === file.path) : undefined;
 	const characterLane =
 		file.kind === "character" ? axis.characters.find((lane) => lane.path === file.path) : undefined;
-	const rows = propertyRows(book, file);
+	const resourceLane = file.kind === "resource" ? axis.resources.find((lane) => lane.path === file.path) : undefined;
+	const rows = propertyRows(book, file).filter((row) => {
+		if (contractLane && row.key === JSON.stringify(["deadline"])) return false;
+		return true;
+	});
 	const identityRows = rows.filter((row) => row.key === JSON.stringify(["aliases"]));
 	const relatedPaths = new Set(
 		book.links.flatMap((link) => (link.from === file.path ? [link.to] : link.to === file.path ? [link.from] : [])),
@@ -228,9 +236,14 @@ export function ArtifactPage(props: ArtifactPageProps) {
 					)}
 				</div>
 			)}
+
+			{!showText && file.kind !== "character" && (
+				<Props key={file.path} plain={isBeat || !!contractLane} rows={rows} open={open} />
+			)}
+			{!showText && <Body content={content} title={book.title(file)} />}
 			{contractLane && <ContractTrack model={axis} lane={contractLane} open={open} />}
-			{!showText && file.kind !== "character" && <Props key={file.path} plain={isBeat} rows={rows} open={open} />}
-			{!showText && <Body content={content} />}
+			{file.kind === "place" && <PlaceUsage book={book} model={axis} path={file.path} />}
+			{file.kind === "resource" && <ResourceFlow model={axis} lane={resourceLane} open={open} />}
 			{file.kind === "character" && (
 				<Props plain rows={rows.filter((row) => !identityRows.includes(row))} open={open} />
 			)}
@@ -270,7 +283,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 				) : (
 					<NoText delegateWrite={props.delegateWrite} openEditor={props.openEditor} />
 				))}
-			{/* 邻域图辅助理解设计结构，不接在小说正文后；承诺页顶部已有完整轨迹。 */}
+			{/* 邻域图辅助理解设计结构，不接在小说正文后；期待页已按阶段展示所有锚点。 */}
 			{!showText &&
 				!contractLane &&
 				hasRelations &&
