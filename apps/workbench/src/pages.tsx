@@ -1,6 +1,6 @@
 import type { LocalCommandOutput } from "@suiming/sdk";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -38,7 +38,16 @@ import {
 	versionPage,
 } from "./model.js";
 import { verdictLabel, verdictTone } from "./review-verdict.js";
-import { ActionButton, EmptyNote, reviewCurrencyLabel, reviewLayerLabel, Segmented, Tag, toneText } from "./ui-bits.js";
+import {
+	ActionButton,
+	EmptyNote,
+	reviewCurrencyLabel,
+	reviewLayerLabel,
+	Segmented,
+	Tag,
+	ToolButton,
+	toneText,
+} from "./ui-bits.js";
 import type { OpenPage, PageState } from "./view-state.js";
 
 const CodeEditor = lazy(() => import("./code-editor.js"));
@@ -687,6 +696,9 @@ export function VersionPage({
 		retry: false,
 	});
 	const entry = selected ? diff.data?.find((item) => item.path === selected) : diff.data?.[0];
+	const entryIndex = diff.data?.findIndex((item) => item.path === entry?.path) ?? -1;
+	const previousFile = entryIndex > 0 ? diff.data?.[entryIndex - 1] : undefined;
+	const nextFile = entryIndex >= 0 ? diff.data?.[entryIndex + 1] : undefined;
 	const revision = book.data.revisions.find((revision) => revision.id === revisionId);
 	// 清单只有路径与增删改；选中的这一个文件再读两侧。未提交的修改是「当前版本 → 作品目录」，
 	// 历史版本是「父版本 → 这个版本」，第一个版本之前是空作品。
@@ -754,7 +766,11 @@ export function VersionPage({
 										{entry?.path ?? (selected || "选择文件")}
 									</span>
 									<span className="shrink-0 text-muted-foreground">
-										{diff.data ? `${diff.data.length} 个文件` : ""}
+										{diff.data
+											? entry
+												? `${entryIndex + 1} / ${diff.data.length} 文件`
+												: `${diff.data.length} 个文件`
+											: ""}
 									</span>
 									<ChevronDown className="shrink-0" />
 								</Button>
@@ -785,6 +801,28 @@ export function VersionPage({
 							</Command>
 						</PopoverContent>
 					</Popover>
+					{(diff.data?.length ?? 0) > 1 && entry && (
+						<fieldset className="flex shrink-0 items-center" aria-label="变更文件导航">
+							<ToolButton
+								label="上一个变更文件"
+								description={previousFile?.path ?? ""}
+								disabled={!previousFile}
+								disabledReason="已经是第一个变更文件"
+								onClick={() => previousFile && setSelected(previousFile.path)}
+							>
+								<ChevronLeft />
+							</ToolButton>
+							<ToolButton
+								label="下一个变更文件"
+								description={nextFile?.path ?? ""}
+								disabled={!nextFile}
+								disabledReason="已经是最后一个变更文件"
+								onClick={() => nextFile && setSelected(nextFile.path)}
+							>
+								<ChevronRight />
+							</ToolButton>
+						</fieldset>
+					)}
 					<Popover>
 						<PopoverTrigger
 							render={
@@ -886,6 +924,19 @@ export function VersionPage({
 								: selected ||
 									(candidate ? "作品目录与当前版本一致，没有未提交的修改。" : "这个版本与父版本内容相同。")}
 					</p>
+					{!diff.error && !diff.isLoading && !!diff.data?.length && (
+						<Button
+							className="mt-4"
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								const first = diff.data?.[0];
+								if (first) setSelected(first.path);
+							}}
+						>
+							查看本版本的变更
+						</Button>
+					)}
 					{diff.error && (
 						<Button
 							className="mt-3"

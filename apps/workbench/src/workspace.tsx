@@ -140,7 +140,6 @@ function WorkspaceShell() {
 		isBeat,
 		editPath,
 		primary,
-		buffer,
 		anyChanged,
 		act,
 		open,
@@ -248,7 +247,6 @@ function WorkspaceShell() {
 
 	const data = shown;
 	const backlinks = file ? backlinksFor(book, file.path) : [];
-	const readingContent = buffer;
 	const textCount = book.order.filter((id) => book.text(id)).length;
 	const workName = data.checkoutPath.split("/").at(-1) ?? "作品";
 	const rightButton = (mode: RightMode, label: string, icon: React.ReactNode) => (
@@ -534,7 +532,7 @@ function WorkspaceShell() {
 							/>
 						)}
 						{view.rightMode === "evidence" && (
-							<EvidencePane book={book} reviews={reviews} file={file} content={readingContent} open={open} />
+							<EvidencePane book={book} reviews={reviews} file={file} open={open} />
 						)}
 						{view.rightMode === "state" && (
 							<ObservationPanel

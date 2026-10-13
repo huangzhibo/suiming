@@ -51,6 +51,7 @@ export const KIND_LABEL: Record<string, string> = {
 	"release-chapter": "发布章节",
 	review: "审稿",
 	"source-note": "原作笔记",
+	"source-material": "原作材料",
 };
 /** 邻域图按种类着色，取全局 token（style.css），不写死色值。 */
 export const KIND_COLOR: Record<string, string> = {

@@ -14,7 +14,7 @@ import {
 	versionPage,
 } from "./model.js";
 import { verdictLabel } from "./review-verdict.js";
-import { Hint, PanelToolbar, reviewCurrencyLabel, reviewLayerLabel, ToolButton } from "./ui-bits.js";
+import { Hint, OverflowHint, PanelToolbar, reviewCurrencyLabel, reviewLayerLabel, ToolButton } from "./ui-bits.js";
 import type { ViewState } from "./view-state.js";
 
 export interface PaneProps {
@@ -352,11 +352,14 @@ export function SourcesPane({ book, reviews, page, open }: PaneProps) {
 	const references = target.filter((file) => file.kind.startsWith("reference-") || file.kind === "style-evidence");
 	const currentVersion = pageKind(page) === "version" ? pageTarget(page) : "";
 	const issue = pageKind(page) === "issue" ? pageTarget(page) : "";
+	const activePath = pageKind(page) === "file" ? pageTarget(page) : page;
 	const item = (key: string, on: boolean, title: string, meta: string, onClick: () => void) => (
-		<button type="button" key={key} data-page={key} className="item-btn" data-on={on} onClick={onClick}>
-			<span className={`truncate text-[12.5px] ${on ? "font-semibold" : ""}`}>{title}</span>
-			<span className="text-[11px] text-muted-foreground">{meta}</span>
-		</button>
+		<OverflowHint key={key} content={`${title}\n${meta}`} side="right">
+			<button type="button" data-page={key} className="item-btn" data-on={on} onClick={onClick}>
+				<span className={`truncate text-[12.5px] ${on ? "font-semibold" : ""}`}>{title}</span>
+				{meta && <span className="text-[11px] text-muted-foreground">{meta}</span>}
+			</button>
+		</OverflowHint>
 	);
 	const Head = ({ label, note }: { label: string; note: string }) => (
 		<div className="group-head">
@@ -381,7 +384,7 @@ export function SourcesPane({ book, reviews, page, open }: PaneProps) {
 					const first = files.find((file) => file.kind === "story-index") ?? files[0];
 					return item(
 						first?.path ?? sourceId,
-						files.some((file) => file.path === page),
+						files.some((file) => file.path === activePath),
 						sourceId,
 						`${files.length} 个抽取文件`,
 						() => first && open(first.path),

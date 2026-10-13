@@ -9,9 +9,7 @@ import {
 	type Book,
 	type FileEntry,
 	issuePage,
-	KIND_LABEL,
 	outlinksFor,
-	paragraphs,
 	type ReviewReport,
 	reviewsFor,
 	shortId,
@@ -90,18 +88,16 @@ export function BacklinksPane({
 	);
 }
 
-/** 依据：版本与正文时效、当前 artifact 的第一段、审稿、正向引用与 Runtime 派生视图。 */
+/** 依据：版本与正文时效、审稿、正向引用与 Runtime 派生视图。 */
 export function EvidencePane({
 	book,
 	reviews,
 	file,
-	content,
 	open,
 }: {
 	book: Book;
 	reviews: ReviewReport[];
 	file: FileEntry | undefined;
-	content: string;
 	open(page: string): void;
 }) {
 	const reports = file ? reviewsFor(book, reviews, file.path) : [];
@@ -116,7 +112,6 @@ export function EvidencePane({
 		queryFn: () => invoke("workspace.context", { task }),
 		enabled: !!task,
 	});
-	const quote = paragraphs(content)[0];
 	const out = file ? outlinksFor(book, file.path) : [];
 	const intents = book.data.files.filter((item) => item.kind === "intent");
 	return (
@@ -126,14 +121,6 @@ export function EvidencePane({
 			<div className="min-h-0 flex-1 overflow-auto px-3.5 pt-4 pb-5">
 				<Cap>正文时效</Cap>
 				<p className="mb-3.5 text-xs leading-[1.7] text-ink-2">{book.currencySummary()}</p>
-				{quote && file && (
-					<>
-						<Cap>{KIND_LABEL[file.kind] ?? file.kind} · 第 1 段</Cap>
-						<blockquote className="mb-3.5 rounded-r-md border-l-2 border-primary bg-white px-3 py-2.5 text-[12.5px] leading-[1.75] text-ink-2">
-							{quote}
-						</blockquote>
-					</>
-				)}
 				{reports.length > 0 && (
 					<>
 						<Cap>审稿依据</Cap>
@@ -208,11 +195,11 @@ export function EvidencePane({
 							variant="link"
 							size="xs"
 							key={item.path}
-							className="ml-1.5 h-auto p-0 text-[11px]"
+							className="mb-1 h-auto max-w-full justify-start p-0 text-left text-[11px]"
 							data-page={item.path}
 							onClick={() => open(item.path)}
 						>
-							{book.title(item)} →
+							<span className="min-w-0 break-words whitespace-normal">{book.title(item)} →</span>
 						</Button>
 					))}
 				</div>
