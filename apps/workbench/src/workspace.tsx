@@ -22,7 +22,7 @@ import { DocumentGroup } from "./document-group.js";
 import { FilePane } from "./file-pane.js";
 import { HelpDialog } from "./help.js";
 import { IdsPane, SearchPane, SourcesPane, SpinePane } from "./left-pane.js";
-import { backlinksFor, CHECK_PAGE, SPINE_PAGE } from "./model.js";
+import { backlinksFor, CANDIDATE_VERSION, CHECK_PAGE, SPINE_PAGE, versionPage } from "./model.js";
 import { ModelSettings } from "./model-settings.js";
 import { NavigationModes } from "./navigation-modes.js";
 import { NavigationSurface } from "./navigation-surface.js";
@@ -34,7 +34,7 @@ import { useAutoHideScrollbars } from "./scrollbars.js";
 import { ToolButton } from "./ui-bits.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
-import { createTab, EMPTY_PAGE, type ObservationSelection, pageState, type RightMode } from "./view-state.js";
+import { createTab, EMPTY_PAGE, navigate, type ObservationSelection, pageState, type RightMode } from "./view-state.js";
 import { LoadingScreen, WelcomeScreen } from "./welcome-screen.js";
 import { type Notice, useWorkspace, WorkspaceContext } from "./workspace-context.js";
 import {
@@ -407,7 +407,22 @@ function WorkspaceShell() {
 						disabled={busy || anyChanged || !data.dirty}
 						onClick={() =>
 							act(async () => {
+								const originGroup = layoutLive.current.activeGroup;
+								const origin = groupView(layoutLive.current, originGroup);
+								const originTab = origin.tabs[origin.active]?.id;
 								const result = await invoke("project.commit", {});
+								if (result.created && isCurrentProject())
+									setLayout((current) =>
+										current.activeGroup !== originGroup
+											? current
+											: updateGroup(current, originGroup, (state) => {
+													const tab = state.tabs[state.active];
+													// 只续接作者正在核对的候选页；回包期间换页或关窗格不抢导航。
+													return tab && tab.id === originTab && tab.location.page === CANDIDATE_VERSION
+														? navigate(state, { ...tab.location, page: versionPage(result.revision.id) })
+														: state;
+												}),
+									);
 								setNotice(result.created ? "已提交一个新版本" : "作品没有新的变更");
 							})
 						}

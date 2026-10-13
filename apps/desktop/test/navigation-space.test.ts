@@ -5,10 +5,62 @@ import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
-import { assertNoTooltip, collectPageErrors, launchDesktop } from "./launch.js";
+import { assertNoTooltip, collectPageErrors, eventually, launchDesktop } from "./launch.js";
 
 declare const innerWidth: number;
 declare function requestAnimationFrame(callback: () => void): number;
+
+test("候选差异提交后保留文件并转到新版本，迟到回包不抢走正在阅读的页面", { timeout: 45000 }, async () => {
+	const directory = await mkdtemp(join(tmpdir(), "suiming-commit-navigation-"));
+	const root = join(directory, "work");
+	await mkdir(root);
+	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
+	(await LocalProjectService.init({ checkoutPath: root })).close();
+	const append = async (path: string, text: string) =>
+		writeFile(join(root, path), `${await readFile(join(root, path), "utf8")}\n${text}\n`);
+	await append("world/core.md", "提交前核对世界。 ");
+	await append("intent/计谋的代价.md", "提交前核对意图。");
+	const app = await launchDesktop({ directory, project: root, flags: ["--workspace-callback-test"] });
+	const page = await app.firstWindow();
+	page.setDefaultTimeout(8000);
+	const errors = collectPageErrors(page);
+	const button = (name: string) => page.getByRole("button", { name, exact: true });
+	try {
+		await button("2 个文件未提交").click();
+		await button("选择变更文件").click();
+		await page.getByRole("option", { name: /world\/core.md/ }).click();
+		await page.locator(".cm-content").filter({ hasText: "提交前核对世界" }).waitFor();
+		await button("提交版本").click();
+		await button("选择作品版本").filter({ hasText: /^r2/ }).waitFor();
+		assert.match(await button("选择变更文件").innerText(), /world\/core.md/);
+		await page.reload();
+		await button("选择作品版本").filter({ hasText: /^r2/ }).waitFor();
+		assert.match(await button("选择变更文件").innerText(), /world\/core.md/);
+
+		await append("world/core.md", "第二次提交。");
+		await button("1 个文件未提交").click();
+		type Fixture = typeof globalThis & { workspaceTestCallbacks: { command: string; release?: () => void } };
+		await app.evaluate(() => {
+			(globalThis as Fixture).workspaceTestCallbacks.command = "project.commit";
+		});
+		await button("提交版本").click();
+		await eventually(
+			() => app.evaluate(() => !!(globalThis as Fixture).workspaceTestCallbacks.release),
+			"等待提交回包进入测试闸门",
+		);
+		await button("新标签页").click();
+		const search = page.getByRole("textbox", { name: "搜索对象或文件", exact: true });
+		await search.waitFor();
+		await app.evaluate(() => (globalThis as Fixture).workspaceTestCallbacks.release?.());
+		await page.getByText("已提交一个新版本", { exact: true }).waitFor();
+		assert.equal(await search.isVisible(), true);
+		assert.equal(await button("选择作品版本").count(), 0, "提交回包不跳离作者后来打开的页面");
+		assert.deepEqual(errors, []);
+	} finally {
+		await app.close();
+		await rm(directory, { recursive: true, force: true });
+	}
+});
 
 test("导航空间：版本逐文件核对、跨版本定位、最近访问截断提示与依据去重", { timeout: 60000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-navigation-space-"));
