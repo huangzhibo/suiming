@@ -297,7 +297,7 @@ export async function loadModelRoutingConfig(
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 		if (options.configPath !== undefined || environmentPath !== undefined) {
-			throw new ModelGatewayError("model_config_not_found", `Model config file does not exist: ${configPath}`);
+			throw new ModelGatewayError("model_config_not_found", `找不到模型配置文件，请先配置模型：${configPath}`);
 		}
 	}
 
