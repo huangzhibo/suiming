@@ -15,10 +15,10 @@ export interface HarnessTool<TParameters extends TSchema = TSchema, TDetails ext
 	 */
 	rereadable?: boolean;
 	/**
-	 * 同一次模型回复里相邻的、都判为可并行的动作同时执行，结果仍按派出顺序交付。只给输出互不重叠、
-	 * 也不读彼此产物的动作（各读一段原文、各写各的笔记）；同一文件被两个动作写，第二次落盘时报写冲突。
+	 * false 表示串行；数组列出这次动作独占的输出标识。相邻动作的标识没有交集才并行，结果按派出顺序交付。
+	 * 空数组只用于只读或输出已按动作隔离的任务。它不是依赖图，也不跨模型回复调度。
 	 */
-	parallel?(params: Static<TParameters>): boolean | Promise<boolean>;
+	parallel?(params: Static<TParameters>): false | readonly string[] | Promise<false | readonly string[]>;
 	execute(actionId: string, params: Static<TParameters>, signal?: AbortSignal): Promise<HarnessToolResult<TDetails>>;
 	/**
 	 * 动作执行到一半被打断（作者停止、应用退出、进程中断）后，loop 给模型补一条「被打断」的结果，不重做、不核对；

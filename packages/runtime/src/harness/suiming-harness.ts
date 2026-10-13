@@ -588,7 +588,10 @@ export class HarnessSession {
 		recordUsage(callId: string, usage: ModelUsage): void;
 	}): Promise<{ loop: TaskLoopOutcome }> {
 		const { restored } = input;
-		const scan: CandidateScanner = () => this.scan();
+		const scan: CandidateScanner = async () => {
+			const candidate = await this.scan();
+			return { ...candidate, artifacts: candidate.artifacts.filter((artifact) => input.env.canRead(artifact.path)) };
+		};
 		const handle: TaskHandle = { telemetryContext: input.telemetry, taskId: input.loopId, env: input.env, scan };
 		// 从 checkpoint 接着跑也用当前的工具面与 systemPrompt：半途的动作不重做，不需要冻结当时的声明。
 		const tools = input.tools(handle);
@@ -944,6 +947,8 @@ export class SuimingHarness {
 			...(options.model === undefined ? {} : { model: options.model }),
 		});
 		execution.bindOwner(sessionId, ownerId);
+		// 上一个 turn 结束到这里之间可能回收过执行对象（只在没有 turn 跑时删），存过哪些节点要重新核对。
+		this.checkpoints.forget();
 		events.refresh();
 		const endTurn = (failure?: ExecutionFailure): SessionRecord =>
 			execution.endTurn({

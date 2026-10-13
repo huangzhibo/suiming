@@ -73,6 +73,28 @@ test("准备好的写入落盘前一刻核对写前的 hash：已经写过的不
 	}
 });
 
+test("同进程的不同受限环境同时覆盖同一文件，只有一个成功；失败后写锁释放", async () => {
+	const { root } = await sandbox();
+	try {
+		const envs = Array.from({ length: 16 }, () => new ConfinedExecutionEnv({ rootPath: root, policy: "write" }));
+		const changes = await Promise.all(envs.map((env, index) => env.prepareWrite("intent/a.md", `候选 ${index}`)));
+		const results = await Promise.allSettled(
+			envs.map((env, index) => {
+				const change = changes[index];
+				assert.ok(change);
+				return env.applyMutation(change);
+			}),
+		);
+		assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+		for (const result of results)
+			if (result.status === "rejected") assert.equal(result.reason.code, "file_write_conflict");
+		await envs[0]?.writeFile("intent/a.md", "后续修改");
+		assert.equal(await readFile(join(root, "intent/a.md"), "utf8"), "后续修改");
+	} finally {
+		await rm(join(root, ".."), { recursive: true, force: true });
+	}
+});
+
 test("list：列出一层目录，目录带斜杠；.git / .suiming 与 symlink 不出现，越界与非目录被拒，读范围照样生效", async () => {
 	const { root, outside } = await sandbox();
 	try {

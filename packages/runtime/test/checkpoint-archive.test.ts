@@ -54,6 +54,60 @@ test("checkpoint 共享节点完整往返，并在新的 archive 实例恢复", 
 	);
 });
 
+test("forget 之后不再相信「这个节点存过」：执行对象回收删掉的节点，下次保存会重新存回去", async () => {
+	// 回收只在没有 turn 跑的时候删；archive 的缓存若活过两个 turn 之间，会引用一个已被删掉的节点而不自知。
+	// SuimingHarness.turn 每次开 turn 都 forget，这里守 forget 本身。
+	const store = objects();
+	const archive = new CheckpointArchive(store);
+	const value = Object.freeze({ messages: Object.freeze([Object.freeze({ content: "原文".repeat(2000) })]) });
+	const first = await archive.write(value);
+	const nodes = [...store.values.keys()].filter((id) => id !== first.id);
+	assert.ok(nodes.length > 0);
+	for (const id of nodes) store.values.delete(id);
+	archive.forget();
+	const second = await archive.write(value);
+	assert.deepEqual(await new CheckpointArchive(store).read((await store.readExecutionObject(second.id)).bytes), value);
+});
+
+test("相邻 checkpoint 读取共享节点只读一次，解码结果独立；读取失败不永久缓存", async () => {
+	const store = objects();
+	const archive = new CheckpointArchive(store);
+	const messages = [{ content: "一份长工具结果".repeat(2000) }];
+	const first = await archive.write({ messages, sequence: 1 });
+	const second = await archive.write({ messages, sequence: 2 });
+	const reads = new Map<string, number>();
+	const reader = new CheckpointArchive({
+		...store,
+		readExecutionObject: async (id) => {
+			reads.set(id, (reads.get(id) ?? 0) + 1);
+			return store.readExecutionObject(id);
+		},
+	});
+	const firstBytes = (await store.readExecutionObject(first.id)).bytes;
+	const restored = (await reader.read(firstBytes)) as { messages: { content: string }[] };
+	const message = restored.messages[0];
+	assert.ok(message);
+	message.content = "调用者修改恢复后的状态";
+	assert.deepEqual(await reader.read((await store.readExecutionObject(second.id)).bytes), { messages, sequence: 2 });
+	assert.ok(reads.size > 0);
+	assert.ok(
+		[...reads.values()].every((count) => count === 1),
+		"新旧 checkpoint 共享的节点不重复读取",
+	);
+	const failedReader = new CheckpointArchive({
+		...store,
+		readExecutionObject: async (id) => {
+			if (reads.size > 0) {
+				reads.clear();
+				throw new Error("temporary read failure");
+			}
+			return store.readExecutionObject(id);
+		},
+	});
+	await assert.rejects(failedReader.read(firstBytes), /temporary read failure/u);
+	assert.deepEqual(await failedReader.read(firstBytes), { messages, sequence: 1 });
+});
+
 test("外层调用与 evidence 列表追加后保存最新值，不复用可变对象的旧编码", async () => {
 	const store = objects();
 	const archive = new CheckpointArchive(store);

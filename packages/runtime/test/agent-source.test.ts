@@ -159,11 +159,12 @@ test("Source 阅读顺序由 Agent 决定；笔记是普通文件，覆盖率从
 	});
 });
 
-test("委派的 source-reader 自己写笔记，但只能写这个 Source 的 notes/，不必把笔记塞进报告让父 Agent 抄", async () => {
+test("委派的 source-reader 自己写独占笔记，不能改其它笔记或抽取，不必把笔记塞进报告让父 Agent 抄", async () => {
 	// 2026-10-02 斗破抽取：source-reader 原是只读，四个分段阅读的子任务都把整份笔记塞进 submit_task 的报告、
 	// 留话「请代为落盘」，一个因输出过长被截断；父 Agent 只能把几万字再抄进文件。
 	await withProject(async (project) => {
 		const results: string[] = [];
+		let assigned = "";
 		const read = await say(
 			new SuimingHarness({
 				project,
@@ -172,15 +173,21 @@ test("委派的 source-reader 自己写笔记，但只能写这个 Source 的 no
 					call("source_coverage", { sourceId: "访谈" }),
 					(context) => {
 						const { materialSha256 } = JSON.parse(lastToolText(context)) as { materialSha256: string };
+						assigned =
+							JSON.stringify(context.messages).match(/source\/访谈\/notes\/reader-[a-f0-9]{16}\.md/u)?.[0] ?? "";
 						return call("write", {
-							path: "source/访谈/notes/1.md",
+							path: assigned,
 							content: note(materialSha256, [0, total], "黄盖找到火船，拒绝烧毁。"),
 						});
 					},
-					call("write", { path: "source/访谈/world/characters/黄盖.md", content: "越界写抽取。\n" }),
+					call("write", { path: "source/访谈/notes/别人的笔记.md", content: "越界写笔记。" }),
 					(context) => {
 						results.push(lastToolText(context));
-						return call("submit_task", { summary: "笔记已写在 source/访谈/notes/1.md" });
+						return call("write", { path: "source/访谈/world/characters/黄盖.md", content: "越界写抽取。\n" });
+					},
+					(context) => {
+						results.push(lastToolText(context));
+						return call("submit_task", { summary: `笔记已写在 ${assigned}` });
 					},
 					call("commit", { summary: "采用材料笔记" }),
 					reply("笔记由读材料的子任务写好并提交"),
@@ -189,7 +196,9 @@ test("委派的 source-reader 自己写笔记，但只能写这个 Source 的 no
 			"把访谈材料读一遍",
 		);
 		assert.equal(read.failure, undefined);
-		assert.match(results[0] ?? "", /permission_denied|不能写|无权/u, "抽取不归读者写");
+		assert.ok(assigned);
+		assert.equal(results.length, 2);
+		for (const result of results) assert.match(result, /permission_denied/u);
 		assert.deepEqual(sourceCoverage(await project.checkoutCandidate(), "访谈").gaps, []);
 	});
 });
@@ -584,6 +593,81 @@ test("Source 审稿也查抽取是否合 Story Language 语义；host 版指向�
 		);
 		assert.equal(outcome.failure, undefined);
 		assert.match(reviewer, /story_guide/u, "Source Reviewer 能查语义主题");
+	});
+});
+
+test("Source 子任务的领域查询不读取 Target 意图或其它 Source，开场不编译无关的 Target Design", async () => {
+	await withProject(async (project, checkoutPath) => {
+		await project.ingestSource({
+			sourceId: "其它",
+			name: "其它.txt",
+			original: new TextEncoder().encode("OTHER_SOURCE_SECRET"),
+		});
+		await writeFile(join(checkoutPath, "intent/计谋的代价.md"), "TARGET_INTENT_SECRET");
+		await writeFile(join(checkoutPath, "outline/story/index.yaml"), "volumes: [坏掉的目录");
+		const seen: string[] = [];
+		const outcome = await say(
+			new SuimingHarness({
+				project,
+				models: gateway([
+					call("delegate", { profile: "source-reader", sourceId: "访谈", goal: "读材料" }),
+					call("search", { query: "TARGET_INTENT_SECRET", kinds: ["intent"] }),
+					(context) => {
+						seen.push(lastToolText(context));
+						return call("read_source", { sourceId: "其它", start: 0, end: 30 });
+					},
+					(context) => {
+						seen.push(lastToolText(context));
+						return call("submit_task", { summary: "完成" });
+					},
+					reply("完成"),
+				]),
+			}),
+			"读访谈材料",
+		);
+		assert.equal(outcome.failure, undefined);
+		assert.equal(seen.length, 2);
+		assert.doesNotMatch(seen.join("\n"), /TARGET_INTENT_SECRET|OTHER_SOURCE_SECRET/u);
+		assert.equal(project.loadExecutionEntities().tasks[0]?.status, "completed");
+	});
+});
+
+test("相邻分段委派的 Beat 号段重叠时串行，避免同时修改同一候选", async () => {
+	await withProject(async (project) => {
+		const running: number[] = [];
+		const worker = () => {
+			running.push(project.loadExecutionEntities().tasks.filter((task) => task.status === "running").length);
+			return call("submit_task", { summary: "完成" });
+		};
+		const outcome = await say(
+			new SuimingHarness({
+				project,
+				models: gateway([
+					fauxAssistantMessage([
+						fauxToolCall("delegate", {
+							profile: "source-extractor",
+							sourceId: "访谈",
+							goal: "第一段",
+							span: [0, 20],
+							beatRange: { from: 101, to: 199 },
+						}),
+						fauxToolCall("delegate", {
+							profile: "source-extractor",
+							sourceId: "访谈",
+							goal: "重叠段",
+							span: [20, total],
+							beatRange: { from: 150, to: 249 },
+						}),
+					]),
+					worker,
+					worker,
+					reply("完成"),
+				]),
+			}),
+			"分段抽取",
+		);
+		assert.equal(outcome.failure, undefined);
+		assert.deepEqual(running, [1, 1]);
 	});
 });
 

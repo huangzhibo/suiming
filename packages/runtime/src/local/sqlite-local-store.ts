@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalJson, sha256Buffer } from "@suiming/story";
@@ -57,6 +57,36 @@ interface PreparedPayload {
 	byteLength: number;
 	inlineBytes: Uint8Array | null;
 	objectHash: string | null;
+}
+
+export interface ExecutionObjectCollection {
+	/** busy：有 turn 在跑（本进程或别的进程），这次没删完（或一个没删），下次再来。 */
+	status: "collected" | "busy" | "incomplete";
+	removedObjects: number;
+	removedFiles: number;
+	/** 从 session 与 task 走得到、字节却读不出（丢了或内容变了）的执行对象。 */
+	missing: string[];
+}
+
+const EXECUTION_OBJECT_ID = /eo_[a-f0-9]{64}/gu;
+const COLLECTION_BATCH = 100;
+
+/**
+ * 批与批之间让出事件循环：桌面主进程同时在答 IPC，2026-10-07 三国作品第一次回收删了四万个对象，不让出就是 8 秒卡死。
+ * 每批 100 个，在写事务里同步删。
+ */
+function yieldToEventLoop(): Promise<void> {
+	return new Promise((resolve) => setImmediate(resolve));
+}
+
+function unlinkIfPresent(path: string): number {
+	try {
+		unlinkSync(path);
+		return 1;
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+		throw error;
+	}
 }
 
 function nonempty(value: string, label: string): string {
@@ -440,14 +470,149 @@ export class SqliteLocalStore {
 	}
 
 	/**
-	 * 回收对象目录里没人引用的字节。Canon 搬去 git 之后引用只剩执行对象一处，但回收仍是必需的：
-	 * checkpoint 与模型 Context 的执行对象每个 turn 都在增加，没有回收这个目录只会涨。
+	 * 回收执行对象：从 session 与 task 的 checkpoint、结果出发，顺着内容里出现的 `eo_…` 走一遍，走不到的就是垃圾。
+	 * 2026-10-07 三国作品一次长运行后 49,746 个执行对象只有 9,657 个还被引用——每次保存 checkpoint 都换掉一批节点，
+	 * 删掉的 session 整个留在库里，没有回收对象目录只会涨。
+	 *
+	 * 安全靠两条，不靠时间猜：
+	 * - 执行对象只在 turn 里写（checkpoint、子任务结果、rank 结果），写完到登记之间、以及 CheckpointArchive 记住「这个节点
+	 *   已经存过」的那段时间都在 turn 里；所以有 turn 在跑（本进程或别的进程，lease 持有者还活着）就不删。每一批删除都在
+	 *   写事务里重新查一次，并核对扫描开始时的实体版本，连扫描期间已经结束的 turn 也能发现；startTurn 同样要写锁。
+	 * - `before` 之后登记的行、修改时间在 `before` 之后的文件当作还有人要，连同它引用的都留着；防的是以后有人在 turn 外写对象。
+	 *
+	 * 「被引用、字节却读不出」时返回 incomplete 与 missing，停止删除，不把损坏的引用图当完整图。
 	 */
-	async collectObjects(): Promise<Awaited<ReturnType<ContentAddressedObjectStore["collect"]>>> {
-		const rows = this.#database
-			.prepare("SELECT DISTINCT object_hash FROM execution_objects WHERE object_hash IS NOT NULL")
-			.all() as { object_hash: string }[];
-		return this.objects.collect(new Set(rows.map((row) => row.object_hash)));
+	async collectExecutionObjects(options: { before: Date }): Promise<ExecutionObjectCollection> {
+		const busy = (removedObjects = 0, removedFiles = 0, missing: string[] = []): ExecutionObjectCollection => ({
+			status: "busy",
+			removedObjects,
+			removedFiles,
+			missing,
+		});
+		if (this.#turnRunning()) return busy();
+		const versions = this.#executionVersions();
+		const changed = () => this.#turnRunning() || this.#executionVersions() !== versions;
+		const cutoff = options.before.toISOString();
+		const entities = this.loadExecutionEntities();
+		const pending: string[] = [];
+		for (const entity of [...entities.sessions, ...entities.tasks])
+			for (const ref of [entity.checkpointRef, entity.result]) if (ref !== undefined) pending.push(ref.id);
+		for (const row of this.#database
+			.prepare("SELECT id FROM execution_objects WHERE created_at >= ?")
+			.all(cutoff) as { id: string }[])
+			pending.push(row.id);
+		const live = new Set<string>();
+		const missing: string[] = [];
+		while (pending.length > 0) {
+			const id = pending.pop() as string;
+			if (live.has(id)) continue;
+			live.add(id);
+			let bytes: Uint8Array;
+			try {
+				bytes = (await this.readExecutionObject(id)).bytes;
+			} catch {
+				missing.push(id);
+				continue;
+			}
+			for (const match of Buffer.from(bytes).toString("latin1").matchAll(EXECUTION_OBJECT_ID))
+				if (!live.has(match[0])) pending.push(match[0]);
+		}
+		missing.sort();
+		// 引用链断了就无法证明哪些节点是垃圾；保留剩余对象，避免一次丢失继续扩大。
+		if (missing.length > 0) return { status: "incomplete", removedObjects: 0, removedFiles: 0, missing };
+
+		const garbage = (
+			this.#database.prepare("SELECT id, object_hash FROM execution_objects WHERE created_at < ?").all(cutoff) as {
+				id: string;
+				object_hash: string | null;
+			}[]
+		).filter((row) => !live.has(row.id));
+		const hashInUse = this.#database.prepare(
+			"SELECT 1 AS found FROM execution_objects WHERE object_hash = ? LIMIT 1",
+		);
+		const remove = this.#database.prepare("DELETE FROM execution_objects WHERE id = ?");
+		let removedObjects = 0;
+		let removedFiles = 0;
+		for (let start = 0; start < garbage.length; start += COLLECTION_BATCH) {
+			const batch = garbage.slice(start, start + COLLECTION_BATCH);
+			// 删行与删文件在同一个写事务里：turn 开始要写锁，等这一批删完才能开始写对象。文件删除必须同步，
+			// 事务期间不能让出事件循环——同一个连接上别的写入会撞上「事务里再开事务」。
+			const files = this.#transaction(() => {
+				if (changed()) return undefined;
+				let files = 0;
+				for (const row of batch) {
+					remove.run(row.id);
+					if (row.object_hash !== null && hashInUse.get(row.object_hash) === undefined)
+						files += unlinkIfPresent(this.objects.pathFor(row.object_hash));
+				}
+				return files;
+			});
+			if (files === undefined) return busy(removedObjects, removedFiles, missing);
+			removedObjects += batch.length;
+			removedFiles += files;
+			await yieldToEventLoop();
+		}
+
+		// 目录里没有行登记的文件：崩在写文件与登记之间留下的，或写到一半的临时文件。
+		const orphans = (await this.objects.files()).filter((file) => file.modifiedAt < options.before);
+		for (let start = 0; start < orphans.length; start += COLLECTION_BATCH) {
+			const batch = orphans.slice(start, start + COLLECTION_BATCH);
+			const files = this.#transaction(() => {
+				if (changed()) return undefined;
+				let files = 0;
+				for (const file of batch)
+					if (file.hash === undefined || hashInUse.get(file.hash) === undefined)
+						files += unlinkIfPresent(file.path);
+				return files;
+			});
+			if (files === undefined) return busy(removedObjects, removedFiles, missing);
+			removedFiles += files;
+			await yieldToEventLoop();
+		}
+		const completed = this.#transaction(() => {
+			if (changed()) return false;
+			this.#database
+				.prepare(
+					"INSERT INTO local_meta (key, value) VALUES ('execution_objects_collected_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+				)
+				.run(this.#timestamp());
+			return true;
+		});
+		if (!completed) return busy(removedObjects, removedFiles, missing);
+		return { status: "collected", removedObjects, removedFiles, missing };
+	}
+
+	/** 引用扫描的边界：哪怕 turn 已经结束，实体版本也会变；复用现有版本，不另存 GC 世代。 */
+	#executionVersions(): string {
+		return JSON.stringify(
+			this.#database
+				.prepare(`
+			SELECT 'session' AS kind, id, json_extract(data_json, '$.version') AS version FROM sessions
+			UNION ALL SELECT 'task' AS kind, id, json_extract(data_json, '$.version') AS version FROM tasks
+			ORDER BY kind, id
+		`)
+				.all(),
+		);
+	}
+
+	/** 上一次完整跑完执行对象回收的时间；被 turn 打断的不算。 */
+	executionObjectsCollectedAt(): string | undefined {
+		const row = this.#database
+			.prepare("SELECT value FROM local_meta WHERE key = 'execution_objects_collected_at'")
+			.get() as { value: string } | undefined;
+		return row?.value;
+	}
+
+	/** 有没有 turn 在跑：持有进程还活着的 running session（崩溃遗留的不算，它不会再写）。 */
+	#turnRunning(): boolean {
+		return (
+			this.#database.prepare("SELECT data_json FROM sessions WHERE status = 'running'").all() as {
+				data_json: string;
+			}[]
+		).some((row) => {
+			const lease = json<SessionRecord>(row.data_json, "sessions").lease;
+			return lease !== undefined && leaseHolderAlive(lease);
+		});
 	}
 
 	async saveExecutionObject(mediaType: string, bytes: Uint8Array): Promise<LocalExecutionObject> {
@@ -613,6 +778,7 @@ export class SqliteLocalStore {
 	/**
 	 * 本地执行库只认 v6。v1→v6 的迁移链 2026-10-02 删掉，删前确认在用作品都已是 v6：旧执行数据本来就不迁，
 	 * 作品版本在作品目录的 git 仓里。旧库在这里就停，不建表、不改版本。
+	 * `local_meta` 是 2026-10-07 随执行对象回收加的：只增一张表，打开 v6 库时补上，旧版本照常读写，所以不升版本。
 	 */
 	#migrate(): void {
 		const hasMeta =
@@ -646,6 +812,10 @@ export class SqliteLocalStore {
 				command_id TEXT PRIMARY KEY,
 				fingerprint TEXT NOT NULL,
 				result_json TEXT NOT NULL
+			) STRICT;
+			CREATE TABLE IF NOT EXISTS local_meta (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
 			) STRICT;
 			CREATE TABLE IF NOT EXISTS execution_objects (
 				id TEXT PRIMARY KEY,

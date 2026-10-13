@@ -64,11 +64,14 @@ async function staleArtifacts(
 export async function readProjectStatus(
 	project: HarnessProjectPort,
 	candidate: ArtifactCandidate,
-	options: { stale?: boolean } = {},
+	options: { stale?: boolean; readable?: (path: string) => boolean } = {},
 ) {
 	const headRevisionId = await project.refreshHead();
 	const revisions = await project.history();
-	const committed = candidateFromStoryFiles(headRevisionId, await project.exportRevision(headRevisionId));
+	const committed = candidateFromStoryFiles(
+		headRevisionId,
+		(await project.exportRevision(headRevisionId)).filter((file) => options.readable?.(file.path) ?? true),
+	);
 	const uncommittedChanges = changeOperationsBetween(committed, candidate).length;
 	return {
 		projectId: project.projectId,

@@ -206,7 +206,7 @@ export * from "./harness/index.js";
 export { readProjectStatus } from "./harness/project-status.js";
 export { type CheckDiagnostic, type CheckSummary, checkDiagnostic, checkSummary } from "./local/check-summary.js";
 export { LocalCheckoutSynchronizer } from "./local/checkout-synchronizer.js";
-export type { ObjectCollectionResult } from "./local/content-addressed-object-store.js";
+export type { StoredObjectFile } from "./local/content-addressed-object-store.js";
 export { ContentAddressedObjectStore } from "./local/content-addressed-object-store.js";
 export type {
 	InitLocalProjectInput,
@@ -237,6 +237,7 @@ export { LocalWorkspace } from "./local/local-workspace.js";
 export { LocalProjectLock } from "./local/project-lock.js";
 export { type ReviewSummary, reviewSummaries, reviewSummary } from "./local/review-summary.js";
 export type {
+	ExecutionObjectCollection,
 	LocalExecutionObject,
 	LocalProjectRecord,
 	LocalRemoteBinding,

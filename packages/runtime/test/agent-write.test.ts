@@ -6,7 +6,15 @@ import type { fauxProvider } from "@earendil-works/pi-ai";
 import { getSystemMessageText } from "@earendil-works/pi-ai/utils/text";
 import { readProjectStatus } from "../src/harness/project-status.js";
 import { compileWriteContext, composeReviewFile, SuimingHarness, textCurrencies } from "../src/index.js";
-import { call, fauxGateway, type Responses, reply, say, withSampleProject as withProject } from "./harness-fixtures.js";
+import {
+	call,
+	fauxGateway,
+	lastToolText,
+	type Responses,
+	reply,
+	say,
+	withSampleProject as withProject,
+} from "./harness-fixtures.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
 function gateway(responses: Responses) {
@@ -20,6 +28,40 @@ function gateway(responses: Responses) {
 const beatOneText =
 	"军杖落到第三十下，黄盖咬住了衣角。他知道曹操的人就在辕门外看着，也知道这顿打少一下都不像真的。\n\n他没有喊。";
 const beatTwoText = "约定那夜，二十艘船一齐点火，借着风冲进曹营。没有人拦得住。";
+
+test("Writer 的搜索与文件读取共用读范围，不能经 kind 参数读到 Source 原文", async () => {
+	await withProject(async (project) => {
+		await project.ingestSource({
+			sourceId: "答案",
+			name: "答案.txt",
+			original: new TextEncoder().encode("AUDIT_SECRET_原作答案"),
+		});
+		const results: string[] = [];
+		const outcome = await say(
+			new SuimingHarness({
+				project,
+				models: gateway([
+					call("delegate", { profile: "writer", storyBeatId: "beat-0001", goal: "核对读范围" }),
+					call("read", { path: "source/答案/material.txt" }),
+					(context) => {
+						results.push(lastToolText(context));
+						return call("search", { sourceId: "答案", kinds: ["source-material"], query: "AUDIT_SECRET" });
+					},
+					(context) => {
+						results.push(lastToolText(context));
+						return call("submit_task", { summary: "完成" });
+					},
+					reply("完成"),
+				]),
+			}),
+			"核对读范围",
+		);
+		assert.equal(outcome.failure, undefined);
+		assert.equal(results.length, 2);
+		assert.match(results[0] ?? "", /permission_denied/u);
+		assert.doesNotMatch(results[1] ?? "", /AUDIT_SECRET_原作答案/u);
+	});
+});
 
 test("Agent 自己写正文并提交，不需要隔离 Writer；正文时效从提交历史派生", async () => {
 	await withProject(async (project, checkoutPath) => {

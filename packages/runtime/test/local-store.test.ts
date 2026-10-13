@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -70,19 +70,15 @@ async function cleanupFixture(fixture: LocalFixture): Promise<void> {
 	await rm(fixture.root, { recursive: true, force: true });
 }
 
-test("content-addressed object store 去重、校验并回收未引用对象", async () => {
+test("content-addressed object store 去重并校验内容", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-objects-"));
 	try {
 		const objects = new ContentAddressedObjectStore(root);
 		const keptHash = await objects.put(new Uint8Array([1, 2, 3]));
-		const removedHash = await objects.put(new Uint8Array([4, 5, 6]));
 		assert.equal(await objects.put(new Uint8Array([1, 2, 3])), keptHash);
 		assert.deepEqual(await objects.read(keptHash), new Uint8Array([1, 2, 3]));
-
-		const collected = await objects.collect(new Set([keptHash]));
-		assert.deepEqual(collected, { kept: [keptHash], removed: [removedHash] });
 		await assert.rejects(
-			() => objects.read(removedHash),
+			() => objects.read(sha256(new Uint8Array([4, 5, 6]))),
 			(error: unknown) => error instanceof ArtifactError && error.code === "object_not_found",
 		);
 
@@ -247,7 +243,7 @@ test("SQLite execution state 可跨进程恢复，并保留 command idempotency 
 	}
 });
 
-test("SQLite execution object 按内容去重，重启与 GC 后仍可由 Task result 引用", async () => {
+test("SQLite execution object 按内容去重，重启后仍可由 id 读回", async () => {
 	const fixture = await createLocalFixture();
 	let store: SqliteLocalStore | undefined;
 	try {
@@ -256,7 +252,6 @@ test("SQLite execution object 按内容去重，重启与 GC 后仍可由 Task r
 		const first = await store.saveExecutionObject("application/vnd.suiming.test+json", payload);
 		const duplicate = await store.saveExecutionObject("application/vnd.suiming.test+json", payload);
 		assert.equal(duplicate.id, first.id);
-		assert.ok((await store.collectObjects()).kept.includes(sha256(payload)));
 		store.close();
 
 		store = openStore(fixture);
@@ -267,6 +262,200 @@ test("SQLite execution object 按内容去重，重启与 GC 后仍可由 Task r
 		);
 	} finally {
 		store?.close();
+		await cleanupFixture(fixture);
+	}
+});
+
+test("执行对象回收：只删从 session 与 task 走不到、又早于期限的；有 turn 在跑就不动；被引用却读不出的报出来", async () => {
+	// 2026-10-07 三国作品一次长运行后 49,746 个执行对象只有 9,657 个还被引用；没有回收，对象目录只会涨。
+	const fixture = await createLocalFixture();
+	let clock = new Date("2026-10-01T00:00:00.000Z");
+	const store = new SqliteLocalStore({
+		databasePath: fixture.databasePath,
+		objectRootPath: fixture.objectRootPath,
+		inlineTextThresholdBytes: 1024,
+		now: () => clock,
+	});
+	const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+	const save = async (value: unknown, mediaType = "application/vnd.suiming.test+json") =>
+		(await store.saveExecutionObject(mediaType, encode(value))).id;
+	const exists = async (path: string) =>
+		stat(path).then(
+			() => true,
+			() => false,
+		);
+	try {
+		store.createProject({ projectId: "project-1", checkoutPath: fixture.checkoutPath });
+		// 被引用的：checkpoint 经节点引用节点；子任务结果是内联的小 JSON；同样的字节换个媒体类型另存一份当垃圾
+		const leaf = await save({ text: "checkpoint 里的消息" });
+		const lost = await save({ text: "被引用，字节却丢了" });
+		const shared = { text: "两种媒体类型各存一份" };
+		const sharedLive = await save(shared);
+		const checkpoint = await save({ root: [{ ref: leaf }, { ref: lost }, { ref: sharedLive }] });
+		const result = await save({ result: "子任务交回的结果", rounds: [leaf] }, "application/json");
+		// 没人引用的
+		const garbage = await save({ text: "只有被换掉的旧 checkpoint 引用过" });
+		const garbageInline = await save({ text: "没人引用的内联对象" }, "application/json");
+		const sharedGarbage = await save(shared, "application/vnd.suiming.other+json");
+		const orphanOld = await store.objects.put(encode("没来得及登记就崩了"));
+		await utimes(store.objects.pathFor(orphanOld), new Date("2026-09-01"), new Date("2026-09-01"));
+		const orphanFresh = await store.objects.put(encode("刚写进目录、还没登记"));
+		await rm(store.objects.pathFor(sha256(encode({ text: "被引用，字节却丢了" }))));
+		clock = new Date("2026-10-01T05:00:00.000Z");
+		const recent = await save({ text: "期限之后写的，还可能有人正要引用" });
+
+		const execution = store.createExecutionState({ now: () => clock });
+		execution.createSession({ commandId: "create", id: "session-1", projectId: "project-1" });
+		const alive = { ownerId: "owner", pid: process.pid, hostname: hostname(), acquiredAt: clock.toISOString() };
+		execution.startTurn({ commandId: "start", sessionId: "session-1", lease: alive });
+		execution.recordSessionCheckpoint("checkpoint", "session-1", { kind: "object", id: checkpoint }, 0);
+		execution.addTask({ commandId: "task", id: "task-1", sessionId: "session-1", kind: "main", key: "a" });
+		execution.completeTask("complete", "task-1", { kind: "object", id: result });
+
+		const before = new Date("2026-10-01T04:00:00.000Z");
+		// 本进程有 turn 在跑：一个都不删，也不记作回收过
+		assert.deepEqual(await store.collectExecutionObjects({ before }), {
+			status: "busy",
+			removedObjects: 0,
+			removedFiles: 0,
+			missing: [],
+		});
+		assert.equal(store.executionObjectsCollectedAt(), undefined);
+
+		execution.endTurn({ commandId: "end", sessionId: "session-1" });
+		const incomplete = await store.collectExecutionObjects({ before });
+		assert.equal(incomplete.status, "incomplete");
+		assert.deepEqual(incomplete.missing, [lost]);
+		assert.equal(incomplete.removedObjects, 0, "引用链不完整时不能继续删");
+		assert.equal(store.executionObjectsCollectedAt(), undefined);
+		await store.objects.put(encode({ text: "被引用，字节却丢了" }));
+		const collected = await store.collectExecutionObjects({ before });
+		assert.equal(collected.status, "collected");
+		assert.deepEqual(collected.missing, []);
+		assert.equal(collected.removedObjects, 3);
+		assert.equal(collected.removedFiles, 2, "garbage 一个文件、无人登记的旧文件一个；同字节那份还有人用");
+		for (const id of [leaf, sharedLive, checkpoint, result, recent]) await store.readExecutionObject(id);
+		for (const id of [garbage, garbageInline, sharedGarbage])
+			await assert.rejects(
+				() => store.readExecutionObject(id),
+				(error: unknown) => error instanceof ArtifactError && error.code === "execution_object_not_found",
+			);
+		assert.equal(
+			await exists(store.objects.pathFor(sha256(encode({ text: "只有被换掉的旧 checkpoint 引用过" })))),
+			false,
+		);
+		assert.equal(await exists(store.objects.pathFor(orphanOld)), false);
+		assert.equal(await exists(store.objects.pathFor(orphanFresh)), true);
+		assert.equal(store.executionObjectsCollectedAt(), clock.toISOString());
+
+		// 删掉 session：它的 checkpoint 与子任务结果随之成为垃圾
+		execution.deleteSession("delete", "session-1");
+		clock = new Date("2026-10-02T00:00:00.000Z");
+		const afterDelete = await store.collectExecutionObjects({ before: clock });
+		assert.equal(afterDelete.status, "collected");
+		assert.deepEqual(afterDelete.missing, []);
+		assert.equal(afterDelete.removedObjects, 6);
+		assert.equal(afterDelete.removedFiles, 5, "内联的结果没有文件");
+		for (const id of [leaf, sharedLive, checkpoint, result, recent])
+			await assert.rejects(() => store.readExecutionObject(id));
+		assert.equal(await exists(store.objects.pathFor(orphanFresh)), true, "目录里的新文件按修改时间留着");
+	} finally {
+		store.close();
+		await cleanupFixture(fixture);
+	}
+});
+
+test("执行对象回收跑到一半有 turn 开始：还没删的都留着，等下次", async (t) => {
+	const fixture = await createLocalFixture();
+	const options = { databasePath: fixture.databasePath, objectRootPath: fixture.objectRootPath };
+	const store = new SqliteLocalStore(options);
+	const other = new SqliteLocalStore(options);
+	try {
+		store.createProject({ projectId: "project-1", checkoutPath: fixture.checkoutPath });
+		const save = async (text: string) =>
+			(await store.saveExecutionObject("application/vnd.suiming.test+json", new TextEncoder().encode(text))).id;
+		const checkpoint = await save("当前的 checkpoint");
+		const garbage = [await save("旧节点一"), await save("旧节点二")];
+		const execution = store.createExecutionState();
+		execution.createSession({ commandId: "create", id: "session-1", projectId: "project-1" });
+		const lease = {
+			ownerId: "desktop",
+			pid: process.pid,
+			hostname: hostname(),
+			acquiredAt: new Date().toISOString(),
+		};
+		execution.startTurn({ commandId: "start-1", sessionId: "session-1", lease });
+		execution.recordSessionCheckpoint("checkpoint", "session-1", { kind: "object", id: checkpoint }, 0);
+		execution.endTurn({ commandId: "end-1", sessionId: "session-1" });
+		// 另一个进程在回收顺着引用走的时候开了 turn
+		const read = store.readExecutionObject.bind(store);
+		let started = false;
+		t.mock.method(store, "readExecutionObject", async (id: string) => {
+			if (!started) {
+				started = true;
+				other.createExecutionState().startTurn({
+					commandId: "start-2",
+					sessionId: "session-1",
+					lease: { ...lease, ownerId: "cli" },
+				});
+			}
+			return read(id);
+		});
+		const collected = await store.collectExecutionObjects({ before: new Date(Date.now() + 60_000) });
+		assert.equal(collected.status, "busy");
+		assert.equal(collected.removedObjects, 0);
+		t.mock.restoreAll();
+		for (const id of garbage) await store.readExecutionObject(id);
+		assert.equal(store.executionObjectsCollectedAt(), undefined);
+	} finally {
+		other.close();
+		store.close();
+		await cleanupFixture(fixture);
+	}
+});
+
+test("回收扫描期间另一个 turn 开始又结束，不能按旧引用集合删掉新 checkpoint 复用的节点", async (t) => {
+	const fixture = await createLocalFixture();
+	let clock = new Date("2026-10-01T00:00:00Z");
+	const options = { databasePath: fixture.databasePath, objectRootPath: fixture.objectRootPath, now: () => clock };
+	const store = new SqliteLocalStore(options);
+	const other = new SqliteLocalStore(options);
+	const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+	try {
+		store.createProject({ projectId: "project-1", checkoutPath: fixture.checkoutPath });
+		const initial = await store.saveExecutionObject("application/json", bytes({ text: "旧恢复点" }));
+		const reused = await store.saveExecutionObject("application/json", bytes({ text: "暂时无人引用的旧节点" }));
+		const execution = store.createExecutionState({ now: () => clock });
+		const lease = { ownerId: "desktop", pid: process.pid, hostname: hostname(), acquiredAt: clock.toISOString() };
+		execution.createSession({ commandId: "create", id: "session-1", projectId: "project-1" });
+		execution.startTurn({ commandId: "start-1", sessionId: "session-1", lease });
+		execution.recordSessionCheckpoint("checkpoint-1", "session-1", { kind: "object", id: initial.id }, 0);
+		execution.endTurn({ commandId: "end-1", sessionId: "session-1" });
+		clock = new Date("2026-10-02T00:00:00Z");
+		const read = store.readExecutionObject.bind(store);
+		let injected = false;
+		t.mock.method(store, "readExecutionObject", async (id: string) => {
+			if (!injected) {
+				injected = true;
+				const active = other.createExecutionState({ now: () => clock });
+				active.startTurn({ commandId: "start-2", sessionId: "session-1", lease });
+				await other.saveExecutionObject("application/json", reused.bytes);
+				const root = await other.saveExecutionObject("application/json", bytes({ ref: reused.id }));
+				active.recordSessionCheckpoint("checkpoint-2", "session-1", { kind: "object", id: root.id }, 0);
+				active.endTurn({ commandId: "end-2", sessionId: "session-1" });
+			}
+			return read(id);
+		});
+		const result = await store.collectExecutionObjects({ before: new Date("2026-10-01T23:00:00Z") });
+		assert.equal(result.status, "busy");
+		assert.equal(result.removedObjects, 0);
+		assert.deepEqual((await read(reused.id)).bytes, reused.bytes);
+		t.mock.restoreAll();
+		assert.equal((await store.collectExecutionObjects({ before: clock })).status, "collected");
+		await read(reused.id);
+	} finally {
+		other.close();
+		store.close();
 		await cleanupFixture(fixture);
 	}
 });

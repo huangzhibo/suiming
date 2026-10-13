@@ -34,6 +34,35 @@ async function fixture() {
 	};
 }
 
+test("串行动作是并行组的前置边界：先写入、再并行读取、最后继续串行", async () => {
+	const { provider, options } = await fixture();
+	let written = false;
+	const seen: boolean[] = [];
+	const delivered: string[] = [];
+	provider.setResponses([
+		fauxAssistantMessage(["write", "read-a", "read-b", "after"].map((name) => fauxToolCall(name, {}))),
+		fauxAssistantMessage("完成"),
+	]);
+	await runTaskLoop({
+		...options,
+		tools: ["write", "read-a", "read-b", "after"].map((name) => ({
+			name,
+			description: name,
+			parameters: Type.Object({}),
+			parallel: () => (name.startsWith("read") ? [] : false),
+			execute: async () => {
+				if (name === "write") written = true;
+				if (name.startsWith("read")) seen.push(written);
+				if (name === "after") assert.equal(seen.length, 2);
+				return { content: [{ type: "text" as const, text: name }] };
+			},
+		})),
+		onToolCall: (event) => delivered.push(event.toolName),
+	});
+	assert.deepEqual(seen, [true, true]);
+	assert.deepEqual(delivered, ["write", "read-a", "read-b", "after"]);
+});
+
 test("请求前恢复点保存失败时不调用 provider、不执行工具", async () => {
 	const { provider, effects, options } = await fixture();
 	const failure = new Error("checkpoint write failed");
@@ -179,7 +208,7 @@ test("同一次回复里相邻的可并行动作同时执行，结果按派出�
 		name,
 		label: name,
 		description: name,
-		parallel: () => true,
+		parallel: () => [],
 		parameters: Type.Object({}),
 		execute: async () => {
 			started.get(name)?.();

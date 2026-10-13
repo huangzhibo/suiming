@@ -203,7 +203,20 @@ export class LocalSessionController {
 				// 在 completion 兑现之前摘掉：等 completion 的调用方看到的 activeSessionIds 必须已经不含它。
 				this.#active.delete(sessionId);
 			}
-		})();
+		})().then(async () => {
+			// 维护不改变 turn 结果；失败与缺失要进诊断输出，不能静默吞掉。下次到点再试。
+			try {
+				const result = await this.#project.collectExecutionObjects();
+				if (result !== undefined && result.missing.length > 0)
+					process.emitWarning(`执行对象缺失或损坏，已跳过回收：${result.missing.join(", ")}`, {
+						code: "execution_objects_missing",
+					});
+			} catch (error) {
+				process.emitWarning(`执行对象回收未完成：${error instanceof Error ? error.message : String(error)}`, {
+					code: "execution_object_collection_failed",
+				});
+			}
+		});
 		this.#active.set(sessionId, { controller, completion });
 		void completion.catch(() => undefined);
 	}

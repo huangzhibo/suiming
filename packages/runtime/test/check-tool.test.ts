@@ -60,3 +60,14 @@ test("check 工具：全书未完待续时，已建立未回应的 Contract 只�
 	);
 	assert.equal(result, "PASSED\n当前边界仍开放的 Contract：诈降");
 });
+
+test("check 工具：只剩 Source 时根检查仍报告 Target 缺失，不自动降成 Source 检查", () => {
+	const sourceOnly = candidateFromStoryFiles("r1", [
+		{
+			path: "source/访谈/material.txt",
+			mediaType: "text/plain; charset=utf-8",
+			bytes: encoder.encode("黄盖在江边找到火船。"),
+		},
+	]);
+	assert.match(formatCheck(sourceOnly), /^FAILED story_index_not_found:/u);
+});

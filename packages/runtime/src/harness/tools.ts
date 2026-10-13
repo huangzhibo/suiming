@@ -17,6 +17,7 @@ import {
 	conflictMessage,
 	type FileMutation,
 } from "./confined-env.js";
+import { formatSourceCheck } from "./source-context.js";
 import { type HarnessTool, type HarnessToolResult, type ToolDetails, ToolRejection } from "./tool.js";
 import { renderState, styleEvidenceFor } from "./write-context.js";
 
@@ -186,10 +187,11 @@ export function fileTools(
 	env: ConfinedExecutionEnv,
 	policy: ConfinedEnvPolicy,
 	scan?: CandidateScanner,
+	sourceId?: string,
 ): HarnessTool[] {
 	/** 改动已经落盘之后再检查：检查不过也如实返回，模型据此接着改，不回滚写入。 */
 	const written = async (summary: string, check: boolean | undefined) =>
-		text(check && scan ? `${summary}\n\n检查：${formatCheck(await scan())}` : summary);
+		text(check && scan ? `${summary}\n\n检查：${formatCheck(await scan(), sourceId)}` : summary);
 	const read: HarnessTool<typeof ReadSchema> = {
 		name: "read",
 		description: "读取作品中的 UTF-8 文件。offset 从 1 开始，默认最多 2000 行。",
@@ -457,14 +459,14 @@ export function impactTool(scan: CandidateScanner): HarnessTool<typeof ImpactSch
 const CheckSchema = Type.Object({}, { additionalProperties: false });
 
 /** 提交用同一个 Checker；这里让模型随时看到会被拒的问题、拦不住但要修的问题与 warning。 */
-export function checkTool(scan: CandidateScanner): HarnessTool<typeof CheckSchema, undefined> {
+export function checkTool(scan: CandidateScanner, sourceId?: string): HarnessTool<typeof CheckSchema, undefined> {
 	return readTool({
 		name: "check",
 		description:
 			"对当前工作目录运行确定性 Checker（schema、引用、顺序、Contract、硬状态、已有正文）。结论三种：PASSED 没有问题；ISSUES 可以提交，但列出的设计或正文问题要修，阶段提交时先留着也要在回复里告诉作者；FAILED 提交会被拒绝，先修。",
 		parameters: CheckSchema,
 		async execute() {
-			return text(formatCheck(await scan()));
+			return text(formatCheck(await scan(), sourceId));
 		},
 	});
 }
@@ -474,7 +476,9 @@ export function checkTool(scan: CandidateScanner): HarnessTool<typeof CheckSchem
  * 2026-10-02 之前只有 PASSED / FAILED：这里只复用提交闸，设计层错误不拦提交，于是 Agent 对一份
  * Contract 没兑现的候选看到「PASSED」，CLI 与桌面却说「未通过：设计」。
  */
-export function formatCheck(candidate: ArtifactCandidate): string {
+export function formatCheck(candidate: ArtifactCandidate, sourceId?: string): string {
+	// 检查范围由角色显式指定；根候选缺失 Target 不能被误判为一份合法的 Source 投影。
+	if (sourceId !== undefined) return formatSourceCheck(candidate, sourceId);
 	try {
 		const inspected = validateStoryProjectCandidate(candidate);
 		const findings = checkFindings(inspected);

@@ -1,4 +1,5 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
+import { sha256Hex } from "@suiming/story";
 import { Value } from "typebox/value";
 import { sourceCoverage } from "../artifact/derived.js";
 import { designFrame } from "../artifact/design-frame.js";
@@ -133,21 +134,22 @@ async function childOutcome<T>(body: () => Promise<T>): Promise<T> {
 
 /**
  * 子任务拿到根的全部读取工具，写范围随角色。writer 没有读原文的工具：read_source / search_source 从候选里直接读
- * 材料、不经过读范围，留出评测里原作就是参照答案，Skill 的 Writer 契约也不给它 Source。
+ * 材料；候选扫描也按读范围过滤，留出评测里原作就是参照答案，Skill 的 Writer 契约也不给它 Source。
  */
 function subagentTools(
 	session: HarnessSession,
 	handle: TaskHandle,
 	policy: "read" | "write",
 	source: boolean,
+	sourceId?: string,
 ): HarnessTool[] {
 	return [
 		projectStatusTool(session, handle),
-		...fileTools(handle.env, policy, handle.scan),
+		...fileTools(handle.env, policy, handle.scan, sourceId),
 		searchTool(handle.scan),
 		impactTool(handle.scan),
 		compactContextTool(),
-		checkTool(handle.scan),
+		checkTool(handle.scan, sourceId),
 		frameTool(handle.scan),
 		...(source ? sourceTools(handle, { segmentCodePoints: () => segmentCodePoints(session) }) : []),
 	];
@@ -161,7 +163,11 @@ function projectStatusTool(session: HarnessSession, handle: TaskHandle): Harness
 		parameters: Type.Object({}, { additionalProperties: false }),
 		rereadable: true,
 		async execute() {
-			return text(await readProjectStatus(session.projectPort, await handle.scan()));
+			return text(
+				await readProjectStatus(session.projectPort, await handle.scan(), {
+					readable: (path) => handle.env.canRead(path),
+				}),
+			);
 		},
 	};
 }
@@ -204,7 +210,6 @@ async function segmentCodePoints(session: HarnessSession): Promise<number | unde
 function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<typeof DelegateSchema> {
 	const execute = async (actionId: string, params: Static<typeof DelegateSchema>) => {
 		const candidate = await session.scan();
-		const frame = designFrame(candidate, { seeds: [] });
 		if (params.profile === "writer" && params.storyBeatId === undefined)
 			throw new ToolRejection("invalid_delegation", "委派 writer 必须指定 storyBeatId，否则拿不到 Write Context");
 		if (
@@ -229,7 +234,8 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 			);
 		let context: ReturnType<typeof compileWriteContext> | undefined;
 		try {
-			context = params.storyBeatId === undefined ? undefined : compileWriteContext(candidate, params.storyBeatId);
+			context =
+				params.profile === "writer" ? compileWriteContext(candidate, params.storyBeatId as string) : undefined;
 		} catch (error) {
 			requireDomain(error);
 		}
@@ -237,11 +243,12 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 		// 整份笔记塞进交付报告让父 Agent 抄进文件，正是「结果先保存、再以引用交还」要避免的转录。
 		// source-extractor 的产物是 outline/ 与 world/：10-03 两轮按审稿修改的子任务把核对过程写成 29 份笔记，
 		// 混进读原文的记录。
+		const readerNote = `source/${params.sourceId}/notes/reader-${sha256Hex(actionId).slice(0, 16)}.md`;
 		const writable =
 			params.profile === "writer"
 				? (path: string) => path === context?.targetPath
 				: params.profile === "source-reader"
-					? (path: string) => path.startsWith(`source/${params.sourceId}/notes/`)
+					? (path: string) => path === readerNote
 					: params.profile === "source-extractor"
 						? range !== undefined
 							? segmentWritable(params.sourceId as string, range)
@@ -256,6 +263,8 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 		let source: string | undefined;
 		try {
 			source = sourceRole ? sourceBrief(candidate, params.sourceId as string) : undefined;
+			if (params.profile === "source-reader")
+				source += `\n本任务的笔记只写 ${readerNote}，可以多次更新；其他笔记只读。`;
 			// 分段时把这段的范围写进输入；补全（已经整合过、有 index）还要带整份抽取，它要带着后文回头读这段原文
 			if (range !== undefined && params.span !== undefined) {
 				const [start, end] = params.span;
@@ -296,13 +305,19 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 							path.startsWith("review/source-"),
 					}
 				: params.profile === "writer"
-					? { readable: (path: string) => path !== "source" && !path.startsWith("source/") }
+					? { readable: (path: string) => path.split("/")[0]?.toLowerCase() !== "source" }
 					: {}),
 			systemPrompt: roleSystemPrompt ?? withConstitution(SUBAGENT_PROMPT),
-			prompt: `任务：${params.goal}\n${context?.text ?? (sourceRole ? source : frame.text)}`,
+			prompt: `任务：${params.goal}\n${context?.text ?? (sourceRole ? source : designFrame(candidate, { seeds: [] }).text)}`,
 			maxTurns: Number.MAX_SAFE_INTEGER,
 			tools: (handle) => [
-				...subagentTools(session, handle, policy, params.profile !== "writer"),
+				...subagentTools(
+					session,
+					handle,
+					policy,
+					params.profile !== "writer",
+					sourceRole ? params.sourceId : undefined,
+				),
 				submitTool({
 					name: "submit_task",
 					description: "交付候选和可回读的任务报告",
@@ -326,9 +341,16 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 		parameters: DelegateSchema,
 		// 并行只给写入不重叠的：读原文各写各的笔记；分段抽取与补全各写自己号段的 Beat 与笔记。writer 不并行——
 		// 后一节的 Write Context 要带前一节刚写好的正文；整合、统一修与 main 会大面积改同一棵目录。
-		parallel: (params) =>
-			params.profile === "source-reader" ||
-			(params.profile === "source-extractor" && params.beatRange !== undefined),
+		parallel: (params) => {
+			if (params.profile === "source-reader") return []; // 笔记路径按原委派动作 id 隔离，续做仍是同一份。
+			if (params.profile !== "source-extractor" || params.beatRange === undefined) return false;
+			const { from, to } = params.beatRange;
+			if (from > to) return false;
+			return Array.from(
+				{ length: to - from + 1 },
+				(_, index) => `source/${params.sourceId}/beat-${beatNumber(from + index)}`,
+			);
+		},
 		execute: (id, params) => execute(id, params),
 		interrupted: async (id) => childProgress(session, id),
 	};

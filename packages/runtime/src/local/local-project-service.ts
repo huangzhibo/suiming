@@ -51,10 +51,16 @@ import { scaffoldOpenStoryDirectory } from "./starter-project.js";
 
 /** 并行 `suim` 调用重叠在 open / commit 临界区时的最长等待；超过就是真的有人长期持锁。 */
 const PROJECT_LOCK_WAIT_MS = 5_000;
+/**
+ * 执行对象回收的节奏。一次回收要把所有还被引用的对象读一遍（三国作品约 9,700 个），每个 turn 后都跑划不来；
+ * 一天一次够把增长压住。宽限一小时是给「在 turn 外写对象」留的余地，现在没有这样的写入。
+ */
+const EXECUTION_OBJECT_COLLECTION_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const EXECUTION_OBJECT_COLLECTION_GRACE_MS = 60 * 60 * 1000;
 
 import { sha256Buffer } from "@suiming/story";
 import { GitCanonStore } from "../artifact/git-canon-store.js";
-import type { LocalExecutionObject, LocalRemoteBinding } from "./sqlite-local-store.js";
+import type { ExecutionObjectCollection, LocalExecutionObject, LocalRemoteBinding } from "./sqlite-local-store.js";
 import { type LocalProjectRecord, SqliteLocalStore, type SqliteLocalStoreOptions } from "./sqlite-local-store.js";
 
 /** 作品在本地的当前样子：登记信息来自 SQLite，`headRevisionId` 只来自作品仓的 canon ref。 */
@@ -549,6 +555,22 @@ export class LocalProjectService {
 	async readExecutionObject(id: string): Promise<LocalExecutionObject> {
 		this.#requireOpen();
 		return this.#store.readExecutionObject(id);
+	}
+
+	/**
+	 * 到点了就回收执行对象：距上次完整回收满一天才跑，只动一小时以前写的。`LocalSessionController` 在一次 drive 的
+	 * turn 都收口之后调；有 turn 在跑时回收自己会停下（见 `SqliteLocalStore.collectExecutionObjects`）。
+	 * 没到点返回 undefined。`now` 给测试拨钟用。
+	 */
+	async collectExecutionObjects(options: { now?: Date } = {}): Promise<ExecutionObjectCollection | undefined> {
+		this.#requireOpen();
+		const now = options.now ?? new Date();
+		const last = this.#store.executionObjectsCollectedAt();
+		if (last !== undefined && now.getTime() - Date.parse(last) < EXECUTION_OBJECT_COLLECTION_INTERVAL_MS)
+			return undefined;
+		return this.#store.collectExecutionObjects({
+			before: new Date(now.getTime() - EXECUTION_OBJECT_COLLECTION_GRACE_MS),
+		});
 	}
 
 	/**

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { constants, type Dirent } from "node:fs";
-import { mkdir, open, readdir, rename, unlink } from "node:fs/promises";
+import { mkdir, open, readdir, realpath, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { sha256Buffer } from "@suiming/story";
 import { confinedPath } from "../files/confined-path.js";
@@ -17,6 +17,9 @@ const PRIVATE_ROOTS = new Set([".git", ".suiming"]);
  */
 export const HOST_ADAPTER_ROOTS: ReadonlySet<string> = new Set([".agents", ".claude", ".codex", ".grok"]);
 export type ConfinedEnvPolicy = "read" | "write";
+
+/** 同一进程内的 Agent、子任务与编辑器共用写入临界区；外部程序仍靠落盘前的 hash 尽力发现冲突。 */
+const pendingWrites = new Map<string, Promise<void>>();
 
 export interface ConfinedEnvOptions {
 	rootPath: string;
@@ -59,6 +62,12 @@ export class ConfinedExecutionEnv {
 		this.#options = options;
 	}
 
+	/** codec 给出的规范逻辑路径；领域查询与文件工具共用角色读范围。 */
+	canRead(logicalPath: string): boolean {
+		const root = logicalPath.split("/")[0] ?? "";
+		return this.#hiddenRoot(root) === undefined && (this.#options.readable?.(logicalPath) ?? true);
+	}
+
 	/** 这个环境里看不见的根。macOS 默认不分大小写，`.Claude/` 打开的就是 `.claude/`，所以按小写比。 */
 	#hiddenRoot(root: string): "private" | "host-adapter" | undefined {
 		const name = root.toLowerCase();
@@ -93,7 +102,7 @@ export class ConfinedExecutionEnv {
 				"permission_denied",
 				`${root}/ 是 Codex / Claude Code / Grok 的接入文件，不是作品，不能读写`,
 			);
-		if (logical && this.#options.readable && !this.#options.readable(logical))
+		if (logical && !this.canRead(logical))
 			throw new ToolRejection("permission_denied", `This task may not read ${logical}`);
 		if (write) {
 			if (
@@ -178,6 +187,26 @@ export class ConfinedExecutionEnv {
 
 	/** 落盘前一刻核对 before：准备写入之后有人改过同一个文件就报写冲突，已经是 after 的当作写过。 */
 	async applyMutation(mutation: FileMutation, signal?: AbortSignal): Promise<void> {
+		const { absolute } = await this.#confine(mutation.path, true);
+		// 默认 macOS / Windows 文件系统不分大小写；保守地把不同大小写的同一路径串起来。
+		const canonical = resolve(await realpath(this.rootPath), relative(this.rootPath, absolute));
+		const key = process.platform === "linux" ? canonical : canonical.toLowerCase();
+		const previous = pendingWrites.get(key);
+		let release!: () => void;
+		const pending = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		pendingWrites.set(key, pending);
+		await previous;
+		try {
+			await this.#applyMutation(mutation, signal);
+		} finally {
+			release();
+			if (pendingWrites.get(key) === pending) pendingWrites.delete(key);
+		}
+	}
+
+	async #applyMutation(mutation: FileMutation, signal?: AbortSignal): Promise<void> {
 		signal?.throwIfAborted();
 		const { absolute } = await this.#confine(mutation.path, true);
 		const { bytes } = mutation;

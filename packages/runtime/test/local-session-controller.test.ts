@@ -11,6 +11,7 @@ import {
 	LocalSessionController,
 	ModelGateway,
 	materializeOpenStoryDirectorySnapshot,
+	SqliteLocalStore,
 } from "../src/index.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
@@ -145,6 +146,95 @@ test("一句话开一个 turn；同一作品同时只跑一个；interrupt 回 i
 		unsubscribe();
 	} finally {
 		project?.close();
+		await rm(checkoutPath, { recursive: true, force: true });
+	}
+});
+
+test("一次对话收口后到点回收执行对象：删掉的对话留下的对象被收走，留着的对话照常续；一天之内不再跑", async () => {
+	const checkoutPath = await fixture();
+	let project: LocalProjectService | undefined;
+	try {
+		project = await LocalProjectService.init({ checkoutPath, projectId: "project-gc" });
+		const provider = fauxProvider({
+			provider: "suiming-local-controller-gc",
+			models: [{ id: "agent-model" }, { id: "reviewer-model" }],
+		});
+		provider.setResponses([
+			fauxAssistantMessage(fauxToolCall("read", { path: "intent/计谋的代价.md" })),
+			fauxAssistantMessage("读完了"),
+			fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+			fauxAssistantMessage("这个对话之后会被删掉"),
+			fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+			fauxAssistantMessage("接着上次的读完了"),
+		]);
+		const controller = new LocalSessionController({ project, models: gateway(provider) });
+		const kept = await controller.send({ commandId: "kept", text: "读一下意图" });
+		await controller.completion(kept.sessionId);
+		const paths = project.paths;
+		const collectedAt = () => {
+			const store = new SqliteLocalStore({ databasePath: paths.databasePath, objectRootPath: paths.objectRootPath });
+			try {
+				return store.executionObjectsCollectedAt();
+			} finally {
+				store.close();
+			}
+		};
+		const firstCollection = collectedAt();
+		assert.ok(firstCollection, "turn 收口后回收跑过一次");
+
+		const dropped = await controller.send({ commandId: "dropped", text: "读一下黄盖" });
+		await controller.completion(dropped.sessionId);
+		assert.equal(collectedAt(), firstCollection, "一天之内不再跑");
+		controller.harness().deleteSession(dropped.sessionId);
+
+		const later = await project.collectExecutionObjects({ now: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) });
+		assert.equal(later?.status, "collected");
+		assert.deepEqual(later?.missing, []);
+		assert.ok((later?.removedObjects ?? 0) > 0, "删掉的对话的 checkpoint 被收走");
+
+		await controller.send({ commandId: "kept-2", text: "再读一下黄盖", sessionId: kept.sessionId });
+		await controller.completion(kept.sessionId);
+		const session = project.loadExecutionEntities().sessions.find((item) => item.id === kept.sessionId);
+		assert.equal(session?.status, "idle");
+		assert.equal(session?.lastFailure, undefined, "回收之后留着的对话照常从 checkpoint 续");
+		assert.equal(session?.turn, 2);
+	} finally {
+		project?.close();
+		await rm(checkoutPath, { recursive: true, force: true });
+	}
+});
+
+test("后台回收发现缺失或失败会输出诊断，不把完成的 turn 改成失败", async (t) => {
+	const checkoutPath = await fixture();
+	const project = await LocalProjectService.init({ checkoutPath, projectId: "project-gc-diagnostic" });
+	try {
+		const warnings: string[] = [];
+		t.mock.method(process, "emitWarning", (warning: string | Error) => warnings.push(String(warning)));
+		let run = 0;
+		t.mock.method(project, "collectExecutionObjects", async () => {
+			if (run++ > 0) throw new Error("read failed");
+			return { status: "incomplete", removedObjects: 0, removedFiles: 0, missing: ["eo_missing"] };
+		});
+		const provider = fauxProvider({
+			provider: "maintenance-diagnostic",
+			models: [{ id: "agent-model" }, { id: "reviewer-model" }],
+		});
+		provider.setResponses([fauxAssistantMessage("完成一"), fauxAssistantMessage("完成二")]);
+		const controller = new LocalSessionController({ project, models: gateway(provider) });
+		for (const commandId of ["first", "second"]) {
+			const sent = await controller.send({ commandId, text: "讨论" });
+			await controller.completion(sent.sessionId);
+		}
+		assert.equal(warnings.length, 2);
+		assert.match(warnings[0] ?? "", /eo_missing/u);
+		assert.match(warnings[1] ?? "", /read failed/u);
+		assert.ok(
+			project
+				.loadExecutionEntities()
+				.sessions.every((session) => session.status === "idle" && session.lastFailure === undefined),
+		);
+	} finally {
+		project.close();
 		await rm(checkoutPath, { recursive: true, force: true });
 	}
 });

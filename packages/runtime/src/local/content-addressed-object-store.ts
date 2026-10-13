@@ -6,9 +6,11 @@ import { ArtifactError } from "../artifact/errors.js";
 
 const HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
-export interface ObjectCollectionResult {
-	kept: string[];
-	removed: string[];
+/** 对象目录里的一个文件：内容寻址的对象（有 hash），或写到一半留下的临时文件。 */
+export interface StoredObjectFile {
+	path: string;
+	hash?: string;
+	modifiedAt: Date;
 }
 
 function requireHash(hash: string): string {
@@ -71,19 +73,17 @@ export class ContentAddressedObjectStore {
 		return bytes;
 	}
 
-	async verify(hash: string): Promise<void> {
-		await this.read(hash);
-	}
-
-	async collect(referencedHashes: ReadonlySet<string>): Promise<ObjectCollectionResult> {
-		for (const hash of referencedHashes) requireHash(hash);
-		const kept: string[] = [];
-		const removed: string[] = [];
+	/**
+	 * 列出目录里的对象文件与写到一半的临时文件。删不删由持有引用的一方决定（`SqliteLocalStore.collectExecutionObjects`）：
+	 * 只看目录判断不了一个文件是不是刚写进来、正要登记。
+	 */
+	async files(): Promise<StoredObjectFile[]> {
+		const files: StoredObjectFile[] = [];
 		let shards: string[];
 		try {
 			shards = await readdir(this.rootPath);
 		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code === "ENOENT") return { kept, removed };
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") return files;
 			throw error;
 		}
 		for (const shard of shards.sort()) {
@@ -92,16 +92,17 @@ export class ContentAddressedObjectStore {
 			if (!(await stat(shardPath)).isDirectory()) continue;
 			for (const name of (await readdir(shardPath)).sort()) {
 				const hash = `${shard}${name}`;
-				if (!HASH_PATTERN.test(hash)) continue;
-				if (referencedHashes.has(hash)) {
-					await this.verify(hash);
-					kept.push(hash);
-				} else {
-					await rm(this.pathFor(hash));
-					removed.push(hash);
-				}
+				const temporary = /^\.object-.+\.tmp$/u.test(name);
+				if (!temporary && !HASH_PATTERN.test(hash)) continue;
+				const path = join(shardPath, name);
+				const modifiedAt = await stat(path).then(
+					(info) => info.mtime,
+					() => undefined,
+				);
+				if (modifiedAt === undefined) continue;
+				files.push({ path, ...(temporary ? {} : { hash }), modifiedAt });
 			}
 		}
-		return { kept, removed };
+		return files;
 	}
 }

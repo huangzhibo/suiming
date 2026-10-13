@@ -822,27 +822,27 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		delete state.overflowRetried;
 		delete state.transientRetries;
 		const actions = state.actions.filter((action) => action.modelCallId === call.id);
-		// 相邻的可并行动作先一起推进到 result_ready，下面的循环再按派出顺序交付。一个出了基础设施故障，
-		// 等同组的都停下再抛第一个——作者打断时整组共用同一个 signal，一起停。
-		for (let index = 0; index < actions.length; ) {
+		// 按调用顺序推进；只有当前位置开始、输出不重叠的相邻动作可一起执行，不能越过前面的串行动作。
+		for (let index = 0; index < actions.length; index += 1) {
+			const action = actions[index] as ActionRecord;
 			const group: ActionRecord[] = [];
-			while (index < actions.length) {
-				const action = actions[index] as ActionRecord;
-				const tool = options.tools.find((item) => item.name === action.call.name);
-				const pending = action.state === "planned" || action.state === "effect_pending";
-				if (!pending || !tool?.parallel || !Value.Check(tool.parameters, action.call.arguments)) break;
-				if (!(await tool.parallel(action.call.arguments))) break;
-				group.push(action);
-				index += 1;
+			const outputs = new Set<string>();
+			for (let next = index; next < actions.length; next += 1) {
+				const candidate = actions[next] as ActionRecord;
+				const tool = options.tools.find((item) => item.name === candidate.call.name);
+				const pending = candidate.state === "planned" || candidate.state === "effect_pending";
+				if (!pending || !tool?.parallel || !Value.Check(tool.parameters, candidate.call.arguments)) break;
+				const claimed = await tool.parallel(candidate.call.arguments);
+				if (claimed === false || claimed.some((output) => outputs.has(output))) break;
+				for (const output of claimed) outputs.add(output);
+				group.push(candidate);
 			}
-			if (group.length === 0) index += 1;
-			if (group.length < 2) continue;
-			check();
-			const settled = await Promise.allSettled(group.map((action) => settle(action, call)));
-			const failed = settled.find((outcome) => outcome.status === "rejected");
-			if (failed) throw failed.reason;
-		}
-		for (const action of actions) {
+			if (group.length > 1) {
+				check();
+				const settled = await Promise.allSettled(group.map((item) => settle(item, call)));
+				const failed = settled.find((outcome) => outcome.status === "rejected");
+				if (failed) throw failed.reason;
+			}
 			check();
 			if (action.state === "delivered") {
 				if (action.result?.terminate) {
