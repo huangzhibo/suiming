@@ -354,7 +354,8 @@ test("长篇工作面：故事轴适应全书，人物经历直接可读，状�
 		await page.getByRole("radio", { name: "错误 0", exact: true }).click();
 		await page.getByText("没有符合筛选条件的诊断。", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "清除筛选", exact: true }).click();
-		await page.getByText("显示 437 / 437 条", { exact: true }).waitFor();
+		await page.getByRole("radio", { name: "全部 437", exact: true }).waitFor();
+		assert.equal(await page.getByText("显示 437 / 437 条", { exact: true }).count(), 0);
 
 		assert.deepEqual(errors, []);
 	} finally {

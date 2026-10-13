@@ -297,7 +297,11 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	// 外壳只在作品读到之后才画出各窗格，这里只是让类型收窄。
 	if (!shown || !book) return null;
 	const data = shown;
-	const report = kind === "issue" ? reviews.find((item) => item.id === pageTarget(page)) : undefined;
+	const reviewFile = kind === "artifact" && file?.kind === "review" && !file.dirty && !changed;
+	const loadingReview = reviewFile && reviewsLoading;
+	const report = reviews.find((item) =>
+		kind === "issue" ? item.id === pageTarget(page) : reviewFile && item.path === rawPath,
+	);
 	const textCount = book.order.filter((id) => book.text(id)).length;
 	const dirtyCount = data.files.filter((item) => item.dirty).length;
 	const split = (orientation: "horizontal" | "vertical", paired = false) => {
@@ -556,7 +560,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			)}
 			{kind !== "diff" && !((kind === "artifact" || kind === "file") && view.edit !== "read" && editable) && (
 				<div
-					className={`relative min-h-0 flex-1 ${kind === "artifact" ? "overflow-auto [scrollbar-gutter:stable]" : "flex flex-col overflow-hidden"}`}
+					className={`relative min-h-0 flex-1 ${kind === "artifact" && !report && !loadingReview ? "overflow-auto [scrollbar-gutter:stable]" : "flex flex-col overflow-hidden"}`}
 					ref={bodyRef}
 					data-scroll-key={`body:${view.beatView}`}
 					key={restoreKey}
@@ -628,7 +632,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							)}
 						</>
 					)}
-					{kind === "artifact" && file && !view.resolveContent && (
+					{kind === "artifact" && file && !report && !loadingReview && !view.resolveContent && (
 						<ArtifactPage
 							book={book}
 							reviews={reviews}
@@ -720,7 +724,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							onRecheck={() => setNotice("")}
 						/>
 					)}
-					{kind === "issue" && report && (
+					{report && (
 						<IssuePage
 							key={`${tab?.id}:${report.id}`}
 							scrolls={view.scrolls}
@@ -740,7 +744,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							}}
 						/>
 					)}
-					{kind === "issue" && !report && (
+					{((kind === "issue" && !report) || loadingReview) && (
 						<div className="px-8 py-20 text-center text-muted-foreground">
 							<h2 className="mb-2 text-base font-medium">
 								{reviewsLoading ? "正在读取审稿报告…" : "找不到这份审稿报告"}

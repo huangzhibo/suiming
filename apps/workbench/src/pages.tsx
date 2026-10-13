@@ -157,6 +157,7 @@ export interface ArtifactPageProps {
 /** 正文页只展示阅读内容；设计与对象页补充属性、轨迹和邻域图。 */
 export function ArtifactPage(props: ArtifactPageProps) {
 	const { book, reviews, file, content, text, view, selected, open } = props;
+	const compactObject = file.kind === "place" || file.kind === "resource";
 	const isBeat = file.kind === "story-beat";
 	const isText = file.kind === "story-text";
 	const beatId = isBeat || isText ? file.localId : undefined;
@@ -194,11 +195,13 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	);
 	const extraCharacterPaths = [...relatedPaths].filter((path) => !experiencePaths.has(path));
 	const hasRelations = relatedPaths.size > 0;
+	const [placeSelection, setPlaceSelection] = useState<{ path: string; volume: string }>();
+	const placeVolume = placeSelection?.path === file.path ? placeSelection.volume : "";
 	const [expandedKinds, setExpandedKinds] = useState<Set<string>>(new Set());
 	const status: { text: string; color: string }[] = [
 		{
 			text:
-				file.kind === "character" || contractLane
+				file.kind === "character" || contractLane || compactObject
 					? ""
 					: `${codePoints(stripFrontmatter(showText ? textContent : content)).toLocaleString()} 字`,
 			color: "text-muted-foreground",
@@ -225,7 +228,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			</ul>
 		</section>
 	);
-	const showKind = file.kind !== "character" && !contractLane;
+	const showKind = file.kind !== "character" && !contractLane && !compactObject;
 	const hasMetadata = showKind || status.length > 0 || identityRows.length > 0;
 	return (
 		<article
@@ -261,13 +264,21 @@ export function ArtifactPage(props: ArtifactPageProps) {
 			)}
 
 			{!showText && file.kind !== "character" && (
-				<Props key={file.path} plain={isBeat || !!contractLane} rows={rows} open={open} />
+				<Props key={file.path} plain={isBeat || !!contractLane || compactObject} rows={rows} open={open} />
 			)}
 			{!showText && <Body content={content} title={book.title(file)} />}
 			{contractLane && (
 				<ContractTrack model={axis} lane={contractLane} projectId={book.data.projectId} open={open} />
 			)}
-			{file.kind === "place" && <PlaceUsage book={book} model={axis} path={file.path} />}
+			{file.kind === "place" && (
+				<PlaceUsage
+					book={book}
+					model={axis}
+					path={file.path}
+					selectedVolume={placeVolume}
+					onVolume={(volume) => setPlaceSelection({ path: file.path, volume })}
+				/>
+			)}
 			{file.kind === "resource" && <ResourceFlow model={axis} lane={resourceLane} open={open} />}
 			{file.kind === "character" && (
 				<Props plain rows={rows.filter((row) => !identityRows.includes(row))} open={open} />
@@ -324,6 +335,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 						<NeighborhoodView
 							book={book}
 							path={file.path}
+							volumeId={file.kind === "place" ? placeVolume : ""}
 							open={open}
 							expandedKinds={expandedKinds}
 							onExpand={(kind) => setExpandedKinds(new Set([...expandedKinds, kind]))}

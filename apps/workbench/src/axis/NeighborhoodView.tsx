@@ -54,12 +54,14 @@ export function NeighborhoodView({
 	open,
 	expandedKinds,
 	onExpand,
+	volumeId = "",
 }: {
 	book: Book;
 	path: string;
 	open(page: string): void;
 	expandedKinds: Set<string>;
 	onExpand(kind: string): void;
+	volumeId?: string;
 }) {
 	const root = useRef<HTMLDivElement>(null);
 	const [available, setAvailable] = useState(704);
@@ -72,7 +74,22 @@ export function NeighborhoodView({
 		return () => observer.disconnect();
 	}, []);
 	const file = book.byPath.get(path);
-	const { up, down } = neighborhoodFor(book, path);
+	const { up, down: allDown } = neighborhoodFor(book, path);
+	const volume = book.data.volumes.find((item) => item.id === volumeId);
+	const down = volume
+		? allDown
+				.map((group) =>
+					group.kind === "story-beat"
+						? {
+								...group,
+								items: group.items.filter((item) =>
+									volume.beatIds.includes(book.byPath.get(item.path)?.localId ?? ""),
+								),
+							}
+						: group,
+				)
+				.filter((group) => group.items.length > 0)
+		: allDown;
 	const upCount = up.reduce((sum, group) => sum + group.items.length, 0);
 	const downCount = down.reduce((sum, group) => sum + group.items.length, 0);
 	const columns = 1 + Number(upCount > 0) + Number(downCount > 0);

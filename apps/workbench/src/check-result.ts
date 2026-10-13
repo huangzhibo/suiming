@@ -125,3 +125,27 @@ export function checkNotice(outcome: CheckOutcome): { text: string; tone: "ok" |
 		details: true,
 	};
 }
+
+/** 只在本文件所有诊断的提示逐字相同时合并，保留完整原文供搜索和机器使用。 */
+export function sharedDiagnosticHint(items: readonly CheckDiagnostic[]): {
+	items: readonly CheckDiagnostic[];
+	hint?: string;
+} {
+	const marker = "；提示：";
+	const first = items[0]?.detail ?? "";
+	const start = first.indexOf(marker);
+	const hint = start >= 0 ? first.slice(start + marker.length) : "";
+	if (
+		items.length < 2 ||
+		!hint ||
+		!items.every(
+			(item) =>
+				item.detail.indexOf(marker) >= 0 && item.detail.slice(item.detail.indexOf(marker) + marker.length) === hint,
+		)
+	)
+		return { items };
+	return {
+		hint,
+		items: items.map((item) => ({ ...item, detail: item.detail.slice(0, item.detail.indexOf(marker)) })),
+	};
+}

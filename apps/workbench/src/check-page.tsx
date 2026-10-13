@@ -10,6 +10,7 @@ import {
 	diagnosticPosition,
 	groupDiagnostics,
 	runCheck,
+	sharedDiagnosticHint,
 } from "./check-result.js";
 import { type Book, filePage, textPathFor } from "./model.js";
 import { Hint, Segmented, Tag } from "./ui-bits.js";
@@ -57,6 +58,7 @@ function DiagnosticList({
 	open(page: string): void;
 }) {
 	return groupDiagnostics(diagnostics).map((group) => {
+		const presentation = sharedDiagnosticHint(group.items);
 		const file = group.path === undefined ? undefined : book.byPath.get(group.path);
 		const target = group.path === undefined ? undefined : file ? group.path : filePage(group.path);
 		const counts = [group.errors ? `${group.errors} 处错误` : "", group.warnings ? `${group.warnings} 条警告` : ""]
@@ -69,7 +71,7 @@ function DiagnosticList({
 				className="border-t border-hair-2 py-2.5"
 				data-check-path={group.path ?? ""}
 			>
-				<div className="mb-1 flex items-baseline gap-2">
+				<div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
 					{target ? (
 						<Button
 							variant="link"
@@ -84,15 +86,20 @@ function DiagnosticList({
 						<span className="text-[13px] font-semibold">未指明文件</span>
 					)}
 					{file && book.title(file) !== group.path && (
-						<span className="min-w-0 truncate font-mono text-[11.5px] text-muted-foreground">{group.path}</span>
+						<span className="min-w-0 break-all font-mono text-[11.5px] text-muted-foreground">{group.path}</span>
 					)}
 					<span className="ml-auto shrink-0 text-[11.5px] text-muted-foreground">{counts}</span>
 				</div>
 				<ul>
-					{group.items.map((item) => (
+					{presentation.items.map((item) => (
 						<DiagnosticRow key={item.message} item={item} />
 					))}
 				</ul>
+				{presentation.hint && (
+					<p data-check-shared-hint className="mt-1 pl-5 text-xs leading-relaxed text-muted-foreground">
+						这些问题的处理建议：{presentation.hint}
+					</p>
+				)}
 			</section>
 		);
 	});
@@ -247,9 +254,11 @@ export function CheckPage({
 					value={filter.query}
 					onChange={(event) => onFilter({ ...filter, query: event.target.value })}
 				/>
-				<span className="text-xs text-muted-foreground" role="status">
-					显示 {visible.length} / {diagnostics.length} 条
-				</span>
+				{(filter.query || filter.severity !== "all") && (
+					<span className="text-xs text-muted-foreground" role="status">
+						显示 {visible.length} / {diagnostics.length} 条
+					</span>
+				)}
 				{(filter.query || filter.severity !== "all") && (
 					<Button size="xs" variant="ghost" onClick={() => onFilter({ severity: "all", query: "" })}>
 						清除筛选

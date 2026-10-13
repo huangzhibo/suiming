@@ -8,6 +8,7 @@ import {
 	diagnosticPosition,
 	groupDiagnostics,
 	runCheck,
+	sharedDiagnosticHint,
 } from "../src/check-result.js";
 import { CommandError } from "../src/command-error.js";
 import type { WorkspaceData } from "../src/model.js";
@@ -141,4 +142,20 @@ test("检查提示：通过且无诊断不给详情，有警告、未通过或�
 		}),
 		{ text: "作品文件有结构问题，检查没有跑完：共 2 处。", tone: "warn", details: true },
 	);
+});
+
+test("文件内重复提示只展示一次，不改变原诊断、不同提示或筛选语义", () => {
+	const first = warning("a", "甲；提示：检查引用");
+	const input = [first, warning("a", "乙；提示：检查引用")];
+	const grouped = sharedDiagnosticHint(input);
+	assert.equal(grouped.hint, "检查引用");
+	assert.deepEqual(
+		grouped.items.map((item) => item.detail),
+		["甲", "乙"],
+	);
+	assert.equal(input[0]?.detail, "甲；提示：检查引用");
+	for (const items of [[first], [first, warning("a", "乙；提示：另一个建议")], [first, warning("a", "无提示")]]) {
+		assert.equal(sharedDiagnosticHint(items).hint, undefined);
+		assert.deepEqual(sharedDiagnosticHint(items).items, items);
+	}
 });

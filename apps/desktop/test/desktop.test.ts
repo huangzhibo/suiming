@@ -294,6 +294,23 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 			.first()
 			.click();
 		await page.getByRole("heading", { name: "审稿报告 · 6 条问题" }).waitFor();
+		// 搜索/文件入口也应进入同一份核对界面，源文件编辑仍可往返。
+		const reviewPath = await page.evaluate(async () => {
+			const bridge = window.suiming;
+			if (!bridge) throw new Error("Missing bridge");
+			return (await bridge.invoke("workspace.reviews", {}))[0]?.path;
+		});
+		assert.ok(reviewPath);
+		await page.locator("[data-navigation-icons]").getByRole("button", { name: "搜索", exact: true }).click();
+		await page.getByRole("textbox", { name: "搜索作品", exact: true }).fill(reviewPath);
+		await page.locator(`.item-btn[data-page="${reviewPath}"]`).click();
+		await page.getByRole("heading", { name: "审稿报告 · 6 条问题" }).waitFor();
+		assert.equal(await page.locator("article dl").count(), 0);
+		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
+		await page.locator(".cm-content").filter({ hasText: "findings:" }).waitFor();
+		await page.getByRole("button", { name: "切换到阅读视图", exact: true }).click();
+		await page.getByRole("heading", { name: "审稿报告 · 6 条问题" }).waitFor();
+		await page.locator("[data-navigation-icons]").getByRole("button", { name: "材料", exact: true }).click();
 		const findings = page.getByRole("region", { name: "审稿结论与问题" });
 		assert.equal(await page.locator("[data-review-summary]").getAttribute("open"), null);
 		await page.getByRole("radio", { name: "当前稿", exact: true }).waitFor();
@@ -318,6 +335,12 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/review.png" });
 		// 窄窗按单条意见核对，选择与稿件视图在重载后仍然保留。
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
+		await page.waitForFunction(() => window.innerWidth === 960);
+		await page.evaluate(
+			() => new Promise<void>((done) => window.requestAnimationFrame(() => window.requestAnimationFrame(done))),
+		);
+		const expandReviewSide = page.getByRole("button", { name: "展开右栏", exact: true });
+		if (await expandReviewSide.isVisible()) await expandReviewSide.click();
 		const chooser = page.getByRole("combobox", { name: "选择审稿意见", exact: true });
 		await chooser.waitFor();
 		await chooser.click();

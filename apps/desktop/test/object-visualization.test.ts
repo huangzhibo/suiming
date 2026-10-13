@@ -137,7 +137,8 @@ test("稀疏对象：资源开场归属与消耗有依据，空地点和空资�
 		assert.equal(await graph.locator('[data-page^="world/characters/"]').count(), 8, "展开资源不应误开人物组");
 		await visit("world/resources/火船.md");
 		const flow = page.locator("[data-resource-flow]");
-		await flow.getByText("开场归属：由黄盖持有", { exact: true }).waitFor();
+		await page.getByText("火船：由黄盖持有", { exact: true }).waitFor();
+		assert.equal(await page.getByText(/开场归属：/).count(), 0, "开场状态只显示一次");
 		await flow.getByText("已消耗", { exact: true }).waitFor();
 		await flow.locator("[data-page]").press("Enter");
 		await page.getByRole("heading", { name: "beat-0002", exact: true }).waitFor();
