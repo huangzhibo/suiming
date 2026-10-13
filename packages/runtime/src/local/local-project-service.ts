@@ -845,13 +845,17 @@ export class LocalProjectService {
 		// 2026-10-06 之前落盘的 paused 也在这里收敛成 idle（recoverUnfinished）。
 		const unfinished = this.#store
 			.loadExecutionEntities()
-			.sessions.filter((session) => session.status === "running" || (session.status as string) === "paused")
+			.sessions.filter(
+				(session) =>
+					(session.status === "running" || (session.status as string) === "paused") &&
+					(session.lease === undefined || !leaseHolderAlive(session.lease)),
+			)
 			.map((session) => `${session.id}@${session.version}`)
 			.sort();
 		if (unfinished.length === 0) return;
 		const execution = this.createExecutionState();
-		// 只收敛持有进程已经不在的 session：另一个进程正在跑的不是崩溃遗留，任何 `suim` 调用都不能把它打断。
-		execution.recoverUnfinished(`process-restart:${unfinished.join(",")}`, {
+		// 活着的 owner 不进入命令指纹：否则只读打开会保存一份空恢复回执，真正退出后同版本被去重，永远留在 running。
+		execution.recoverUnfinished(`process-restart:dead-owner:${unfinished.join(",")}`, {
 			holderAlive: leaseHolderAlive,
 		});
 	}

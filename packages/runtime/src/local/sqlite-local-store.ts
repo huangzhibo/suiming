@@ -1,6 +1,7 @@
 import { mkdirSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { EventType } from "@suiming/sdk";
 import { canonicalJson, sha256Buffer } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
 import { artifactVersionId, shouldInlineArtifactVersion } from "../artifact/version-storage.js";
@@ -14,7 +15,7 @@ import type {
 	SessionRecord,
 	TaskRecord,
 } from "../execution/types.js";
-import type { SessionEvent } from "../harness/events.js";
+import { openTextMessages, type SessionEvent } from "../harness/events.js";
 import type { ConfirmedStateEvent } from "../harness/state-events.js";
 import { ContentAddressedObjectStore } from "./content-addressed-object-store.js";
 import { leaseHolderAlive } from "./project-lock.js";
@@ -376,6 +377,37 @@ export class SqliteLocalStore {
 				)
 					throw new ArtifactError("session_event_conflict", event.id);
 				continue;
+			}
+			// 强杀、停止或流错误可能没有消息结束事件。与执行状态的收尾在同一事务补齐，
+			// 否则官方 AG-UI 客户端拒绝 RUN_FINISHED，桌面会永远重连。只扫描当前 turn。
+			if (
+				event.event.type === EventType.RUN_FINISHED ||
+				event.event.type === EventType.SUBAGENT_FINISHED ||
+				event.event.type === EventType.SUBAGENT_ERROR
+			) {
+				const start = this.#database
+					.prepare(
+						"SELECT COALESCE(MAX(sequence), 1) AS sequence FROM session_events WHERE session_id = ? AND json_extract(event_json, '$.event.type') = 'RUN_STARTED'",
+					)
+					.get(event.sessionId) as { sequence: number };
+				for (const message of openTextMessages(
+					this.readSessionEvents(event.sessionId, Number(start.sequence) - 1),
+				)) {
+					if (event.event.type !== EventType.RUN_FINISHED && message.subagentRunId !== event.event.subagentRunId)
+						continue;
+					this.#appendConfirmedEvents([
+						{
+							sessionId: event.sessionId,
+							id: `${message.messageId}:end`,
+							event: {
+								type: EventType.TEXT_MESSAGE_END,
+								messageId: message.messageId,
+								...(message.metadata === undefined ? {} : { metadata: message.metadata }),
+								...(message.subagentRunId === undefined ? {} : { subagentRunId: message.subagentRunId }),
+							},
+						},
+					]);
+				}
 			}
 			const last = this.#database
 				.prepare("SELECT COALESCE(MAX(sequence), 0) AS last FROM session_events WHERE session_id = ?")

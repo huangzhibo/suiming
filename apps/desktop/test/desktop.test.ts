@@ -1,4 +1,4 @@
-import type { DesktopBridge } from "@suiming/sdk";
+import { type DesktopBridge, EventType } from "@suiming/sdk";
 
 declare const window: {
 	suiming?: DesktopBridge;
@@ -14,6 +14,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import type { ElectronApplication, Locator, Page } from "playwright";
+import { assertAgUiConformance } from "../../../packages/runtime/test/harness-fixtures.js";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import { assertNoTooltip, collectPageErrors, launchDesktop, openGate } from "./launch.js";
 
@@ -573,6 +574,37 @@ test("主进程 SIGKILL 后重开：没收到回复的请求作废，再发一�
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		// 调用计数会先于请求发送更新；等 faux provider 真正接到请求后再注入进程故障。
 		await requestStarted;
+		// 真模型故障复现：进程退出前已经发布一段正文，没有 TEXT_MESSAGE_END。
+		// faux 在途请求保持不结束，直接向同一持久事件日志注入等价的流式前缀。
+		const active = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
+		const sessionId = active?.sessions[0]?.id;
+		assert.ok(sessionId);
+		const streaming = await LocalProjectService.open(root);
+		try {
+			// 旧实现只读打开活跃作品也落空回执；同版本随后真的崩溃时不能被它去重。
+			const execution = streaming.createExecutionState();
+			const version = execution.session(sessionId).version;
+			execution.recoverUnfinished(`process-restart:${sessionId}@${version}`, { holderAlive: () => true });
+			const last = streaming.readSessionEvents(sessionId).at(-1)?.sequence ?? 0;
+			streaming.appendSessionEvents([
+				{
+					sessionId,
+					id: "partial:start",
+					sequence: last + 1,
+					at: new Date().toISOString(),
+					event: { type: EventType.TEXT_MESSAGE_START, messageId: "partial", role: "assistant" },
+				},
+				{
+					sessionId,
+					id: "partial:text:0",
+					sequence: last + 2,
+					at: new Date().toISOString(),
+					event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: "partial", delta: "分析还没说完" },
+				},
+			]);
+		} finally {
+			streaming.close();
+		}
 		const child = app.process();
 		const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
 		child.kill("SIGKILL");
@@ -585,6 +617,12 @@ test("主进程 SIGKILL 后重开：没收到回复的请求作废，再发一�
 		await page.getByRole("textbox", { name: "输入消息" }).fill("接着分析");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		await page.locator(".message.assistant").filter({ hasText: "恢复后的分析已完成" }).waitFor();
+		await page.reload();
+		await page.locator(".message.assistant").filter({ hasText: "恢复后的分析已完成" }).waitFor();
+		assert.equal(
+			await page.getByText("对话连接暂时中断，正在重新连接；Agent 的进度不会丢。", { exact: true }).count(),
+			0,
+		);
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		const after = await page.evaluate(() => window.suiming?.invoke("session.list", {}));
 		assert.equal(after?.sessions.length, 1);
@@ -599,6 +637,7 @@ test("主进程 SIGKILL 后重开：没收到回复的请求作废，再发一�
 			assert.equal(state.sessions[0]?.status, "idle");
 			assert.ok((state.sessions[0]?.usage?.calls ?? 0) >= 2);
 			assert.equal((await opened.history()).length, 1);
+			await assertAgUiConformance(opened);
 		} finally {
 			opened.close();
 		}
@@ -606,7 +645,14 @@ test("主进程 SIGKILL 后重开：没收到回复的请求作废，再发一�
 	} catch (error) {
 		const page = await app.firstWindow();
 		console.error("recovery UI", await page.locator("body").innerText());
-		console.error("recovery state", await page.evaluate(() => window.suiming?.invoke("workspace.show", {})));
+		console.error("recovery state", await page.evaluate(() => window.suiming?.invoke("session.list", {})));
+		const diagnostic = await LocalProjectService.open(root);
+		try {
+			const id = diagnostic.loadExecutionEntities().sessions[0]?.id;
+			console.error("recovery events", id && diagnostic.readSessionEvents(id).slice(-8));
+		} finally {
+			diagnostic.close();
+		}
 		throw error;
 	} finally {
 		await app.close().catch(() => undefined);

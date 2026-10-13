@@ -14,6 +14,25 @@ import {
 	validateProductEvent,
 } from "@suiming/sdk";
 
+/** 从日志派生仍在流的消息；一次运行或子任务结束后，旧的半截文本只能作为历史保留。 */
+export function openTextMessages(events: readonly SessionEvent[]) {
+	const open = new Map<string, Extract<SessionEventBody, { type: EventType.TEXT_MESSAGE_START }>>();
+	for (const { event } of events) {
+		if (event.type === EventType.TEXT_MESSAGE_START) open.set(event.messageId, event);
+		else if (event.type === EventType.TEXT_MESSAGE_END) open.delete(event.messageId);
+		else if (
+			event.type === EventType.RUN_STARTED ||
+			event.type === EventType.RUN_FINISHED ||
+			event.type === EventType.RUN_ERROR
+		)
+			open.clear();
+		else if (event.type === EventType.SUBAGENT_FINISHED || event.type === EventType.SUBAGENT_ERROR) {
+			for (const [id, message] of open) if (message.subagentRunId === event.subagentRunId) open.delete(id);
+		}
+	}
+	return [...open.values()];
+}
+
 /** 唯一 UI 事件日志；确认后发布，稳定 id 补发去重，订阅错误与持久错误分开处理。 */
 export class SessionEventStream {
 	readonly sessionId: string;

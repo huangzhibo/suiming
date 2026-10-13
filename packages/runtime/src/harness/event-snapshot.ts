@@ -1,5 +1,6 @@
 import type { AGUIMessage as Message } from "@suiming/sdk";
 import { EventType, type SessionEvent, type SessionEventBody } from "@suiming/sdk";
+import { openTextMessages } from "./events.js";
 /**
  * 查询持久事件的一次读取结果，不存第二份聊天状态，不产生执行命令。快照包在最近一次运行里（它的 RUN_STARTED 打头，
  * 结束了就以它的 RUN_FINISHED 收尾），符合 AG-UI 的运行生命周期；还没跑过的对话没有消息，返回空。运行还没结束时，
@@ -7,7 +8,7 @@ import { EventType, type SessionEvent, type SessionEventBody } from "@suiming/sd
  */
 export function productEventSnapshot(events: readonly SessionEvent[]): SessionEventBody[] {
 	const messages = new Map<string, Message>();
-	const open = new Set<string>();
+	const open = new Set(openTextMessages(events).map((event) => event.messageId));
 	const views = new Map<string, SessionEventBody>();
 	const lifecycle: SessionEventBody[] = [];
 	const subagents = new Map<string, SessionEventBody>();
@@ -20,12 +21,10 @@ export function productEventSnapshot(events: readonly SessionEvent[]): SessionEv
 				metadata: { ...event.metadata, suiming: { ...event.metadata?.suiming, sequence } },
 				...(event.subagentRunId === undefined ? {} : { subagentRunId: event.subagentRunId }),
 			} as Message);
-			open.add(event.messageId);
 		} else if (event.type === "TEXT_MESSAGE_CONTENT") {
 			const message = messages.get(event.messageId);
 			if (message && typeof message.content === "string") message.content += event.delta;
-		} else if (event.type === "TEXT_MESSAGE_END") open.delete(event.messageId);
-		else if (event.type === "ACTIVITY_SNAPSHOT") {
+		} else if (event.type === "ACTIVITY_SNAPSHOT") {
 			const previous = views.get(`activity:${event.messageId}`);
 			views.set(`activity:${event.messageId}`, {
 				...event,

@@ -1,11 +1,66 @@
 import assert from "node:assert/strict";
+import { hostname } from "node:os";
 import test from "node:test";
+import { type BaseEvent, verifyEvents } from "@ag-ui/client";
 import { EventType, type SessionEventBody } from "@suiming/sdk";
+import { from, lastValueFrom, toArray } from "rxjs";
 import { agentTurn } from "../src/harness/agent.js";
 import { productEventSnapshot } from "../src/harness/event-snapshot.js";
 import { SessionEventStream } from "../src/harness/events.js";
 import { SuimingHarness } from "../src/index.js";
 import { fauxGateway, reply, withSampleProject } from "./harness-fixtures.js";
+
+test("旧日志中的半截输出不在后续 turn 的 attach 快照中重新开流", async () => {
+	const events = new SessionEventStream("session");
+	events.emit({ type: EventType.RUN_STARTED, threadId: "session", runId: "interrupted" });
+	events.message("partial", "分析到这里被中断", false, {});
+	events.emit({ type: EventType.RUN_FINISHED, threadId: "session", runId: "interrupted" });
+	events.emit({ type: EventType.RUN_STARTED, threadId: "session", runId: "continued" });
+	events.message("complete", "后续分析完成", true, {});
+	events.emit({ type: EventType.RUN_FINISHED, threadId: "session", runId: "continued" });
+	const snapshot = productEventSnapshot(events.durableEventsAfter(0));
+	await lastValueFrom(verifyEvents()(from(snapshot as BaseEvent[])).pipe(toArray()));
+	const messages = snapshot.find((event) => event.type === "MESSAGES_SNAPSHOT");
+	assert.deepEqual(
+		messages?.messages.map((message) => message.content),
+		["分析到这里被中断", "后续分析完成"],
+	);
+});
+
+test("子任务异常收尾先关闭自己的半截消息，保留根消息；turn 结束再关闭根消息", async () => {
+	await withSampleProject(async (project) => {
+		const execution = project.createExecutionState();
+		execution.createSession({ commandId: "create", id: "session", projectId: project.projectId });
+		execution.startTurn({
+			commandId: "start",
+			sessionId: "session",
+			lease: { ownerId: "test", pid: process.pid, hostname: hostname(), acquiredAt: new Date().toISOString() },
+		});
+		execution.addTask({ commandId: "child", id: "child", sessionId: "session", kind: "main", key: "child" });
+		const stream = new SessionEventStream("session", undefined, {
+			history: project.readSessionEvents("session"),
+			persist: (event) => project.appendSessionEvents([event]),
+		});
+		stream.message("root-text", "根消息未完", false, {});
+		stream.message("child-text", "子消息未完", false, {}, "assistant", "child");
+		execution.failTask({
+			commandId: "fail",
+			taskId: "child",
+			failure: { code: "test", message: "断流", retryable: true },
+		});
+		const afterChild = project.readSessionEvents("session").map(({ event }) => event);
+		assert.equal(afterChild.filter((event) => event.type === EventType.TEXT_MESSAGE_END).length, 1);
+		const childEnd = afterChild.findIndex((event) => event.type === EventType.TEXT_MESSAGE_END);
+		const closed = afterChild[childEnd];
+		assert.ok(closed?.type === EventType.TEXT_MESSAGE_END);
+		assert.equal(closed.subagentRunId, "child");
+		assert.equal(afterChild[childEnd + 1]?.type, EventType.SUBAGENT_ERROR);
+		execution.endTurn({ commandId: "end", sessionId: "session" });
+		const afterRoot = project.readSessionEvents("session").map(({ event }) => event);
+		assert.equal(afterRoot.at(-2)?.type, EventType.TEXT_MESSAGE_END);
+		assert.equal(afterRoot.at(-1)?.type, EventType.RUN_FINISHED);
+	});
+});
 
 /** AG-UI 的运行生命周期：头一条是 RUN_STARTED，每个事件都落在某次运行之内，RUN_FINISHED 之后只能接下一次 RUN_STARTED。 */
 function assertRunLifecycle(events: readonly SessionEventBody[]) {
