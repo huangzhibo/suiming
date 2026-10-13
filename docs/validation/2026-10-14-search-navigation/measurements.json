@@ -1,0 +1,40 @@
+{
+  "fixture": {
+    "beats": 231,
+    "files": 1117,
+    "changedFiles": 24,
+    "revision": "r4"
+  },
+  "search": {
+    "exactCharacter": "刘备",
+    "matches": 20,
+    "bodyPaths": 231,
+    "lastPath": "text/beat-0441.md",
+    "scrollBefore": 11381,
+    "scrollAfterReload": 11381,
+    "scrollHeight": 12220,
+    "clientHeight": 839
+  },
+  "history": {
+    "revision": "r1",
+    "files": 1117,
+    "selected": "world/characters/刘备.md",
+    "index": 532,
+    "next": "world/characters/刘安.md",
+    "nextIndex": 533,
+    "reloadPreserved": true
+  },
+  "narrow": {
+    "width": 960,
+    "height": 640,
+    "bodyScrollWidth": 960,
+    "nextFileTooltip": {
+      "x": 698,
+      "y": 117,
+      "width": 168.09375,
+      "height": 51
+    },
+    "searchScrollAfterQueryChange": 0
+  },
+  "rendererErrors": []
+}
