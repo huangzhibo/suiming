@@ -104,5 +104,72 @@
         "height": 410
       }
     }
-  ]
+  ],
+  "realRecovery": {
+    "secondBeatCodePoints": 339,
+    "revisionCount": 6,
+    "sameSession": true,
+    "sessionCount": 1,
+    "interruptedTurn": 9,
+    "resumedTurn": 10,
+    "assistantCharsAtKill": 39,
+    "partialClosedBeforeRunFinished": true,
+    "status": "idle",
+    "canonUnchanged": true,
+    "dirtyAfterResume": false,
+    "authorMessages": 10,
+    "uniqueAuthorMessageIds": 10,
+    "uiCompletedAfterReload": true,
+    "reconnectBannerCount": 0,
+    "usage": {
+      "calls": 48,
+      "confirmedCalls": 45,
+      "input": 75418,
+      "output": 6692,
+      "cacheRead": 467456,
+      "cacheWrite": 0,
+      "reasoning": 1066,
+      "totalTokens": 549566,
+      "costUsd": 0.26450160000000006
+    },
+    "check": {
+      "passed": true,
+      "changedFiles": 0,
+      "designPassed": true,
+      "statePassed": true,
+      "storyTextPassed": true,
+      "storyTextFailures": [],
+      "sourceCount": 0,
+      "diagnostics": []
+    },
+    "rendererErrors": 0,
+    "langfuse": {
+      "status": 200,
+      "count": 115,
+      "counts": {
+        "GENERATION": 45,
+        "SPAN": 7,
+        "TOOL": 57,
+        "GUARDRAIL": 4,
+        "AGENT": 2
+      }
+    },
+    "earlierProbes": [
+      {
+        "turns": [
+          5,
+          6
+        ],
+        "limitation": "中断触发误认作者回显，不能证明模型已输出"
+      },
+      {
+        "turns": [
+          7,
+          8
+        ],
+        "assistantCharsAtKill": 34,
+        "finding": "后台完成，界面停在残片且反复重连"
+      }
+    ]
+  }
 }

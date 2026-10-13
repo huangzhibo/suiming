@@ -136,6 +136,8 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 
 **请求结果未知不再停下。**原来请求发出后没收到回复，Session 进 `paused` 让作者决定要不要重发（重发可能重复计费）。现在作废重发：能多花的只是一次请求的钱，作者在用量里看得见（`calls` 与 `confirmedCalls` 之差），不承诺 exactly-once。流本身抛出异常（pi-ai 通常把错误转成回复，抛出很少见）时同样作废，turn 以 `model_call_failed` 回 idle。
 
+**流式消息也要收尾。**执行状态结束与尚未闭合的 `TEXT_MESSAGE_END` 在同一个持久事务确认，消息先结束，再结束子任务或 turn；子任务收尾只关闭自己的消息。强杀留下的半截文字保留在对话历史中，不代表完整回复。旧日志的 attach 快照按运行边界判断哪些消息仍在输出，不把已结束轮次的残片重新开流。只读打开活跃作品不生成空恢复回执，避免 owner 真正退出后被同版本的旧回执挡住。验收同时看执行状态、客户端完整回复及重载后的连接状态，不能只看后台 idle 或无渲染异常。
+
 **`commit` 工具就是 `commitCheckout` 加 commandId receipt。**作者的「提交」按钮、host agent 的 `suim commit`、Agent 的 `commit` 走同一条路：扫 checkout diff → ChangeSet → Checker → 推进 `refs/suiming/canon`。Agent 只多一个回执。提交没有合并步骤；作者与 Agent 改同一文件时，冲突在动作发生的当下解决，见[系统架构](architecture.md) 4.3。
 
 ## 6. 工具面
