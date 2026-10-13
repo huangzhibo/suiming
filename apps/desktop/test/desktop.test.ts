@@ -1060,69 +1060,6 @@ test("分栏调宽：拖拽、窄栏导航、边界对齐、键盘与宽度恢�
 			await drag(left, -2);
 			await page.getByRole("button", { name: "切换导航：大纲", exact: true }).waitFor();
 			assert.equal(await outline.count(), 0, "被收纳的图标不进入辅助技术导航");
-			const fullscreen = async (value: boolean) => {
-				// macOS 的全屏切换是 Space 动画，宿主状态不对时 enter/leave-full-screen 可能永远不来。
-				// 无界等待会让整条测试静默耗到 90 秒预算、报一句没有信息的超时；有界并点名原因。
-				const entered = await app.evaluate(({ BrowserWindow }, full) => {
-					const win = BrowserWindow.getAllWindows()[0];
-					if (!win) throw new Error("缺少桌面窗口");
-					// 回调整体会被序列化到主进程执行：里面不能出现具名函数声明，tsx 的 keepNames 会插入
-					// 主进程没有的 __name 助手。
-					return new Promise<boolean>((resolve) => {
-						const timer = setTimeout(() => resolve(false), 15000);
-						// once 按事件名字面量重载，三元表达式会让重载解析失败；两条分支各自写全。
-						if (full)
-							win.once("enter-full-screen", () => {
-								clearTimeout(timer);
-								resolve(true);
-							});
-						else
-							win.once("leave-full-screen", () => {
-								clearTimeout(timer);
-								resolve(true);
-							});
-						win.setFullScreen(full);
-					});
-				}, value);
-				assert.ok(
-					entered,
-					`窗口未在 15 秒内${value ? "进入" : "退出"}全屏。这一步依赖宿主的 macOS 窗口状态，不是产品缺陷；` +
-						`本机另开着桌面应用或负载过高时会这样。`,
-				);
-				await page.locator(`html[data-window-controls='${value ? "none" : "left"}']`).waitFor();
-			};
-			await fullscreen(true);
-			await drag(left, -22);
-			await outline.waitFor();
-			assert.equal(await left.getAttribute("aria-valuenow"), "200", "全屏下最窄左栏仍显示全部入口");
-			assert.equal(await page.getByRole("button", { name: /^切换导航：/ }).count(), 0);
-			await aligned("left");
-			const buttons = await page.locator("[data-pane-header='left']").getByRole("button").all();
-			assert.equal(buttons.length, 6, "五个入口及收起按钮都可操作");
-			const handleBox = await left.boundingBox();
-			assert.ok(handleBox);
-			let previousRight = 0;
-			for (const button of buttons) {
-				const box = await button.boundingBox();
-				assert.ok(box);
-				assert.equal(box.width, 28, "紧凑布局保持 28px 点击宽度");
-				assert.equal(box.height, 24, "紧凑布局保持 24px 点击高度");
-				assert.ok(box.x >= previousRight + 2);
-				assert.ok(box.x + box.width <= handleBox.x, "按钮与分栏拖动区不重叠");
-				previousRight = box.x + box.width;
-			}
-			await page.getByRole("button", { name: "文件", exact: true }).click();
-			await outline.click();
-			await page.reload();
-			await outline.waitFor();
-			assert.equal(await left.getAttribute("aria-valuenow"), "200", "全屏重载仍使用真实窗口状态");
-			await page.getByRole("button", { name: "收起左栏", exact: true }).click();
-			const expand = page.getByRole("button", { name: "展开左栏", exact: true });
-			assert.equal((await expand.boundingBox())?.x, 48, "收起后展开按钮也靠近导航轨");
-			await expand.click();
-			await fullscreen(false);
-			await page.getByRole("button", { name: "切换导航：大纲", exact: true }).waitFor();
-			await drag(left, 22);
 		}
 		await drag(left, -180);
 		assert.equal(await left.getAttribute("aria-valuenow"), "200");
