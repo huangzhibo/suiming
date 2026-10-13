@@ -51,6 +51,8 @@ Checker 对它们只查形状：`review/**` 与 `source/<id>/notes/**` 的 front
 
 凡是提交过的正文都有 `writtenAt`；head 里还没有、只在候选里的正文标 `uncommitted`（已提交过的正文在候选里再改，仍按已提交的那一版算）。
 
+历史或当前 Design 无法按当前格式解析时，正文时效为 `unknown`，界面显示「时效无法确认」。不能把回退的全书闭包当成真实变化，也不能推断设计未变；发布检查仍要求可确认的 `current`。旧版本保留原始内容，不为计算时效改写历史。
+
 计算量：`writtenAt` 走一遍祖先链，逐 commit 取整棵树的 blob id（`fileDigests`，只走 tree 不读内容）再与上一个 commit 比，一次算出全部路径的最后变化点；每个 commit 是 O(文件数)，不是只看变化子树的树 diff。摘要按 revision 缓存（`LocalProjectService.historyReader()`），桌面的正文时效投影按 head 缓存（`LocalWorkspace` 的 `#textProjectionFor`，`workspace.show` 每 100ms 一次也只算一遍）。
 
 谁在用：Agent 查覆盖率用 `source_coverage` 工具，CLI 是 `suim source list` 的 `coverage`，Source 审稿与合并任务的输入（`renderSourceNotes`）读同一份，桌面还没有覆盖率视图；`suim review show` 是读文件加 `reviewCurrency`；`suim release status` / `publish` 用 `releaseReadiness`，`publish` 仍生成 `release/**`。桌面每个 Beat 显示「写于哪个版本 · 设计未变 / 设计已变：N 个文件」，只给个数，`changed` 的清单还没在界面上列出；审稿页与故事轴的审稿泳道读 `review/**` 加 `reviewCurrency`，finding 的段落锚点由 `anchors.ts` 从引文派生。
