@@ -69,8 +69,10 @@ export function Hint({
 }
 
 const overflowTargets = (element: HTMLElement | null) =>
-	element ? [element, ...element.querySelectorAll<HTMLElement>(".truncate")] : [];
-const isClipped = (element: HTMLElement) => element.clientWidth > 0 && element.scrollWidth > element.clientWidth;
+	element ? [element, ...element.querySelectorAll<HTMLElement>(".truncate, [data-overflow-text]")] : [];
+const isClipped = (element: HTMLElement) =>
+	element.clientWidth > 0 &&
+	(element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight);
 
 /** 仅补全被省略的文字；完整名称不重复提示。触发时测量，打开期间随宽度变化关闭。 */
 export function OverflowHint({

@@ -41,6 +41,7 @@ import { verdictLabel, verdictTone } from "./review-verdict.js";
 import {
 	ActionButton,
 	EmptyNote,
+	OverflowHint,
 	reviewCurrencyLabel,
 	reviewLayerLabel,
 	Segmented,
@@ -489,45 +490,66 @@ export function IssuePage({
 					</div>
 				</details>
 			</header>
-			<div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] @min-[640px]/review:grid-cols-[200px_minmax(0,1fr)] @min-[640px]/review:grid-rows-1">
-				<section
-					aria-label="审稿结论与问题"
-					className="min-h-0 border-b border-hair-2 @min-[640px]/review:overflow-auto @min-[640px]/review:border-r @min-[640px]/review:border-b-0"
-					data-scroll-key="review-findings"
-				>
-					<div className="p-2 @min-[640px]/review:hidden">
-						<Select value={String(active)} onValueChange={(value) => value !== null && choose(Number(value))}>
-							<SelectTrigger aria-label="选择审稿意见" className="h-auto min-h-8 w-full">
-								<span className="min-w-0 whitespace-normal text-left">
-									{finding ? `${active + 1} / ${report.findings.length} · ${finding.title}` : "没有审稿意见"}
-								</span>
-							</SelectTrigger>
-							<SelectContent>
-								<SelectGroup>
-									{report.findings.map((item, index) => (
-										<SelectItem key={`${item.title}:${item.paths.join(";")}`} value={String(index)}>
+			<div
+				className={cn(
+					"grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-1",
+					report.findings.length > 1 &&
+						"grid-rows-[auto_minmax(0,1fr)] @min-[640px]/review:grid-cols-[200px_minmax(0,1fr)] @min-[640px]/review:grid-rows-1",
+				)}
+			>
+				{report.findings.length > 1 && (
+					<section
+						aria-label="审稿结论与问题"
+						className="min-h-0 min-w-0 border-b border-hair-2 @min-[640px]/review:overflow-auto @min-[640px]/review:border-r @min-[640px]/review:border-b-0"
+						data-scroll-key="review-findings"
+					>
+						<div className="p-2 @min-[640px]/review:hidden">
+							<Select value={String(active)} onValueChange={(value) => value !== null && choose(Number(value))}>
+								<SelectTrigger aria-label="选择审稿意见" className="h-8 w-full min-w-0">
+									<span className="min-w-0 truncate text-left">
+										{finding
+											? `${active + 1} / ${report.findings.length} · ${finding.title}`
+											: "没有审稿意见"}
+									</span>
+								</SelectTrigger>
+								<SelectContent alignItemWithTrigger={false}>
+									<SelectGroup>
+										{report.findings.map((item, index) => (
+											<OverflowHint
+												key={`${item.title}:${item.paths.join(";")}`}
+												content={item.title}
+												side="right"
+											>
+												<SelectItem value={String(index)} className="[&>div]:min-w-0">
+													<span data-overflow-text className="line-clamp-2 min-w-0 whitespace-normal">
+														{index + 1}. {item.title}
+													</span>
+												</SelectItem>
+											</OverflowHint>
+										))}
+									</SelectGroup>
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="hidden p-2 @min-[640px]/review:block">
+							<p className="px-2 py-1 text-xs text-muted-foreground">审稿意见 · {report.findings.length}</p>
+							{report.findings.map((item, index) => (
+								<OverflowHint key={`${item.title}:${item.paths.join(";")}`} content={item.title} side="right">
+									<Button
+										variant="ghost"
+										className="mb-1 h-auto w-full justify-start whitespace-normal px-2 py-2 text-left text-xs aria-pressed:bg-muted"
+										aria-pressed={active === index}
+										onClick={() => choose(index)}
+									>
+										<span data-overflow-text className="line-clamp-2 min-w-0">
 											{index + 1}. {item.title}
-										</SelectItem>
-									))}
-								</SelectGroup>
-							</SelectContent>
-						</Select>
-					</div>
-					<div className="hidden p-2 @min-[640px]/review:block">
-						<p className="px-2 py-1 text-xs text-muted-foreground">审稿意见 · {report.findings.length}</p>
-						{report.findings.map((item, index) => (
-							<Button
-								key={`${item.title}:${item.paths.join(";")}`}
-								variant="ghost"
-								className="mb-1 h-auto w-full justify-start whitespace-normal px-2 py-2 text-left text-xs aria-pressed:bg-muted"
-								aria-pressed={active === index}
-								onClick={() => choose(index)}
-							>
-								{index + 1}. {item.title}
-							</Button>
-						))}
-					</div>
-				</section>
+										</span>
+									</Button>
+								</OverflowHint>
+							))}
+						</div>
+					</section>
+				)}
 				<div className="flex min-h-0 min-w-0 flex-col">
 					<section
 						aria-label="当前审稿意见"
