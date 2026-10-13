@@ -128,6 +128,7 @@ export interface PageState {
 	reviewPane: "current" | "reviewed";
 	checkFilter: { severity: "all" | "error" | "warning"; query: string };
 	versionFile: string;
+	objectSearch: { query: string; limit: number };
 }
 export interface WorkbenchTab {
 	id: string;
@@ -170,6 +171,7 @@ export function pageState(page = EMPTY_PAGE): PageState {
 		reviewPane: "current",
 		checkFilter: { severity: "all", query: "" },
 		versionFile: "",
+		objectSearch: { query: "", limit: 60 },
 	};
 }
 export function createTab(location = pageState()): WorkbenchTab {
@@ -237,7 +239,9 @@ export function navigate(
 						...tab,
 						location: next,
 						forward: [],
-						back: [...tab.back, tab.location].filter((location) => location.page !== EMPTY_PAGE).slice(-50),
+						back: [...tab.back, tab.location]
+							.filter((location) => location.page !== EMPTY_PAGE || location.objectSearch.query.trim())
+							.slice(-50),
 					},
 		),
 	};

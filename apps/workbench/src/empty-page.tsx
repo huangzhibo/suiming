@@ -1,25 +1,31 @@
 import { BookOpen, File } from "lucide-react";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { documentTarget } from "./document-navigation.js";
 import { type Book, filePage, KIND_LABEL, pageKind, pageTarget } from "./model.js";
 import { OverflowHint } from "./ui-bits.js";
-import type { OpenPage } from "./view-state.js";
+import type { OpenPage, PageState } from "./view-state.js";
 
 export function EmptyPage({
 	book,
 	files,
+	filesLoading,
 	recent,
+	searchState,
+	onSearch,
 	open,
 }: {
 	book: Book;
 	files: string[];
+	filesLoading: boolean;
 	recent: string[];
+	searchState: PageState["objectSearch"];
+	onSearch(value: PageState["objectSearch"]): void;
 	open: OpenPage;
 }) {
-	const [query, setQuery] = useState("");
+	const { query, limit } = searchState;
 	const search = query.trim().toLowerCase();
-	const targets = search
+	const matches = search
 		? [
 				...book.data.files
 					.filter((file) => file.kind !== "story-text")
@@ -28,9 +34,19 @@ export function EmptyPage({
 					.filter((path) => !book.byPath.has(path) || book.byPath.get(path)?.kind === "story-text")
 					.map(filePage),
 			]
-				.filter((page) => `${book.pageTitle(page)} ${page}`.toLowerCase().includes(search))
-				.slice(0, 60)
+				.map((page) => {
+					const title = book.pageTitle(page).toLowerCase();
+					const path = (pageKind(page) === "file" ? pageTarget(page) : page).toLowerCase();
+					if (title === search || path === search) return { page, rank: 0 };
+					if (title.startsWith(search)) return { page, rank: 1 };
+					if (title.includes(search)) return { page, rank: 2 };
+					return { page, rank: path.includes(search) ? 3 : -1 };
+				})
+				.filter(({ rank }) => rank >= 0)
+				.sort((a, b) => a.rank - b.rank)
+				.map(({ page }) => page)
 		: recent;
+	const targets = search ? matches.slice(0, limit) : matches;
 	return (
 		<div className="mx-auto w-full max-w-[640px] overflow-auto px-8 py-6" data-scroll-key="empty">
 			<h1 className="mb-2 text-xl font-semibold">打开一个工作页面</h1>
@@ -39,9 +55,28 @@ export function EmptyPage({
 				aria-label="搜索对象或文件"
 				placeholder="搜索标题或相对路径…"
 				value={query}
-				onChange={(event) => setQuery(event.target.value)}
+				onChange={(event) => {
+					onSearch({ query: event.target.value, limit: 60 });
+					event.currentTarget.closest('[data-scroll-key="empty"]')?.scrollTo({ top: 0 });
+				}}
+				onKeyDown={(event) => {
+					if (event.key === "Enter" && !event.nativeEvent.isComposing && search && targets[0]) {
+						event.preventDefault();
+						open(targets[0]);
+					}
+				}}
 			/>
-			<p className="mt-6 mb-2 text-xs text-muted-foreground">{search ? "匹配的对象与文件" : "最近访问"}</p>
+			<p className="mt-6 mb-2 text-xs text-muted-foreground" role="status">
+				{search
+					? filesLoading
+						? "正在读取文件…"
+						: !matches.length
+							? "没有匹配项。"
+							: targets.length < matches.length
+								? `已显示 ${targets.length} / ${matches.length} 个匹配`
+								: `${matches.length} 个匹配`
+					: "最近访问"}
+			</p>
 			{targets.map((page) => {
 				const kind = pageKind(page);
 				const path = kind === "file" || kind === "diff" ? pageTarget(page) : page;
@@ -79,9 +114,12 @@ export function EmptyPage({
 					</OverflowHint>
 				);
 			})}
-			{!targets.length && (
-				<p className="mt-4 text-xs text-muted-foreground">{search ? "没有匹配项。" : "还没有访问记录。"}</p>
+			{search && targets.length < matches.length && (
+				<Button variant="outline" size="sm" className="mt-3" onClick={() => onSearch({ query, limit: limit + 60 })}>
+					显示更多结果
+				</Button>
 			)}
+			{!search && !targets.length && <p className="mt-4 text-xs text-muted-foreground">还没有访问记录。</p>}
 		</div>
 	);
 }

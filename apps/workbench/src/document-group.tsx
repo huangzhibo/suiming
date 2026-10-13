@@ -161,7 +161,12 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	// biome-ignore lint/correctness/useExhaustiveDependencies: live / layoutLive 是 useWorkspaceGroup 给的 ref，读的是事件发生那一刻的值，不该让 effect 随它重跑
 	useEffect(() => {
 		if (!mainRef.current || restoredFor.current === restoreKey) return;
-		if (((kind === "artifact" || kind === "file") && primary.isLoading) || (isBeat && secondary.isLoading)) return;
+		if (
+			((kind === "artifact" || kind === "file") && primary.isLoading) ||
+			(isBeat && secondary.isLoading) ||
+			(kind === "empty" && directory.isLoading)
+		)
+			return;
 		const frame = requestAnimationFrame(() => {
 			for (const element of mainRef.current?.querySelectorAll<HTMLElement>("[data-scroll-key]") ?? []) {
 				const position = view.scrolls[element.dataset.scrollKey ?? ""];
@@ -175,7 +180,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			restoredFor.current = restoreKey;
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [restoreKey, kind, primary.isLoading, isBeat, secondary.isLoading, view.scrolls]);
+	}, [restoreKey, kind, primary.isLoading, isBeat, secondary.isLoading, directory.isLoading, view.scrolls]);
 	// 正文选择：原生选择落在段落内即形成带段号的引用。
 	useEffect(() => {
 		const onSelect = () => {
@@ -567,12 +572,15 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				>
 					{kind === "empty" && (
 						<EmptyPage
+							filesLoading={directory.isLoading}
 							book={book}
 							files={
 								directory.data?.entries.filter((entry) => entry.type === "file").map((entry) => entry.path) ??
 								[]
 							}
 							recent={state.recentPages}
+							searchState={view.objectSearch}
+							onSearch={(objectSearch) => patch({ objectSearch })}
 							open={open}
 						/>
 					)}
