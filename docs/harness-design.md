@@ -74,7 +74,7 @@ Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两�
 
 **`interrupt`** 是唯一的停止命令：中止当前模型调用（checkpoint 记 `interrupted`，下次续接时弹掉半截响应）和正在跑的子任务，消息列表原样，回 `idle`；被打断的动作下次续接时补「被打断」的结果（第 5 节）。取消不回滚已提交作品。
 
-**关闭**：作者删除 session。删的是 session 与它的子任务记录、inbox 与事件；checkpoint 与子任务结果是 execution object，不随之删除，执行库目前也不回收它们（`collectObjects` 只清对象目录里无行引用的字节，且没有调用点）；checkout 不动——它不属于任何 session，未提交的改动仍在 `project.diff` 里。
+**关闭**：作者删除 session。删的是 session 与它的子任务记录、inbox 与事件；checkpoint 与子任务结果是 execution object，由后续空闲回收清理；回收沿现存 Session / Task 的引用保留可达对象，不触碰 Canon；checkout 不动——它不属于任何 session，未提交的改动仍在 `project.diff` 里。
 
 **owner 与 lease**：每个 `running` 的 session 有一个进程 owner（`SessionRecord.lease`：pid + hostname + 每次领取的 ownerId）。`LocalProjectService.open` 只收敛持有者已死的 session（同一台机器上 pid 已不在）：回 `idle` 并记一句 `process_restart`，还在跑的子任务标 `interrupted`；停在半途的请求与动作，下一个 turn 从 checkpoint 接着跑时按第 5 节补结果。持有者死没死只看 pid 与 hostname，不加时间过期或心跳：另一个进程正在跑的 session 不是崩溃遗留，任何 `suim` 调用都不能把它打断。所有推进与提交核对 ownerId 与实体版本，陈旧 owner 的写入被拒绝。测试里模拟崩溃遗留，是用 `execution.startTurn` 给一个 `hostname: "elsewhere"` 的 lease。
 
@@ -272,18 +272,20 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 | --- | --- | --- |
 | `writer` | 只写那个 Beat 的正文文件 | Writer 契约 + Write Context；交付前全文完成的那次 `write` 带 `check: true`，跑的是对整个候选的同一判定。没有读原文的工具（`read_source` / `search_source` / `source_coverage` / `story_guide`）：留出评测里原作就是参照答案，Skill 的 Writer 契约也不给它 Source |
 | `reviewer` | 只经 `submit_review` 写审稿 | 走 `review` 工具，不经 `delegate` |
-| `source-reader` | 自己的笔记 `source/<id>/notes/**` | 分段读原作。原先只读，只能把整份笔记塞进报告让父 Agent 抄 |
+| `source-reader` | 本次任务分配的唯一笔记 `source/<id>/notes/reader-<摘要>.md` | 分段读原作，可反复更新分配的笔记；其它笔记只读；续做沿用同一路径 |
 | `source-extractor` | 不带范围：`source/<id>/outline/**` 与 `source/<id>/world/**`；带 `span` 与 `beatRange`：号段内的 Beat 与这段的笔记 `notes/<号段>.md` | 见下文「Source 抽取的分工」 |
 | `main` | 与根相同 | 通用委派 |
 | `researcher` | `reference/**` | 随切片 E 才有，现在 `delegate` 不接受它 |
 
 **子任务带一句给作者看的标题**（2026-10-06）：`delegate` 有可选的 `title`，模型写十来个字说这个子任务做什么（「抽取第 21–40 章」），没给就取 goal 的第一句截到 24 字；审稿按层与范围起（「审正文 · 3 节」）。标题记在 Task 上、随 `session.tasks` 给界面，对话里子任务那一行显示它，不进任何模型请求。原来那一行只有「子任务执行了 47 项操作」，斗破那次 16 个并行的抽取分不清谁负责哪一段；做法对照 Claude Code 的子智能体（一行任务描述加统计，内部步骤收起）。
 
+**读取范围同样随角色走。**文件读取与领域查询的候选扫描共用 `ConfinedExecutionEnv.canRead`：Writer 不读 Source，Source 角色只读所选 Source，搜索、状态与检查不得绕过它。Source 委派只编译 Source 输入，不预先构造 Target Frame；Writer 只构造 Write Context。Source 检查范围由角色显式传入，不能从「候选没有 Target」反推：根候选删空 Target 时仍须报 Target 缺失。根 Agent 仍读取完整候选。
+
 子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。**子任务的角色就是它的 profile**，TaskRecord 的 `kind` 与 SUBAGENT_STARTED 的 `name` 都记它（`writer`、`source-reader`、`source-extractor`、`main` 来自 `delegate`，`reviewer` 来自 `review`，`judge` 来自 `suim rank`），界面按它显示设置页里同一个档位名。2026-10-05 之前另有一维 kind（`subagent` / `review` / `rank.round`），按建它的入口起名，其中 `subagent` 说的是类别本身；角色推得出入口、入口推不出角色，所以只留角色，读旧记录时界面仍认那三个值。
 
 没有预规划：`plan` / `execute_task` 已删（第 2 节）。根 Agent 要分几步做，写在自己的回复里；`delegate` 是同步调用，结果回来再决定下一个。例外是写入不重叠的委派，见下一段。
 
-写入权规则不变：同一候选同一时刻一个写入 owner，根 Agent 等待子 writer 时不写该候选；独立只读任务或隔离输出才能并行。**并行只开给写入不重叠的委派**：同一次回复里的多个 `source-reader`（各写各的笔记），以及带 `beatRange` 的 `source-extractor`（分段抽取与补全，各写自己号段的 Beat 与这段的笔记，号段不重叠写入就不重叠）。真实收益成立：斗破抽取里 3 个 source-reader 一次派出却串行跑了约 30 分钟，host 12 个并行只要 4–9 分钟。工具声明 `parallel(params)`，`runTaskLoop` 把同一次回复里相邻的可并行动作一起推进到 result_ready，规则如下：
+写入权规则不变：同一候选同一时刻一个写入 owner，根 Agent 等待子 writer 时不写该候选；独立只读任务或隔离输出才能并行。**并行只开给写入不重叠的委派**：同一次回复里的多个 `source-reader`（各写各的笔记），以及带 `beatRange` 的 `source-extractor`（分段抽取与补全，各写自己号段的 Beat 与这段的笔记，号段不重叠写入就不重叠）。真实收益成立：斗破抽取里 3 个 source-reader 一次派出却串行跑了约 30 分钟，host 12 个并行只要 4–9 分钟。工具用 `parallel(params)` 声明是否可并行及独占输出键。`runTaskLoop` 按原调用顺序推进，只把当前位置开始、相邻且输出不重叠的动作一起推进到 result_ready；先前的串行动作必须先完成，重叠号段自动串行，规则如下：
 
 | 问题 | 做法 |
 | --- | --- |
@@ -291,7 +293,7 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 | 作者打断 | 整组共用 turn 的 signal，一起停 |
 | 基础设施故障 | 等同组停下，再抛第一个 |
 | 用量 | 各记在自己的 Task 上；合计进本轮的用量检查点，到线时同组各在自己的下一次请求之前停 |
-| 写冲突 | 同一文件被两个动作写时，第二次落盘前核对写前 hash，报 `file_write_conflict` |
+| 写冲突 | 同一进程内按规范文件路径串行完成 hash 核对与落盘，拒绝过期写入；外部编辑器与 host 不参加此锁，hash 只能尽力发现它们的竞态，不承诺跨程序原子 CAS |
 | 恢复 | 同组被打断的动作各补「被打断」的结果；子任务用 `resume_task` 续，同一次回复里续的照原委派的判定并行 |
 
 checkpoint 的写入为此排队：快照在调用时同步取，后取的一定后落盘。writer 不并行——后一节的 Write Context 要带前一节刚写好的正文；整合、统一修与 `main` 会大面积改同一棵目录。不新增 graph engine。
@@ -340,7 +342,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 | `session.interrupt`（IPC） | 第 3 节。CLI 没有：每次 `suim` 调用是新进程，停不了别的进程里跑着的 turn，自己跑的那一轮按 Ctrl+C |
 | `session.list` / `session.show`（CLI）/ `session.tasks`（IPC） | 查询；摘要投影只有一份（`sessionSummary`），标题是 inbox 第一条。候选 diff 是 `project.diff`，没有 `session.diff`——候选不属于 session |
 | `session.inbox`（IPC） | 作者消息队列，每条带是否已被取走 |
-| `session.action`（IPC） | 对话里点开一个动作时的完整参数与结果。事件里的 `suiming.action` 只带一句摘要，完整内容在跑它的那个 loop（根 Agent 或子任务）的 checkpoint 里，点开时才读（按 checkpoint 对象缓存最近几份，整读一份几十到两百多毫秒），不在事件里再存一份。依赖 checkpoint 的 `actions` 不被裁剪，与 `resume_task` 同一个前提 |
+| `session.action`（IPC） | 对话里点开一个动作时的完整参数与结果。事件里的 `suiming.action` 只带一句摘要，完整内容在跑它的那个 loop（根 Agent 或子任务）的 checkpoint 里，点开时才读（按 checkpoint 对象缓存最近几份，并跨读取复用不可变编码节点；新 checkpoint 仍需遍历解码，真实长对话的端到端耗时待复测），不在事件里再存一份。依赖 checkpoint 的 `actions` 不被裁剪，与 `resume_task` 同一个前提 |
 | `session.events`（CLI，`--after`）/ `session.attach`（IPC，`afterSequence`） | 从持久游标读事件；attach 只读，不启动执行 |
 | `session.delete`（IPC） | 第 3 节 |
 | `rank`（CLI） | Eval 协议，见下 |
@@ -379,6 +381,10 @@ checkpoint 按下文 [checkpoint 归档](#checkpoint-归档)的片段引用保�
 ### checkpoint 归档
 
 checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固定块引用，恢复点只新增变化的节点；请求的输入只在内存里，不进 checkpoint：恢复时没收到回复的请求从消息列表重新组装（2026-10-06 之前的 checkpoint 存过当前请求的 Context，下一次请求时清掉）。消息、动作结果与历史恢复点可完整回读；不可变消息和输入只复制一次。
+
+读取侧按对象 ID 缓存不可变编码节点，共享在途读取，最近使用优先，最多 10,000 节点且按编码字节计不超过 32 MiB；每次解码仍构造独立对象。turn 开始清掉读写缓存，避免沿用已被回收的节点。
+
+本地控制器在 turn 结束后最多每天回收一次执行对象，保留最近一小时写入。回收先遍历 Session / Task 的 checkpoint 与结果引用，每批删除在事务内复查活跃 turn 与扫描开始时的实体版本集合；期间即使有 turn 开始又结束，版本变化也让本次回收停止并待下次重扫。可达对象丢失时返回 incomplete，不删对象、不登记成功时间；丢失与异常输出进程诊断。Canon、作者记录与命令回执不在此回收范围。
 
 ## 13. 实施切片
 

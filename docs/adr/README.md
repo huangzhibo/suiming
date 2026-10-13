@@ -17,6 +17,7 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0011](0011-desktop-product-and-autonomous-runtime.md) | Amended，已实现 | 桌面是核心产品、原子能力、AG-UI 标准事件加扩展、host-native 仍有效；执行底座由 0012 修订，「一份 Run 完成完整委托」由 2026-09-13 的 Session 模型取代 |
 | [0012](0012-own-suiming-harness.md) | Accepted，已实现 | 自建唯一的 SuimingHarness、只依赖 pi-ai 仍有效；Run / Task / Attempt 与同 Attempt 恢复由 Session / Task 取代 |
 | [0013](0013-cli-init-and-update.md) | Accepted | CLI 用 init 开工作品、update 维护接入；保留作者模型配置，初始化失败撤回补写文件 |
+| [0014](0014-runtime-read-write-and-collection-boundaries.md) | Accepted | 文件与领域查询共用角色读范围；按顺序组成不重叠的并行组；受控写入互斥；GC 复用实体版本验证扫描仍有效 |
 | [0015](0015-desktop-send-rejection.md) | Accepted | 首次发送明确被模型预检拒绝时退回草稿；结果不明与确认重试仍保留原命令 ID |
 | [0016](0016-page-information-hierarchy.md) | Amended；人物折叠由 0018 取代 | 按页面工作目的组织信息：版本核对、人物概览与情节设计保持各自顺序，共享基础控件 |
 | [0017](0017-check-review-state-workflows.md) | Accepted | 检查按诊断筛选，审稿按意见核对，状态查询保留观察边界，设置精简重复说明 |
