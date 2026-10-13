@@ -238,7 +238,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	const hasMetadata = showKind || status.length > 0 || identityRows.length > 0;
 	return (
 		<article
-			className={cn("document-page", characterLane && "pb-0")}
+			className={cn("document-page", characterLane && "pb-0", contractLane && "[--content-width:1260px]")}
 			data-measure={showText ? "reading" : "document"}
 		>
 			<div

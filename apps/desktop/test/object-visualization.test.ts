@@ -45,10 +45,7 @@ test("对象页按用途展示：期待阶段、资源流转、地点情节和�
 				.count(),
 			1,
 		);
-		await contract
-			.getByRole("button", { name: /献刀脱身与陈宫释曹/ })
-			.first()
-			.press("Space");
+		await contract.locator("button[data-page]").filter({ hasText: "献刀脱身与陈宫释曹" }).first().press("Space");
 		await page.getByRole("radio", { name: "设计", exact: true }).click();
 		const graph = page.locator("[data-neighborhood]");
 		await graph.getByText("曹操", { exact: true }).waitFor();

@@ -8,6 +8,7 @@ import { parse, stringify } from "yaml";
 import { collectPageErrors, launchDesktop } from "./launch.js";
 
 declare const innerWidth: number;
+declare const innerHeight: number;
 declare function requestAnimationFrame(callback: () => void): number;
 
 test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶段、空记录和大量异常事件", { timeout: 90000 }, async () => {
@@ -73,7 +74,12 @@ test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶�
 	const capture = async (name: string) => {
 		if (!process.env.SUIMING_UI_CAPTURE) return;
 		await mkdir(process.env.SUIMING_UI_CAPTURE, { recursive: true });
-		await page.screenshot({ path: join(process.env.SUIMING_UI_CAPTURE, name), type: "jpeg", quality: 85 });
+		await page.screenshot({
+			path: join(process.env.SUIMING_UI_CAPTURE, name),
+			type: "jpeg",
+			quality: 85,
+			animations: "disabled",
+		});
 	};
 	try {
 		await page.locator("[data-navigation-icons]").getByRole("button", { name: "搜索", exact: true }).click();
@@ -89,7 +95,14 @@ test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶�
 		const track = page.locator("[data-contract-track]");
 		const events = track.locator("[data-contract-event]");
 		await visit("传国玉玺下落");
-		await track.locator("[data-contract-excerpt]").first().filter({ hasText: "张让" }).waitFor();
+		assert.equal(await track.locator("[data-contract-excerpt]").count(), 0, "原文按需预览，不常驻占位");
+		await events.first().locator("button[data-page]").hover();
+		const preview = page.getByRole("region", { name: /^情节预览：/u });
+		await preview.locator("[data-contract-excerpt]").filter({ hasText: "张让" }).waitFor();
+		await preview.hover();
+		await capture("01-hover-preview.jpg");
+		await page.keyboard.press("Escape");
+		await preview.waitFor({ state: "hidden" });
 		assert.equal(await events.count(), 2);
 		assert.equal(
 			await events.locator("[data-contract-order]:visible").count(),
@@ -128,15 +141,48 @@ test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶�
 		await events.last().locator("button[data-page]").press("Enter");
 		await page.getByRole("heading", { name: "孙坚得玺与辞盟欺袁", exact: true }).waitFor();
 
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1600, 940));
+		await page.waitForFunction(() => innerWidth === 1600);
 		await visit("关羽归刘");
+		await track.locator('[data-layout="horizontal"]').waitFor();
 		assert.equal(await track.locator('[data-phase="advance"]').count(), 4);
+		await events.nth(2).locator("button[data-page]").hover();
+		await preview.waitFor();
+		await preview.locator("[data-contract-excerpt]").filter({ hasText: /./u }).waitFor();
+		await capture("02-six-horizontal-preview.jpg");
+		const withinWindow = async () => {
+			const box = await preview.boundingBox();
+			const size = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+			assert.ok(
+				box &&
+					box.x >= 8 &&
+					box.y >= 8 &&
+					box.x + box.width <= size.width - 8 &&
+					box.y + box.height <= size.height - 8,
+			);
+		};
+		await withinWindow();
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1120, 940));
+		await page.waitForFunction(() => innerWidth === 1120);
+		await track.locator('[data-layout="vertical"]').waitFor();
+		await preview.waitFor({ state: "hidden" });
 		const boxes = await events.all();
 		for (let i = 1; i < boxes.length; i++) {
 			const a = await boxes[i - 1]?.boundingBox();
 			const b = await boxes[i]?.boundingBox();
-			assert.ok(a && b && a.y + a.height <= b.y + 1, "多次推进用连续纵线，不挤入一行");
+			assert.ok(a && b && a.y + a.height <= b.y + 1, "窄窗用连续纵线，不挤入一行");
 		}
-		await capture("02-multiple.jpg");
+		await page.keyboard.press("Tab");
+		await events.nth(2).locator("button[data-page]").focus();
+		await preview.waitFor();
+		await withinWindow();
+		assert.equal(await preview.getAttribute("data-side"), "right", "纵排右侧有空间时，预览不应翻到左侧遮住导航");
+		await capture("02-six-vertical-preview.jpg");
+		await page.keyboard.press("Escape");
+		await preview.waitFor({ state: "hidden" });
+		await events.nth(2).locator("button[data-page]").press("Enter");
+		await page.getByRole("heading", { name: "关羽斩颜良刘备免罪", exact: true }).waitFor();
+
 		await visit("验收等待回应");
 		await page.locator("article").getByText("等待回应", { exact: true }).waitFor();
 		assert.equal(await track.getByText(/回应期限|到期|全书结束前/u).count(), 0);
@@ -161,7 +207,11 @@ test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶�
 		await visit("验收多次推进");
 		assert.equal(await events.count(), 30, "大量记录不能丢弃或藏到折叠入口里");
 		await events.last().scrollIntoViewIfNeeded();
+		await events.last().getByRole("button", { name: /^预览/u }).hover();
+		await preview.waitFor();
+		await withinWindow();
 		await capture("08-dense-end.jpg");
+		await page.keyboard.press("Escape");
 		await events.last().locator("button[data-page]").press("Space");
 		await page.getByRole("heading", { name: ordered[29]?.title ?? "", exact: true }).waitFor();
 
@@ -183,7 +233,11 @@ test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶�
 		);
 		assert.equal(await track.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), true);
 		await capture("10-narrow.jpg");
-		await events.last().locator("button[data-page]").click();
+		await events.last().getByRole("button", { name: /^预览/u }).click();
+		await preview.waitFor();
+		await withinWindow();
+		await capture("11-narrow-preview.jpg");
+		await preview.getByRole("button", { name: "打开情节", exact: true }).click();
 		await page.getByRole("heading", { name: "孙坚得玺与辞盟欺袁", exact: true }).waitFor();
 		assert.deepEqual(errors, []);
 	} finally {
