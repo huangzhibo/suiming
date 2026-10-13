@@ -1,0 +1,108 @@
+{
+  "baseline": "8d61df7",
+  "sample": {
+    "writtenCodePoints": 524,
+    "firstTurn": {
+      "calls": 8,
+      "confirmedCalls": 8,
+      "input": 26538,
+      "output": 1358,
+      "cacheRead": 66432,
+      "cacheWrite": 0,
+      "reasoning": 278,
+      "totalTokens": 94328,
+      "costUsd": 0.07329920000000001
+    },
+    "afterReview": {
+      "calls": 16,
+      "confirmedCalls": 16,
+      "input": 41616,
+      "output": 2719,
+      "cacheRead": 139776,
+      "cacheWrite": 0,
+      "reasoning": 491,
+      "totalTokens": 184111,
+      "costUsd": 0.1243996
+    },
+    "revisionCount": 4,
+    "dirtyAfterReopen": false,
+    "turnsAfterReopen": 2,
+    "statusAfterReopen": "idle",
+    "reviewCurrentAfterEdit": false,
+    "reviewChangedPaths": [
+      "text/beat-0001.md"
+    ]
+  },
+  "largeIPC": {
+    "files": 1117,
+    "beats": 231,
+    "timings": [
+      196,
+      147,
+      143,
+      149,
+      152,
+      141,
+      162,
+      141,
+      141,
+      158
+    ]
+  },
+  "navigationPositions": [
+    {
+      "index": 0,
+      "box": {
+        "x": 1130,
+        "y": 131.0859375,
+        "width": 220,
+        "height": 410
+      }
+    },
+    {
+      "index": 1,
+      "box": {
+        "x": 1130,
+        "y": 131,
+        "width": 220,
+        "height": 410
+      }
+    },
+    {
+      "index": 0,
+      "box": {
+        "x": 1130,
+        "y": 131.0859375,
+        "width": 220,
+        "height": 410
+      }
+    },
+    {
+      "index": 8,
+      "box": {
+        "x": 1130,
+        "y": 131,
+        "width": 220,
+        "height": 410
+      }
+    },
+    {
+      "index": 7,
+      "box": {
+        "x": 1130,
+        "y": 131,
+        "width": 220,
+        "height": 410
+      }
+    },
+    {
+      "index": 8,
+      "box": {
+        "x": 1130,
+        "y": 131,
+        "width": 220,
+        "height": 410
+      }
+    }
+  ]
+}
