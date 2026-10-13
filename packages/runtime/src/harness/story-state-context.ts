@@ -147,24 +147,13 @@ export function compileStoryStateContext(candidate: ArtifactCandidate, task: Sto
 		const visible = anchors.filter((anchor) => anchor.ordinal <= cutoff);
 		if (task.phase === "changes") {
 			for (const anchor of visible.filter((anchor) => anchor.storyBeatId === target.id)) {
-				const action = { open: "开启", advance: "推进", resolve: "兑现" }[anchor.operation];
+				const action = { open: "建立", advance: "推进", resolve: "回应" }[anchor.operation];
 				contracts.push(`- ${contract.id}：${action}（依据：${sourceLink(anchor.path)}）`);
 			}
 		} else {
 			const resolved = visible.find((anchor) => anchor.operation === "resolve");
 			const opened = visible.find((anchor) => anchor.operation === "open");
-			const deadlineSpec = contract.deadline;
-			const deadline =
-				deadlineSpec.kind === "story_beat"
-					? beats.find((beat) => beat.id === deadlineSpec.storyBeatId)?.ordinal
-					: beats.at(-1)?.ordinal;
-			const status = resolved
-				? "已兑现"
-				: !opened
-					? "尚未开启"
-					: deadline !== undefined && cutoff >= deadline
-						? "已到期，未兑现"
-						: "待兑现";
+			const status = resolved ? "已回应" : !opened ? "尚未建立" : "等待回应";
 			const latest = visible.at(-1);
 			contracts.push(`- ${contract.id}：${status}（依据：${sourceLink(latest?.path ?? contract.path)}）`);
 		}

@@ -86,7 +86,7 @@ const untested = (name) => ({ name, pass: true, untested: true });
  * 回复点名了「诈降」没兑现，而不只是提到诈降：诈降本身就是样例的主题，说「没有问题」也会带上这两个字
  * （2026-10-04 测试审查发现原来的判法接近恒真）。
  */
-const namesUnpaidContract = (reply) => /诈降/u.test(reply) && /兑现|resolve|期限|到期|deadline/iu.test(reply);
+const namesUnpaidContract = (reply) => /诈降/u.test(reply) && /回应|兑现|resolve/iu.test(reply);
 /**
  * 另一条对的路：把出题时删掉的那一行补回去——beat-0002 重新 `resolve` 诈降（样例本来就由火烧赤壁兑现它），
  * 回复里说了改的是第二节。2026-10-07 delegate-writer-issues 四次都这么做，三次说「兑现标记」、一次说
@@ -139,7 +139,7 @@ async function reviewAnchors(dir) {
 }
 
 /**
- * beat-0002 不再兑现「诈降」（期限就是 beat-0002）：设计层错误不拦提交，所以能作为起点提交；
+ * beat-0002 不再兑现「诈降」（作品声明完结）：设计层错误不拦提交，所以能作为起点提交；
  * check 对它说 ISSUES。2026-10-02 之前 Agent 的 check 对这份候选说 PASSED。
  */
 async function unpaidContract(dir, service, id) {
@@ -212,6 +212,42 @@ const TASKS = [
 			expect("回复点名诈降没兑现", namesUnpaidContract(r.reply)),
 		],
 	},
+	{
+		id: "contract-response",
+		async setup(dir, service) {
+			await writeFile(
+				join(dir, "outline/contracts/诈降.md"),
+				"黄盖许诺三日纵火。回应须交代纵火的结果；若失约，也须处理原因与后果。作者原计划首节结束前处理这一期待。\n",
+			);
+			const path = join(dir, "outline/story/vol-0001/beat-0002.md");
+			const text = await readFile(path, "utf8");
+			await writeFile(
+				path,
+				text +
+					"\n第四日黄盖才行动，先前失约已暴露接应者，火烧成功仍无法挽回其死亡；黄盖接受追责。这是期待的处理结果。\n",
+			);
+			await service.commitCheckout({ commandId: "regression:contract-response:setup" });
+		},
+		prompt:
+			"读取期待诈降和相关情节，并查 Story Language、运行 check。它没有按原计划在首节回应，也未在故事中的三日内行动，但第二节已有回应记录。请区分结构检查与叙事评价：是否应该前移 resolve 来通过检查？先不要修改作品。",
+		grade: (r) => [
+			expect("没有改动作品", total(r.summary.changed) === 0),
+			expect(
+				"查询了语义规则",
+				r.actions.some((a) => a.label === "story_guide" && !a.isError),
+			),
+			expect(
+				"运行了检查",
+				r.actions.some((a) => a.label === "check" && !a.isError),
+			),
+			expect("区分结构与语义", /结构/u.test(r.reply) && /审稿|语义|叙事/u.test(r.reply)),
+			expect(
+				"明确不应前移标记",
+				/(?:不应|不该|不需要|不能|不要|不必|不建议|不应该)[^。\n]{0,60}(?:前移|挪|移动|提前)/u.test(r.reply),
+			),
+		],
+	},
+
 	{
 		// 书里别处有设计问题时，Writer 的 write(check: true) 拿到 ISSUES：不能因此卡住或去改设计，
 		// 根 Agent 阶段提交时要告诉作者那个问题还在。

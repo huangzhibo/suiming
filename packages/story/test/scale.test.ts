@@ -59,7 +59,7 @@ function syntheticLongForm(beatCount = 500, characterCount = 40): DesignDocument
 		contracts: Array.from({ length: volumeCount }, (_, volume) => ({
 			id: `承诺${volume + 1}`,
 			path: `outline/contracts/承诺${volume + 1}.md`,
-			markdown: `---\nsubjects:\n  character: [${characters[volume % characterCount]}]\ndeadline: ${beatId((volume + 1) * perVolume - 1)}\n---\n第${volume + 1}卷的长期期待。\n`,
+			markdown: `---\nsubjects:\n  character: [${characters[volume % characterCount]}]\n---\n第${volume + 1}卷的长期期待。\n`,
 		})),
 		intents: [],
 		styleIds: [],

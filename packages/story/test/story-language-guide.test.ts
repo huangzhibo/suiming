@@ -9,7 +9,7 @@ test("Source Story Language 机器结构由 schema 渲染，不携带 capability
 	assert.match(guide, /refs: # optional/u);
 	assert.match(guide, /secret: \[<identity-id>, \.\.\.\] # optional/u);
 	assert.match(guide, /kind: <"parent" \| "spouse" \| "sibling" \| "guardian">/u);
-	assert.match(guide, /deadline: <book_end \| beat-id> # optional/u);
+	assert.doesNotMatch(guide, /deadline/u);
 	assert.match(guide, /<state-property>: <non-empty string \| boolean>/u);
 	assert.doesNotMatch(guide, /style_refs|intent\//u);
 	assert.doesNotMatch(guide, /只修改|运行 check|提交/u);

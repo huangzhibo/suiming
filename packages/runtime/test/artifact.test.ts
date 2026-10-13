@@ -60,7 +60,7 @@ function designPackage(): OpenPackageFile[] {
 		file("world/resources/火船.md", "---\ninitial:\n  holder: 黄盖\n---\n黄盖备下的二十艘火船。\n"),
 		file(
 			"outline/contracts/诈降.md",
-			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: beat-0002\n---\n诈降必须兑现成一把火，火船随之烧尽。\n",
+			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\n---\n诈降必须兑现成一把火，火船随之烧尽。\n",
 		),
 		file(
 			"intent/计谋的代价.md",
@@ -98,7 +98,7 @@ function sourcePackage(sourceId: string): OpenPackageFile[] {
 		file(`${root}/world/characters/黄盖.md`, "上阵前先算清退路。\n"),
 		file(
 			`${root}/outline/contracts/火船去向.md`,
-			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
+			"---\nsubjects:\n  character: [黄盖]\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
 		),
 	];
 }

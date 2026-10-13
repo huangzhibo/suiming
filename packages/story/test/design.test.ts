@@ -30,90 +30,49 @@ test("自然语言 Design 绑定为可检查的统一模型", () => {
 	);
 });
 
-test("index 声明 open_ended：全书未完待续时，已建立未回应的 book_end Contract 是进行中；Beat 期限与从未建立的照样报", () => {
+test("未完待续允许开放期待；完整作品要求处理记录，从未建立的期待仍报错", () => {
 	const docs = twoBeatDesignDocuments();
-	// 全书期限、已在 beat-0001 建立、到最后一个 Beat 仍未回应：连载写到一半的常态
-	docs.contracts[0] = {
-		...(docs.contracts[0] as (typeof docs.contracts)[number]),
-		markdown:
-			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n黄盖的投降是假的，约定之夜火船必须烧尽。",
-	};
-	docs.beats[1] = {
-		...(docs.beats[1] as (typeof docs.beats)[number]),
-		markdown: (docs.beats[1]?.markdown ?? "").replace("contracts:\n  resolve: [诈降]\n", ""),
-	};
+	const second = docs.beats[1];
+	assert.ok(second);
+	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
 	const finished = checkDesign(bindDesignDocuments(docs));
-	assert.equal(finished.passed, false, "没声明就是全书写完了，期待没兑现");
-	assert.equal(finished.contracts.results[0]?.status, "outstanding");
-
+	assert.equal(finished.passed, false);
+	assert.equal(finished.contracts.results[0]?.message, "作品声明完结，但没有回应记录");
+	assert.match(finished.diagnostics[0]?.hint ?? "", /不要为了通过检查伪造回应/u);
 	docs.storyIndex = { ...(docs.storyIndex as object), open_ended: true };
 	const ongoing = checkDesign(bindDesignDocuments(docs));
 	assert.equal(ongoing.passed, true);
 	assert.deepEqual(ongoing.contracts.openContractIds, ["诈降"]);
 	assert.deepEqual(ongoing.contracts.results, []);
-
-	// 未完待续不豁免显式的 Beat 期限，也不豁免从来没建立过的期待
-	docs.contracts.push(
-		{ id: "限期", path: "outline/contracts/限期.md", markdown: "---\ndeadline: beat-0002\n---\n第二节前必须回应。" },
-		{ id: "空头", path: "outline/contracts/空头.md", markdown: "---\ndeadline: book_end\n---\n从未建立。" },
-	);
-	docs.beats[0] = {
-		...(docs.beats[0] as (typeof docs.beats)[number]),
-		markdown: (docs.beats[0]?.markdown ?? "").replace("open: [诈降]", "open: [诈降, 限期]"),
-	};
-	const strict = checkDesign(bindDesignDocuments(docs));
-	assert.equal(strict.passed, false);
-	assert.deepEqual(
-		strict.contracts.results.map((result) => [result.contractId, result.status]),
-		[
-			["限期", "outstanding"],
-			["空头", "outstanding"],
-		],
-	);
+	docs.contracts.push({ id: "空头", path: "outline/contracts/空头.md", markdown: "从未建立。" });
+	const invalid = checkDesign(bindDesignDocuments(docs));
+	assert.equal(invalid.passed, false);
+	assert.equal(invalid.contracts.results[0]?.openedAt, null);
 });
 
-test("Contract 没兑现的诊断说清是哪一种：从未建立、到期未兑现、全书结束未兑现、过期才兑现，提示写出要加的那一行", () => {
+test("承诺失败、转化或有意义的否定可有回应记录，Checker 不裁定语义质量或正文中的节奏计划", () => {
 	const docs = twoBeatDesignDocuments();
-	const contractDiagnostics = () =>
-		(checkDesign(bindDesignDocuments(docs)).diagnostics ?? []).map((item) => [item.path, item.message, item.hint]);
-	const beat = (index: number) => docs.beats[index] as (typeof docs.beats)[number];
-	// beat-0002 不再兑现：期限就是 beat-0002
-	docs.beats[1] = { ...beat(1), markdown: beat(1).markdown.replace("contracts:\n  resolve: [诈降]\n", "") };
-	docs.contracts.push(
-		{ id: "空头", path: "outline/contracts/空头.md", markdown: "---\ndeadline: book_end\n---\n从未建立。" },
-		{ id: "悬案", path: "outline/contracts/悬案.md", markdown: "---\ndeadline: book_end\n---\n一直没回应。" },
-		{ id: "迟到", path: "outline/contracts/迟到.md", markdown: "---\ndeadline: beat-0001\n---\n第一节就该回应。" },
-	);
-	docs.beats[0] = {
-		...beat(0),
-		markdown: beat(0).markdown.replace("open: [诈降]", "open: [诈降, 悬案, 迟到]"),
-	};
-	docs.beats[1] = {
-		...beat(1),
-		markdown: beat(1).markdown.replace("---\n", "---\ncontracts:\n  resolve: [迟到]\n"),
-	};
-	assert.deepEqual(contractDiagnostics(), [
-		[
-			"outline/contracts/诈降.md",
-			"StoryContract 诈降：到期限 beat-0002 还没有兑现",
-			"在 beat-0002 或更早的 StoryBeat 里写 contracts.resolve: [诈降]",
-		],
-		[
-			"outline/contracts/空头.md",
-			"StoryContract 空头：没有任何 StoryBeat 建立这个期待",
-			"在建立这个期待的 StoryBeat 里写 contracts.open: [空头]",
-		],
-		[
-			"outline/contracts/悬案.md",
-			"StoryContract 悬案：到全书结束还没有兑现",
-			"在兑现它的 StoryBeat 里写 contracts.resolve: [悬案]",
-		],
-		[
-			"outline/contracts/迟到.md",
-			"StoryContract 迟到：期限是 beat-0001，到 beat-0002 才兑现",
-			"把 contracts.resolve: [迟到] 移到 beat-0001 或更早的 StoryBeat，或者改期限",
-		],
-	]);
+	const contract = docs.contracts[0];
+	const second = docs.beats[1];
+	assert.ok(contract && second);
+	contract.markdown = "计划在首节结束前处理。黄盖承诺约定之夜纵火；失约的原因和后果也应得到回应。";
+	second.markdown += "\n黄盖未能按约纵火，承认失败并承担代价。";
+	const result = checkDesign(bindDesignDocuments(docs));
+	assert.equal(result.passed, true);
+	assert.equal(result.contracts.results[0]?.resolvedAt, "beat-0002");
+	assert.match(result.contracts.results[0]?.message ?? "", /是否充分/u);
+	docs.storyIndex = { ...(docs.storyIndex as object), open_ended: true };
+	const ongoing = checkDesign(bindDesignDocuments(docs));
+	assert.equal(ongoing.contracts.results[0]?.status, "resolved", "未完待续也保留已回应的结构结果");
+	assert.deepEqual(ongoing.contracts.openContractIds, []);
+});
+
+test("Contract 不再接受结构化 deadline，避免旧期限被静默当成有效规则", () => {
+	const docs = twoBeatDesignDocuments();
+	const contract = docs.contracts[0];
+	assert.ok(contract);
+	contract.markdown = "---\ndeadline: beat-0001\n---\n三日之约。";
+	assert.throws(() => bindDesignDocuments(docs), StoryParseError);
 });
 
 test("Checker 报告硬状态冲突的原始 StoryBeat 位置", () => {

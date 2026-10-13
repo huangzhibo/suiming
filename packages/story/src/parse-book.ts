@@ -61,7 +61,6 @@ export interface StoryContract {
 	id: string;
 	path: string;
 	subjects: string[];
-	deadline: { kind: "story_beat"; storyBeatId: string } | { kind: "book_end" };
 	body: string;
 }
 
@@ -201,7 +200,6 @@ export function parseStoryContractMarkdown(
 			{ path, pointer: "/body", message: "StoryContract 的正文不能为空" },
 		]);
 	}
-	const rawDeadline = (document.frontmatter.deadline as string | undefined) ?? "book_end";
 	const subjects = flattenReferenceGroups((document.frontmatter.subjects as ReferenceGroups | undefined) ?? {});
 	for (const [index, subject] of subjects.entries()) {
 		requireNfc(subject, `${path} subjects[${index}]`);
@@ -210,7 +208,6 @@ export function parseStoryContractMarkdown(
 		id,
 		path,
 		subjects,
-		deadline: rawDeadline === "book_end" ? { kind: "book_end" } : { kind: "story_beat", storyBeatId: rawDeadline },
 		body: document.body,
 	};
 }
@@ -281,7 +278,7 @@ export interface BindBookOptions {
 	/** Source extraction 没有 style evidence，可关闭 style_refs 存在性检查。 */
 	enforceStyleEvidence?: boolean;
 	/**
-	 * 故事在此边界之后仍会继续：`book_end` 的 Contract 不算到期。
+	 * 故事在此边界之后仍会继续：已建立的 Contract 可以保持开放。
 	 * Source 的材料边界是 open-ended；全书 Design 只有 index 声明了 `open_ended: true`
 	 * （作者说全书未完待续）才是。
 	 */
@@ -330,7 +327,6 @@ export function bindBookDocuments(sources: BookSources, options: BindBookOptions
 		parseCreativeIntent(item.markdown, item.id, item.path),
 	) as CreativeIntent[];
 	const stateProjection = compileStateProjection(story, { characters, places, resources }, collector);
-	const beatIds = new Set(story.beats.map((beat) => beat.id));
 	const knownIdentityRefs = new Set([
 		...characters.map((entry) => identityRef("character", entry.id)),
 		...places.map((entry) => identityRef("place", entry.id)),
@@ -371,15 +367,6 @@ export function bindBookDocuments(sources: BookSources, options: BindBookOptions
 		}
 	}
 	for (const contract of contracts) {
-		if (contract.deadline.kind === "story_beat" && !beatIds.has(contract.deadline.storyBeatId)) {
-			collector.report("missing_context_reference", [
-				{
-					path: contract.path,
-					pointer: "/frontmatter/deadline",
-					message: `找不到 StoryBeat ${contract.deadline.storyBeatId}`,
-				},
-			]);
-		}
 		for (const [index, subject] of contract.subjects.entries()) {
 			if (subject.startsWith("secret:") || knownStoryRefs.has(subject)) continue;
 			collector.report("missing_context_reference", [

@@ -10,7 +10,7 @@ import { collectPageErrors, launchDesktop } from "./launch.js";
 declare const innerWidth: number;
 declare function requestAnimationFrame(callback: () => void): number;
 
-test("期待事件路径：宽窄窗、原文摘录、默认期限、同节阶段、空记录和大量异常事件", { timeout: 90000 }, async () => {
+test("期待事件路径：宽窄窗、原文摘录、回应语义、同节阶段、空记录和大量异常事件", { timeout: 90000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-contract-journey-"));
 	const root = join(directory, "work");
 	await cp(resolve("examples/sanguo"), root, { recursive: true });
@@ -31,23 +31,22 @@ test("期待事件路径：宽窄窗、原文摘录、默认期限、同节阶�
 		),
 	);
 	const fixtures = [
-		{ id: "空记录", open: [], advance: [], resolve: [], deadline: undefined },
-		{ id: "等待回应", open: [0], advance: [], resolve: [], deadline: undefined },
-		{ id: "到期未回应", open: [0], advance: [], resolve: [], deadline: ordered[1]?.localId },
-		{ id: "超期且继续推进", open: [0], advance: [3], resolve: [2], deadline: ordered[1]?.localId },
-		{ id: "同节建立推进回应", open: [0], advance: [0], resolve: [0], deadline: ordered[0]?.localId },
+		{ id: "空记录", open: [], advance: [], resolve: [] },
+		{ id: "等待回应", open: [0], advance: [], resolve: [] },
+		{ id: "回应后继续推进", open: [0], advance: [3], resolve: [2] },
+		{ id: "同节建立推进回应", open: [0], advance: [0], resolve: [0] },
 		{
 			id: "多次推进",
 			open: [0],
 			advance: Array.from({ length: 28 }, (_, i) => i + 1),
 			resolve: [29],
-			deadline: ordered[29]?.localId,
 		},
 	];
 	for (const fixture of fixtures) {
 		await writeFile(
 			join(root, `outline/contracts/验收${fixture.id}.md`),
-			`---\n${stringify(fixture.deadline ? { deadline: fixture.deadline } : {})}---\n# 验收${fixture.id}\n\n这是用于交互和布局验证的合成期待。\n`,
+			`---\n{}
+---\n# 验收${fixture.id}\n\n这是用于交互和布局验证的合成期待。\n`,
 		);
 	}
 	for (let ordinal = 0; ordinal < 30; ordinal++) {
@@ -97,7 +96,7 @@ test("期待事件路径：宽窄窗、原文摘录、默认期限、同节阶�
 			2,
 			"横向路径仍显示每个事件的全书序号",
 		);
-		assert.equal(await track.locator("[data-contract-deadline]").count(), 1, "期限与回应相同，只标一次");
+		assert.equal(await track.locator("[data-contract-deadline]").count(), 0, "实际回应节点不附加计划期限");
 		assert.equal(await track.locator('[data-phase="advance"]').count(), 0, "无推进不造空阶段");
 		const first = await events.nth(0).boundingBox();
 		const second = await events.nth(1).boundingBox();
@@ -121,6 +120,7 @@ test("期待事件路径：宽窄窗、原文摘录、默认期限、同节阶�
 		await track.getByRole("button", { name: "期待进展说明", exact: true }).hover();
 		const hint = page.getByRole("tooltip");
 		await hint.waitFor();
+		assert.match(await hint.innerText(), /转化或有意义的否定/u);
 		const hintBox = await hint.boundingBox();
 		const windowSize = await page.evaluate(() => ({ width: innerWidth }));
 		assert.ok(hintBox && hintBox.x >= 8 && hintBox.x + hintBox.width <= windowSize.width - 8);
@@ -139,15 +139,10 @@ test("期待事件路径：宽窄窗、原文摘录、默认期限、同节阶�
 		await capture("02-multiple.jpg");
 		await visit("验收等待回应");
 		await page.locator("article").getByText("等待回应", { exact: true }).waitFor();
-		await track.getByText("全书结束前", { exact: false }).waitFor();
+		assert.equal(await track.getByText(/回应期限|到期|全书结束前/u).count(), 0);
 		assert.equal(await events.count(), 1);
 		await capture("03-pending.jpg");
-		await visit("验收到期未回应");
-		await page.locator("article").getByText("已到期限，尚未回应", { exact: true }).waitFor();
-		assert.equal(await events.count(), 1, "期限不伪造成已经发生的事件");
-		await capture("04-overdue.jpg");
-		await visit("验收超期且继续推进");
-		await track.getByText("晚于回应期限", { exact: true }).waitFor();
+		await visit("验收回应后继续推进");
 		await track.getByText("回应后仍有推进，请核对", { exact: true }).waitFor();
 		assert.deepEqual(await events.evaluateAll((items) => items.map((item) => item.getAttribute("data-ordinal"))), [
 			"0",

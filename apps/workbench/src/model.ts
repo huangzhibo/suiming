@@ -164,6 +164,7 @@ export class Book {
 		const entry = this.currencyOf(beatId);
 		if (!entry) return undefined;
 		const written = entry.writtenAt === undefined ? "" : `写于 ${this.revisionLabel(entry.writtenAt)} · `;
+		if (entry.state === "unknown") return { text: `${written}时效无法确认：历史或当前设计无法解析`, tone: "gray" };
 		if (entry.state === "current") return { text: `${written}设计未变`, tone: "green" };
 		// 正文还没提交：页面上已经有「未提交」，这里不再说一遍。
 		if (entry.state === "uncommitted") return undefined;
@@ -174,7 +175,13 @@ export class Book {
 		const texts = this.data.storyText.filter((item) => item.state !== "missing");
 		const changed = texts.filter((item) => item.state === "design-changed").length;
 		if (texts.length === 0) return "还没有已提交正文";
-		return changed === 0 ? `正文 ${texts.length} 篇 · 设计未变` : `正文 ${texts.length} 篇 · ${changed} 篇的设计已变`;
+		const unknown = texts.filter((item) => item.state === "unknown").length;
+		return [
+			`正文 ${texts.length} 篇`,
+			...(changed ? [`${changed} 篇的设计已变`] : []),
+			...(unknown ? [`${unknown} 篇时效无法确认`] : []),
+			...(!changed && !unknown ? ["设计未变"] : []),
+		].join(" · ");
 	}
 	/** 区间内（含两端）引用某个 identity 的 Beat 数；未刷选时传入全书范围。 */
 	refCountInRange(targetPath: string, start: number, end: number): number {
@@ -183,19 +190,6 @@ export class Book {
 			const ordinal = this.ordinal(this.byPath.get(link.from)?.localId ?? "");
 			return ordinal >= start && ordinal <= end;
 		}).length;
-	}
-	/** `deadline: book_end` 的说法；作者在 index 声明全书未完待续时一并说出来，免得读成已到期。 */
-	get bookEndLabel(): string {
-		return this.data.openEnded ? "全书结束前（全书未完待续）" : "全书结束前";
-	}
-	/**
-	 * Contract 的期限落在第几个 Beat：写的 Beat id 照查；`book_end` 是最后一个 Beat，作者在 index 声明全书未完待续时
-	 * 不到期；没写或查不到是 -1。承诺页、侧栏与故事轴都用它——2026-10-05 之前这条规则在这里与 axis/layout.ts
-	 * 各写一遍，与 story 的 `evaluateContractLifecycleScope` 是同一条规则。
-	 */
-	deadlineIndex(deadline: unknown): number {
-		if (deadline === undefined || deadline === "book_end") return this.data.openEnded ? -1 : this.order.length - 1;
-		return typeof deadline === "string" ? this.ordinal(deadline) : -1;
 	}
 	contractState(contractId: string, cursorIndex: number): { label: string; opened: boolean; resolved: boolean } {
 		const contract = this.file("story-contract", contractId);
@@ -207,8 +201,6 @@ export class Book {
 		const resolved = resolves.length > 0 && resolveAt <= cursorIndex;
 		if (!opened) return { label: "尚未建立", opened, resolved };
 		if (resolved) return { label: "已回应", opened, resolved };
-		const deadlineIndex = this.deadlineIndex(contract?.frontmatter.deadline);
-		if (deadlineIndex >= 0 && cursorIndex >= deadlineIndex) return { label: "已到期限，尚未回应", opened, resolved };
 		return { label: "等待回应", opened, resolved };
 	}
 }
@@ -216,7 +208,7 @@ export class Book {
 export interface Link {
 	from: string;
 	to: string;
-	/** frontmatter 键路径，如 refs.character、contracts.open、subjects.character、deadline。 */
+	/** frontmatter 键路径，如 refs.character、contracts.open、subjects.character。 */
 	key: string;
 }
 const KEY_KINDS: Record<string, string[]> = {
@@ -225,7 +217,6 @@ const KEY_KINDS: Record<string, string[]> = {
 	resource: ["resource"],
 	world: ["world"],
 	beat: ["story-beat"],
-	deadline: ["story-beat"],
 	open: ["story-contract"],
 	advance: ["story-contract"],
 	resolve: ["story-contract"],

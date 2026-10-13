@@ -27,7 +27,6 @@ style_refs: [style_contemporary_restraint]
 subjects:
   character: [黄盖]
   resource: [火船]
-deadline: beat-0002
 ---
 黄盖的投降是假的：约定那夜，他带到曹营跟前的不是粮船，而是一把火。
 `,

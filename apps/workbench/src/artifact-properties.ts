@@ -29,7 +29,6 @@ const LABELS: Record<string, string> = {
 	"contracts.open": "建立期待",
 	"contracts.advance": "推进期待",
 	"contracts.resolve": "回应期待",
-	deadline: "回应期限",
 	applies_to: "适用内容",
 	target: "适用范围",
 	style_refs: "风格参考",
@@ -101,7 +100,6 @@ export function propertyRows(book: Book, file: FileEntry): PropertyRow[] {
 				(link) => link.from === file.path && link.key === linkKey && book.byPath.get(link.to)?.localId === value,
 			)?.to;
 			if (path) return { text: book.title(book.byPath.get(path)), path };
-			if (key === "deadline" && value === "book_end") return { text: book.bookEndLabel };
 			if (key === "applies_to" && (value === "design" || value === "text"))
 				return { text: value === "design" ? "设计" : "正文" };
 			if (key === "target" && value === "book") return { text: "全书" };

@@ -187,10 +187,7 @@ export function ArtifactPage(props: ArtifactPageProps) {
 	const characterLane =
 		file.kind === "character" ? axis.characters.find((lane) => lane.path === file.path) : undefined;
 	const resourceLane = file.kind === "resource" ? axis.resources.find((lane) => lane.path === file.path) : undefined;
-	const rows = propertyRows(book, file).filter((row) => {
-		if (contractLane && row.key === JSON.stringify(["deadline"])) return false;
-		return true;
-	});
+	const rows = propertyRows(book, file);
 	const identityRows = rows.filter((row) => row.key === JSON.stringify(["aliases"]));
 	const relatedPaths = new Set(
 		book.links.flatMap((link) => (link.from === file.path ? [link.to] : link.to === file.path ? [link.from] : [])),

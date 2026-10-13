@@ -33,7 +33,9 @@ test("diagnostics 汇总设计与 Source 的错误和警告：message 是拼好�
 			check: {
 				passed: false,
 				state: { passed: true },
-				diagnostics: [{ path: "outline/contracts/诈降.md", message: "到期未兑现", severity: "error" }],
+				diagnostics: [
+					{ path: "outline/contracts/诈降.md", message: "作品声明完结，但没有回应记录", severity: "error" },
+				],
 				warnings: [
 					{
 						path: "outline/story/vol-0001/beat-0001.md",
@@ -73,8 +75,8 @@ test("diagnostics 汇总设计与 Source 的错误和警告：message 是拼好�
 		{
 			severity: "error",
 			path: "outline/contracts/诈降.md",
-			detail: "到期未兑现",
-			message: "outline/contracts/诈降.md：到期未兑现",
+			detail: "作品声明完结，但没有回应记录",
+			message: "outline/contracts/诈降.md：作品声明完结，但没有回应记录",
 		},
 		{
 			severity: "warning",

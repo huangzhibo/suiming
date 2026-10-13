@@ -89,10 +89,8 @@ test("C2 / C10 秘密：曹操刺董之谋第 22 节才埋下，第 1 节就对�
 	);
 });
 
-test("C5 期待到期：伏龙凤雏之谜期限是第 331 节，把那里的兑现删掉就到期未兑现", () => {
-	assert.deepEqual(introduced(B0331, "contracts:\n  resolve: [伏龙凤雏之谜]\n", ""), [
-		"error outline/contracts/伏龙凤雏之谜.md StoryContract 伏龙凤雏之谜：到期限 beat-0331 还没有兑现",
-	]);
+test("C5 材料边界仍开放的期待不因错过旧计划位置而报错", () => {
+	assert.deepEqual(introduced(B0331, "contracts:\n  resolve: [伏龙凤雏之谜]\n", ""), []);
 });
 
 test("C11 期待顺序：伏龙凤雏之谜在第 331 节兑现，第 440 节再推进它", () => {

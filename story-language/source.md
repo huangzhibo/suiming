@@ -39,7 +39,7 @@ Source 可以先只有 `source.yaml + original.bin + material.txt`，随后再�
 
 Target 与每个 Source 各自形成 artifact namespace。同一 `beat-0001`、人物名或 World id 可以同时出现在多个 Source 和 Target 中；本地引用只在所属 namespace 内解析，不使用 `source-id/id` 污染 Story Language local id。
 
-Source 可能只登记原作的一部分，也可能来自未完本作品，所以 `deadline: book_end` 的 Contract 可以在材料边界保持开放；具体规则见 outline 主题「StoryContract」。
+Source 可能只登记原作的一部分，也可能来自未完本作品，所以已建立的 Contract 可以在材料边界保持开放；具体规则见 outline 主题「StoryContract」。
 
 Source 的结构检查只能证明 schema、引用、顺序、硬状态和 Contract 生命周期成立。是否遗漏材料、人物理解是否准确、抽取粒度是否足够以及自然语言是否忠实，仍由读取原始 `material.txt` 的语义 Review 判断。Target 任务默认不能读取 Source；只有明确的研究或转换任务才能在对应任务边界内使用它。
 

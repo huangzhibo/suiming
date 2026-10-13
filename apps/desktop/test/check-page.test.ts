@@ -29,7 +29,7 @@ test("检查结果页：按文件列出诊断，绑定失败也列全，作品�
 		await page.getByText("检查通过。", { exact: true }).waitFor();
 		assert.equal(await details.count(), 0);
 
-		// 设计层未通过：Contract 到期没有兑现。提示点名、给详情入口，详情页按文件归类。
+		// 设计层未通过：完整作品的 Contract 没有回应记录。提示点名、给详情入口，详情页按文件归类。
 		await writeFile(beat2, original2.replace("contracts:\n  resolve: [诈降]\n", ""));
 		await check.click();
 		await page.getByText(/^检查未通过：设计；1 处错误。/).waitFor();

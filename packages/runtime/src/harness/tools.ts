@@ -491,7 +491,7 @@ export function formatCheck(candidate: ArtifactCandidate): string {
 				? "PASSED"
 				: `ISSUES：可以提交，但有 ${issues.length} 处问题要修；阶段提交时先留着，也要在回复里告诉作者还差什么`,
 			...issues,
-			...(open.length === 0 ? [] : [`未闭合但尚未到期的 Contract：${open.join(", ")}`]),
+			...(open.length === 0 ? [] : [`当前边界仍开放的 Contract：${open.join(", ")}`]),
 			...(warnings.length === 0 ? [] : ["warnings：", ...warnings]),
 		].join("\n");
 	} catch (error) {

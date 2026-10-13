@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CircleCheck, Clock3, Flag, Info, MoveRight, TriangleAlert } from "lucide-react";
 import { useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { invoke } from "../bridge.js";
 import { EmptyNote, Hint, Tag } from "../ui-bits.js";
@@ -18,10 +17,9 @@ const PHASES = {
 export function ContractStatus({ model, lane }: { model: AxisModel; lane: ContractLane }) {
 	const status = contractStatus(lane, model.beats.length - 1).split(" · ")[0];
 	const resolved = status === "已回应";
-	const overdue = status === "已到期限，尚未回应";
-	const Icon = resolved ? CircleCheck : overdue ? TriangleAlert : Clock3;
+	const Icon = resolved ? CircleCheck : Clock3;
 	return (
-		<Tag tone={resolved ? "green" : overdue ? "red" : status === "尚未建立" ? "gray" : "amber"}>
+		<Tag tone={resolved ? "green" : status === "尚未建立" ? "gray" : "amber"}>
 			<Icon aria-hidden="true" />
 			{status}
 		</Tag>
@@ -41,9 +39,6 @@ export function ContractTrack({
 	open(page: string): void;
 }) {
 	const entries = contractJourney(model, lane);
-	const deadline = model.beats[lane.deadlineIndex];
-	const mergedDeadline = entries.some((entry) => entry.deadline);
-	const bookEnd = lane.deadline === undefined || lane.deadline === "book_end";
 	return (
 		<section className="@container mt-6" data-contract-track aria-label="读者期待进展">
 			<div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -52,33 +47,11 @@ export function ContractTrack({
 				{lane.advance.length === 0 && lane.resolve.length > 0 && (
 					<span className="text-xs text-muted-foreground">无单独推进记录</span>
 				)}
-				<Hint content="按故事顺序展示已声明的建立、推进与回应。摘录来自情节设计原文；已回应表示有回应记录，不代表语义兑现已经通过审稿。">
+				<Hint content="按故事顺序展示已声明的建立、推进与回应。摘录来自情节设计原文；回应可以是兑现、转化或有意义的否定；已回应仅表示有记录，是否充分由审稿判断。">
 					<button type="button" aria-label="期待进展说明" className="navigation-link text-muted-foreground">
 						<Info className="size-3.5" aria-hidden="true" />
 					</button>
 				</Hint>
-				{!mergedDeadline && (
-					<span
-						className="flex flex-wrap items-baseline gap-1 text-xs text-muted-foreground"
-						data-contract-deadline
-					>
-						回应期限：
-						{bookEnd ? (
-							"全书结束前"
-						) : deadline ? (
-							<button
-								type="button"
-								className="navigation-link text-left"
-								data-page={deadline.path}
-								onClick={() => open(deadline.path)}
-							>
-								{deadline.title}
-							</button>
-						) : (
-							`情节未收录（${lane.deadline}）`
-						)}
-					</span>
-				)}
 			</div>
 			{entries.length === 0 ? (
 				<EmptyNote>尚无建立、推进或回应记录。</EmptyNote>
@@ -109,11 +82,6 @@ export function ContractTrack({
 										<span data-contract-order className="contract-event-order text-muted-foreground">
 											第 {entry.beat.ordinal + 1} 个情节{entry.beat.text === "none" && " · 仅设计"}
 										</span>
-										{entry.deadline && (
-											<Badge variant="outline" data-contract-deadline>
-												{bookEnd ? "全书结束 · 回应期限" : "回应期限"}
-											</Badge>
-										)}
 									</div>
 									<div data-contract-rail className="contract-event-rail">
 										<span

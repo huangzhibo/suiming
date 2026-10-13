@@ -291,8 +291,7 @@ export function compileWriteContext(
 	const lookahead: string[] = ["## authorial_lookahead"];
 	for (const { phase, contract } of read.contracts) {
 		artifacts.push(targetArtifactIdentity("story-contract", contract.id));
-		const deadline = contract.deadline.kind === "book_end" ? "book_end" : contract.deadline.storyBeatId;
-		lookahead.push(`### ${phase} ${contract.id}（${contract.path}，deadline ${deadline}）`, contract.body.trim(), "");
+		lookahead.push(`### ${phase} ${contract.id}（${contract.path}）`, contract.body.trim(), "");
 	}
 	if (lookahead.length === 1) lookahead.push("（本 Beat 不建立、推进或兑现 Contract）");
 	sections.push(lookahead.join("\n").trimEnd());

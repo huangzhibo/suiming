@@ -250,7 +250,7 @@ test("正文的 Design 闭包只取 Writer 读到的那部分：同卷别的 Bea
 		replace(
 			replace(history.candidateFiles(r2), "world/places/赤壁.md", "长江南岸的赤壁，孙刘联军隔江扎营。\n"),
 			"outline/contracts/诈降.md",
-			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: beat-0002\n---\n黄盖的投降是假的。\n",
+			"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\n---\n黄盖的投降是假的。\n",
 		),
 	);
 	const changed = await textCurrency(history, r3, history.candidate(r3), "beat-0001");
@@ -442,4 +442,28 @@ test("Release 从完整且 current 的正文派生，Review 意见不拥有发�
 	const republished = await publishRelease(history, { candidate: history.candidate(r5), headRevisionId: r5 });
 	assert.equal(republished.manifest.revision, r5);
 	assert.equal(republished.manifest.storyTextReview, undefined);
+});
+
+test("旧版 Design 无法解析时正文时效是 unknown，不把保守的全书闭包当成实际变化", async () => {
+	const history = new FakeHistory();
+	const design = sampleWorkFiles();
+	const path = "outline/contracts/诈降.md";
+	const current = new TextDecoder().decode(design.find((file) => file.path === path)?.bytes);
+	const old = replace(design, path, current.replace("---\n", "---\ndeadline: beat-0002\n"));
+	const r1 = history.commit([...old, ...texts()]);
+	const r2 = history.commit([...design, ...texts()]);
+	assert.deepEqual(
+		(await textCurrencies(history, r2, history.candidate(r2))).map((item) => [
+			item.state,
+			item.writtenAt,
+			item.changed,
+		]),
+		[
+			["unknown", r1, []],
+			["unknown", r1, []],
+		],
+	);
+	const readiness = await releaseReadiness(history, r2, history.candidate(r2));
+	assert.equal(readiness.publishable, false);
+	assert.ok(readiness.blockers.some((entry) => entry.includes("beat-0001 unknown")));
 });

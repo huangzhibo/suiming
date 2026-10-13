@@ -32,7 +32,7 @@ test("check 工具：设计层错误不拦提交，但不再说 PASSED——说 
 	assert.match(lines[0] ?? "", /^ISSUES：可以提交，但有 1 处问题要修/u);
 	assert.equal(
 		lines[1],
-		"- error: outline/contracts/诈降.md：StoryContract 诈降：到期限 beat-0002 还没有兑现；提示：在 beat-0002 或更早的 StoryBeat 里写 contracts.resolve: [诈降]",
+		"- error: outline/contracts/诈降.md：StoryContract 诈降：作品声明完结，但没有回应记录；提示：核对故事是否已经处理此期待，再在实际回应的 StoryBeat 里写 contracts.resolve: [诈降]；若故事仍将继续，须由作者确认 open_ended。不要为了通过检查伪造回应。",
 	);
 });
 
@@ -51,16 +51,12 @@ test("check 工具：提交会被拒的问题照旧是 FAILED，带全部诊断"
 	assert.match(result, /\n- outline\/story\/vol-0001\/beat-0001\.md#\/frontmatter\/refs\/character\/1：找不到引用/u);
 });
 
-test("check 工具：全书未完待续时，已建立未到期的 Contract 只作说明，仍是 PASSED", () => {
+test("check 工具：全书未完待续时，已建立未回应的 Contract 只作说明，仍是 PASSED", () => {
 	const result = formatCheck(
 		candidate({
 			...unresolved,
 			"outline/story/index.yaml": `schema_version: 2\nopen_ended: true\n${sampleWorkText("outline/story/index.yaml").replace("schema_version: 2\n", "")}`,
-			"outline/contracts/诈降.md": sampleWorkText("outline/contracts/诈降.md").replace(
-				"deadline: beat-0002",
-				"deadline: book_end",
-			),
 		}),
 	);
-	assert.equal(result, "PASSED\n未闭合但尚未到期的 Contract：诈降");
+	assert.equal(result, "PASSED\n当前边界仍开放的 Contract：诈降");
 });

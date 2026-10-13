@@ -71,7 +71,7 @@ export function syntheticWorkFiles(options: SyntheticWorkOptions = {}): SampleWo
 		volumes.push(`  - id: ${volumeId(volume)}\n    title: 第${volume + 1}卷\n    beat_ids: [${ids.join(", ")}]`);
 		files.set(
 			`outline/contracts/${contractId}.md`,
-			`---\nsubjects:\n  character: [${characters[volume % characterCount]}]\ndeadline: ${ids[ids.length - 1]}\n---\n第${volume + 1}卷的长期期待必须在卷末兑现。\n`,
+			`---\nsubjects:\n  character: [${characters[volume % characterCount]}]\n---\n第${volume + 1}卷的长期期待必须在卷末兑现。\n`,
 		);
 	}
 	files.set("outline/story/index.yaml", `schema_version: 2\nvolumes:\n${volumes.join("\n")}\n`);

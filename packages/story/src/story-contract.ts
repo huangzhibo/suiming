@@ -24,7 +24,6 @@ export interface ContractLifecycleEval {
 	openedAt: string | null;
 	resolvedAt: string | null;
 	advancedAt: string[];
-	deadlineStoryBeatId: string | null;
 }
 
 function operationPointer(operation: ContractOperation, index: number): string {
@@ -108,7 +107,7 @@ export function buildContractLifecycles(
 						path: anchor.path,
 						pointer: anchor.pointer,
 						message: "advance 必须在 Contract 的 resolve 之前",
-						hint: "把 advance 挪到前面；如果 Contract 已经 resolve，就删掉它。",
+						hint: "核对事件与期待的边界：按实际内容修正 advance 或 resolve，不要仅为通过检查挪动标记。",
 					},
 				]);
 			}
@@ -119,14 +118,14 @@ export function buildContractLifecycles(
 }
 
 export interface ContractEvaluationScope {
-	/** 故事在边界之后继续：`book_end` 的 deadline 不算到期。 */
+	/** 故事或材料在此边界之后继续，允许已建立的期待保持开放。 */
 	openEnded?: boolean;
 }
 
 export interface ContractLifecycleEvaluation {
-	/** 已到期 Contract 的结构结论。 */
+	/** 已回应与结构缺口；不对叙事质量作结论。 */
 	results: ContractLifecycleEval[];
-	/** 已 open、未 resolve 且尚未到期的 Contract：未完待续的全书或材料边界上合法的开放期待。 */
+	/** 未完待续的作品或材料边界上，已建立、尚未回应的期待。 */
 	openContractIds: string[];
 }
 
@@ -136,44 +135,28 @@ export function evaluateContractLifecycleScope(
 	scope: ContractEvaluationScope = {},
 ): ContractLifecycleEvaluation {
 	const lifecycles = buildContractLifecycles(story, contracts);
-	const openEnded = scope.openEnded ?? false;
 	const results: ContractLifecycleEval[] = [];
 	const openContractIds: string[] = [];
 	for (const contract of contracts) {
-		const deadlineStoryBeatId = contract.deadline.kind === "story_beat" ? contract.deadline.storyBeatId : null;
-		const deadlineOrdinal =
-			deadlineStoryBeatId === null
-				? undefined
-				: story.beats.find((beat) => beat.id === deadlineStoryBeatId)?.ordinal;
-		const due = deadlineStoryBeatId !== null || !openEnded;
 		const anchors = lifecycles.get(contract.id)?.anchors ?? [];
 		const open = anchors.find((anchor) => anchor.operation === "open");
 		const resolve = anchors.find((anchor) => anchor.operation === "resolve");
-		// 从未 open 的 Contract 不是"仍开放的期待"，未到期也按未闭合报告。
-		if (!due && open !== undefined) {
-			if (resolve === undefined) openContractIds.push(contract.id);
+		if (scope.openEnded && open && !resolve) {
+			openContractIds.push(contract.id);
 			continue;
 		}
-		const resolvedInTime =
-			open !== undefined &&
-			resolve !== undefined &&
-			(deadlineOrdinal === undefined || resolve.ordinal <= deadlineOrdinal);
+		const resolved = open !== undefined && resolve !== undefined;
 		results.push({
 			contractId: contract.id,
-			status: resolvedInTime ? "resolved" : "outstanding",
-			message: resolvedInTime
-				? "建立与兑现在结构上齐了；是否真的兑现要靠审稿判断"
-				: open === undefined
+			status: resolved ? "resolved" : "outstanding",
+			message: resolved
+				? "已有建立与回应记录；回应是否充分由审稿判断"
+				: !open
 					? "没有任何 StoryBeat 建立这个期待"
-					: resolve === undefined
-						? deadlineStoryBeatId === null
-							? "到全书结束还没有兑现"
-							: `到期限 ${deadlineStoryBeatId} 还没有兑现`
-						: `期限是 ${deadlineStoryBeatId}，到 ${resolve.storyBeatId} 才兑现`,
+					: "作品声明完结，但没有回应记录",
 			openedAt: open?.storyBeatId ?? null,
 			resolvedAt: resolve?.storyBeatId ?? null,
 			advancedAt: anchors.filter((anchor) => anchor.operation === "advance").map((anchor) => anchor.storyBeatId),
-			deadlineStoryBeatId,
 		});
 	}
 	return { results, openContractIds };

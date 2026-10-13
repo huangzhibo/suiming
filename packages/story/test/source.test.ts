@@ -26,14 +26,13 @@ test("Source extraction 复用 Story Language，但允许材料边界仍开放�
 	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
 	const contract = extraction.contracts[0];
 	assert.ok(contract);
-	contract.markdown = contract.markdown.replace("deadline: beat-0002", "deadline: book_end");
 
 	const result = checkSource(sourceWith(extraction));
 	assert.equal(result.passed, true);
 	assert.deepEqual(result.contracts.openContractIds, ["诈降"]);
 });
 
-test("Source 不能用从未建立的 book_end Contract 冒充合法开放期待", () => {
+test("Source 不能用从未建立的 Contract 冒充合法开放期待", () => {
 	const extraction = sourceExtraction();
 	const first = extraction.beats[0];
 	const second = extraction.beats[1];
@@ -41,7 +40,6 @@ test("Source 不能用从未建立的 book_end Contract 冒充合法开放期待
 	assert.ok(first && second && contract);
 	first.markdown = first.markdown.replace("contracts:\n  open: [诈降]\n", "");
 	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
-	contract.markdown = contract.markdown.replace("deadline: beat-0002", "deadline: book_end");
 
 	const result = checkSource(sourceWith(extraction));
 	assert.equal(result.passed, false);
@@ -49,13 +47,14 @@ test("Source 不能用从未建立的 book_end Contract 冒充合法开放期待
 	assert.equal(result.contracts.results[0]?.openedAt, null);
 });
 
-test("Source 仍拒绝错过显式 Beat deadline 的未解决 Contract", () => {
+test("Source 不把原作中的期限或当前材料边界当成必须回应的时点", () => {
 	const extraction = sourceExtraction();
 	const second = extraction.beats[1];
-	assert.ok(second);
+	const contract = extraction.contracts[0];
+	assert.ok(second && contract);
 	second.markdown = second.markdown.replace("contracts:\n  resolve: [诈降]\n", "");
-
+	contract.markdown = "黄盖说三日内纵火，但材料只记到第四日失约，后果仍待交代。";
 	const result = checkSource(sourceWith(extraction));
-	assert.equal(result.passed, false);
-	assert.equal(result.contracts.results[0]?.deadlineStoryBeatId, "beat-0002");
+	assert.equal(result.passed, true);
+	assert.deepEqual(result.contracts.openContractIds, ["诈降"]);
 });

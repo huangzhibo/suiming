@@ -121,17 +121,6 @@ test("无法解释的字段或状态类型保留原值，包括空值、false �
 	);
 });
 
-test("回应期限显示情节标题或全书结束，未找到的引用保留实际 ID", () => {
-	const entry = file("story-contract", "太平", { deadline: "beat-0002" });
-	assert.deepEqual(properties(entry, [file("story-beat", "beat-0002", {}, "离开故乡")])[0]?.values, [
-		{ text: "离开故乡", path: "story-beat/beat-0002.md" },
-	]);
-	assert.deepEqual(properties(entry)[0]?.values, [{ text: "beat-0002" }]);
-	assert.deepEqual(properties(file("story-contract", "太平", { deadline: "book_end" }))[0]?.values, [
-		{ text: "全书结束前" },
-	]);
-});
-
 test("家族关系一条一个值：人名链到人物页，名分取 role，没有 role 时说 kind 的中文；不出现 family.0.kind 这类原始键", () => {
 	const rows = properties(
 		file("character", "孙权", {

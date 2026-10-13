@@ -54,7 +54,7 @@ const extractionFiles: Array<[string, string]> = [
 	["source/访谈/world/resources/火船.md", "黄盖备下的引火船。\n"],
 	[
 		"source/访谈/outline/contracts/火船去向.md",
-		"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\ndeadline: book_end\n---\n材料建立了火船最终去向的期待，边界内尚未回答。\n",
+		"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\n---\n材料建立了火船最终去向的期待，边界内尚未回答。\n",
 	],
 ];
 

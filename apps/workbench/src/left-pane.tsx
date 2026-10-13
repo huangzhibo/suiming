@@ -152,7 +152,9 @@ export function SpinePane({ book, reviews, view, page, patch, open }: PaneProps)
 															? "正文有未提交修改"
 															: book.currencyOf(id)?.state === "design-changed"
 																? "已有正文，设计已有更新"
-																: "已提交正文"
+																: book.currencyOf(id)?.state === "unknown"
+																	? "已提交正文，历史或当前设计无法解析，时效无法确认"
+																	: "已提交正文"
 														: "仅设计",
 												...marks.map((mark) => mark.title),
 											].join("\n")}
@@ -176,7 +178,9 @@ export function SpinePane({ book, reviews, view, page, patch, open }: PaneProps)
 																? "border-amber bg-white"
 																: book.currencyOf(id)?.state === "design-changed"
 																	? "border-amber bg-[linear-gradient(90deg,var(--amber)_50%,var(--background)_50%)]"
-																	: "border-success bg-success"
+																	: book.currencyOf(id)?.state === "unknown"
+																		? "border-muted-foreground bg-muted-foreground"
+																		: "border-success bg-success"
 															: "border-faint"
 													}`}
 												/>

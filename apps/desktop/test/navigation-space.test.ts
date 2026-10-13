@@ -29,6 +29,16 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(8000);
 	const errors = collectPageErrors(page);
+	const tooltipBox = async () => {
+		const tooltip = page.getByRole("tooltip");
+		// 可见时仍可能处于进入动画，位置断言应测量动画结束后的布局。
+		await tooltip.evaluate((el) =>
+			Promise.all(
+				el.getAnimations().map((animation: { finished: Promise<unknown> }) => animation.finished.catch(() => {})),
+			),
+		);
+		return tooltip.boundingBox();
+	};
 	const button = (name: string) => page.getByRole("button", { name, exact: true });
 	const capture = async (name: string) => {
 		if (process.env.SUIMING_UI_CAPTURE) {
@@ -47,7 +57,7 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 		await page.keyboard.press("Shift");
 		await materialLink.focus();
 		await page.getByRole("tooltip").filter({ hasText: longName }).waitFor();
-		const materialTip = await page.getByRole("tooltip").boundingBox();
+		const materialTip = await tooltipBox();
 		const materialBox = await materialLink.boundingBox();
 		assert.ok(materialTip && materialBox && materialTip.x >= materialBox.x + materialBox.width);
 		await page.keyboard.press("Escape");
@@ -60,7 +70,7 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 		await button("下一个变更文件").hover();
 		const tooltip = page.getByRole("tooltip");
 		await tooltip.filter({ hasText: "world/core.md" }).waitFor();
-		const tipBox = await tooltip.boundingBox();
+		const tipBox = await tooltipBox();
 		const triggerBox = await button("下一个变更文件").boundingBox();
 		assert.ok(tipBox && triggerBox && tipBox.y >= triggerBox.y + triggerBox.height && tipBox.x >= 0);
 		await button("下一个变更文件").click();
@@ -100,7 +110,7 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 		await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).fill(longName);
 		await row.hover();
 		await tooltip.filter({ hasText: added }).waitFor();
-		const narrow = await tooltip.boundingBox();
+		const narrow = await tooltipBox();
 		assert.ok(narrow && narrow.x >= 0 && narrow.x + narrow.width <= 960);
 		const intentLink = page.locator(`#workbench-right [data-page="${added}"]`);
 		const rightLink = await intentLink.boundingBox();

@@ -14,9 +14,7 @@ export function contractJourney(model: AxisModel, lane: ContractLane) {
 		const phases = CONTRACT_PHASES.filter((phase) => lane[phase].includes(ordinal));
 		const warnings: string[] = [];
 		if (lane.late.includes(ordinal)) warnings.push("回应后仍有推进，请核对");
-		if (phases.includes("resolve") && lane.deadlineIndex >= 0 && ordinal > lane.deadlineIndex)
-			warnings.push("晚于回应期限");
-		return [{ beat, phases, deadline: lane.deadlineIndex === ordinal, warnings }];
+		return [{ beat, phases, warnings }];
 	});
 }
 

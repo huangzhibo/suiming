@@ -60,7 +60,7 @@ test("design impact 改一节时召回紧接着的下一节，不论它有没有
 	}
 });
 
-test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及的全部 Beat、Contract 的 open / resolve 与 deadline、Intent 的范围", async () => {
+test("design impact 按主体召回候选：Beat 的下游依赖、人物涉及的全部 Beat、Contract 的 open / advance / resolve、Intent 的范围", async () => {
 	await withProject(async (project) => {
 		const candidate = await project.checkoutCandidate();
 		const beat = storyImpact(candidate, parseStoryImpactSubject("beat:beat-0001"));

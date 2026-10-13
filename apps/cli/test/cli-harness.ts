@@ -64,7 +64,7 @@ export function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 		text(`${root}/world/characters/黄盖.md`, "上阵前先算清退路。\n"),
 		text(
 			`${root}/outline/contracts/火船去向.md`,
-			"---\nsubjects:\n  character: [黄盖]\ndeadline: book_end\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
+			"---\nsubjects:\n  character: [黄盖]\n---\n材料已经建立火船去向的期待，但当前边界尚未回答。\n",
 		),
 	];
 }

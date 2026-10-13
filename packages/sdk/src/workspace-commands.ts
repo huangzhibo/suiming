@@ -39,13 +39,14 @@ const fileDiff = Type.Array(
 		{ additionalProperties: false },
 	),
 );
-/** 正文时效（Runtime `TextCurrency`）：current / design-changed / uncommitted / missing。 */
+/** 正文时效（Runtime `TextCurrency`）：current / design-changed / unknown / uncommitted / missing。 */
 const textCurrency = Type.Object(
 	{
 		storyBeatId: id,
 		state: Type.Union([
 			Type.Literal("current"),
 			Type.Literal("design-changed"),
+			Type.Literal("unknown"),
 			Type.Literal("uncommitted"),
 			Type.Literal("missing"),
 		]),
@@ -329,7 +330,7 @@ export const LOCAL_COMMANDS = {
 				files: Type.Array(fileEntry),
 				/** index.yaml 声明的卷与 Beat 顺序；index 缺失或无法解析时为空。 */
 				volumes: Type.Array(volume),
-				/** 作者在 index 声明全书未完待续（`open_ended: true`）：`book_end` 的 Contract 不算到期。 */
+				/** 作者在 index 声明全书未完待续（`open_ended: true`）：已建立的 Contract 可以保持开放。 */
 				openEnded: Type.Optional(Type.Literal(true)),
 				/** index.yaml 存在但无法解码或解析时的原因；缺失时不设。Checker 在检查 / 提交时给准确诊断。 */
 				storyIndexError: Type.Optional(Type.String()),

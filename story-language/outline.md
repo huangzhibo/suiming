@@ -95,20 +95,16 @@ StoryBeat 是可独立寻址、修改、审查并写成正文的完整故事变�
 ---
 subjects:
   character: [诸葛亮, 周瑜]
-deadline: beat-0002
 ---
-军令状当众建立了三日交出十万支箭的期待。兑现时，诸葛亮必须在期限内亲自交箭，周瑜必须当众验收、面对自己的算计落空；不能由旁人替诸葛亮凑数，也不能让军令状无故作废。
+军令状建立了诸葛亮能否三日交出十万支箭的期待。回应须交代交箭结果及周瑜如何面对结果；如未能交箭，也须处理失约的原因与后果，不能让军令状无故消失。
 ```
 
-frontmatter 只有可选 `subjects / deadline`。`subjects` 与 StoryBeat `refs` 一样按 kind 分组；`deadline` 只写本地 Beat id 或 `book_end`，省略时就是 `book_end`。Markdown 主体说明故事向受众建立了什么长期期待，以及怎样才算兑现、转化或有意义地否定。Beat 用 `contracts.open / advance / resolve` 建立稀疏锚点：`open` 建立可感知的长期期待，`advance` 实质推进或改变理解，`resolve` 声明已经处理。Checker 只验证结构生命周期；语义兑现由模型判断，可记录的独立 Review 可以保存意见。
+frontmatter 只有可选 `subjects`，与 StoryBeat `refs` 一样按 kind 分组。Markdown 主体说明故事向受众建立了什么长期期待，以及怎样才算兑现、转化或有意义地否定。
 
-Checker 按下表判断 Contract 是否到期未兑现：
+Beat 用 `contracts.open / advance / resolve` 建立稀疏锚点：`open` 建立可感知的长期期待，`advance` 实质推进或改变理解，`resolve` 声明期待已得到处理。锚点记录所声明事件发生的位置，不是计划截止点，也不意味着整个回应过程只占一个瞬间：多节处理过程可用 `advance` 记录，在处理完成处用 `resolve`。`resolve` 不等于故事中的承诺成功履行；失败及其后果、转化或有意义的否定也可以回应期待。
 
-| 情况 | `deadline` 是 Beat id | `deadline` 是 `book_end` |
-| --- | --- | --- |
-| 普通 Target Design | 期限那一节或之前必须 `resolve` | 全书结束前必须 `resolve` |
-| index 写了 `open_ended: true` 的 Target，或 Source | 期限那一节或之前必须 `resolve` | 已 `open`、未 `resolve` 算进行中 |
+故事内的约定（如三日交箭）和作者的节奏要求（如本卷揭晓）写在主体里；适用于全书的作者要求写在 Intent。不得从它们自动推导精确 Beat 期限，不设默认全书期限。是否拖延、是否违背作者要求、回应是否充分由 Review 结合原文判断，Checker 不裁定这些语义问题。
 
-任何情况下，从未 `open` 的 Contract 都是错误。Source 可能只登记原作的一部分，也可能抽取未完本作品，所以它的 `book_end` 指当前登记材料的边界，不宣称原作已经完结；Source 不得为通过 Checker 伪造 `resolve`。
+Checker 检查引用存在、每节同一 Contract 只有一种操作、一次建立和一次回应、推进与回应在建立之后、推进在回应之前。任何情况下，从未 `open` 的 Contract 都是结构缺口。普通 Target 声明完整作品，因此仍要求已建立的期待有 `resolve` 处理记录；这只是完整性对账，不代表语义质量已通过。作者声明 `open_ended: true` 的 Target 与 Source 允许已建立、未回应的期待保持开放。Source 的当前材料边界不宣称原作已经完结，不能为通过 Checker 伪造回应；Target 也不能擅自改成未完待续来掩盖遗漏。
 
 人物在故事里说出承诺，首先只是 StoryBeat 中发生的事件；只有它同时形成需要跨多个 Beat 独立追踪的受众期待时，才提升为 StoryContract。普通因果、主题、关系和完整人物弧不建 Contract。

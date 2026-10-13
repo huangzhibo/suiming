@@ -13,7 +13,7 @@ export interface AxisBeat {
 	path: string;
 	/** committed = 已提交正文且与 Design 一致；incompatible = 有正文但 Design 已变化；none = 仅设计。 */
 	/** candidate：有正文但带未提交的修改（含从没提交过的）；设计已变时仍是 incompatible。 */
-	text: "committed" | "candidate" | "incompatible" | "none";
+	text: "committed" | "candidate" | "incompatible" | "unknown" | "none";
 	textPath: string | undefined;
 	dirty: boolean;
 }
@@ -34,9 +34,6 @@ export interface ContractLane {
 	resolve: number[];
 	/** resolve 之后仍出现的 advance：Checker 不报，作者要看。 */
 	late: number[];
-	deadline: string | undefined;
-	/** deadline 在轴上的位置；book_end 指向最后一个 Beat；没有或解析不到为 -1。 */
-	deadlineIndex: number;
 	subjects: string[];
 }
 
@@ -135,7 +132,9 @@ export function axisModel(book: Book, reviews: ReviewReport[]): AxisModel {
 					? "incompatible"
 					: text.dirty
 						? "candidate"
-						: "committed"
+						: currency?.state === "unknown"
+							? "unknown"
+							: "committed"
 				: "none",
 			textPath: text?.path,
 			dirty: !!(beat?.dirty || text?.dirty),
@@ -350,7 +349,6 @@ export function contractLane(
 	const advance = anchors("advance");
 	const resolve = anchors("resolve");
 	const resolveAt = resolve[0];
-	const deadline = typeof file.frontmatter.deadline === "string" ? file.frontmatter.deadline : "book_end";
 	const subjects = file.frontmatter.subjects as { character?: unknown } | undefined;
 	return {
 		path: file.path,
@@ -360,9 +358,6 @@ export function contractLane(
 		advance,
 		resolve,
 		late: resolveAt === undefined ? [] : advance.filter((ordinal) => ordinal > resolveAt),
-		deadline,
-		// 全书未完待续时 book_end 不在任何一列上：最后一个 Beat 不是结局
-		deadlineIndex: book.deadlineIndex(deadline),
 		subjects: Array.isArray(subjects?.character)
 			? subjects.character.filter((x): x is string => typeof x === "string")
 			: [],
@@ -404,6 +399,5 @@ export function contractStatus(
 	const resolved = lane.resolve.length > 0 && (lane.resolve[0] ?? 0) <= cursorIndex;
 	if (!opened) return "尚未建立";
 	if (resolved) return `已回应 · ${beatTitle(lane.resolve[0] ?? 0)}`;
-	if (lane.deadlineIndex >= 0 && cursorIndex >= lane.deadlineIndex) return "已到期限，尚未回应";
 	return "等待回应";
 }

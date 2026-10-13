@@ -94,8 +94,8 @@ function boundDesignOf(candidate: ArtifactCandidate): BoundDesign | undefined {
 
 export interface TextCurrency {
 	storyBeatId: string;
-	/** current：写成之后 Design 闭包没变；design-changed：变了，`changed` 列出哪些；uncommitted：候选里还没提交。 */
-	state: "current" | "design-changed" | "uncommitted" | "missing";
+	/** current：写成之后 Design 闭包没变；design-changed：变了，`changed` 列出哪些；unknown：历史或当前 Design 无法解析，时效不能确认；uncommitted：候选里还没提交。 */
+	state: "current" | "design-changed" | "unknown" | "uncommitted" | "missing";
 	writtenAt?: string;
 	changed: string[];
 }
@@ -191,6 +191,8 @@ export async function textCurrency(
 	const writtenAt = shared.written.get(path);
 	if (writtenAt === undefined) return { storyBeatId, state: "uncommitted", changed: [] };
 	const then = await snapshotOf(reader, shared, writtenAt);
+	if (!boundDesignOf(then) || !boundDesignOf(candidate))
+		return { storyBeatId, state: "unknown", writtenAt, changed: [] };
 	const closure = new Set([...designClosurePaths(candidate, storyBeatId), ...designClosurePaths(then, storyBeatId)]);
 	let changed = await changedBetween(reader, shared, writtenAt, head, closure);
 	const indexPath = candidate.artifacts.find(

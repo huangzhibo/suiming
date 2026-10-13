@@ -1,5 +1,5 @@
 import { type Static, Type } from "typebox";
-import { STORY_BEAT_ID_FRAGMENT, STORY_BEAT_ID_PATTERN, VOLUME_ID_PATTERN } from "./book-patterns.js";
+import { STORY_BEAT_ID_PATTERN, VOLUME_ID_PATTERN } from "./book-patterns.js";
 import { IDENTITY_ID_PATTERN, LOCAL_ID_PATTERN } from "./local-id.js";
 
 export const STYLE_REF_PATTERN = "^style_[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$";
@@ -7,7 +7,6 @@ export { IDENTITY_ID_PATTERN, LOCAL_ID_PATTERN };
 export const INTENT_ID_PATTERN = LOCAL_ID_PATTERN;
 export const STORY_CONTRACT_ID_PATTERN = LOCAL_ID_PATTERN;
 export const SHA256_PATTERN = "^[a-f0-9]{64}$";
-export const STORY_POINT_PATTERN = `^(?:book_end|${STORY_BEAT_ID_FRAGMENT})$`;
 
 export const FAMILY_LINK_KINDS = ["parent", "spouse", "sibling", "guardian"] as const;
 
@@ -60,7 +59,7 @@ export type StoryReferenceGroups = Static<typeof StoryReferenceGroupsSchema>;
 export const StoryIndexYamlSchema = Type.Object(
 	{
 		schema_version: Type.Literal(2),
-		/** 全书未完待续：最后一个 Beat 之后还有故事，`book_end` 的 Contract 不算到期。只在成立时写 true。 */
+		/** 全书未完待续：最后一个 Beat 之后还有故事，已建立的 Contract 可以保持开放。只在成立时写 true。 */
 		open_ended: Type.Optional(Type.Literal(true)),
 		volumes: Type.Array(
 			Type.Object(
@@ -138,7 +137,6 @@ export type CharacterHeader = Static<typeof CharacterHeaderSchema>;
 export const StoryContractHeaderSchema = Type.Object(
 	{
 		subjects: Type.Optional(SubjectReferenceGroupsSchema),
-		deadline: Type.Optional(Type.String({ pattern: STORY_POINT_PATTERN })),
 	},
 	{ additionalProperties: false },
 );

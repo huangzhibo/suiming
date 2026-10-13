@@ -50,10 +50,9 @@ const data = {
 		file("story-text", "text/beat-0001.md", "beat-0001", {}),
 		file("story-text", "text/beat-0002.md", "beat-0002", {}),
 		file("story-contract", "outline/contracts/诈降.md", "诈降", {
-			deadline: "beat-0002",
 			subjects: { character: ["黄盖"] },
 		}),
-		file("story-contract", "outline/contracts/未兑现.md", "未兑现", { deadline: "book_end" }),
+		file("story-contract", "outline/contracts/未兑现.md", "未兑现", {}),
 		file("story-contract", "outline/contracts/孤立.md", "孤立", {}),
 	],
 	revisions: [],
@@ -92,7 +91,7 @@ test("正文有未提交的修改时是 candidate，不当成已提交", () => {
 	);
 });
 
-test("承诺生命周期按 ordinal 计算：deadline、resolve 之后的 advance、没有锚点的承诺不画", () => {
+test("承诺生命周期按 ordinal 计算：resolve 之后的 advance、没有锚点的承诺不画", () => {
 	const model = axisModel(new Book(data), []);
 	assert.deepEqual(
 		model.contracts.map((lane) => lane.id),
@@ -101,9 +100,7 @@ test("承诺生命周期按 ordinal 计算：deadline、resolve 之后的 advanc
 	const first = model.contracts[0];
 	assert.deepEqual([first?.open, first?.advance, first?.resolve], [[0], [1, 3], [2]]);
 	assert.deepEqual(first?.late, [3]);
-	assert.equal(first?.deadlineIndex, 2);
 	assert.deepEqual(first?.subjects, ["黄盖"]);
-	assert.equal(model.contracts[1]?.deadlineIndex, 4);
 	assert.equal(contractStatus(first as NonNullable<typeof first>, 0), "等待回应");
 	assert.equal(contractStatus(first as NonNullable<typeof first>, 4), "已回应 · 第 3 个情节");
 	assert.equal(
@@ -111,19 +108,6 @@ test("承诺生命周期按 ordinal 计算：deadline、resolve 之后的 advanc
 		"已回应 · beat-0002",
 	);
 	assert.equal(contractStatus(model.contracts[1] as NonNullable<typeof first>, 2), "尚未建立");
-});
-
-test("全书未完待续（index 的 open_ended）：book_end 的承诺在最后一个 Beat 也只是等待回应，不画期限", () => {
-	const finished = axisModel(new Book(data), []).contracts[1];
-	assert.equal(contractStatus(finished as NonNullable<typeof finished>, 4), "已到期限，尚未回应");
-	const ongoing = axisModel(new Book({ ...data, openEnded: true } as WorkspaceData), []).contracts[1];
-	assert.equal(ongoing?.deadlineIndex, -1);
-	assert.equal(contractStatus(ongoing as NonNullable<typeof ongoing>, 4), "等待回应");
-	// 写明 Beat 期限的承诺不受影响
-	assert.equal(axisModel(new Book({ ...data, openEnded: true } as WorkspaceData), []).contracts[0]?.deadlineIndex, 2);
-	// 左侧身份列表用的 Book.contractState 与故事轴同一条规则
-	assert.equal(new Book(data).contractState("未兑现", 4).label, "已到期限，尚未回应");
-	assert.equal(new Book({ ...data, openEnded: true } as WorkspaceData).contractState("未兑现", 4).label, "等待回应");
 });
 
 test("可见范围：进入某一卷只画那一卷，null 或找不到的卷画全书", () => {
@@ -323,7 +307,7 @@ test("泳道只取 Target：Source 抽取里同名的人物、资源、世界与
 			source("character", "world/characters", "黄盖"),
 			source("resource", "world/resources", "火船", { initial: { holder: "黄盖" } }),
 			source("world", "world", "旧案"),
-			source("story-contract", "outline/contracts", "诈降", { deadline: "beat-0002" }),
+			source("story-contract", "outline/contracts", "诈降", {}),
 			source("story-beat", "outline/story/vol-0001", "beat-0001"),
 			source("story-beat", "outline/story/vol-0001", "beat-0002"),
 		],
@@ -400,7 +384,7 @@ test("邻域：左列是它依赖的、右列是依赖它的，按 kind 分组�
 	);
 	assert.deepEqual(
 		contract.up.map((group) => group.items.map((item) => `${item.title}:${item.key}`)),
-		[["beat-0002:deadline"], ["黄盖:subjects.character"]],
+		[["黄盖:subjects.character"]],
 	);
 });
 
@@ -489,14 +473,23 @@ test("因果弧的高随跨度一路增高，不在中途封顶；弧越多描�
 	for (const count of [10, 60, 100, 200, 449, 1000]) assert.ok(arcOpacity(count * 2) <= arcOpacity(count));
 });
 
-test("省略期待期限等同全书结束，状态列表与故事轴共用完结边界", () => {
-	const files = data.files.map((entry) => (entry.localId === "未兑现" ? { ...entry, frontmatter: {} } : entry));
+test("状态只根据实际锚点派生，不把当前最后一节变成回应期限", () => {
 	for (const openEnded of [true, false]) {
-		const book = new Book({ ...data, files, ...(openEnded ? { openEnded: true as const } : {}) });
+		const book = new Book({ ...data, ...(openEnded ? { openEnded: true as const } : {}) });
 		const lane = axisModel(book, []).contracts.find((entry) => entry.id === "未兑现");
 		assert.ok(lane);
-		assert.equal(lane.deadlineIndex, openEnded ? -1 : 4);
-		assert.equal(contractStatus(lane, 4), openEnded ? "等待回应" : "已到期限，尚未回应");
+		assert.equal(contractStatus(lane, 4), "等待回应");
 		assert.equal(book.contractState("未兑现", 4).label, contractStatus(lane, 4));
 	}
+});
+
+test("无法解析历史时不把正文画成已更新或设计未变，列表和汇总给出相同的不确定状态", () => {
+	const book = new Book({
+		...data,
+		storyText: [{ storyBeatId: "beat-0001", state: "unknown", writtenAt: "r1", changed: [] }],
+	});
+	assert.match(book.currencySummary(), /1 篇时效无法确认/u);
+	assert.doesNotMatch(book.currencySummary(), /设计已变|设计未变/u);
+	assert.match(book.currencyLabel("beat-0001")?.text ?? "", /时效无法确认/u);
+	assert.equal(axisModel(book, []).beats[0]?.text, "unknown");
 });

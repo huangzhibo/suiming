@@ -19,7 +19,7 @@ import type { StoryBeat } from "./story-outline.js";
 export interface DesignCheckResult {
 	passed: boolean;
 	state: CheckResult;
-	/** 全部阻塞性诊断：硬状态失败、到期未闭合的 Contract、未声明即揭示的 secret。 */
+	/** 全部阻塞性诊断：硬状态失败、完整作品未回应的 Contract、未声明即揭示的 secret。 */
 	diagnostics: Diagnostic[];
 	/** 不阻塞的提示：refs 疑似遗漏、已死人物再被引用、Contract subjects 未出现在锚点 Beat 的 refs。 */
 	warnings: Diagnostic[];
@@ -27,7 +27,7 @@ export interface DesignCheckResult {
 		checked: true;
 		passed: boolean;
 		results: ContractLifecycleEval[];
-		/** 已 open、未 resolve、尚未到期的 Contract；全书未完待续与 Source 材料边界上合法。 */
+		/** 已 open、未 resolve 的 Contract；全书未完待续与 Source 材料边界上合法。 */
 		openContractIds: string[];
 	};
 }
@@ -110,14 +110,11 @@ function storyProjection(design: BoundBook): StateProjection {
 	};
 }
 
-/** 与 lifecycle 的 message 一一对应：从未建立、未兑现（Beat 期限 / 全书）、过期才兑现。 */
+/** 诊断要求核对真实内容，不能诱导模型补造或前移回应记录。 */
 function contractHint(result: ContractLifecycleEval): string {
 	const id = result.contractId;
-	if (result.openedAt === null) return `在建立这个期待的 StoryBeat 里写 contracts.open: [${id}]`;
-	if (result.deadlineStoryBeatId === null) return `在兑现它的 StoryBeat 里写 contracts.resolve: [${id}]`;
-	if (result.resolvedAt === null)
-		return `在 ${result.deadlineStoryBeatId} 或更早的 StoryBeat 里写 contracts.resolve: [${id}]`;
-	return `把 contracts.resolve: [${id}] 移到 ${result.deadlineStoryBeatId} 或更早的 StoryBeat，或者改期限`;
+	if (result.openedAt === null) return `核对是否确有此期待；在实际建立它的 StoryBeat 里写 contracts.open: [${id}]`;
+	return `核对故事是否已经处理此期待，再在实际回应的 StoryBeat 里写 contracts.resolve: [${id}]；若故事仍将继续，须由作者确认 open_ended。不要为了通过检查伪造回应。`;
 }
 
 function contractDiagnostics(design: BoundBook, results: readonly ContractLifecycleEval[]): Diagnostic[] {

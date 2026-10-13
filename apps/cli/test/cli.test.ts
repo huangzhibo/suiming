@@ -701,7 +701,7 @@ test("设计能绑定但 Checker 不通过时，check 成功返回逐条诊断�
 			JSON.stringify(errors),
 		);
 
-		// 「全书未完待续时 book_end 的期待算进行中」是 Checker 规则，story 的 design.test 与 check-tool.test 守，这里不重复。
+		// 「全书未完待续时已建立未回应的期待算进行中」是 Checker 规则，story 的 design.test 与 check-tool.test 守，这里不重复。
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 	}

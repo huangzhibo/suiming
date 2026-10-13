@@ -28,10 +28,10 @@ test("一次绑定报出全部跨文档错误，而不是首错即停", () => {
 		"  secret: [苦肉计]",
 		"  secret: [苦肉计]\n  beat: [beat-0002]",
 	);
-	// 3. Contract 引用不存在的 Beat 作为 deadline
+	// 3. Contract 引用不存在的主体
 	const contract = documents.contracts[0];
 	assert.ok(contract);
-	contract.markdown = contract.markdown.replace("deadline: beat-0002", "deadline: beat-0099");
+	contract.markdown = contract.markdown.replace("character: [黄盖]", "character: [无此人]");
 	// 4. Intent subjects 引用不存在的地点
 	const intent = documents.intents[0];
 	assert.ok(intent);
@@ -53,7 +53,7 @@ test("一次绑定报出全部跨文档错误，而不是首错即停", () => {
 	assert.equal(caught.diagnostics.length, 5, messages.join("\n"));
 	assert.ok(messages.some((message) => message.includes("character:不存在的人")));
 	assert.ok(messages.some((message) => message.includes("只能依赖故事顺序里更早的 Beat")));
-	assert.ok(messages.some((message) => message.includes("beat-0099")));
+	assert.ok(messages.some((message) => message.includes("无此人")));
 	assert.ok(messages.some((message) => message.includes("place:无此地")));
 	assert.ok(messages.some((message) => message.includes("不存在的地方")));
 	assert.ok(caught.diagnostics.every((item) => item.severity === "error"));

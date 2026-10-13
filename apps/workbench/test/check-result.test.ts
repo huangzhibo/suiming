@@ -65,12 +65,12 @@ test("诊断按文件归类：有错误的文件在前、组内错误在前，�
 		error(undefined, "全书级问题"),
 		warning("outline/story/vol-0001/beat-0002.md", "提到了火船"),
 		error("outline/story/vol-0001/beat-0002.md", "引用不存在"),
-		error("outline/contracts/诈降.md", "到期未兑现"),
+		error("outline/contracts/诈降.md", "作品声明完结，但没有回应记录"),
 	]);
 	assert.deepEqual(
 		groups.map((group) => [group.path, group.errors, group.warnings, group.items.map((item) => item.detail)]),
 		[
-			["outline/contracts/诈降.md", 1, 0, ["到期未兑现"]],
+			["outline/contracts/诈降.md", 1, 0, ["作品声明完结，但没有回应记录"]],
 			["outline/story/vol-0001/beat-0002.md", 1, 1, ["引用不存在", "提到了火船"]],
 			["outline/story/vol-0001/beat-0001.md", 0, 1, ["提到了黄盖"]],
 			[undefined, 1, 0, ["全书级问题"]],
@@ -130,7 +130,7 @@ test("检查提示：通过且无诊断不给详情，有警告、未通过或�
 				designPassed: false,
 				storyTextPassed: false,
 				storyTextFailures: [...missing, { storyBeatId: "beat-0001", code: "empty_text", message: "正文为空" }],
-				diagnostics: [error("c.md", "到期未兑现"), warning("a.md", "提到了黄盖")],
+				diagnostics: [error("c.md", "作品声明完结，但没有回应记录"), warning("a.md", "提到了黄盖")],
 			}),
 		}),
 		{ text: "检查未通过：设计 / 正文；1 处错误、1 条警告；1 篇正文有问题。", tone: "warn", details: true },

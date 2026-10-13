@@ -43,12 +43,12 @@ test("故事状态按幕前 / 变化 / 幕后区分人物与读者知情，复�
 		assert.match(before.text, /火船 · 持有者：黄盖/);
 		// 有人拿着的物品，位置是原子规则隐含清空的「无」，单列一行只是噪声。
 		assert.doesNotMatch(before.text, /火船 · 位置/);
-		assert.match(before.text, /诈降：尚未开启/);
+		assert.match(before.text, /诈降：尚未建立/);
 		assert.ok(!before.paths.some((path) => path.endsWith("beat-0002.md")), "未来 Beat 不成为状态依据");
 		const after = await query("design:state:beat-0001:after");
 		assert.match(after.text, /黄盖 · 连环计 · 已揭示：是/);
 		assert.doesNotMatch(after.text, /读者 · 连环计/);
-		assert.match(after.text, /诈降：待兑现/);
+		assert.match(after.text, /诈降：等待回应/);
 		const changes = await query("design:state:beat-0002:changes");
 		assert.match(changes.text, /火船 · 持有者：黄盖 → 无/);
 		// 桌面只编译 Write Context 与设计视图；其余种类原来静默退回一份裁剪过的 Design Frame，结果是错的。
@@ -56,11 +56,11 @@ test("故事状态按幕前 / 变化 / 幕后区分人物与读者知情，复�
 			await assert.rejects(query(task), { code: "unsupported_context_task" }, task);
 		assert.match(changes.text, /火船 · 已消耗：未记录 → 是/);
 		assert.match(changes.text, /读者 · 连环计 · 已揭示：未记录 → 是/);
-		assert.match(changes.text, /诈降：兑现/);
+		assert.match(changes.text, /诈降：回应/);
 		const final = await query("design:state:beat-0002:after:resource:火船");
 		assert.match(final.text, /火船 · 已消耗：是/);
 		assert.doesNotMatch(final.text, /持有者：黄盖/);
-		assert.match(final.text, /诈降：已兑现/);
+		assert.match(final.text, /诈降：已回应/);
 		const character = await query("design:state:beat-0002:after:character:黄盖");
 		assert.match(character.text, /黄盖 · 连环计 · 已揭示：是/);
 		assert.doesNotMatch(character.text, /读者 · 连环计/);

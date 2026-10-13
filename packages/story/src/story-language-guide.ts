@@ -6,7 +6,6 @@ import {
 	IDENTITY_ID_PATTERN,
 	IdentityHeaderSchema,
 	LOCAL_ID_PATTERN,
-	STORY_POINT_PATTERN,
 	StoryBeatHeaderSchema,
 	StoryContractHeaderSchema,
 	StoryIndexYamlSchema,
@@ -44,7 +43,6 @@ function patternLabel(pattern: string | undefined): string {
 	if (pattern === STORY_BEAT_ID_PATTERN) return "beat-id";
 	if (pattern === LOCAL_ID_PATTERN) return "local-id";
 	if (pattern === IDENTITY_ID_PATTERN) return "identity-id";
-	if (pattern === STORY_POINT_PATTERN) return "book_end | beat-id";
 	return "string";
 }
 
@@ -125,7 +123,7 @@ const GUIDE_PREAMBLE =
 
 /** `open_ended` 的形状由 schema 给出，谁有权写、写了意味着什么必须同屏说清：它不是让检查通过的开关。 */
 const OPEN_ENDED_NOTE =
-	"`open_ended: true` 是作者声明全书未完待续（连载、结局未定）：最后一个 Beat 不是结局，`deadline: book_end` 的 Contract 已建立未回应时算进行中；写明 Beat 期限的 Contract 照样要按期回应，从未建立的照样报错。只有作者说过全书未完待续才写，不能为了让检查通过自己加；全书写完删掉这一行。";
+	"`open_ended: true` 是作者声明全书未完待续（连载、结局未定）：最后一个 Beat 不是结局，Contract 已建立未回应时算进行中，从未建立的照样报错。只有作者说过全书未完待续才写，不能为了让检查通过自己加；全书写完删掉这一行。";
 
 function designSections(root: string): string[] {
 	const prefix = root === "" ? "" : `${root}/`;

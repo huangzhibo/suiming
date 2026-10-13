@@ -82,7 +82,7 @@ changes:
 				id: "诈降",
 				path: "outline/contracts/诈降.md",
 				markdown:
-					"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\n  secret: [苦肉计]\ndeadline: beat-0002\n---\n黄盖的投降是假的，约定之夜必须兑现成一把火，火船随之烧尽。",
+					"---\nsubjects:\n  character: [黄盖]\n  resource: [火船]\n  secret: [苦肉计]\n---\n黄盖的投降是假的，约定之夜必须兑现成一把火，火船随之烧尽。",
 			},
 		],
 		intents: [

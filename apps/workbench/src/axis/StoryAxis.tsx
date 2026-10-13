@@ -685,7 +685,9 @@ export function StoryAxis({
 																? `${beat.title}：仅有设计，尚无正文`
 																: beat.text === "incompatible"
 																	? `${beat.title}：已有正文，所依据的设计已有更新，请核对`
-																	: `${beat.title}：${beat.dirty ? "正文有未提交修改" : "已提交正文"}`
+																	: beat.text === "unknown"
+																		? `${beat.title}：已有正文，历史或当前设计无法解析，时效无法确认`
+																		: `${beat.title}：${beat.dirty ? "正文有未提交修改" : "已提交正文"}`
 														}
 														key={`${row.key}:${beat.id}`}
 													>
@@ -695,7 +697,9 @@ export function StoryAxis({
 																	? `${beat.title}：仅有设计，尚无正文`
 																	: beat.text === "incompatible"
 																		? `${beat.title}：已有正文，所依据的设计已有更新，请核对`
-																		: `${beat.title}：${beat.dirty ? "正文有未提交修改" : "已提交正文"}`
+																		: beat.text === "unknown"
+																			? `${beat.title}：已有正文，历史或当前设计无法解析，时效无法确认`
+																			: `${beat.title}：${beat.dirty ? "正文有未提交修改" : "已提交正文"}`
 															}
 															cx={cx(beat.ordinal)}
 															cy={midY}
@@ -705,7 +709,9 @@ export function StoryAxis({
 																	? "var(--success)"
 																	: beat.text === "incompatible"
 																		? "url(#axis-design-changed)"
-																		: "none"
+																		: beat.text === "unknown"
+																			? "var(--muted-foreground)"
+																			: "none"
 															}
 															stroke={
 																beat.text === "committed"
@@ -976,16 +982,15 @@ export function StoryAxis({
 								if (row.kind !== "contract") return null;
 								const lane = row.lane;
 								const first = lane.open[0] ?? lane.advance[0] ?? 0;
-								const last =
-									lane.resolve[0] ?? (lane.deadlineIndex >= 0 ? lane.deadlineIndex : model.beats.length - 1);
+								const last = lane.resolve[0] ?? model.beats.length - 1;
 								return (
 									<g key={row.key}>
 										{first <= range.end && last >= range.start && (
 											<Hint
-												content={`${lane.title}：建立 ${lane.open.length} 次 · 推进 ${lane.advance.length} 次 · ${lane.resolve.length ? "已回应" : "尚未回应"}\n回应期限：${lane.deadline === "book_end" ? book.bookEndLabel : lane.deadline ? book.beatTitle(lane.deadline) : "未设置"}\n涉及对象：${lane.subjects.join("、") || "未设置"}`}
+												content={`${lane.title}：建立 ${lane.open.length} 次 · 推进 ${lane.advance.length} 次 · ${lane.resolve.length ? "已回应" : "尚未回应"}\n涉及对象：${lane.subjects.join("、") || "未设置"}`}
 											>
 												<line
-													aria-label={`${lane.title}：建立 ${lane.open.length} 次 · 推进 ${lane.advance.length} 次 · ${lane.resolve.length ? "已回应" : "尚未回应"}\n回应期限：${lane.deadline === "book_end" ? book.bookEndLabel : lane.deadline ? book.beatTitle(lane.deadline) : "未设置"}\n涉及对象：${lane.subjects.join("、") || "未设置"}`}
+													aria-label={`${lane.title}：建立 ${lane.open.length} 次 · 推进 ${lane.advance.length} 次 · ${lane.resolve.length ? "已回应" : "尚未回应"}\n涉及对象：${lane.subjects.join("、") || "未设置"}`}
 													x1={clampX(first)}
 													y1={midY}
 													x2={clampX(last)}
@@ -997,21 +1002,7 @@ export function StoryAxis({
 												></line>
 											</Hint>
 										)}
-										{lane.deadlineIndex >= 0 && inRange(lane.deadlineIndex) && (
-											<Hint
-												content={`回应期限：${lane.deadline === "book_end" ? book.bookEndLabel : book.beatTitle(lane.deadline ?? "")}`}
-											>
-												<line
-													aria-label={`回应期限：${lane.deadline === "book_end" ? book.bookEndLabel : book.beatTitle(lane.deadline ?? "")}`}
-													x1={cx(lane.deadlineIndex)}
-													y1={midY - 9}
-													x2={cx(lane.deadlineIndex)}
-													y2={midY + 9}
-													stroke="var(--amber)"
-													strokeWidth={1.5}
-												></line>
-											</Hint>
-										)}
+
 										{lane.advance
 											.filter((ordinal) => inRange(ordinal))
 											.map((ordinal) => (

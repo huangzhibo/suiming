@@ -112,11 +112,9 @@ function rootBeats(design: BoundDesign, subject: StoryImpactSubject): { roots: S
 			const contract = design.contracts.find((entry) => entry.id === subject.id);
 			if (contract === undefined)
 				throw new ArtifactError("contract_not_found", `StoryContract not found: ${subject.id}`);
-			const deadline = contract.deadline.kind === "story_beat" ? contract.deadline.storyBeatId : undefined;
 			return {
 				roots: story.beats.filter(
 					(beat) =>
-						beat.id === deadline ||
 						beat.contracts.open.includes(subject.id) ||
 						beat.contracts.advance.includes(subject.id) ||
 						beat.contracts.resolve.includes(subject.id),
