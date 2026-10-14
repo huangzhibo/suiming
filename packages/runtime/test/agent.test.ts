@@ -681,6 +681,7 @@ test("子任务的开场输入就过了压缩线：一次请求都不发，作�
 		assert.equal(outcome.failure, undefined, "不掀掉根 Agent 这一轮");
 		assert.match(rejection, /delegation_too_large/u);
 		assert.match(rejection, /拆小/u);
+		assert.doesNotMatch(rejection, /resume_task/u, "开场超窗需要缩小范围，不建议原样续做");
 		assert.equal(f.provider.state.callCount, 2, "子任务一次请求都没发");
 		assert.deepEqual(
 			f.project.loadExecutionEntities().tasks.map((task) => [task.kind, task.status]),
@@ -1780,5 +1781,80 @@ test("整轮观测区分成功、失败与主动停止，模型调用能与工�
 	} finally {
 		await f.close();
 		await telemetry.shutdown();
+	}
+});
+
+test("独立审稿模型失败后交回可续做的任务编号：下一轮沿用模型与已读进度，只产生一份审稿和一个新版本", async () => {
+	const f = await fixture();
+	try {
+		const models = createModels();
+		models.setProvider(f.provider.provider);
+		models.setProvider(f.alternate.provider);
+		const harness = new SuimingHarness({
+			project: f.project,
+			models: new ModelGateway(models, {
+				profiles: {
+					main: { provider: f.provider.provider.id, model: f.provider.getModel().id },
+					reviewer: { provider: f.alternate.provider.id, model: f.alternate.getModel().id },
+				},
+			}),
+		});
+		let rejection = "";
+		f.provider.setResponses([
+			call("review", { layer: "design" }),
+			async (context) => {
+				rejection = JSON.stringify(context.messages.at(-1));
+				return reply("审稿模型暂时失败，进度已保存。");
+			},
+		]);
+		f.alternate.setResponses([
+			call("read", { path: "world/characters/黄盖.md" }),
+			{ ...reply(""), stopReason: "error", errorMessage: "synthetic reviewer rejected request" },
+		]);
+		const session = await harness.createSession();
+		f.project.queueInbox(session.id, "独立审稿");
+		const failed = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+		assert.equal(failed.failure, undefined, "独立模型故障不掀掉根对话");
+		const task = f.project.loadExecutionEntities().tasks[0];
+		assert.ok(task);
+		assert.equal(task.status, "failed");
+		assert.equal(task.failure?.code, "model_call_failed");
+		assert.match(rejection, /model_call_failed/u);
+		assert.match(rejection, /synthetic reviewer rejected request/u);
+		assert.ok(rejection.includes(task.id), "父模型必须拿到真实任务编号，才能续做而非重建审稿");
+		assert.match(rejection, /resume_task/u);
+		f.provider.setResponses([
+			call("resume_task", { taskId: task.id }),
+			call("commit", { summary: "保存恢复后的独立审稿" }),
+			reply("审稿完成并提交。"),
+		]);
+		f.alternate.setResponses([
+			async (context) => {
+				assert.ok(
+					context.messages.some((message) => message.role === "toolResult" && message.toolName === "read"),
+					"已完成的读取仍在原子任务进度中",
+				);
+				return call("submit_review", {
+					verdict: "pass",
+					summary: "设计一致。",
+					findings: [],
+					uncovered: [],
+					uncertainties: [],
+				});
+			},
+		]);
+		f.project.queueInbox(session.id, "继续");
+		const resumed = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
+		assert.equal(resumed.failure, undefined);
+		const tasks = f.project.loadExecutionEntities().tasks;
+		assert.equal(tasks.length, 1);
+		assert.equal(tasks[0]?.id, task.id);
+		assert.equal(tasks[0]?.status, "completed");
+		assert.equal(tasks[0]?.model?.provider, f.alternate.provider.id);
+		assert.equal((await readdir(join(f.root, "review"))).length, 1);
+		assert.equal((await f.project.history()).length, 2);
+		await assertAgUiConformance(f.project);
+	} finally {
+		await f.close();
 	}
 });

@@ -331,6 +331,40 @@ if (process.argv.includes("--product-audit-test")) {
 		});
 	provider.setResponses([fauxAssistantMessage("已核对作品状态，作品未修改。".repeat(20))]);
 }
+let reviewerProfile: { provider: string; model: string } | undefined;
+if (process.argv.includes("--reviewer-recovery-test")) {
+	const reviewer = fauxProvider({ provider: "independent-reviewer-test" });
+	models.setProvider(reviewer.provider);
+	reviewerProfile = { provider: reviewer.provider.id, model: reviewer.getModel().id };
+	reviewer.setResponses([
+		fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+		{ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "测试：独立审稿模型暂时不可用" },
+		(context) => {
+			if (!context.messages.some((message) => message.role === "toolResult" && message.toolName === "read"))
+				throw new Error("审稿恢复丢失已读取的进度");
+			return fauxAssistantMessage(
+				fauxToolCall("submit_review", {
+					verdict: "pass",
+					summary: "设计连续，恢复后的审稿完成。",
+					findings: [],
+					uncovered: [],
+					uncertainties: [],
+				}),
+			);
+		},
+	]);
+	provider.setResponses([
+		fauxAssistantMessage(fauxToolCall("review", { layer: "design" })),
+		fauxAssistantMessage("独立审稿模型暂时失败，已读进度仍在。恢复服务后说继续即可。"),
+		(context) => {
+			const taskId = /taskId: \\"(task_[0-9a-f-]+)\\"/u.exec(JSON.stringify(context.messages))?.[1];
+			if (!taskId) throw new Error("失败结果没有给出续做任务编号");
+			return fauxAssistantMessage(fauxToolCall("resume_task", { taskId }));
+		},
+		fauxAssistantMessage(fauxToolCall("commit", { summary: "提交恢复后的独立审稿" })),
+		fauxAssistantMessage("已沿用原审稿进度完成并提交。"),
+	]);
+}
 models.setProvider(provider.provider);
 const profile = { provider: provider.provider.id, model: provider.getModel().id };
 if (modelTest) {
@@ -365,5 +399,6 @@ if (modelTest) {
 } else if (process.argv.includes("--unconfigured-model-test")) startDesktop();
 else
 	startDesktop({
-		models: async () => new ModelGateway(models, { profiles: { main: profile, reviewer: profile } }),
+		models: async () =>
+			new ModelGateway(models, { profiles: { main: profile, reviewer: reviewerProfile ?? profile } }),
 	});

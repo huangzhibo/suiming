@@ -122,12 +122,18 @@ const CHILD_FAILURE_CODES = new Set([
 	"model_output_truncated",
 	"run_no_progress",
 ]);
-async function childOutcome<T>(body: () => Promise<T>): Promise<T> {
+async function childOutcome<T>(body: () => Promise<T>, progress: () => string): Promise<T> {
 	try {
 		return await body();
 	} catch (error) {
-		if (error instanceof SuimingHarnessError && CHILD_FAILURE_CODES.has(error.code))
-			throw new ToolRejection(error.code, `子任务没有完成：${error.message}`, { cause: error });
+		if (error instanceof SuimingHarnessError && CHILD_FAILURE_CODES.has(error.code)) {
+			// 暂时的调用失败和未交付仍有可复用的进度；只给错误文字会让父模型拿不到 taskId，只能重建任务。
+			// 开场超窗、模型不可用和反复无进展需要改范围或方向，不建议原样重试。
+			const resumable = ["model_call_failed", "model_output_truncated", "task_not_submitted"].includes(error.code);
+			throw new ToolRejection(error.code, `子任务没有完成：${error.message}${resumable ? `\n${progress()}` : ""}`, {
+				cause: error,
+			});
+		}
 		throw error;
 	}
 }
@@ -331,7 +337,10 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 			result: () => submission,
 			resultMediaType: "application/vnd.suiming.task-result+json",
 		};
-		const child = await childOutcome(() => session.executeChild(parent, actionId, spec));
+		const child = await childOutcome(
+			() => session.executeChild(parent, actionId, spec),
+			() => childProgress(session, actionId),
+		);
 		return text({ taskId: child.taskId, result: child.result });
 	};
 	return {
@@ -372,7 +381,10 @@ function review(session: HarnessSession, parent: TaskHandle): HarnessTool<typeof
 		} catch (error) {
 			requireDomain(error);
 		}
-		const child = await childOutcome(() => session.executeChild(parent, actionId, task.spec));
+		const child = await childOutcome(
+			() => session.executeChild(parent, actionId, task.spec),
+			() => childProgress(session, actionId),
+		);
 		const report = task.reportOf(child.result);
 		return text({
 			taskId: child.taskId,
@@ -425,7 +437,7 @@ function resumeTask(session: HarnessSession, tools: HarnessTool[]): HarnessTool<
 	return {
 		name: "resume_task",
 		description:
-			"接着做一个被打断的子任务（委派或审稿）：从它自己保存的进度继续，不从头来，目标与范围沿用当初的；已经做完的直接交回结果。被打断的委派在动作结果里给出 taskId。同一次回复里续几个读原文或分段抽取的子任务会同时执行。",
+			"接着做一个被打断或暂时失败的子任务（委派或审稿）：从它自己保存的进度继续，不从头来，目标与范围沿用当初的；已经做完的直接交回结果。可续做的失败或被打断的委派在动作结果里给出 taskId。同一次回复里续几个读原文或分段抽取的子任务会同时执行。",
 		parameters: ResumeTaskSchema,
 		async parallel(params) {
 			try {
