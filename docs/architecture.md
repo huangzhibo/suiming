@@ -163,6 +163,8 @@ Local SQLite 使用版本检查、幂等 command receipt 与 owner / lease 边�
 
 三者以 `sessionId / turn id / taskId / traceId / ProjectRevision` 关联，不互相镜像。观测后端不可用时任务仍须正确完成（`telemetry.test.ts`「观测 flush / shutdown 超时和故障均不抛回业务」）。
 
+观测按 turn 记 completed / failed / stopped，generation 与工具共用持久 `model_call_id`。来源由桌面 / CLI 入口设置，环境和构建由进程配置标识。默认只导出运行元数据；显式开启内容采集后，才发送过滤且有界的模型请求 / 响应、工具内容和本轮输入 / 回复。关闭时不构造内容副本，不把观测 payload 写回执行状态；过滤不保证匿名化，配置与限制见 [ADR-0024](adr/0024-observability-results-and-content.md) 和根目录 `.env.example`。
+
 Review 使用独立 Task、独立 Context 与 `reviewer` profile，不强制不同厂商；模型只返回 ReviewDraft，`submit_review` 校验 schema、范围与每条引文逐字出自被审文件（Source 审稿也可以引原作）后写成 `review/<id>.md`，随下一次 commit 进版本；意见锚定实际路径，可被 Agent 反驳。同一候选不通过重复采样追求 pass；发现问题后由 Agent 修订，再决定是否建立新 Task，不建立无界回边。
 
 正式 Eval 不能先于可信样本：先用真实长篇暴露失败，从失败中抽取确定性长程题作为 C 的最低证据，R 的强基线是同模型、同 Intent 的整书或逐章直写。策略、Context、模型路由的改进走固定输入的 paired eval，达标晋级、可回退；生成模型不能裁决自己的晋级，宪法与作者 Intent 不被运行反馈自动改写。

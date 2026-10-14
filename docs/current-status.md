@@ -20,7 +20,7 @@
 | 大量版本与长对话 | 10 / 100 / 500 版本检索、键盘和文件保持；真实 1314 动作历史按需加载，侧栏 / 主工作面不溢出 | [规模操作验收](validation/2026-10-14-version-and-conversation/README.md)；不等于长篇持续运行性能验收 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓测试 484 项中 479 通过、5 skip；工作台 74 / 74 | 外部集成的 skip 不记通过；此前一次性 PostgreSQL / MinIO 集成有独立通过记录。本次编辑器修改后复跑全仓测试 |
+| 自动检查 | 最近全仓检查通过；全仓测试 488 项中 483 通过、5 skip；工作台 74 / 74 | 外部集成的 skip 不记通过；此前一次性 PostgreSQL / MinIO 集成有独立通过记录。本次观测接入修改后复跑全仓测试 |
 | 桌面与窗口 | 最终完整桌面 42 / 42 通过、0 skip，含 macOS 原生全屏 | [长正文验收](validation/2026-10-14-long-editor/README.md)；此前锁屏失败与补验历史仍保留在原记录 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
@@ -40,7 +40,7 @@
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | Cloud Canon 与显式同步 | `packages/cloud-*`、`apps/api` | 机制；真实 PostgreSQL 18.6 与 MinIO 上 11 项集成测试 2026-09-30 真跑通过 |
-| 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；2026-10-13 创作闭环的 45 次已确认模型调用已核对 |
+| 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |
 | 盲评 `suim rank` | `harness/rank-experiment.ts` | 机制；与作者判断的一致率还没量过。两种口径见[路线图](roadmap.md)第 5 节 |
 | 长篇 | — | 无 |
 

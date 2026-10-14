@@ -1,0 +1,85 @@
+{
+  "synthetic": [
+    {
+      "capture": false,
+      "scenario": "completed",
+      "sessionId": "session_6f167158-db0a-419c-a7e1-b4dd0c94725c",
+      "failure": null,
+      "count": 10,
+      "traceId": "eae9cf70fa9c0c698671af31255d50d7",
+      "level": "DEFAULT"
+    },
+    {
+      "capture": false,
+      "scenario": "failed",
+      "sessionId": "session_4e519abb-9012-422d-a94d-7073ba68fe4c",
+      "failure": "turn_failed",
+      "count": 1,
+      "traceId": "0c24416447a1d7b7fbcdc681d319fdb3",
+      "level": "ERROR"
+    },
+    {
+      "capture": false,
+      "scenario": "stopped",
+      "sessionId": "session_6043947d-08d5-40f1-bd60-71cec0c3f83d",
+      "failure": null,
+      "count": 1,
+      "traceId": "64ff7f768218db2d4e4bf3656c25973f",
+      "level": "WARNING"
+    },
+    {
+      "capture": true,
+      "scenario": "completed",
+      "sessionId": "session_51635bf9-6afc-4f2f-86b7-4a2a420925b0",
+      "failure": null,
+      "count": 10,
+      "traceId": "f1668fa5d7d7114da6252d7ff3a38b4d",
+      "level": "DEFAULT"
+    },
+    {
+      "capture": true,
+      "scenario": "failed",
+      "sessionId": "session_f24e1e10-fa42-4cd8-a25e-d6fa50294fe5",
+      "failure": "turn_failed",
+      "count": 1,
+      "traceId": "7698f33ca05be1733ff540523e111dc2",
+      "level": "ERROR"
+    },
+    {
+      "capture": true,
+      "scenario": "stopped",
+      "sessionId": "session_453211e0-134a-447d-812b-54c08686dd13",
+      "failure": null,
+      "count": 1,
+      "traceId": "a7f14e99e7bb0ef0658b005bc96de89e",
+      "level": "WARNING"
+    }
+  ],
+  "realSmoke": {
+    "traceId": "40cf443f44243476c85d1b658ba77c0e",
+    "sessionId": "session_84e4976d3bba1aba0bf5084e999d5189040ec666070aaa5f8c9a195303dbcf63",
+    "count": 2,
+    "model": "gpt-6.1-sol",
+    "modelCallId": "call_3cb7da72-c681-4cc1-bbb5-2aa4f5d15f54",
+    "cost": 0.02037,
+    "usage": {
+      "input": 5685,
+      "output": 900,
+      "input_cache_read": 0,
+      "input_cache_write": 0,
+      "total": 6585
+    },
+    "ttft": 11.025,
+    "inputBytes": 23943,
+    "inputTruncated": false,
+    "outcome": "completed",
+    "entrypoint": "cli",
+    "release": "langfuse-audit-20261014"
+  },
+  "tests": {
+    "total": 488,
+    "passed": 483,
+    "skipped": 5,
+    "desktopTelemetryPassed": 2
+  }
+}
