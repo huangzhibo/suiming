@@ -37,7 +37,7 @@ export function traceModelCall(
 	telemetryContext: TelemetryContext,
 	binding: ModelBindingSnapshot,
 	callback: (span: TelemetrySpan) => Promise<AssistantMessage>,
-	request?: { context: Context; modelCallId?: string },
+	request?: { context: Context; modelCallId?: string; purpose?: "compaction" },
 ): Promise<AssistantMessage> {
 	return telemetryContext.startSpan(
 		{
@@ -45,6 +45,7 @@ export function traceModelCall(
 			attributes: {
 				"langfuse.observation.type": "generation",
 				"langfuse.observation.metadata.model_call_id": request?.modelCallId,
+				"langfuse.observation.metadata.purpose": request?.purpose ?? "execution",
 				"gen_ai.operation.name": "chat",
 				"gen_ai.provider.name": binding.provider,
 				"gen_ai.request.model": binding.model,

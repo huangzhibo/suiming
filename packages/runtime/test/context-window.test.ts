@@ -14,8 +14,7 @@ import type { HarnessTool } from "../src/harness/tool.js";
 import { ModelGateway } from "../src/model/model-gateway.js";
 
 /**
- * 会话永续，上下文就必须有生命周期（2026-10-01 Harness 审查 F3）：请求接近窗口时先清掉较早的工具结果，
- * 仍然太大就请模型压缩，provider 报超限时清理后重试一次，实在放不下就如实报 context_overflow。
+ * 接近窗口与超限恢复共用摘要路径；原消息保留，近期原话和工具调用配对不能丢。
  * 这里的 faux provider 按请求大小拒绝超限请求，和真实 provider 一样。
  */
 
@@ -91,204 +90,12 @@ function bigTool(size: number): HarnessTool {
 }
 
 /** 校准前的估计不超过窗口、校准后又高于压缩线的长度；faux 按字符数 / 4 计，harness 起初按字节数 / 3 估。 */
-const PROMPT_CHARS = 17000;
 
 function lastToolResults(context: Transcript): string[] {
 	return context.messages
 		.filter((message) => message.role === "toolResult")
 		.map((message) => message.content.map((part) => (part.type === "text" ? part.text : "")).join(""));
 }
-
-test("请求接近窗口时清掉较早的工具结果：发出的请求不超窗口，原消息不改，最近一次的结果保留", async () => {
-	const window = 4000;
-	const { provider, model } = await fixture(window);
-	const seen: Transcript[] = [];
-	const step = async (context: Transcript) => {
-		seen.push(context);
-		const tokens = tokensOf(context);
-		if (tokens > window) return overflow(tokens, window);
-		return seen.length <= 8 ? fauxAssistantMessage(fauxToolCall("big", {})) : fauxAssistantMessage("读完了");
-	};
-	provider.setResponses(Array.from({ length: 9 }, () => step));
-	let checkpoint: LoopCheckpoint | undefined;
-	const outcome = await runTaskLoop({
-		model,
-		systemPrompt: "测试",
-		prompt: "反复读",
-		tools: [bigTool(2400)],
-		budget: { maxTurns: 20 },
-		saveCheckpoint: async (next) => {
-			checkpoint = structuredClone(next);
-		},
-	});
-	assert.equal(outcome.stop, "model_stopped");
-	assert.ok(
-		seen.every((context) => tokensOf(context) <= window),
-		"每个请求都在窗口内",
-	);
-	const last = lastToolResults(seen.at(-1) as Transcript);
-	assert.match(last.at(-1) ?? "", /^第8段：/u, "最近一次的结果原样发送");
-	assert.ok(
-		last.some((text) => text.includes("已清除")),
-		"较早的结果换成了占位",
-	);
-	const stored = (checkpoint?.messages ?? []).filter((message) => message.role === "toolResult");
-	assert.equal(stored.length, 8);
-	assert.ok(
-		stored.every((message) => JSON.stringify(message.content).includes("黄盖受刑")),
-		"checkpoint 里的原消息一字不改",
-	);
-});
-
-test("provider 报上下文超限时清掉较早的工具结果重试一次，turn 照常结束", async () => {
-	// 模型目录说窗口很大，provider 实际只收 4000：主动清理不会触发，靠报错后的重试兜住。
-	const limit = 4000;
-	const { provider, model } = await fixture(1_000_000);
-	let overflows = 0;
-	let calls = 0;
-	const step = async (context: Transcript) => {
-		calls += 1;
-		const tokens = tokensOf(context);
-		if (tokens > limit) {
-			overflows += 1;
-			return overflow(tokens, limit);
-		}
-		return lastToolResults(context).length < 9
-			? fauxAssistantMessage(fauxToolCall("big", {}))
-			: fauxAssistantMessage("读完了");
-	};
-	provider.setResponses(Array.from({ length: 12 }, () => step));
-	let checkpoint: LoopCheckpoint | undefined;
-	const outcome = await runTaskLoop({
-		model,
-		systemPrompt: "测试",
-		prompt: "反复读",
-		tools: [bigTool(2400)],
-		budget: { maxTurns: 20 },
-		saveCheckpoint: async (next) => {
-			checkpoint = structuredClone(next);
-		},
-	});
-	assert.equal(outcome.stop, "model_stopped");
-	assert.equal(overflows, 1, "清理后重试一次就够了");
-	assert.ok(
-		!(checkpoint?.messages ?? []).some((message) => message.role === "assistant" && message.stopReason === "error"),
-		"报超限的那次响应撤回，不留在消息列表里",
-	);
-	assert.ok(calls <= 12);
-});
-
-test("清掉工具结果后仍然偏大：请求末尾请模型先 compact_context，压缩后接着做", async () => {
-	const window = 6000;
-	const { provider, model } = await fixture(window);
-	const seen: Transcript[] = [];
-	let compacted = false;
-	const step = async (context: Transcript) => {
-		seen.push(context);
-		const tokens = tokensOf(context);
-		if (tokens > window) return overflow(tokens, window);
-		const last = context.messages.at(-1);
-		const asked = last?.role === "user" && JSON.stringify(last.content).includes("compact_context");
-		if (asked && !compacted) {
-			compacted = true;
-			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "已经讨论了黄盖诈降的代价。" }));
-		}
-		if (compacted) return fauxAssistantMessage("压缩后接着说完。");
-		// 工具结果很小，清不出多少；占地方的是模型自己的长回复。
-		return fauxAssistantMessage([
-			{ type: "text", text: "黄盖在军杖落下前停了一下。".repeat(120) },
-			fauxToolCall("note", { n: seen.length }),
-		]);
-	};
-	provider.setResponses(Array.from({ length: 30 }, () => step));
-	const note: HarnessTool = {
-		name: "note",
-		description: "记一笔",
-		// 每次记的不一样：同一动作同一结果连续三次会被当成空转停下（run_no_progress）。
-		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
-		rereadable: true,
-		execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-	};
-	const { compactContextTool } = await import("../src/harness/tools.js");
-	const outcome = await runTaskLoop({
-		model,
-		systemPrompt: "测试",
-		prompt: "讨论",
-		tools: [note, compactContextTool()],
-		budget: { maxTurns: 40 },
-	});
-	assert.equal(outcome.stop, "model_stopped");
-	assert.equal(compacted, true, "模型被请求压缩并照做了");
-	assert.ok(
-		seen.every((context) => tokensOf(context) <= window),
-		"没有请求超出窗口",
-	);
-	assert.ok(tokensOf(seen.at(-1) as Transcript) < tokensOf(seen.at(-2) as Transcript), "压缩之后请求变小");
-});
-
-test("作者的开场消息本身就超过压缩线：压不动就不再要求压缩，接着做，不陷入一次次压缩", async () => {
-	// 2026-10-04 三国前五十回的抽取：补全子任务的开场消息带整份抽取，光它就超过压缩线。压缩只压得动工具结果与
-	// 模型回复，作者消息原样保留，于是每次请求都要求压缩、模型每次照做，5 个子任务各压了 40–50 次、一个文件没写，
-	// 没有预算的创作路径就这样一直烧下去。
-	const window = 6000;
-	const { provider, model } = await fixture(window);
-	let compactions = 0;
-	let notes = 0;
-	const step = async (context: Transcript) => {
-		const tokens = tokensOf(context);
-		if (tokens > window) return overflow(tokens, window);
-		const last = context.messages.at(-1);
-		if (last?.role === "user" && JSON.stringify(last.content).includes("compact_context")) {
-			compactions += 1;
-			return fauxAssistantMessage(fauxToolCall("compact_context", { summary: "还没开始补全。" }));
-		}
-		notes += 1;
-		return notes <= 3 ? fauxAssistantMessage(fauxToolCall("note", { n: notes })) : fauxAssistantMessage("补完了。");
-	};
-	provider.setResponses(Array.from({ length: 40 }, () => step));
-	const note: HarnessTool = {
-		name: "note",
-		description: "记一笔",
-		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
-		rereadable: true,
-		execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-	};
-	const { compactContextTool } = await import("../src/harness/tools.js");
-	const outcome = await runTaskLoop({
-		model,
-		systemPrompt: "测试",
-		prompt: `整份抽取：${"x".repeat(PROMPT_CHARS)}`,
-		tools: [note, compactContextTool()],
-		budget: { maxTurns: 30 },
-	});
-	assert.equal(outcome.stop, "model_stopped", `停在 ${outcome.stop}，压缩了 ${compactions} 次`);
-	assert.ok(compactions <= 1, `压缩了 ${compactions} 次`);
-	assert.equal(notes, 4, "压不动之后照常干活");
-});
-
-test("清完仍放不下：重试一次后如实报 context_overflow，不无限重发", async () => {
-	const limit = 1000;
-	const { provider, model } = await fixture(1_000_000);
-	let calls = 0;
-	provider.setResponses(
-		Array.from({ length: 5 }, () => async (context: Transcript) => {
-			calls += 1;
-			return overflow(tokensOf(context), limit);
-		}),
-	);
-	await assert.rejects(
-		runTaskLoop({
-			model,
-			systemPrompt: "测试",
-			prompt: "作者贴进来的一整章。".repeat(800),
-			tools: [],
-			budget: { maxTurns: 20 },
-		}),
-		(error: { code?: string; message?: string }) =>
-			error.code === "context_overflow" && /新对话/u.test(error.message ?? ""),
-	);
-	assert.ok(calls <= 2, `最多重试一次，实际 ${calls} 次`);
-});
 
 test("请求带上 loop 的 id 作 sessionId：按会话做 prompt cache 的 provider 能把同一会话的请求路由到一起", async () => {
 	const { provider, model } = await fixture(1_000_000);
@@ -453,67 +260,213 @@ test("压缩和别的工具在同一次回复里：同一批读到的结果压�
 	assert.match(JSON.stringify(seen[0]?.messages), /读过第一段。/u, "摘要在写它的那次回复里");
 });
 
-test("刚过边界、上下文过半：新一轮的第一次请求请模型先压缩；同样大小在干活中途不请；压缩后任务开场照留", async () => {
-	// 第一轮最后一次请求与第二轮第一次请求都在窗口的六成上下（faux 口径）：中途的门槛是 70%，边界上是 50%。
-	const window = 6000;
-	const { provider, model } = await fixture(window);
-	const inbox: { sequence: number; text: string }[] = [];
-	const notes: string[] = [];
+async function history(
+	model: Awaited<ReturnType<typeof fixture>>["model"],
+	provider: Awaited<ReturnType<typeof fixture>>["provider"],
+) {
 	let checkpoint: LoopCheckpoint | undefined;
-	const note: HarnessTool = {
-		name: "note",
-		description: "记一笔",
-		parameters: Type.Object({ n: Type.Number() }, { additionalProperties: false }),
-		rereadable: true,
-		execute: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-	};
-	const { compactContextTool } = await import("../src/harness/tools.js");
-	const run = (responses: ((context: Transcript) => Promise<ReturnType<typeof fauxAssistantMessage>>)[]) => {
-		provider.setResponses(
-			responses.map((respond) => async (context: Transcript) => {
-				const last = context.messages.at(-1);
-				const text = last?.role === "user" ? JSON.stringify(last.content) : "";
-				notes.push(text.includes("compact_context") ? text : "");
-				return respond(context);
-			}),
+	provider.setResponses([fauxAssistantMessage("开场已确认")]);
+	await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		prompt: "作品开场",
+		tools: [],
+		budget: { maxTurns: 1 },
+		saveCheckpoint: async (next) => {
+			checkpoint = structuredClone(next);
+		},
+	});
+	assert.ok(checkpoint);
+	checkpoint.phase = "ready";
+	delete checkpoint.stop;
+	checkpoint.turns = 0;
+	checkpoint.calls = [];
+	for (let n = 0; n < 16; n++)
+		checkpoint.messages.push(
+			{ role: "user", content: `旧要求 ${n}：${"情节与人物的历史讨论。".repeat(80)}`, timestamp: n },
+			fauxAssistantMessage("已记录，尚未写入作品。"),
 		);
-		return runTaskLoop({
-			model,
-			systemPrompt: "测试",
-			...(checkpoint === undefined ? { prompt: "任务：讨论苦肉计" } : { checkpoint }),
-			tools: [note, compactContextTool()],
-			budget: { maxTurns: 30 },
-			steering: () => inbox,
-			saveCheckpoint: async (next) => {
-				checkpoint = structuredClone(next);
-			},
-		});
-	};
-	const long = (n: number) =>
-		fauxAssistantMessage([
-			{ type: "text", text: "黄盖在军杖落下前停了一下。".repeat(210) },
-			fauxToolCall("note", { n }),
-		]);
-	await run([
-		...Array.from({ length: 5 }, (_, index) => async () => long(index)),
-		async () => fauxAssistantMessage("说完了"),
-	]);
-	assert.deepEqual(notes, ["", "", "", "", "", ""], "第一轮在干活，六成不到七成，不请压缩");
-	inbox.push({ sequence: 1, text: "接着说阚泽" });
-	let after: Transcript | undefined;
-	await run([
-		async () => fauxAssistantMessage(fauxToolCall("compact_context", { summary: "讨论了黄盖受刑。" })),
-		async (context) => {
-			after = context;
-			return fauxAssistantMessage("阚泽献书");
+	checkpoint.messages.push({
+		role: "user",
+		content: "改口：取消悲剧结局，保留真实代价。继续尚未提交的第二节。",
+		timestamp: 100,
+	});
+	return checkpoint;
+}
+function isSummary(context: Transcript) {
+	return JSON.stringify(context.messages[0]).includes("你只负责生成简洁的执行摘要");
+}
+
+test("缩小窗口：分批整理旧作者消息，保留最新改口、刷新作品开场，原记录不变", async () => {
+	const { provider, model } = await fixture(8000);
+	const checkpoint = await history(model, provider);
+	const before = structuredClone(checkpoint.messages);
+	const seen: Transcript[] = [];
+	let saved = checkpoint;
+	provider.setResponses(
+		Array.from({ length: 20 }, () => async (context: Transcript) => {
+			seen.push(context);
+			return fauxAssistantMessage(
+				isSummary(context) ? "当前要求：取消悲剧结局，保留代价；第二节尚未提交。" : "接着写第二节。",
+			);
+		}),
+	);
+	await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		checkpoint,
+		tools: [],
+		budget: { maxTurns: 20 },
+		refreshOpening: async () => "当前作品 r3",
+		saveCheckpoint: async (next) => {
+			saved = structuredClone(next);
+		},
+	});
+	assert.ok(seen.some(isSummary));
+	const final = seen.at(-1);
+	assert.ok(final);
+	assert.match(JSON.stringify(final.messages), /取消悲剧结局/u);
+	assert.match(JSON.stringify(final.messages), /当前作品 r3/u);
+	assert.ok(final.messages.filter((m) => m.role === "user").length < 10, "旧作者原话不再无限堆积");
+	assert.deepEqual(saved.messages.slice(0, before.length), before);
+	assert.equal(saved.usage.calls, seen.length + 1, "摘要也计费用量");
+	assert.ok(saved.calls.some((c) => c.purpose === "compaction"));
+});
+
+test("provider 超限后走摘要再继续，第二次超限停止，不盲目重发", async () => {
+	const { provider, model } = await fixture(1000000);
+	const checkpoint = await history(model, provider);
+	let ordinary = 0,
+		summaries = 0;
+	provider.setResponses(
+		Array.from({ length: 10 }, () => async (context: Transcript) => {
+			if (isSummary(context)) {
+				summaries++;
+				return fauxAssistantMessage("已讨论旧要求，按最新改口继续。");
+			}
+			ordinary++;
+			return overflow(tokensOf(context), 100);
+		}),
+	);
+	await assert.rejects(runTaskLoop({ model, systemPrompt: "测试", checkpoint, tools: [], budget: { maxTurns: 10 } }), {
+		code: "context_overflow",
+	});
+	assert.equal(summaries, 1);
+	assert.equal(ordinary, 2);
+});
+
+test("摘要流中断后续同一历史，未知调用保留，摘要正文不作为助手答复发布", async () => {
+	const { provider, model } = await fixture(8000);
+	const checkpoint = await history(model, provider);
+	let saved = checkpoint;
+	let messages = 0;
+	provider.setResponses([
+		async () => {
+			throw new Error("summary stream interrupted");
 		},
 	]);
-	assert.match(notes[6] ?? "", /上一件事已经做完，趁现在先调用 compact_context/u, "新一轮的第一次请求请压缩");
-	assert.equal(notes[7], "", "压缩之后不再请");
-	const users = (after?.messages ?? [])
-		.filter((message) => message.role === "user")
-		.map((message) => JSON.stringify(message.content));
-	assert.match(users[0] ?? "", /任务：讨论苦肉计/u, "没有给新开场的 loop，开场照留");
-	assert.ok(users.some((text) => text.includes("接着说阚泽")));
-	assert.doesNotMatch(JSON.stringify(after?.messages), /军杖落下前停了一下/u, "压缩之前的长回复由摘要代表");
+	const options = {
+		model,
+		systemPrompt: "测试",
+		tools: [],
+		budget: { maxTurns: 20 },
+		saveCheckpoint: async (next: LoopCheckpoint) => {
+			saved = structuredClone(next);
+		},
+		onMessage: () => {
+			messages++;
+		},
+		transientRetry: { maxRetries: 0, baseDelayMs: 0 },
+	};
+	await assert.rejects(runTaskLoop({ ...options, checkpoint }));
+	assert.deepEqual(saved.messages, checkpoint.messages);
+	assert.ok(saved.compacting);
+	provider.setResponses(
+		Array.from(
+			{ length: 20 },
+			() => async (context: Transcript) =>
+				fauxAssistantMessage(isSummary(context) ? "第二节未提交，按最新要求继续。" : "继续完成。"),
+		),
+	);
+	await runTaskLoop({ ...options, checkpoint: saved });
+	assert.equal(messages, 1);
+	assert.ok(saved.calls.length > 1);
+	assert.equal(saved.phase, "settled");
+});
+
+test("截断摘要不替代历史，继续后可重新生成", async () => {
+	const { provider, model } = await fixture(8000);
+	const checkpoint = await history(model, provider);
+	let saved = checkpoint;
+	provider.setResponses([fauxAssistantMessage("未完整的摘要", { stopReason: "length" })]);
+	const options = {
+		model,
+		systemPrompt: "测试",
+		tools: [],
+		budget: { maxTurns: 20 },
+		saveCheckpoint: async (next: LoopCheckpoint) => {
+			saved = structuredClone(next);
+		},
+	};
+	await assert.rejects(runTaskLoop({ ...options, checkpoint }), { code: "model_output_truncated" });
+	assert.deepEqual(saved.messages, checkpoint.messages);
+	assert.equal(saved.reduction, undefined);
+	provider.setResponses(
+		Array.from(
+			{ length: 20 },
+			() => async (context: Transcript) =>
+				fauxAssistantMessage(isSummary(context) ? "第二节未提交，按最新要求继续。" : "完成。"),
+		),
+	);
+	await runTaskLoop({ ...options, checkpoint: saved });
+	assert.equal(saved.phase, "settled");
+});
+
+test("开场独自超过窗口：不发送请求，也不空转摘要", async () => {
+	const { provider, model } = await fixture(1000);
+	let calls = 0;
+	provider.setResponses([
+		async () => {
+			calls++;
+			return fauxAssistantMessage("不应请求");
+		},
+	]);
+	await assert.rejects(
+		runTaskLoop({ model, systemPrompt: "测试", prompt: "长正文".repeat(2000), tools: [], budget: { maxTurns: 20 } }),
+		{ code: "context_overflow" },
+	);
+	assert.equal(calls, 0);
+});
+
+test("摘要已落盘后进程退出：恢复直接应用已有结果，调用与用量不重复", async () => {
+	const { provider, model } = await fixture(8000);
+	const checkpoint = await history(model, provider);
+	let saved = checkpoint;
+	let crashed = false;
+	let count = 0;
+	provider.setResponses(
+		Array.from({ length: 20 }, () => async (context: Transcript) => {
+			count++;
+			return fauxAssistantMessage(isSummary(context) ? "保留代价，第二节未提交。" : "继续第二节。");
+		}),
+	);
+	const options = {
+		model,
+		systemPrompt: "测试",
+		tools: [],
+		budget: { maxTurns: 20 },
+		saveCheckpoint: async (next: LoopCheckpoint) => {
+			saved = structuredClone(next);
+			if (!crashed && next.phase === "tools" && next.calls.at(-1)?.purpose === "compaction") {
+				crashed = true;
+				throw new Error("crash after durable summary response");
+			}
+		},
+	};
+	await assert.rejects(runTaskLoop({ ...options, checkpoint }), /crash after durable/u);
+	assert.equal(count, 1);
+	await runTaskLoop({ ...options, checkpoint: saved });
+	assert.equal(saved.calls.filter((c) => c.state === "received").length, count);
+	assert.ok(saved.calls.every((c) => c.usageRecorded));
+	assert.equal(saved.phase, "settled");
 });

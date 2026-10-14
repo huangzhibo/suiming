@@ -93,6 +93,7 @@ const actionLabels: Record<string, string> = {
 	submit_review: "交回审稿",
 };
 type Activity = {
+	progress?: boolean;
 	id: string;
 	sequence: number;
 	/** 执行这个动作的子任务（事件上的 subagentRunId）；根 Agent 的没有，2026-10-05 之前的事件是 sessionId。 */
@@ -267,6 +268,19 @@ function ActionRow({
 	const opened = useContext(OpenedActions);
 	const [expanded, setExpanded] = useState(activity.status === "failed" || opened.has(activity.id));
 	const label = actionLabels[activity.label] ?? activity.label;
+	if (activity.progress)
+		return (
+			<p className="activity text-muted-foreground" role="status">
+				{label} ·{" "}
+				{activity.status === "running"
+					? (activity.summary ?? "进行中")
+					: activity.status === "completed"
+						? "完成"
+						: activity.status === "interrupted"
+							? "已中断"
+							: "失败"}
+			</p>
+		);
 	// 内部编号（执行对象、子任务的 id）不给作者看，2026-10-05 之前的 read_result 就以它为对象。
 	const target = activity.target && !internalId(activity.target) ? activity.target : undefined;
 	return (
@@ -288,10 +302,15 @@ function ActionRow({
 					{target && !compact ? " · " : ""}
 					<ActivityTarget target={target} titles={titles} open={open} />
 				</span>
-				{/* 动作只在结束时发出（suiming.action 只有 completed / failed）；成功的不另外标。 */}
+				{activity.status === "running" && (
+					<span className="shrink-0 text-muted-foreground" role="status">
+						执行中
+					</span>
+				)}
+				{activity.status === "interrupted" && <span className="shrink-0 text-muted-foreground">已中断</span>}
 				{activity.status === "failed" && <span className="shrink-0 text-destructive">失败</span>}
 			</summary>
-			{expanded && (
+			{expanded && activity.status !== "running" && (
 				<div className="ml-4">
 					<ActionDetail sessionId={sessionId} taskId={taskId} actionId={activity.id} revision={activity.status} />
 				</div>
@@ -488,7 +507,10 @@ export function Transcript({
 					summaries.get(event.messageId)?.sequence ?? Number(event.metadata?.suiming?.sequence ?? record.sequence),
 				summary: event.content as SuimingTurnSummary,
 			});
-		if (event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.action") {
+		if (
+			event.type === "ACTIVITY_SNAPSHOT" &&
+			(event.activityType === "suiming.action" || event.activityType === "suiming.progress")
+		) {
 			const body = event.content as {
 				/** 2026-10-05 之前落盘的事件：执行者写在内容里（根 Agent 是 sessionId），现在是事件上的 subagentRunId。 */
 				taskId?: string;
@@ -498,6 +520,7 @@ export function Transcript({
 				summary?: string;
 			};
 			activities.set(event.messageId, {
+				progress: event.activityType === "suiming.progress",
 				...body,
 				...(event.subagentRunId === undefined ? {} : { taskId: event.subagentRunId }),
 				id: event.messageId,

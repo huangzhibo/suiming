@@ -16,6 +16,7 @@ import { addModelUsage, emptyModelUsage } from "../execution/model-usage.js";
 import type { ModelUsage } from "../execution/types.js";
 import type { BoundModelProfile } from "../model/model-gateway.js";
 import { captureTelemetryContent } from "../model/telemetry-content.js";
+import { compactionContext, compactionCut } from "./context-compaction.js";
 import { SuimingHarnessError } from "./errors.js";
 import { type HarnessTool, type HarnessToolResult, rejectionForToolError, ToolRejection } from "./tool.js";
 
@@ -44,6 +45,7 @@ export interface ModelCallRecord {
 	interrupted?: boolean;
 	/** 发出去的请求的字节数；与返回的 input tokens 一起校准下一次请求的大小估计。 */
 	promptBytes?: number;
+	purpose?: "compaction";
 }
 export interface ActionRecord {
 	id: string;
@@ -64,16 +66,17 @@ export interface LoopCheckpoint {
 	loopId: string;
 	sequence: number;
 	steeringSequence: number;
-	/** 最近一次压缩：摘要就在写它的那次回复的 compact_context 调用里；throughMessage 是那一批结果之后的下标。 */
+	/** 最近一次摘要及替代的历史边界；原消息保持完整。 */
 	reduction?: {
 		throughMessage: number;
-		actionId: string;
+		actionId?: string;
 		modelCallId: string;
+		summary?: string;
 		/** 压缩那一刻的开场快照，请求里替换第一条消息（只有根 Agent 有：它的开场是作品快照，子任务的开场是任务本身）。 */
 		opening?: string;
 	};
-	/** 消息下标小于它的工具结果在请求里换成占位；原消息不改。只往前推，前缀因此在两次清理之间稳定。 */
-	cleared?: number;
+	/** 正在生成摘要的历史边界；请求中断后按同一边界重新组装。 */
+	compacting?: { throughMessage: number };
 	/** 最近一个边界之后第一条消息的下标；它之前的大读取结果在请求里折成头尾（见 FOLD_BYTES）。只往前推。 */
 	boundary?: number;
 	/** 上一次请求被 provider 以上下文超限拒绝、已经清理重试过；再超限就如实报错，不无限重发。 */
@@ -113,6 +116,8 @@ export interface TaskLoopOptions {
 	captureSubmission?(): unknown;
 	/** 瞬时失败（流中断、429、5xx）的自动重发；缺省见 TRANSIENT_RETRY。 */
 	transientRetry?: { maxRetries: number; baseDelayMs: number };
+	refreshOpening?(): Promise<string>;
+	onProgress?(id: string, label: string, status: "running" | "completed" | "failed", summary?: string): void;
 	onTurnStart?(turn: number, context: Context): Promise<void> | void;
 	onTextDelta?(delta: string, callId: string): void;
 	onMessage?(callId: string, message: AssistantMessage): void;
@@ -183,31 +188,9 @@ function summarize(result: unknown): string {
 	return codePoints.length <= 200 ? joined : `${codePoints.slice(0, 200).join("")}…`;
 }
 
-/**
- * 上下文的生命周期（2026-10-01 Harness 审查 F3）。会话永续，消息列表只增不减，请求必须有办法变小：
- * 先清掉较早的工具结果（确定、可恢复：原文还在作品或 checkpoint 里，要用就重读），清完仍偏大就请模型
- * 用 compact_context 压成摘要，实在放不下就如实报错。只改请求的投影，消息列表与 checkpoint 一字不改。
- * 比例是相对模型目录里的 contextWindow 的估计；估错了由 provider 的超限报错兜住（清理后重试一次）。
- */
-const CLEAR_AT = 0.8;
-const CLEAR_TO = 0.5;
-const COMPACT_AT = 0.7;
-/**
- * 刚过边界（新一轮或刚提交，之后模型还没回复过）时请模型压缩的门槛。手上没有做到一半的事，压掉的不会是正在用的，
- * 所以比中途的 COMPACT_AT 低：趁边界先压，免得做到一半撞上 70%（Harness 设计第 7 节「压缩在边界做」）。
- */
-const BOUNDARY_COMPACT_AT = 0.5;
-/** 压缩至少要能腾出这么多窗口才值得请模型做；压不动的开场消息不能让每次请求都要求压缩。 */
-const COMPACT_MIN_GAIN = 0.1;
-/** 估计值超过整个窗口才不发：差一点的照发，真超了由 provider 的报错兜住。 */
-const GIVE_UP_AT = 1;
-/**
- * 子任务的第一次请求估计超过窗口的这个比例就不发，作为委派失败交回父 Agent（`delegation_too_large`）。
- * 开场消息是父 Agent 给的输入，压缩压不动它；开场就过了压缩线，留给读写的只到清理线（0.8）前那一成。
- * 取压缩线是按两次真实运行定的：2026-10-04 三国补全的开场超过七成，五个子任务空转 19 分钟、估算 $92；
- * 10-03 斗破 120 章的 Source 审稿每次请求平均占 68%（含读取）照常做完。
- */
-export const TASK_OPENING_AT = COMPACT_AT;
+/** 输入预留两成给输出与工具；自动摘要保留最近约两成窗口。 */
+const COMPACT_AT = 0.8;
+export const TASK_OPENING_AT = 0.7;
 /** 没有校准数据时按每 3 字节 1 token 估：中文一个字 3 字节，偏保守。 */
 const DEFAULT_TOKENS_PER_BYTE = 1 / 3;
 
@@ -222,20 +205,6 @@ const FOLD_EXCERPT_CODE_POINTS = 200;
 
 function textOf(message: ToolResultMessage): string {
 	return message.content.map((part) => (part.type === "text" ? part.text : "")).join("");
-}
-
-function clearedToolResult(message: ToolResultMessage): ToolResultMessage {
-	const { details: _details, ...rest } = message;
-	const length = Array.from(textOf(message)).length;
-	return {
-		...rest,
-		content: [
-			{
-				type: "text",
-				text: `[较早的工具结果已清除以腾出上下文：${message.toolName}，原文约 ${length} 字；需要时重新读取]`,
-			},
-		],
-	};
 }
 
 /** 产生这个工具结果的调用参数：在它前面最近的那条模型回复里。 */
@@ -268,10 +237,9 @@ function foldedToolResult(messages: readonly Message[], index: number, message: 
 	};
 }
 
-/** 一条工具结果在请求里的样子：清理点之前换成占位，边界之前的大读取结果折成头尾，其余原样。 */
+/** 边界之前的大读取结果折成头尾，其余原样。 */
 function projectToolResult(state: LoopCheckpoint, index: number, foldable: ReadonlySet<string>): ToolResultMessage {
 	const message = state.messages[index] as ToolResultMessage;
-	if (index < (state.cleared ?? 0)) return clearedToolResult(message);
 	if (
 		index < (state.boundary ?? 0) &&
 		foldable.has(message.toolName) &&
@@ -281,29 +249,40 @@ function projectToolResult(state: LoopCheckpoint, index: number, foldable: Reado
 	return message;
 }
 
-/**
- * 发给模型的消息：工具结果按清理点与边界投影（projectToolResult）；压缩过的话，写摘要的那次回复之前只留作者消息，
- * 其余由那次回复里 compact_context 的 summary 代表。那次回复本身和它同一批的结果照常发：模型常把压缩和别的
- * 工具放在同一次回复里，2026-10-05 之前压缩点划在整批之后，同一批里读到的东西被摘要一起盖掉，而摘要写在读之前。
- */
+/** 请求投影：开场、合并摘要、最新作者原话、近期完整交互；原历史不改。 */
 function projectMessages(state: LoopCheckpoint, foldable: ReadonlySet<string>): Message[] {
 	const project = (message: Message, index: number): Message =>
 		message.role === "toolResult" ? projectToolResult(state, index, foldable) : message;
 	if (!state.reduction) return state.messages.map(project);
-	let response = state.reduction.throughMessage - 1;
-	while (response > 0 && state.messages[response]?.role !== "assistant") response -= 1;
-	const opening = state.reduction.opening;
+	// 旧恢复点的摘要曾放在工具参数里；读出后使用同一投影，不改变历史文件。
+	let cut = state.reduction.throughMessage;
+	let summary = state.reduction.summary;
+	if (summary === undefined) {
+		while (cut > 0 && state.messages[cut - 1]?.role !== "assistant") cut--;
+		cut = Math.max(1, cut - 1);
+		const action = state.actions.find((item) => item.id === state.reduction?.actionId);
+		summary = action?.result?.contextSummary ?? "";
+	}
+	const first = state.messages[0];
 	return [
-		...state.messages
-			.slice(0, response)
-			.flatMap((message, index): Message[] =>
-				message.role !== "user"
-					? []
-					: index === 0 && opening !== undefined
-						? [{ ...message, content: opening }]
-						: [message],
-			),
-		...state.messages.slice(response).map((message, offset) => project(message, response + offset)),
+		...(first
+			? [
+					{
+						...first,
+						...(state.reduction.opening === undefined ? {} : { content: state.reduction.opening }),
+					} as Message,
+				]
+			: []),
+		{
+			role: "user",
+			content: `[执行摘要：历史原文仍保存在对话记录中；作品事实以当前文件为准]\n${summary}`,
+			timestamp: 0,
+		},
+		...(state.messages.findLastIndex((message) => message.role === "user") > 0 &&
+		state.messages.findLastIndex((message) => message.role === "user") < cut
+			? [state.messages[state.messages.findLastIndex((message) => message.role === "user")] as Message]
+			: []),
+		...state.messages.slice(cut).map((message, offset) => project(message, cut + offset)),
 	];
 }
 
@@ -315,24 +294,17 @@ function bytesOf(value: unknown): number {
 function tokensPerByte(state: LoopCheckpoint): number {
 	for (let index = state.calls.length - 1; index >= 0; index -= 1) {
 		const call = state.calls[index];
-		if (call?.state !== "received" || !call.usage || !call.promptBytes) continue;
+		if (call?.purpose === "compaction" || call?.state !== "received" || !call.usage || !call.promptBytes) continue;
 		const prompt = call.usage.input + call.usage.cacheRead + call.usage.cacheWrite;
 		if (prompt > 0) return prompt / call.promptBytes;
 	}
 	return DEFAULT_TOKENS_PER_BYTE;
 }
 
-/** 清理点最远推到最后一条模型回复：它之后的工具结果是模型下一步要用的，不能清。 */
-function clearableUntil(messages: readonly Message[]): number {
-	for (let index = messages.length - 1; index >= 0; index -= 1)
-		if (messages[index]?.role === "assistant") return index;
-	return 0;
-}
-
 function contextOverflowError(): SuimingHarnessError {
 	return new SuimingHarnessError(
 		"context_overflow",
-		"对话超出了模型的上下文上限，清掉较早的工具结果后仍然放不下。请开一个新对话接着做（作品和已提交的版本都在），或换一个上下文更大的模型。",
+		"本次输入超过模型的上下文上限，现有历史无法再安全压缩。请缩小本次材料范围或换用更大窗口的模型；作品与对话记录已保留。",
 	);
 }
 
@@ -433,6 +405,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			})),
 			usage: { ...state.usage },
 			...(state.reduction ? { reduction: { ...state.reduction } } : {}),
+			...(state.compacting ? { compacting: { ...state.compacting } } : {}),
 			...(state.repeated ? { repeated: { ...state.repeated } } : {}),
 			...(state.submission !== undefined ? { submission: immutableCopy(state.submission) } : {}),
 		};
@@ -518,7 +491,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			options.onModelCall?.(last.usage, last.id, state.usage);
 			last.usageRecorded = true;
 		}
-		state.messages.pop();
+		if (last.purpose !== "compaction") state.messages.pop();
 		state.phase = "ready";
 		await save();
 	}
@@ -589,6 +562,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 					// 先记下「已开始」：恢复时据此区分「执行时被打断」与「没有执行」。
 					action.state = "effect_pending";
 					await save();
+					options.onProgress?.(action.id, action.call.name, "running");
 					check();
 					result = await tool.execute(action.id, action.call.arguments, options.signal);
 				} catch (thrown) {
@@ -651,56 +625,39 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				)
 					throw new SuimingHarnessError(
 						"delegation_too_large",
-						`开场输入约 ${Math.round((promptBytes * ratio) / 1000)}k token，占 ${options.model.model.id} 窗口的 ${Math.round(((promptBytes * ratio) / window) * 100)}%（上限 ${Math.round(options.openingLimit * 100)}%），子任务放不下、也没有读写的余地，一次请求都没发。把范围拆小再派（比如按卷）；拆不小就停下告诉作者。`,
+						"子任务的开场输入过大，请把材料或情节范围拆小后再派；尚未发送模型请求。",
 					);
-				if (promptBytes * ratio > window * CLEAR_AT) {
-					// 从旧到新清，清到估计值落到 CLEAR_TO 以下或清到最后一条模型回复为止。
-					const until = clearableUntil(state.messages);
-					let saved = 0;
-					let cleared = Math.max(state.cleared ?? 0, state.reduction?.throughMessage ?? 0);
-					while (cleared < until && (promptBytes - saved) * ratio > window * CLEAR_TO) {
-						const message = state.messages[cleared];
-						if (message?.role === "toolResult")
-							saved +=
-								bytesOf(projectToolResult(state, cleared, foldable)) - bytesOf(clearedToolResult(message));
-						cleared += 1;
-					}
-					if (cleared > (state.cleared ?? 0)) {
-						state.cleared = cleared;
-						context = build();
-						promptBytes = bytesOf(context);
-					}
-				}
-				if (promptBytes * ratio > window * GIVE_UP_AT) throw contextOverflowError();
-				// 压缩只压得动模型回复与工具结果，作者消息原样保留：可压的部分不到窗口的一成就不再要求，
-				// 否则开场消息本身就超线时，每次请求都要求压缩，模型每次照做，永远不往下干活。
-				const compactable = projectMessages(state, foldable)
-					.filter((message) => message.role !== "user")
-					.reduce((sum, message) => sum + bytesOf(message), 0);
-				const atBoundary =
-					state.boundary !== undefined &&
-					!state.messages.slice(state.boundary).some((message) => message.role === "assistant");
 				if (
-					promptBytes * ratio > window * (atBoundary ? BOUNDARY_COMPACT_AT : COMPACT_AT) &&
-					compactable * ratio > window * COMPACT_MIN_GAIN &&
-					declarations.some((tool) => tool.name === "compact_context")
+					!state.compacting &&
+					(promptBytes * ratio > window * COMPACT_AT ||
+						(state.overflowRetried && state.calls.at(-1)?.purpose !== "compaction"))
 				) {
-					// 只加在这次请求的末尾，不进消息列表：前缀不变，压缩之后自然消失。
-					const used = Math.round(((promptBytes * ratio) / window) * 100);
-					context.messages.push({
-						role: "user",
-						content: atBoundary
-							? `[系统附注：上下文已用到窗口的约 ${used}%。上一件事已经做完，趁现在先调用 compact_context 把之前的过程压成摘要（保留作者要求、未完成的计划、结果引用与待验证的判断），再处理接下来的事。]`
-							: `[系统附注：上下文已用到窗口的约 ${used}%，清掉较早的工具结果后仍偏大。先调用 compact_context 把已处理的过程压成摘要（保留作者要求、未完成的计划、结果引用与待验证的判断），再继续。]`,
-						timestamp: Date.now(),
-					});
+					const cut = compactionCut(state.messages, state.reduction?.throughMessage ?? 1, window);
+					if (cut !== undefined) state.compacting = { throughMessage: cut };
+					else if (promptBytes * ratio > window || state.overflowRetried) throw contextOverflowError();
+				}
+				if (state.compacting) {
+					context = compactionContext(
+						state.messages,
+						state.compacting.throughMessage,
+						state.reduction,
+						state.actions,
+						window,
+					);
 					promptBytes = bytesOf(context);
 				}
 			}
+
 			state.turns += 1;
 			await options.onTurnStart?.(state.turns, context);
 			check();
-			state.calls.push({ id: `call_${randomUUID()}`, turn: state.turns, state: "prepared", promptBytes });
+			state.calls.push({
+				id: `call_${randomUUID()}`,
+				turn: state.turns,
+				state: "prepared",
+				promptBytes,
+				...(state.compacting ? { purpose: "compaction" as const } : {}),
+			});
 			state.phase = "model_pending";
 			request = context;
 			await save();
@@ -714,6 +671,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			check();
 			call.state = "effect_pending";
 			await save();
+			if (call.purpose === "compaction") options.onProgress?.(call.id, "整理上下文", "running");
 			if (options.signal?.aborted) {
 				// 停在这里时请求确定没发出，退回 prepared，恢复时直接撤掉。
 				call.state = "prepared";
@@ -727,12 +685,14 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			try {
 				const stream = options.model.stream(context, {
 					modelCallId: call.id,
+					...(call.purpose === undefined ? {} : { purpose: call.purpose }),
 					signal: abort.signal,
 					...(options.loopId === undefined ? {} : { sessionId: options.loopId }),
 					...(options.telemetryContext === undefined ? {} : { telemetryContext: options.telemetryContext }),
 				});
 				for await (const event of stream) {
-					if (event.type === "text_delta" && event.delta) options.onTextDelta?.(event.delta, call.id);
+					if (call.purpose !== "compaction" && event.type === "text_delta" && event.delta)
+						options.onTextDelta?.(event.delta, call.id);
 				}
 				response = await stream.result();
 			} catch (error) {
@@ -752,9 +712,9 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			call.usage = usageOfMessage(options.model.model, response);
 			state.usage = addModelUsage(state.usage, call.usage);
 			call.state = response.stopReason === "error" || response.stopReason === "aborted" ? "failed" : "received";
-			state.messages.push(response);
+			if (call.purpose !== "compaction") state.messages.push(response);
 			state.actions.push(
-				...response.content
+				...(call.purpose === "compaction" ? [] : response.content)
 					.filter((part): part is ToolCall => part.type === "toolCall")
 					.map(
 						(toolCall): ActionRecord => ({
@@ -770,7 +730,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		}
 		const call = state.calls.at(-1);
 		if (!call?.response || !call.usage) throw new SuimingHarnessError("checkpoint_invalid", "缺少已确认的模型响应");
-		options.onMessage?.(call.id, call.response);
+		if (call.purpose !== "compaction") options.onMessage?.(call.id, call.response);
 		if (!call.usageRecorded) {
 			options.onModelCall?.(call.usage, call.id, state.usage);
 			call.usageRecorded = true;
@@ -778,41 +738,85 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		}
 		check();
 		if (call.response.stopReason === "aborted") throw interruptedError(options.signal);
+		if (call.purpose === "compaction" && call.response.stopReason !== "error") {
+			const summary = call.response.content
+				.flatMap((part) => (part.type === "text" ? [part.text] : []))
+				.join("\n")
+				.trim();
+			if (
+				call.response.stopReason !== "stop" ||
+				!summary ||
+				call.response.content.some((part) => part.type === "toolCall")
+			) {
+				state.phase = "ready";
+				await save();
+				options.onProgress?.(call.id, "整理上下文", "failed", "摘要没有完整生成，原历史已保留");
+				throw new SuimingHarnessError("model_output_truncated", "摘要没有完整生成，原历史已保留；继续即可重试。");
+			}
+			const opening = await options.refreshOpening?.();
+			state.reduction = {
+				throughMessage:
+					state.compacting?.throughMessage ??
+					(() => {
+						throw new Error("Missing compaction boundary");
+					})(),
+				modelCallId: call.id,
+				summary,
+				...(opening === undefined ? {} : { opening }),
+			};
+			delete state.compacting;
+			delete state.transientRetries;
+			state.phase = "ready";
+			await save();
+			options.onProgress?.(call.id, "整理上下文", "completed", "已保留当前要求与未完成事项");
+			continue;
+		}
 		if (
 			(call.response.stopReason === "error" || call.response.stopReason === "length") &&
 			isContextOverflow(call.response, options.model.model.contextWindow || undefined)
 		) {
-			// provider 说放不下：撤回这次响应，把能清的工具结果全清掉再试一次。清无可清或已经试过就如实报错，
-			// 否则下一句会把同一份上下文原样再发，会话卡死在同一个错误上。
-			const until = clearableUntil(state.messages.slice(0, -1));
-			if (state.overflowRetried || until <= (state.cleared ?? 0)) throw contextOverflowError();
+			if (call.purpose === "compaction" || state.overflowRetried) throw contextOverflowError();
 			state.overflowRetried = true;
 			state.messages.pop();
 			state.actions = state.actions.filter((action) => action.modelCallId !== call.id);
-			state.cleared = until;
 			state.phase = "ready";
 			await save();
 			continue;
 		}
+
 		if (call.response.stopReason === "error") {
 			const policy = options.transientRetry ?? TRANSIENT_RETRY;
 			const retries = state.transientRetries ?? 0;
 			if (isRetryableAssistantError(call.response) && retries < policy.maxRetries) {
 				// 与上下文超限同一种撤回：这次响应与它带出的工具调用都不算数，调用记录与用量照记。
 				state.transientRetries = retries + 1;
-				state.messages.pop();
+				if (call.purpose !== "compaction") state.messages.pop();
 				state.actions = state.actions.filter((action) => action.modelCallId !== call.id);
 				state.phase = "ready";
 				await save();
 				try {
-					await sleep(Math.min(policy.baseDelayMs * 2 ** retries, TRANSIENT_RETRY.maxDelayMs), undefined, {
+					const delay = Math.min(policy.baseDelayMs * 2 ** retries, TRANSIENT_RETRY.maxDelayMs);
+					options.onProgress?.(
+						call.id,
+						"自动重试",
+						"running",
+						`第 ${retries + 1} 次，${Math.ceil(delay / 1000)} 秒后重试`,
+					);
+					await sleep(delay, undefined, {
 						...(options.signal === undefined ? {} : { signal: options.signal }),
 					});
 				} catch {
 					throw interruptedError(options.signal);
 				}
+				options.onProgress?.(call.id, "自动重试", "completed");
 				continue;
 			}
+			options.onProgress?.(
+				call.id,
+				call.purpose === "compaction" ? "整理上下文" : "模型请求",
+				"failed",
+				call.response.errorMessage,
+			);
 			throw new SuimingHarnessError(
 				"model_call_failed",
 				`${call.response.errorMessage ?? "模型调用失败"}${retries > 0 ? `（同一请求已自动重试 ${retries} 次）` : ""}`,
@@ -905,7 +909,11 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 		const reduced = actions.findLast((action) => action.result?.contextSummary);
 		if (reduced?.result?.contextSummary)
 			state.reduction = {
-				throughMessage: state.messages.length,
+				throughMessage: Math.max(
+					1,
+					state.messages.findLastIndex((message) => message.role === "assistant"),
+				),
+				summary: reduced.result.contextSummary,
 				actionId: reduced.id,
 				modelCallId: call.id,
 				...(reduced.result.contextOpening === undefined ? {} : { opening: reduced.result.contextOpening }),

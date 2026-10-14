@@ -52,6 +52,9 @@ function gate(name: string): Promise<void> {
 	return entry.opened ? Promise.resolve() : new Promise<void>((resolve) => (entry.release = resolve));
 }
 Object.assign(globalThis, {
+	testGateReached(name: string) {
+		return gates.has(name);
+	},
 	openTestGate(name: string) {
 		const entry = gates.get(name) ?? { opened: false };
 		entry.opened = true;
@@ -258,6 +261,7 @@ if (process.argv.includes("--subtask-resume-test")) {
 			return fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/阚泽.md" }));
 		},
 		async (_context, options) => {
+			void gate("subtask-waiting-abort");
 			const signal = options?.signal;
 			if (!signal?.aborted)
 				await new Promise((resolve) => signal?.addEventListener("abort", resolve, { once: true }));

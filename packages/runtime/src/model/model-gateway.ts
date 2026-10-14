@@ -51,6 +51,7 @@ export interface ModelCallRuntimeOptions {
 	signal?: AbortSignal;
 	telemetryContext?: TelemetryContext;
 	modelCallId?: string;
+	purpose?: "compaction";
 	/** 同一会话（或子任务）的请求共用一个 id：按会话做 prompt cache 路由的 provider 靠它命中前缀。 */
 	sessionId?: string;
 }
@@ -180,6 +181,7 @@ function tracedStream(
 	snapshot: ModelBindingSnapshot,
 	context: Context,
 	modelCallId: string | undefined,
+	purpose: "compaction" | undefined,
 	open: (span: TelemetryContext) => AssistantMessageEventStream,
 ): AssistantMessageEventStream {
 	const outer = createAssistantMessageEventStream();
@@ -228,7 +230,7 @@ function tracedStream(
 			if (terminal?.type === "error") return terminal.error;
 			return inner.result();
 		},
-		{ context, ...(modelCallId === undefined ? {} : { modelCallId }) },
+		{ context, ...(modelCallId === undefined ? {} : { modelCallId }), ...(purpose === undefined ? {} : { purpose }) },
 	).then(
 		(message) => {
 			if (terminal !== undefined) outer.push(terminal);
@@ -370,6 +372,7 @@ export class ModelGateway {
 					snapshot,
 					context,
 					runtime?.modelCallId,
+					runtime?.purpose,
 					(span) =>
 						this.#models.stream(
 							model,

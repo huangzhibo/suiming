@@ -29,6 +29,11 @@ test("子任务停下再续做：对话里是先后两段，前一段标已停�
 		const running = page.locator("details.activities");
 		await running.locator(":scope > summary").waitFor();
 		await running.locator(":scope > summary").click();
+		await running.getByText("执行中", { exact: true }).waitFor();
+		await page.reload();
+		await running.locator(":scope > summary").waitFor();
+		await running.locator(":scope > summary").click();
+		await running.getByText("执行中", { exact: true }).waitFor();
 		// 子任务读完第一个文件停在闸门上：点开这一行，再放第二次读取进来
 		const firstRead = running.locator("details.activity").filter({ hasText: "读取文件" });
 		await firstRead.locator("summary").click();
@@ -39,6 +44,15 @@ test("子任务停下再续做：对话里是先后两段，前一段标已停�
 		assert.equal(await run.getAttribute("open"), "", "并成一行之后照旧展开");
 		await run.locator("details.activity[open] .action-detail").filter({ hasText: "黄盖" }).waitFor();
 
+		await eventually(
+			async () =>
+				app.evaluate(() =>
+					(globalThis as typeof globalThis & { testGateReached(name: string): boolean }).testGateReached(
+						"subtask-waiting-abort",
+					),
+				),
+			"模型进入等待停止的请求",
+		);
 		await page.getByRole("button", { name: "停止", exact: true }).click();
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		await input.fill("继续");

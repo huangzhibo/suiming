@@ -333,3 +333,20 @@ test("作者消息里的引用折成标签：原话照常显示，选段带标�
 	assert.deepEqual(messageReferences("只有一句话\n\n作品之外的引号：不算", () => undefined).references, []);
 	assert.equal(messageReferences(`${selection}`, (path) => titles.get(path)).body, "", "只有引用时原话为空");
 });
+
+test("续做在执行开始时已显示：动作顺序提前仍关联同一子任务，失败的重复续做不认领", () => {
+	const groups = [
+		{ kind: "activities", taskId: "task-a", rows: [{ id: "a", sequence: 2 }] },
+		{
+			kind: "activities",
+			rows: [
+				{ id: "failed", sequence: 4, label: "resume_task", target: "task-a", status: "failed" },
+				{ id: "resume", sequence: 5, label: "resume_task", target: "task-a", status: "completed" },
+			],
+		},
+		{ kind: "activities", taskId: "task-a", rows: [{ id: "b", sequence: 6 }] },
+	];
+	const segments = subtaskSegments(groups, [{ id: "task-a", key: "delegate" }]);
+	assert.equal(segments.opener.get(2), "resume");
+	assert.ok(!segments.claimed.has("failed"));
+});

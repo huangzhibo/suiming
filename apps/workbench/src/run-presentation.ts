@@ -130,7 +130,7 @@ export function actionRuns<A extends { label: string; status: string }>(
 /**
  * 子任务每一段的开头。一个子任务被打断、用 resume_task 续上，在对话里就是先后两段（中间隔着作者的话）：
  * 第一段的开头是建它的委派或审稿（id 是 task.key），之后每一段的开头是续它的那次 resume_task（target 是 taskId）。
- * 动作做完才交回，所以开头那个动作排在这一段的步骤之后：取这段最后一步之后第一个还没认领的；还在跑的那段没有。
+ * 新事件从动作开始就显示，续做入口在子任务步骤之前；旧记录只在结束时显示，入口在步骤之后。两者按区间和状态匹配。
  * 认领了的动作放进子任务那一行，点开先看到委派的内容与交回的结果，根 Agent 里不再单列；没认领的照常列出——
  * 一个动作都没做就失败的委派（开场就放不下）、被拒绝的续做，否则这件事在对话里就看不见了。
  * 后面还有同一个子任务的一段，这一段就是停下了；子任务现在的状态只属于最后一段。
@@ -139,7 +139,7 @@ export function subtaskSegments(
 	groups: readonly {
 		kind: string;
 		taskId?: string;
-		rows?: readonly { id: string; sequence: number; label?: string; target?: string }[];
+		rows?: readonly { id: string; sequence: number; label?: string; target?: string; status?: string }[];
 	}[],
 	tasks: readonly { id: string; key: string }[],
 ): { opener: Map<number, string>; stopped: Set<number>; claimed: Set<string> } {
@@ -161,6 +161,18 @@ export function subtaskSegments(
 			stopped.add(previous);
 			const end = group.rows?.at(-1)?.sequence ?? Number.POSITIVE_INFINITY;
 			id = resumes.find((row) => row.target === group.taskId && row.sequence > end && !claimed.has(row.id))?.id;
+			if (id === undefined) {
+				const start = group.rows?.[0]?.sequence ?? end;
+				const previousEnd = groups[previous]?.rows?.at(-1)?.sequence ?? 0;
+				id = resumes.findLast(
+					(row) =>
+						row.target === group.taskId &&
+						row.sequence > previousEnd &&
+						row.sequence < start &&
+						(row.status === "completed" || row.status === "running") &&
+						!claimed.has(row.id),
+				)?.id;
+			}
 		}
 		if (id === undefined) return;
 		opener.set(index, id);

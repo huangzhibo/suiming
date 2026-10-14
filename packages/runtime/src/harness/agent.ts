@@ -489,6 +489,7 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 	return session.runRoot({
 		systemPrompt: withConstitution(AGENT_PROMPT),
 		prompt: await workSnapshot(session, "会话开始"),
+		refreshOpening: () => workSnapshot(session, "压缩上下文"),
 		decorateInbox: async (text) => {
 			const current = await readProjectStatus(project, await session.scan(), { stale: false });
 			return `${text}\n\n[系统附注：当前版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个]`;

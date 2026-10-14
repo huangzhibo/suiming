@@ -109,7 +109,7 @@ export function validateProductEvent(event: AGUIEvent): void {
 		const schema =
 			event.activityType === "suiming.turn"
 				? SuimingTurnSummarySchema
-				: event.activityType === "suiming.action"
+				: event.activityType === "suiming.action" || event.activityType === "suiming.progress"
 					? SuimingActivitySchema
 					: undefined;
 		if (schema === undefined || !Value.Check(schema, event.content))
