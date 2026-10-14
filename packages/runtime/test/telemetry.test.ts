@@ -54,7 +54,9 @@ test("OpenTelemetry 桥：回调作用域决定父子关系，span 带 traceId�
 	assert.equal(outer.spanContext().spanId, outerIds.spanId);
 	assert.equal(inner.spanContext().traceId, outerIds.traceId, "子 span 与父 span 同一 trace");
 	assert.equal(inner.parentSpanContext?.spanId, outerIds.spanId);
-	assert.deepEqual(outer.attributes, { "suiming.kind": "outer", tags: ["a", "b"] });
+	assert.equal(outer.attributes["suiming.kind"], "outer");
+	assert.deepEqual(outer.attributes.tags, ["a", "b"]);
+	assert.equal(outer.attributes.skipped, undefined);
 	assert.deepEqual(
 		outer.events.map((event) => [event.name, event.attributes]),
 		[["checkpoint", { turn: 1 }]],

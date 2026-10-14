@@ -50,6 +50,7 @@ export interface ModelBindingSnapshot {
 export interface ModelCallRuntimeOptions {
 	signal?: AbortSignal;
 	telemetryContext?: TelemetryContext;
+	modelCallId?: string;
 	/** 同一会话（或子任务）的请求共用一个 id：按会话做 prompt cache 路由的 provider 靠它命中前缀。 */
 	sessionId?: string;
 }
@@ -177,6 +178,8 @@ function callOptions(
 function tracedStream(
 	telemetryContext: TelemetryContext,
 	snapshot: ModelBindingSnapshot,
+	context: Context,
+	modelCallId: string | undefined,
 	open: (span: TelemetryContext) => AssistantMessageEventStream,
 ): AssistantMessageEventStream {
 	const outer = createAssistantMessageEventStream();
@@ -204,24 +207,29 @@ function tracedStream(
 		},
 	});
 	// 终止事件等 span 记录完 usage 与 stopReason 之后再转发，调用方 await result() 时 span 已经完整。
-	void traceModelCall(telemetryContext, snapshot, async (span) => {
-		const inner = open(span);
-		let completionStarted = false;
-		for await (const event of inner) {
-			if (!completionStarted && ["text_delta", "thinking_delta", "toolcall_delta"].includes(event.type)) {
-				completionStarted = true;
-				span.setAttributes({ "langfuse.observation.completion_start_time": new Date().toISOString() });
+	void traceModelCall(
+		telemetryContext,
+		snapshot,
+		async (span) => {
+			const inner = open(span);
+			let completionStarted = false;
+			for await (const event of inner) {
+				if (!completionStarted && ["text_delta", "thinking_delta", "toolcall_delta"].includes(event.type)) {
+					completionStarted = true;
+					span.setAttributes({ "langfuse.observation.completion_start_time": new Date().toISOString() });
+				}
+				if (event.type === "done" || event.type === "error") {
+					terminal = event;
+					break;
+				}
+				outer.push(event);
 			}
-			if (event.type === "done" || event.type === "error") {
-				terminal = event;
-				break;
-			}
-			outer.push(event);
-		}
-		if (terminal?.type === "done") return terminal.message;
-		if (terminal?.type === "error") return terminal.error;
-		return inner.result();
-	}).then(
+			if (terminal?.type === "done") return terminal.message;
+			if (terminal?.type === "error") return terminal.error;
+			return inner.result();
+		},
+		{ context, ...(modelCallId === undefined ? {} : { modelCallId }) },
+	).then(
 		(message) => {
 			if (terminal !== undefined) outer.push(terminal);
 			else outer.end(message);
@@ -357,8 +365,17 @@ export class ModelGateway {
 			snapshot,
 			model,
 			stream: (context: Context, runtime?: ModelCallRuntimeOptions) =>
-				tracedStream(runtime?.telemetryContext ?? this.#telemetryContext, snapshot, (span) =>
-					this.#models.stream(model, context, callOptions(options, { ...runtime, telemetryContext: span }, span)),
+				tracedStream(
+					runtime?.telemetryContext ?? this.#telemetryContext,
+					snapshot,
+					context,
+					runtime?.modelCallId,
+					(span) =>
+						this.#models.stream(
+							model,
+							context,
+							callOptions(options, { ...runtime, telemetryContext: span }, span),
+						),
 				),
 		});
 	}

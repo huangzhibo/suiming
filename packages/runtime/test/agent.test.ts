@@ -1720,3 +1720,65 @@ test("委派观测归属 turn；工具 / Checker 带同一 session 关联", asyn
 		await telemetry.shutdown();
 	}
 });
+
+test("整轮观测区分成功、失败与主动停止，模型调用能与工具和 checkpoint 对账", async () => {
+	const { InMemorySpanExporter, SimpleSpanProcessor } = await import("@opentelemetry/sdk-trace");
+	const { createOpenTelemetry } = await import("../src/index.js");
+	const exporter = new InMemorySpanExporter();
+	const telemetry = createOpenTelemetry({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+	const f = await fixture({ telemetryContext: telemetry.context });
+	try {
+		f.provider.setResponses([call("read", { path: "outline/story/index.yaml" }), reply("已核对")]);
+		const success = await f.say("检查目录");
+		const failed = await f.harness.createSession();
+		const failure = await f.harness.turn(failed.id, {}, async () => {
+			throw new Error("private-error");
+		});
+		assert.ok(failure.failure);
+		const stopped = await f.harness.createSession();
+		const controller = new AbortController();
+		await f.harness.turn(stopped.id, { signal: controller.signal }, async () => {
+			controller.abort();
+			throw new Error("private-stop");
+		});
+		const spans = exporter.getFinishedSpans();
+		for (const [id, outcome, status] of [
+			[success.sessionId, "completed", 1],
+			[failed.id, "failed", 2],
+			[stopped.id, "stopped", 1],
+		] as const) {
+			const span = spans.find((s) => s.name === "suiming.turn agent" && s.attributes["suiming.session.id"] === id);
+			assert.equal(span?.attributes["langfuse.observation.metadata.outcome"], outcome);
+			assert.equal(span?.status.code, status);
+			if (outcome === "stopped") {
+				assert.equal(span?.attributes["langfuse.observation.metadata.failure_code"], undefined);
+				assert.equal(span?.attributes["langfuse.observation.metadata.stop_reason"], "interrupted");
+			}
+		}
+		const tool = spans.find((s) => s.name === "suiming.tool read");
+		const generation = spans.find(
+			(s) =>
+				s.name === "suiming.model.call" &&
+				s.attributes["langfuse.observation.metadata.model_call_id"] ===
+					tool?.attributes["langfuse.observation.metadata.model_call_id"],
+		);
+		assert.ok(generation);
+		assert.equal(success.session.checkpointRef?.kind, "object");
+		assert.ok(success.session.checkpointRef);
+		const checkpoint = (await f.harness.checkpoints.read(
+			(
+				await f.project.readExecutionObject(success.session.checkpointRef.id)
+			).bytes,
+		)) as { loop: LoopCheckpoint };
+		assert.ok(
+			checkpoint.loop.calls.some(
+				(call) => call.id === generation.attributes["langfuse.observation.metadata.model_call_id"],
+			),
+		);
+		assert.equal(generation.parentSpanContext?.spanId, tool?.parentSpanContext?.spanId);
+		assert.ok(!JSON.stringify(spans.map((s) => s.attributes)).includes("private-error"));
+	} finally {
+		await f.close();
+		await telemetry.shutdown();
+	}
+});

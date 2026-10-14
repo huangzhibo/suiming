@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import {
 	NOOP_TELEMETRY_CONTEXT,
 	type SpanAttributes,
@@ -18,6 +19,8 @@ import {
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor, type SpanExporter, type SpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
+
+import { registerTelemetryContent, type TelemetryContentPolicy } from "./telemetry-content.js";
 
 /**
  * pi-telemetry 的 TelemetryContext 是 Suiming 所有观测的契约；这里是它到 OpenTelemetry 的桥（ADR-0008 决定 5）。
@@ -54,6 +57,10 @@ const correlationKeys = new Set([
 	"langfuse.trace.name",
 	"langfuse.trace.tags",
 	"langfuse.environment",
+	"langfuse.release",
+	"langfuse.version",
+	"langfuse.observation.metadata.entrypoint",
+	"langfuse.observation.metadata.content_capture",
 	"suiming.project.id",
 	"suiming.session.id",
 	"suiming.turn.id",
@@ -70,7 +77,13 @@ function spanAttributes(attributes: SpanAttributes = {}): Attributes {
 function correlation(attributes: Attributes): Attributes {
 	return Object.fromEntries(
 		Object.entries(attributes).filter(
-			([key]) => correlationKeys.has(key) || key.startsWith("langfuse.observation.metadata."),
+			([key]) =>
+				correlationKeys.has(key) ||
+				[...correlationKeys].some(
+					(k) =>
+						k.startsWith("suiming.") &&
+						key === `langfuse.observation.metadata.${k.slice(8).replaceAll(".", "_")}`,
+				),
 		),
 	);
 }
@@ -88,11 +101,18 @@ class OpenTelemetryContext implements TelemetryContext {
 	readonly #tracer: Tracer;
 	readonly #parent: OtelContext;
 	readonly #inherited: Attributes;
+	readonly #content: TelemetryContentPolicy;
 
-	constructor(tracer: Tracer, parent: OtelContext = ROOT_CONTEXT, inherited: Attributes = {}) {
+	constructor(
+		tracer: Tracer,
+		parent: OtelContext = ROOT_CONTEXT,
+		inherited: Attributes = {},
+		content: TelemetryContentPolicy = {},
+	) {
 		this.#tracer = tracer;
 		this.#parent = parent;
 		this.#inherited = inherited;
+		this.#content = content;
 	}
 
 	startSpan<T>(options: SpanOptions, callback: (span: TelemetrySpan) => T | Promise<T>): Promise<T> {
@@ -104,7 +124,7 @@ class OpenTelemetryContext implements TelemetryContext {
 			return NOOP_TELEMETRY_CONTEXT.startSpan(options, callback);
 		}
 		const inherited = correlation(attributes);
-		const child = new OpenTelemetryContext(this.#tracer, trace.setSpan(this.#parent, span), inherited);
+		const child = new OpenTelemetryContext(this.#tracer, trace.setSpan(this.#parent, span), inherited, this.#content);
 		let ended = false;
 		let explicitStatus = false;
 		const spanContext = span.spanContext();
@@ -138,6 +158,7 @@ class OpenTelemetryContext implements TelemetryContext {
 				}
 			},
 		};
+		registerTelemetryContent(handle, this.#content);
 		const settle = (failed: boolean, error?: unknown): void => {
 			if (ended) return;
 			ended = true;
@@ -171,7 +192,10 @@ class OpenTelemetryContext implements TelemetryContext {
 	}
 }
 
-export interface CreateOpenTelemetryOptions {
+export interface CreateOpenTelemetryOptions extends TelemetryContentPolicy {
+	entrypoint?: string;
+	environment?: string;
+	release?: string;
 	spanProcessors: SpanProcessor[];
 	serviceName?: string;
 	tracerName?: string;
@@ -186,7 +210,18 @@ export function createOpenTelemetry(options: CreateOpenTelemetryOptions): Suimin
 	});
 	const tracer = provider.getTracer(options.tracerName ?? "suiming");
 	return {
-		context: new OpenTelemetryContext(tracer),
+		context: new OpenTelemetryContext(
+			tracer,
+			ROOT_CONTEXT,
+			{
+				"langfuse.environment": options.environment ?? "local",
+				"langfuse.release": options.release ?? RUNTIME_VERSION,
+				"langfuse.version": options.release ?? RUNTIME_VERSION,
+				"langfuse.observation.metadata.entrypoint": options.entrypoint ?? "runtime",
+				"langfuse.observation.metadata.content_capture": options.captureContent === true ? "enabled" : "disabled",
+			},
+			options,
+		),
 		flush: (timeoutMs = 5000) => bounded(() => provider.forceFlush(), timeoutMs, options.onDiagnostic),
 		shutdown: (timeoutMs = 5000) => bounded(() => provider.shutdown(), timeoutMs, options.onDiagnostic),
 	};
@@ -224,7 +259,9 @@ function diagnose(listener: ((code: string) => void) | undefined, code: string):
 	}
 }
 
-export interface LangfuseTelemetryOptions {
+const RUNTIME_VERSION = (createRequire(import.meta.url)("../../package.json") as { version: string }).version;
+
+export interface LangfuseTelemetryOptions extends Omit<CreateOpenTelemetryOptions, "spanProcessors"> {
 	onDiagnostic?: (code: string) => void;
 	baseUrl: string;
 	publicKey: string;
@@ -263,6 +300,7 @@ export function createLangfuseTelemetry(options: LangfuseTelemetryOptions): Suim
 		shutdown: () => target.shutdown(),
 	};
 	return createOpenTelemetry({
+		...options,
 		spanProcessors: [new BatchSpanProcessor({ exporter, exportTimeoutMillis: 2000 })],
 		onDiagnostic,
 		...(options.serviceName === undefined ? {} : { serviceName: options.serviceName }),
@@ -282,14 +320,30 @@ const LANGFUSE_DEFAULT_BASE_URL = "https://cloud.langfuse.com";
  * 从环境决定观测后端：配置了 LANGFUSE_PUBLIC_KEY 与 LANGFUSE_SECRET_KEY 就发到 Langfuse
  * （LANGFUSE_BASE_URL 缺省为 Langfuse Cloud），否则 NOOP。观测不是模型调用的前置条件。
  */
-export function telemetryFromEnvironment(environment: Readonly<Record<string, string | undefined>>): SuimingTelemetry {
+export function telemetryFromEnvironment(
+	environment: Readonly<Record<string, string | undefined>>,
+	source: { entrypoint?: string; release?: string } = {},
+): SuimingTelemetry {
 	const publicKey = environment.LANGFUSE_PUBLIC_KEY?.trim();
 	const secretKey = environment.LANGFUSE_SECRET_KEY?.trim();
 	if (publicKey === undefined || publicKey.length === 0 || secretKey === undefined || secretKey.length === 0) {
+		if (publicKey || secretKey) console.error("[Suiming telemetry] langfuse_credentials_incomplete");
 		return NOOP_TELEMETRY;
 	}
+	if (environment.SUIMING_TELEMETRY_CONTENT && !["true", "false"].includes(environment.SUIMING_TELEMETRY_CONTENT))
+		console.error("[Suiming telemetry] telemetry_content_invalid_disabled");
+	console.error(
+		`[Suiming telemetry] langfuse_enabled content=${environment.SUIMING_TELEMETRY_CONTENT === "true" ? "on" : "off"}`,
+	);
 	const baseUrl = environment.LANGFUSE_BASE_URL?.trim();
 	return createLangfuseTelemetry({
+		...source,
+		environment: environment.SUIMING_TELEMETRY_ENVIRONMENT?.trim() || "local",
+		release: environment.SUIMING_TELEMETRY_RELEASE?.trim() || source.release || RUNTIME_VERSION,
+		captureContent: environment.SUIMING_TELEMETRY_CONTENT === "true",
+		redactValues: Object.entries(environment)
+			.filter(([key]) => /KEY|TOKEN|SECRET|PASSWORD/iu.test(key))
+			.flatMap(([, value]) => (value ? [value] : [])),
 		baseUrl: baseUrl === undefined || baseUrl.length === 0 ? LANGFUSE_DEFAULT_BASE_URL : baseUrl,
 		publicKey,
 		secretKey,

@@ -15,6 +15,7 @@ import { Value } from "typebox/value";
 import { addModelUsage, emptyModelUsage } from "../execution/model-usage.js";
 import type { ModelUsage } from "../execution/types.js";
 import type { BoundModelProfile } from "../model/model-gateway.js";
+import { captureTelemetryContent } from "../model/telemetry-content.js";
 import { SuimingHarnessError } from "./errors.js";
 import { type HarnessTool, type HarnessToolResult, rejectionForToolError, ToolRejection } from "./tool.js";
 
@@ -575,6 +576,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				},
 			},
 			async (toolSpan) => {
+				captureTelemetryContent(toolSpan, "input", () => action.call.arguments);
 				try {
 					if (!tool) throw new ToolRejection("unknown_tool", action.call.name);
 					if (!Value.Check(tool.parameters, action.call.arguments))
@@ -603,6 +605,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 					result = { content: [{ type: "text", text: error.message }] };
 					isError = true;
 				}
+				captureTelemetryContent(toolSpan, "output", () => ({ content: result.content, isError }));
 			},
 		);
 		action.result = result;
@@ -723,6 +726,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			let response: AssistantMessage;
 			try {
 				const stream = options.model.stream(context, {
+					modelCallId: call.id,
 					signal: abort.signal,
 					...(options.loopId === undefined ? {} : { sessionId: options.loopId }),
 					...(options.telemetryContext === undefined ? {} : { telemetryContext: options.telemetryContext }),

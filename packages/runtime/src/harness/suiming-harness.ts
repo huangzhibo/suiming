@@ -30,6 +30,7 @@ import type {
 import type { ModelProfileId } from "../model/config.js";
 import { ModelGatewayError } from "../model/errors.js";
 import type { BoundModelProfile, ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
+import { captureTelemetryContent } from "../model/telemetry-content.js";
 import { CheckpointArchive } from "./checkpoint-archive.js";
 import { type ConfinedEnvPolicy, ConfinedExecutionEnv } from "./confined-env.js";
 import { SuimingHarnessError } from "./errors.js";
@@ -373,6 +374,7 @@ export class HarnessSession {
 					usage: { ...usage, calls: 0, confirmedCalls: 1 },
 				}),
 		});
+		captureTelemetryContent(this.#telemetry, "output", () => this.#lastReply);
 		return { stop: outcome.loop.stop, reply: this.#lastReply, turns: outcome.loop.turns };
 	}
 
@@ -996,18 +998,34 @@ export class SuimingHarness {
 						usageCheckpoint: await this.#usageCheckpoint(),
 					});
 					events.refresh();
+					captureTelemetryContent(span, "input", () =>
+						session?.pendingInbox().map((item) => ({ role: "user", content: item.text })),
+					);
 					start = await turnStart(session);
 					const value = await body(session);
 					await this.#emitTurnSummary(session, start, ownerId);
 					const ended = endTurn();
 					events.refresh();
+					span.setAttributes({ "langfuse.observation.metadata.outcome": "completed" });
+					span.setStatus({ status: "ok" });
 					return { session: ended, value };
 				} catch (error) {
+					const failure = executionFailure(error);
+					const interrupted = failure.code === "run_interrupted" || options.signal?.aborted === true;
+					span.setAttributes({
+						"langfuse.observation.metadata.outcome": interrupted ? "stopped" : "failed",
+						"langfuse.observation.metadata.failure_code": interrupted ? undefined : failure.code,
+						"langfuse.observation.metadata.stop_reason": interrupted ? "interrupted" : undefined,
+						"langfuse.observation.level": interrupted ? "WARNING" : "ERROR",
+					});
+					span.setStatus(
+						interrupted
+							? { status: "ok" }
+							: { status: "error", error: { name: failure.code, message: "Turn failed" } },
+					);
 					// 持久化已经失败的实例不能再记账；把原错误抛回，状态留给下一次 open 收敛。
 					execution.assertWritable();
 					events.assertWritable();
-					const failure = executionFailure(error);
-					const interrupted = failure.code === "run_interrupted" || options.signal?.aborted === true;
 					// 失败或被打断的 turn 也报这一轮改了什么；对账本身出错不能盖住原来的失败。停下的 turn 标出来：
 					// 没有它，对话里只剩一串操作、后面没有回复，作者看不出是自己停的还是出了什么事。
 					if (session !== undefined)
@@ -1017,6 +1035,17 @@ export class SuimingHarness {
 					return { session: ended, ...(interrupted ? {} : { failure }) };
 				} finally {
 					const latest = execution.session(sessionId);
+					if ((latest.inboxSequence ?? 0) > (record.inboxSequence ?? 0))
+						captureTelemetryContent(span, "input", () =>
+							this.project
+								.readInbox(sessionId)
+								.filter(
+									(item) =>
+										item.sequence > (record.inboxSequence ?? 0) &&
+										item.sequence <= (latest.inboxSequence ?? 0),
+								)
+								.map((item) => ({ role: "user", content: item.text })),
+						);
 					span.setAttributes({
 						...usageAttributes("suiming.session", latest.usage ?? emptyModelUsage()),
 						"suiming.session.status": latest.status,

@@ -12,68 +12,88 @@ import { collectPageErrors, launchDesktop, waitForSessionIdle } from "./launch.j
 
 declare const window: { suiming: DesktopBridge };
 type Span = { name: string; traceId: string; attributes: { key: string; value: { stringValue?: string } }[] };
-test("桌面通过主进程环境接入 OTLP，退出导出最后一批 span", { timeout: 60000 }, async () => {
-	const received: Span[] = [];
-	const headers: string[] = [];
-	const server = createServer(async (req, res) => {
-		const chunks: Buffer[] = [];
-		for await (const chunk of req) chunks.push(Buffer.from(chunk));
-		const raw = Buffer.concat(chunks);
-		const body = JSON.parse((req.headers["content-encoding"] === "gzip" ? gunzipSync(raw) : raw).toString()) as {
-			resourceSpans: { scopeSpans: { spans: Span[] }[] }[];
-		};
-		headers.push(String(req.headers["x-langfuse-ingestion-version"]));
-		for (const resource of body.resourceSpans) for (const scope of resource.scopeSpans) received.push(...scope.spans);
-		res.writeHead(200, { "content-type": "application/json" });
-		res.end("{}");
-	});
-	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-	const address = server.address();
-	assert.ok(address && typeof address !== "string");
-	const directory = await mkdtemp(join(tmpdir(), "suiming-telemetry-desktop-"));
-	const root = join(directory, "work");
-	await mkdir(root);
-	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
-	(await LocalProjectService.init({ checkoutPath: root })).close();
-	const app = await launchDesktop({
-		directory,
-		project: root,
-		flags: ["--telemetry-test"],
-		env: {
-			LANGFUSE_BASE_URL: `http://127.0.0.1:${address.port}`,
-			LANGFUSE_PUBLIC_KEY: "pk-test",
-			LANGFUSE_SECRET_KEY: "sk-test",
-		},
-	});
-	let closed = false;
-	try {
-		const page = await app.firstWindow();
-		const errors = collectPageErrors(page);
-		await page.waitForFunction(() => !!window.suiming);
-		const result = await page.evaluate(() =>
-			window.suiming.invoke("session.send", {
-				commandId: "telemetry-test",
-				text: "Synthetic telemetry probe",
-			}),
-		);
-		// 等整个 turn 结束后再验收退出导出。
-		await waitForSessionIdle(page, result.sessionId);
-		assert.deepEqual(errors, []);
-		await app.close();
-		closed = true;
-		assert.ok(received.some((s) => s.name === "suiming.turn agent"));
-		assert.ok(received.some((s) => s.name === "suiming.model.call"));
-		assert.ok(received.some((s) => s.name === "suiming.tool read"));
-		assert.equal(new Set(received.map((s) => s.traceId)).size, 1);
-		for (const span of received)
-			assert.equal(
-				span.attributes.find((a) => a.key === "langfuse.session.id")?.value.stringValue,
-				result.sessionId,
+for (const captureContent of [false, true]) {
+	test(`桌面通过主进程环境接入 OTLP，退出导出最后一批 span（内容采集 ${captureContent}）`, {
+		timeout: 60000,
+	}, async () => {
+		const received: Span[] = [];
+		const headers: string[] = [];
+		const server = createServer(async (req, res) => {
+			const chunks: Buffer[] = [];
+			for await (const chunk of req) chunks.push(Buffer.from(chunk));
+			const raw = Buffer.concat(chunks);
+			const body = JSON.parse((req.headers["content-encoding"] === "gzip" ? gunzipSync(raw) : raw).toString()) as {
+				resourceSpans: { scopeSpans: { spans: Span[] }[] }[];
+			};
+			headers.push(String(req.headers["x-langfuse-ingestion-version"]));
+			for (const resource of body.resourceSpans)
+				for (const scope of resource.scopeSpans) received.push(...scope.spans);
+			res.writeHead(200, { "content-type": "application/json" });
+			res.end("{}");
+		});
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+		const address = server.address();
+		assert.ok(address && typeof address !== "string");
+		const directory = await mkdtemp(join(tmpdir(), "suiming-telemetry-desktop-"));
+		const root = join(directory, "work");
+		await mkdir(root);
+		await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
+		(await LocalProjectService.init({ checkoutPath: root })).close();
+		const app = await launchDesktop({
+			directory,
+			project: root,
+			flags: ["--telemetry-test"],
+			env: {
+				LANGFUSE_BASE_URL: `http://127.0.0.1:${address.port}`,
+				LANGFUSE_PUBLIC_KEY: "pk-test",
+				LANGFUSE_SECRET_KEY: "sk-test",
+				SUIMING_TELEMETRY_ENVIRONMENT: "validation",
+				SUIMING_TELEMETRY_RELEASE: "desktop-audit",
+				SUIMING_TELEMETRY_CONTENT: String(captureContent),
+			},
+		});
+		let closed = false;
+		try {
+			const page = await app.firstWindow();
+			const errors = collectPageErrors(page);
+			await page.waitForFunction(() => !!window.suiming);
+			const result = await page.evaluate(() =>
+				window.suiming.invoke("session.send", {
+					commandId: "telemetry-test",
+					text: "Synthetic telemetry probe",
+				}),
 			);
-		assert.ok(headers.length > 0 && headers.every((header) => header === "4"));
-	} finally {
-		if (!closed) await app.close();
-		await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-		await rm(directory, { recursive: true, force: true });
-	}
-});
+			// 等整个 turn 结束后再验收退出导出。
+			await waitForSessionIdle(page, result.sessionId);
+			assert.deepEqual(errors, []);
+			await app.close();
+			closed = true;
+			assert.ok(received.some((s) => s.name === "suiming.turn agent"));
+			assert.ok(received.some((s) => s.name === "suiming.model.call"));
+			assert.ok(received.some((s) => s.name === "suiming.tool read"));
+			assert.equal(new Set(received.map((s) => s.traceId)).size, 1);
+			for (const span of received)
+				assert.equal(
+					span.attributes.find((a) => a.key === "langfuse.session.id")?.value.stringValue,
+					result.sessionId,
+				);
+			for (const span of received) {
+				const attribute = (key: string) => span.attributes.find((a) => a.key === key)?.value.stringValue;
+				assert.equal(attribute("langfuse.environment"), "validation");
+				assert.equal(attribute("langfuse.release"), "desktop-audit");
+				assert.equal(attribute("langfuse.observation.metadata.entrypoint"), "desktop");
+				if (span.name === "suiming.turn agent")
+					assert.equal(attribute("langfuse.observation.metadata.outcome"), "completed");
+				if (["suiming.turn agent", "suiming.model.call", "suiming.tool read"].includes(span.name)) {
+					assert.equal(attribute("langfuse.observation.input") !== undefined, captureContent, span.name);
+					assert.equal(attribute("langfuse.observation.output") !== undefined, captureContent, span.name);
+				}
+			}
+			assert.ok(headers.length > 0 && headers.every((header) => header === "4"));
+		} finally {
+			if (!closed) await app.close();
+			await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+			await rm(directory, { recursive: true, force: true });
+		}
+	});
+}

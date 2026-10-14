@@ -1,6 +1,7 @@
-import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
 import type { TelemetryContext, TelemetrySpan } from "@earendil-works/pi-telemetry";
 import type { ModelBindingSnapshot } from "./model-gateway.js";
+import { captureTelemetryContent, telemetryInput, telemetryMessages } from "./telemetry-content.js";
 
 function recordResult(span: TelemetrySpan, message: AssistantMessage): void {
 	span.setAttributes({
@@ -36,12 +37,14 @@ export function traceModelCall(
 	telemetryContext: TelemetryContext,
 	binding: ModelBindingSnapshot,
 	callback: (span: TelemetrySpan) => Promise<AssistantMessage>,
+	request?: { context: Context; modelCallId?: string },
 ): Promise<AssistantMessage> {
 	return telemetryContext.startSpan(
 		{
 			name: "suiming.model.call",
 			attributes: {
 				"langfuse.observation.type": "generation",
+				"langfuse.observation.metadata.model_call_id": request?.modelCallId,
 				"gen_ai.operation.name": "chat",
 				"gen_ai.provider.name": binding.provider,
 				"gen_ai.request.model": binding.model,
@@ -61,7 +64,9 @@ export function traceModelCall(
 			},
 		},
 		async (span) => {
+			if (request) captureTelemetryContent(span, "input", () => telemetryInput(request.context));
 			const message = await callback(span);
+			captureTelemetryContent(span, "output", () => telemetryMessages([message]));
 			recordResult(span, message);
 			return message;
 		},

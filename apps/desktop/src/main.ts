@@ -72,7 +72,8 @@ function describeOpenFailure(error: unknown): Error & { code: string } {
 export function startDesktop(
 	options: { models?: () => Promise<ModelGateway>; settings?: LocalModelSettings; telemetry?: SuimingTelemetry } = {},
 ): void {
-	const telemetry = options.telemetry ?? telemetryFromEnvironment(process.env);
+	const telemetry =
+		options.telemetry ?? telemetryFromEnvironment(process.env, { entrypoint: "desktop", release: app.getVersion() });
 	let window: BrowserWindow | undefined;
 	let workspace: LocalWorkspace | undefined;
 	let quitting = false;

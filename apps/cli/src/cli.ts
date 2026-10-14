@@ -469,7 +469,8 @@ const telemetryByIo = new WeakMap<SuimCliIo, SuimingTelemetry>();
 function cliTelemetry(io: SuimCliIo): SuimingTelemetry {
 	const existing = telemetryByIo.get(io);
 	if (existing !== undefined) return existing;
-	const created = io.telemetry ?? telemetryFromEnvironment(process.env);
+	const created =
+		io.telemetry ?? telemetryFromEnvironment(process.env, { entrypoint: "cli", release: SUIM_CLI_VERSION });
 	telemetryByIo.set(io, created);
 	return created;
 }
