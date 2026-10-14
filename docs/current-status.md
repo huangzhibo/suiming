@@ -1,4 +1,4 @@
-# 当前状态（2026-10-14）
+# 当前状态（2026-10-15）
 
 本文只回答三件事：什么已经成立、证据到哪一级、还有哪些已知缺陷。形状以[系统架构](architecture.md)与 [Harness 设计](harness-design.md)为准；接下来做什么只在[路线图](roadmap.md)第 6 节维护，发生过什么见[变更记录](changelog.md)。
 
@@ -13,7 +13,7 @@
 
 ## 最近有效验收
 
-2026-10-15：模型依赖统一升至 pi-ai / pi-telemetry 1.2.0；检查与 80 项定向机制测试通过。输入边界与压缩仍在优化，见[分步记录](validation/2026-10-15-harness-alignment/README.md)。
+2026-10-15：模型依赖统一升至 pi-ai / pi-telemetry 1.2.0；检查与 80 项定向机制测试通过。读取字节边界、Source 按范围预载通过 37 项机制验收；压缩仍在优化，见[分步记录](validation/2026-10-15-harness-alignment/README.md)。
 
 | 范围 | 已验证结果 | 证据与限制 |
 | --- | --- | --- |

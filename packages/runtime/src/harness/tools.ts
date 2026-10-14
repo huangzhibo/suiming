@@ -17,6 +17,7 @@ import {
 	conflictMessage,
 	type FileMutation,
 } from "./confined-env.js";
+import { readWindow } from "./read-window.js";
 import { formatSourceCheck } from "./source-context.js";
 import { type HarnessTool, type HarnessToolResult, type ToolDetails, ToolRejection } from "./tool.js";
 import { renderState, styleEvidenceFor } from "./write-context.js";
@@ -38,6 +39,7 @@ const ReadSchema = Type.Object(
 	{
 		path: Type.String({ minLength: 1 }),
 		offset: Type.Optional(Type.Integer({ minimum: 1 })),
+		column: Type.Optional(Type.Integer({ minimum: 1, description: "首行从第几个 Unicode 码点续读，默认 1" })),
 		limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 4000 })),
 	},
 	{ additionalProperties: false },
@@ -194,20 +196,16 @@ export function fileTools(
 		text(check && scan ? `${summary}\n\n检查：${formatCheck(await scan(), sourceId)}` : summary);
 	const read: HarnessTool<typeof ReadSchema> = {
 		name: "read",
-		description: "读取作品中的 UTF-8 文件。offset 从 1 开始，默认最多 2000 行。",
+		description:
+			"读取作品中的 UTF-8 文件。offset 从 1 开始，默认最多 2000 行且正文不超过 50 KiB；截断时按返回的 offset、column 继续读取。",
 		parameters: ReadSchema,
 		rereadable: true,
 		async execute(_id, params, signal) {
 			const content = await env.readTextFile(params.path, signal);
-			const lines = content.split("\n");
-			const start = (params.offset ?? 1) - 1;
-			const end = Math.min(lines.length, start + (params.limit ?? 2000));
-			if (start >= lines.length) throw new ToolRejection("invalid_read_range", `文件只有 ${lines.length} 行`);
+			const result = readWindow(content, params);
 			return text(
-				lines
-					.slice(start, end)
-					.map((line, i) => `${start + i + 1}: ${line}`)
-					.join("\n") + (end < lines.length ? `\n[还有 ${lines.length - end} 行；用 offset 继续读取]` : ""),
+				result.text +
+					(result.next ? `\n[尚未读完；继续 read：${JSON.stringify({ path: params.path, ...result.next })}]` : ""),
 			);
 		},
 	};

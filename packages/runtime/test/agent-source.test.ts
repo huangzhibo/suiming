@@ -1111,7 +1111,7 @@ test("分段抽取时还没有 index，impact 查这份 Source 是回到子任�
 	});
 });
 
-test("补全：已有 index 时带范围的 source-extractor 拿到整份抽取，带着后文回头读这段原文，只改自己号段的 Beat", async () => {
+test("补全：只预载本段抽取，保留跨段读取，仍只改自己号段的 Beat", async () => {
 	// 没被强调的伏笔只有知道后文揭示才认得出，所以查漏放在整合之后；它是抽取的第二遍，不是只读的审稿。
 	await withProject(async (project, checkoutPath) => {
 		for (const [path, content] of extractionFiles) {
@@ -1135,6 +1135,10 @@ test("补全：已有 index 时带范围的 source-extractor 拿到整份抽取�
 					(context) => {
 						system = JSON.stringify(context.messages[0]);
 						prompt = JSON.stringify(context.messages[1]);
+						return call("read", { path: "source/访谈/outline/story/vol-0001/beat-0002.md" });
+					},
+					(context) => {
+						assert.match(lastToolText(context), /旧友劝黄盖烧掉火船/u, "跨段原文仍可读取");
 						return call("edit", {
 							path: "source/访谈/outline/story/vol-0001/beat-0001.md",
 							oldText: "决定先不公开",
@@ -1160,7 +1164,8 @@ test("补全：已有 index 时带范围的 source-extractor 拿到整份抽取�
 		assert.equal(outcome.failure, undefined);
 		assert.match(system, /补全/u);
 		assert.doesNotMatch(system, /分段抽取：/u);
-		assert.match(prompt, /旧友劝黄盖烧掉火船/u, "输入里带着整份抽取");
+		assert.doesNotMatch(prompt, /旧友劝黄盖烧掉火船/u, "号段外全文不灌进输入");
+		assert.match(prompt, /跨段关联/u, "明确要求主动核对后文");
 		assert.doesNotMatch(results[0] ?? "", /permission_denied/u);
 		assert.match(results[1] ?? "", /permission_denied/u, "别的段的 Beat 列进交付，不动手");
 	});

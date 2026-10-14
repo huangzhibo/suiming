@@ -90,15 +90,15 @@ export const SOURCE_EXTRACTION_METHOD = `抽取方法：每类作品文件写什
  * 一起给出。2026-10-05 之前它常驻在 delegate 的说明里，每次根请求都带，纯讨论也带；而真正让模型照做的是现成的分段。
  * 不是固定流水线：何时派、派几个仍由根 Agent 定。
  */
-export const SOURCE_EXTRACTION_PLAN = `抽取这份 Source 的计划（segments 是在章标题处切好的分段，各带 span 与 beatRange）：① 分段抽取——同一次回复里为 segments 的每一段各委派一个带这组 span 与 beatRange 的 source-extractor（只有一段也这样派：笔记由它写，根 Agent 不必自己再读一遍原文；一段时 ③④ 可省）；各段互不等待，跨段的人物、伏笔与衔接归 ② 整合，不要让前一段给后一段交代状态；② 整合——委派一个不带范围的 source-extractor；③ 补全——同一次回复里按原来的 span 与 beatRange 各委派一次，它们带着整份抽取回头读原文；④ 统一修——把补全交回的号段外改动交给一个不带范围的 source-extractor；⑤ review 一轮；⑥ 需要时提升为 Target。独立的几段先分好，在同一次回复里一起派出，不要先派一段试水再派其余。`;
+export const SOURCE_EXTRACTION_PLAN = `抽取这份 Source 的计划（segments 是在章标题处切好的分段，各带 span 与 beatRange）：① 分段抽取——同一次回复里为 segments 的每一段各委派一个带这组 span 与 beatRange 的 source-extractor（只有一段也这样派：笔记由它写，根 Agent 不必自己再读一遍原文；一段时 ③④ 可省）；各段互不等待，跨段的人物、伏笔与衔接归 ② 整合，不要让前一段给后一段交代状态；② 整合——委派一个不带范围的 source-extractor；③ 补全——同一次回复里按原来的 span 与 beatRange 各委派一次，它们带着本段抽取回头读原文，并按需核对后文与跨段关联；④ 统一修——把补全交回的号段外改动交给一个不带范围的 source-extractor；⑤ review 一轮；⑥ 需要时提升为 Target。独立的几段先分好，在同一次回复里一起派出，不要先派一段试水再派其余。`;
 
 export const SOURCE_SEGMENT_METHOD = `分段抽取：只读给定区间的原文，直接写这段的 Beat，编号用给定号段（Beat 编号是身份不是顺序），先都放在 outline/story/vol-0001/ 下，分卷与 index 由整合来定。不建人物、地点、物品、World 与 Contract 文件，refs 照原文写名字，整合时再建档。写完再写这段的笔记（路径见任务）：frontmatter 写 span 与 material_sha256，正文是交接——这段新出场的人物、地点、物品与设定，具体数值，谁在何时知道了什么，未解的问题，截在段界上的事件从哪接起。`;
 
 /**
- * 补全（同上第 3 步）：整合之后带着整份抽取回头读这段原文。没被强调的伏笔只有知道后文揭示才认得出，所以查漏放在这里，
+ * 补全（同上第 3 步）：整合之后带着本段抽取回头读这段原文，跨段依据按需读。没被强调的伏笔只有知道后文揭示才认得出，所以查漏放在这里，
  * 不放在第一遍；它是抽取的第二遍、直接改作品，不是只读的审稿。
  */
-export const SOURCE_COMPLETION_METHOD = `补全：带着下面附的整份抽取回头读给定区间的原文，只改编号在给定号段内的 Beat：补漏记的情节，补当时没被强调、后文才揭示意义的细节，修行动归属、数值、先后与知情的错，补这段该声明的 Secret 与该连的 refs.beat。号段外的改动（人物档、World、Contract、其他段的 Beat）不动手，在 submit_task 里逐条列出：改哪个文件、改什么、原文依据。`;
+export const SOURCE_COMPLETION_METHOD = `补全：带着下面附的本段抽取回头读给定区间的原文；先读取全书 index，再根据本段人物、期待与秘密检索并读取后文及跨段引用，不能把未预载的内容当成不存在。只改编号在给定号段内的 Beat：补漏记的情节，补当时没被强调、后文才揭示意义的细节，修行动归属、数值、先后与知情的错，补这段该声明的 Secret 与该连的 refs.beat。号段外的改动（人物档、World、Contract、其他段的 Beat）不动手，在 submit_task 里逐条列出：改哪个文件、改什么、原文依据。`;
 
 /** 抽取要遵循的 Story Language 原文：语义只有这一份，抽取子任务直接拿到，不靠它记得去调 story_guide。 */
 export const SOURCE_EXTRACTION_LANGUAGE = `以下是 Story Language 原文，作品文件按它写：\n\n${[

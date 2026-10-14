@@ -9,7 +9,7 @@ import { SuimingHarnessError } from "./errors.js";
 import { readProjectStatus, revisionLabel } from "./project-status.js";
 import { withConstitution } from "./prompts.js";
 import { reviewTask } from "./review-task.js";
-import { renderSourceExtraction } from "./source-context.js";
+import { renderSourceRange } from "./source-context.js";
 import { sourceTools } from "./source-tools.js";
 import type { HarnessSession, RootLoopOutcome, TaskHandle, TaskSpec } from "./suiming-harness.js";
 import { type HarnessTool, ToolRejection } from "./tool.js";
@@ -271,12 +271,11 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 			source = sourceRole ? sourceBrief(candidate, params.sourceId as string) : undefined;
 			if (params.profile === "source-reader")
 				source += `\n本任务的笔记只写 ${readerNote}，可以多次更新；其他笔记只读。`;
-			// 分段时把这段的范围写进输入；补全（已经整合过、有 index）还要带整份抽取，它要带着后文回头读这段原文
+			// 补全只预载本段，跨段依据按需读；保留同一 Source 的完整读取权限。
 			if (range !== undefined && params.span !== undefined) {
 				const [start, end] = params.span;
 				source = `本段原文 [${start}, ${end})；Beat 号段 beat-${beatNumber(range.from)}–beat-${beatNumber(range.to)}；这段的笔记写 ${segmentNotesPath(params.sourceId as string, range)}。\n${source}`;
-				if (sourceIndexed)
-					source += `\n\n# 整份抽取（source/${params.sourceId}/）\n\n${renderSourceExtraction(candidate, params.sourceId as string)}`;
+				if (sourceIndexed) source += `\n\n${renderSourceRange(candidate, params.sourceId as string, range)}`;
 			}
 		} catch (error) {
 			requireDomain(error);

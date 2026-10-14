@@ -24,6 +24,33 @@ export function renderSourceExtraction(candidate: ArtifactCandidate, sourceId: s
 		.join("\n\n");
 }
 
+/** 补全只预载本段。跨段引用和后文必须按需回读，不能让全书体积乘上委派数。 */
+export function renderSourceRange(
+	candidate: ArtifactCandidate,
+	sourceId: string,
+	range: { from: number; to: number },
+): string {
+	let remaining = 48 * 1024;
+	const files = candidate.artifacts
+		.filter((artifact) => {
+			if (!isSourceArtifactIdentity(artifact.identity, sourceId) || artifact.identity.kind !== "story-beat")
+				return false;
+			const number = Number(/^beat-(\d+)$/u.exec(artifact.identity.localId)?.[1]);
+			return number >= range.from && number <= range.to;
+		})
+		.sort((a, b) => a.path.localeCompare(b.path));
+	return [
+		`本段抽取（不是全书）：先 read source/${sourceId}/outline/story/index.yaml 了解卷序；结合本段人物、期待与秘密，用 search / read 查后文揭示和跨段关联。不能把未预载当成不存在。`,
+		...files.map((file) => {
+			const content = `--- BEGIN ARTIFACT ${JSON.stringify(file.path)} ---\n${decoder.decode(file.bytes)}\n--- END ARTIFACT ---`;
+			const size = Buffer.byteLength(content);
+			if (size > remaining) return `按需读取：${file.path}`;
+			remaining -= size;
+			return content;
+		}),
+	].join("\n\n");
+}
+
 export function sourceExtractionSelections(
 	candidate: ArtifactCandidate,
 	sourceId: string,
