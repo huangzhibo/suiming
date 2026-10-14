@@ -171,5 +171,22 @@
         "finding": "后台完成，界面停在残片且反复重连"
       }
     ]
+  },
+  "nativeFullscreen": {
+    "date": "2026-10-14",
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "testDurationMs": 5506.538542,
+    "rendererErrors": 0,
+    "verified": [
+      "native-enter-full-screen",
+      "navigation-geometry",
+      "reload-in-fullscreen",
+      "sidebar-collapse-expand",
+      "native-leave-full-screen",
+      "normal-window-navigation-restored"
+    ]
   }
 }
