@@ -68,6 +68,8 @@ test("审稿长意见：单条不重复目录，多条可预览和切换，窄�
 			{ width, height },
 		);
 		await page.waitForFunction((width) => innerWidth === width, width);
+		// 先等 ResizeObserver 和窄栏入口落地，再判断是否需要展开右栏。
+		await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 		if (width === 960) {
 			const expand = button("展开右栏");
 			if (await expand.isVisible()) await expand.click();

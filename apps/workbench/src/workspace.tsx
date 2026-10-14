@@ -33,6 +33,7 @@ import { BacklinksPane, EvidencePane } from "./right-pane.js";
 import { useAutoHideScrollbars } from "./scrollbars.js";
 import { ToolButton } from "./ui-bits.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
+import { useEditorHistory } from "./use-editor-history.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
 import { createTab, EMPTY_PAGE, navigate, type ObservationSelection, pageState, type RightMode } from "./view-state.js";
 import { LoadingScreen, WelcomeScreen } from "./welcome-screen.js";
@@ -52,6 +53,10 @@ export function Workspace() {
 	useAutoHideScrollbars();
 	const [layout, setLayout] = useState(workspaceLayout);
 	const [projectId, setProjectId] = useState("");
+	const editorHistory = useEditorHistory(
+		projectId,
+		layout.groups.flatMap((group) => group.tabs),
+	);
 	const composerActions = useComposerWorkspace(layout, setLayout, projectId);
 	const [panePriority, setPanePriority] = useState<"left" | "right">("right");
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -63,6 +68,7 @@ export function Workspace() {
 		<WorkspaceContext
 			value={{
 				composerActions,
+				editorHistory,
 				layout,
 				setLayout,
 				projectId,

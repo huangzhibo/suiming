@@ -19,11 +19,13 @@ import {
 	type RefObject,
 	useEffect,
 	useImperativeHandle,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { ComparisonResizer } from "./comparison-resizer.js";
+import type { EditorHistory, EditorScroll } from "./use-editor-history.js";
 import type { ComparisonLayout, EditorPosition } from "./view-state.js";
 
 export interface ComparisonStatus {
@@ -58,9 +60,26 @@ function selectedChunk(view: EditorView | undefined): number {
 	);
 }
 
+// 用计算时间控制精细比较，不按固定扫描长度把长文中分散的小改动吞成整块。
+const diffConfig = { timeout: 100 };
+
+function captureScroll(view: EditorView): EditorScroll {
+	const bounds = view.scrollDOM.getBoundingClientRect();
+	const line = Array.from(view.contentDOM.querySelectorAll(".cm-line")).find(
+		(line) => line.getBoundingClientRect().bottom > bounds.top,
+	);
+	const anchor = line ? view.posAtDOM(line) : view.state.selection.main.head;
+	return {
+		snapshot: view.scrollSnapshot(),
+		anchor,
+		offset: (view.coordsAtPos(anchor)?.top ?? bounds.top) - bounds.top,
+	};
+}
+
 const unifiedExtensions = (original: string, changesOnly: boolean) =>
 	unifiedMergeView({
 		original,
+		diffConfig,
 		mergeControls: false,
 		allowInlineDiffs: false,
 		...(changesOnly ? { collapseUnchanged: { margin: 3, minSize: 6 } } : {}),
@@ -152,8 +171,10 @@ export default function CodeEditor({
 	position,
 	onPosition,
 	comparison,
+	editHistory,
 }: {
 	content: string;
+	editHistory?: EditorHistory;
 	comparison?: ComparisonConfig;
 	autoFocus?: boolean;
 	original?: string;
@@ -238,12 +259,32 @@ export default function CodeEditor({
 	const editable = onChange !== undefined;
 	const incoming = useRef({ content, original, position, autoFocus });
 	incoming.current = { content, original, position, autoFocus };
+	// 在 DOM 被移除前捕获滚动锚点；被动 effect 清理时布局信息已经失效。
+	useLayoutEffect(
+		() => () => {
+			const current = views.current?.current;
+			const before = views.current?.before;
+			if (!editHistory || !editable || !current) return;
+			editHistory.state = current.state;
+			editHistory.scroll = captureScroll(current);
+			if (before) editHistory.before = { doc: before.state.doc, scroll: captureScroll(before) };
+		},
+		[editHistory, editable],
+	);
 	useEffect(() => {
 		if (!container.current) return;
 		const previous =
 			retained.current?.path === path && retained.current.state.doc.toString() === incoming.current.content
 				? retained.current
 				: null;
+		const historyState =
+			previous?.state ??
+			(editHistory?.state?.doc.toString() === incoming.current.content ? editHistory.state : null);
+		const savedScroll = historyState ? editHistory?.scroll : undefined;
+		const savedBeforeScroll =
+			editHistory?.before && editHistory.before.doc.toString() === incoming.current.original
+				? editHistory.before.scroll
+				: undefined;
 		const retain = (view: EditorView, before?: EditorView) => {
 			if (!dedicated) return;
 			const block = view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop - view.documentPadding.top));
@@ -300,6 +341,28 @@ export default function CodeEditor({
 					},
 					annotations: externalChange.of(true),
 				});
+			// 恢复位置时两栏会各自重算长文高度，不把这些程序滚动互相覆盖。
+			let interactiveScroll = false;
+			const beginInteraction = () => {
+				interactiveScroll = true;
+			};
+			for (const target of [view.scrollDOM, before?.scrollDOM]) {
+				for (const event of ["wheel", "pointerdown", "keydown", "touchstart"])
+					target?.addEventListener(event, beginInteraction, { passive: true });
+			}
+			const correctionFrames: number[] = [];
+			const restoreScroll = (target: EditorView, scroll: EditorScroll) => {
+				target.dispatch({ effects: scroll.snapshot, annotations: externalChange.of(true) });
+				// MergeView 的对齐 spacer 会重算；按实际可见行校准快照估算的像素偏移。
+				correctionFrames.push(
+					requestAnimationFrame(() => {
+						const coordinates = target.coordsAtPos(scroll.anchor);
+						if (!coordinates) return;
+						const delta = coordinates.top - target.scrollDOM.getBoundingClientRect().top - scroll.offset;
+						if (Math.abs(delta) > 1) target.scrollDOM.scrollTop += delta;
+					}),
+				);
+			};
 			const frame = requestAnimationFrame(() => {
 				if (previous) {
 					view.requestMeasure({
@@ -311,15 +374,19 @@ export default function CodeEditor({
 					if (before) before.scrollDOM.scrollTop = previous.beforeTop;
 					if (previous.focused) view.focus();
 				} else if (position) {
-					view.scrollDOM.scrollTop = position.top;
-					if (before) before.scrollDOM.scrollTop = position.beforeTop ?? 0;
+					if (before) {
+						if (savedBeforeScroll) restoreScroll(before, savedBeforeScroll);
+						else before.scrollDOM.scrollTop = position.beforeTop ?? 0;
+					}
+					if (savedScroll) restoreScroll(view, savedScroll);
+					else view.scrollDOM.scrollTop = position.top;
 				}
 			});
 			let syncing: HTMLElement | null = null;
 			let syncFrame = 0;
 			const scroll = (event: Event) => {
 				const source = event.target as HTMLElement;
-				if (before && callbacks.current.comparison?.sync && syncing !== source) {
+				if (interactiveScroll && before && callbacks.current.comparison?.sync && syncing !== source) {
 					// 联动纵向滚动量；两栏宽度不同时换行独立，差异导航会分别定位对应变更块。
 					const target = source === view.scrollDOM ? before.scrollDOM : view.scrollDOM;
 					if (Math.abs(target.scrollTop - source.scrollTop) > 1) {
@@ -337,6 +404,11 @@ export default function CodeEditor({
 			before?.scrollDOM.addEventListener("scroll", scroll);
 			return () => {
 				cancelAnimationFrame(frame);
+				for (const frame of correctionFrames) cancelAnimationFrame(frame);
+				for (const target of [view.scrollDOM, before?.scrollDOM]) {
+					for (const event of ["wheel", "pointerdown", "keydown", "touchstart"])
+						target?.removeEventListener(event, beginInteraction);
+				}
 				cancelAnimationFrame(syncFrame);
 				view.scrollDOM.removeEventListener("scroll", scroll);
 				before?.scrollDOM.removeEventListener("scroll", scroll);
@@ -361,7 +433,7 @@ export default function CodeEditor({
 		});
 		const editing = [
 			history(),
-			...(previous ? [historyField.init(() => previous.state.field(historyField))] : []),
+			...(historyState ? [historyField.init(() => historyState.field(historyField))] : []),
 			keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap]),
 			listener,
 			EditorState.readOnly.of(!editable),
@@ -371,6 +443,7 @@ export default function CodeEditor({
 		];
 		if (diff && !unified) {
 			const merge = new MergeView({
+				diffConfig,
 				a: {
 					doc: incoming.current.original ?? "",
 					extensions: [
@@ -439,7 +512,7 @@ export default function CodeEditor({
 			view.destroy();
 			views.current = null;
 		};
-	}, [path, diff, editable, dedicated, unified]);
+	}, [path, diff, editable, dedicated, unified, editHistory]);
 	// 外部改了内容（保存后回读、外部修改）时同步进视图；自己敲出的变化已经等于 content，不会重复 dispatch。
 	useEffect(() => replace(views.current?.current, content), [content]);
 	useEffect(() => {

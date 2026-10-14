@@ -44,6 +44,7 @@ const CodeEditor = lazy(() => import("./code-editor.js"));
 export function DocumentGroup({ groupId, first, last }: { groupId: string; first: boolean; last: boolean }) {
 	const {
 		layout,
+		editorHistory,
 		setLayout,
 		settingsOpen,
 		helpOpen,
@@ -491,6 +492,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							}
 							autoFocus={groupId === layout.activeGroup}
 							key={`${tab?.id}:${editPath}:${view.edit}`}
+							editHistory={editorHistory(tab?.id ?? "", editPath)}
 							position={view.editors[`${editPath}:${view.edit}`]}
 							onPosition={(position) =>
 								patch({ editors: { ...view.editors, [`${editPath}:${view.edit}`]: position } })
@@ -538,6 +540,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 								path={editPath}
 								measure={file?.kind === "story-text" || editPath.startsWith("text/") ? "reading" : "full"}
 								key={`${tab?.id}:${editPath}:diff`}
+								editHistory={editorHistory(tab?.id ?? "", editPath)}
 								autoFocus={false}
 								position={view.editors[`${editPath}:diff`]}
 								onPosition={(position) =>

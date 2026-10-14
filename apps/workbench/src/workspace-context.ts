@@ -1,5 +1,6 @@
 import { createContext, type Dispatch, type SetStateAction, useContext } from "react";
 import type { useComposerWorkspace } from "./use-composer-workspace.js";
+import type { useEditorHistory } from "./use-editor-history.js";
 import type { WorkspaceLayout } from "./workspace-layout.js";
 
 /**
@@ -11,6 +12,7 @@ export type Notice = string | { text: string; tone: "ok" | "warn"; action?: { la
 /** 整个工作台共用一份：布局（含各窗格）、当前作品、弹窗、提示与忙碌态。 */
 export const WorkspaceContext = createContext<{
 	composerActions: ReturnType<typeof useComposerWorkspace>;
+	editorHistory: ReturnType<typeof useEditorHistory>;
 	layout: WorkspaceLayout;
 	setLayout: Dispatch<SetStateAction<WorkspaceLayout>>;
 	projectId: string;
