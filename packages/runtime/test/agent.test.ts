@@ -681,6 +681,9 @@ test("子任务的开场输入就过了压缩线：一次请求都不发，作�
 		assert.equal(outcome.failure, undefined, "不掀掉根 Agent 这一轮");
 		assert.match(rejection, /delegation_too_large/u);
 		assert.match(rejection, /拆小/u);
+		assert.match(rejection, /估计 \d+ token/u);
+		assert.match(rejection, /当前模型预留后的上限 \d+ token/u);
+		assert.match(rejection, /更大窗口/u, "不能拆分的全书审稿应明确提示模型窗口选择");
 		assert.doesNotMatch(rejection, /resume_task/u, "开场超窗需要缩小范围，不建议原样续做");
 		assert.equal(f.provider.state.callCount, 2, "子任务一次请求都没发");
 		assert.deepEqual(
@@ -819,6 +822,12 @@ test("作品状态来自版本真源，候选修改不会冒充已提交版本",
 		f.provider.setResponses([
 			async (context) => {
 				assert.match(JSON.stringify(context.messages), /committedRevisionCount/);
+				assert.match(
+					JSON.stringify(context.messages),
+					/收到这条消息时/u,
+					"附注是采集时的状态，不是持续更新的当前值",
+				);
+				assert.doesNotMatch(JSON.stringify(context.messages), /当前状态以作者消息后的系统附注/u);
 				return call("write", { path: "intent/计谋的代价.md", content: "选择必须承担后果。" });
 			},
 			call("project_status", {}),

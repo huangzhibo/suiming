@@ -11,6 +11,9 @@ import {
 	ModelGateway,
 	SuimingHarness,
 	sourceCoverage,
+	reviewsIn,
+	reviewCurrency,
+	readProjectStatus,
 	telemetryFromEnvironment,
 	useEnvironmentProxy,
 } from "@suiming/runtime";
@@ -80,7 +83,15 @@ if (mode === "prepare") {
 		project.close();
 	}
 } else {
-	assert.ok(mode === "stop" || mode === "resume" || mode === "expand" || mode === "inspect");
+	assert.ok(
+		mode === "stop" ||
+			mode === "resume" ||
+			mode === "expand" ||
+			mode === "complete" ||
+			mode === "review" ||
+			mode === "followup" ||
+			mode === "inspect",
+	);
 	const meta = JSON.parse(await readFile(metaPath, "utf8"));
 	const project = await LocalProjectService.open(root);
 	useEnvironmentProxy();
@@ -127,6 +138,33 @@ if (mode === "prepare") {
 			);
 		}
 
+		if (mode === "complete") {
+			meta.completionBaseline = {
+				usage: project.loadExecutionEntities().sessions.find((s) => s.id === meta.sessionId)?.usage,
+				revision: await project.history(),
+			};
+			meta.remainingRanges = [
+				{ span: [0, 48181], beatRange: { from: 1, to: 99 } },
+				{ span: [48181, 99721], beatRange: { from: 101, to: 199 } },
+				{ span: [99721, 148658], beatRange: { from: 201, to: 299 } },
+				{ span: [148658, 197346], beatRange: { from: 301, to: 399 } },
+			];
+			project.queueInbox(
+				meta.sessionId,
+				`继续同一公开隔离副本，Source ${sourceId} 的末段 401–499 已补全并提交 r3。现在完成其余四段：${JSON.stringify(meta.remainingRanges)}。在同一次回复里委派四个带上述 span 与 beatRange 的 source-extractor，各自逐段回读完整指定原文与已有 Beat；开场只给路径的文件必须按需读取，不能把路径清单当已读。重点核对语义遗漏、人物异名或重复身份、物品归属、期待与秘密的时序、跨卷因果；前次 223–224 的修正保留并结合全段检查。无需润色已经准确的段落，只改有原文依据的错漏。各子任务只写本号段与自己的笔记，人物、物品、World、Contract、index 和号段外修改列清单交回根 Agent。所有任务完成后你统一回读核实、修正全书对象与跨段问题，运行 Source Checker 和 source_coverage 后提交，说明尚存疑点。只改此 Source，保留 Target、本作文本和真实原文，不向作品写验证过程。不在此轮调用独立审稿，完成后下一轮专门审稿。`,
+			);
+		}
+		if (mode === "review") {
+			project.queueInbox(
+				meta.sessionId,
+				`剩余分段补全已完成，现在对整个 Source ${sourceId} 调用 review(layer="source", sourceId="${sourceId}") 做独立审稿。核心是语义遗漏、重复身份和跨卷关联，也核对行动归属、未解期待与秘密知情时序。独立 Reviewer 应审整份 Source，必要时回读原文，不能用覆盖率或 Checker 代替语义判断。你收到报告后逐条回读原文核实：修正成立的问题，说明不成立的问题及依据；只改 Source 与其审稿文件，不改 Target、原文或验证性措辞。若改了被审主体，提交后再次调用全 Source 独立 review 核对当前稿，避免拿已过时的报告宣布完成；无需为拿到 pass 重复跑没有新变化的审稿。最后检查、提交审稿和实际修正，说明最终报告、已解决问题与真实剩余限制。`,
+			);
+		}
+		if (mode === "followup") {
+			assert.ok(process.env.SUIMING_VALIDATION_MESSAGE_FILE, "followup 需要仓库外的消息文件");
+			project.queueInbox(meta.sessionId, await readFile(process.env.SUIMING_VALIDATION_MESSAGE_FILE, "utf8"));
+		}
+
 		if (mode !== "inspect") {
 			const abort = new AbortController();
 			let stopped = false;
@@ -165,13 +203,29 @@ if (mode === "prepare") {
 				stopped,
 				tasks: project.loadExecutionEntities().tasks,
 			};
+			if (mode === "followup") (meta.followups ??= []).push(meta[mode]);
+			await writeFile(metaPath, JSON.stringify(meta, null, 2));
 			console.log("TURN", JSON.stringify(meta[mode]));
 			assert.equal(outcome.failure, undefined);
 			if (mode === "stop") assert.equal(stopped, true);
 		}
 		const candidate = await project.checkoutCandidate();
+		const currentCoverage = sourceCoverage(candidate, sourceId);
+		assert.equal(currentCoverage.materialSha256, meta.coverage.materialSha256, "不得改写原作材料");
+		const history = await project.history();
+		const reviews = await Promise.all(
+			reviewsIn(candidate).map(async (r) => ({
+				path: r.path,
+				layer: r.file.layer,
+				sourceId: r.file.scope.kind === "source" ? r.file.scope.sourceId : undefined,
+				draft: r.file.draft,
+				currency: await reviewCurrency(project.historyReader(), history[0].id, candidate, r),
+			})),
+		);
 		meta.final = {
-			coverage: sourceCoverage(candidate, sourceId),
+			status: await readProjectStatus(project, candidate),
+			reviews,
+			coverage: currentCoverage,
 			check: formatSourceCheck(candidate, sourceId),
 			revisions: (await project.history()).length,
 			late: await readFile(join(source, "outline/story/vol-0009/beat-0440.md"), "utf8"),
@@ -179,7 +233,10 @@ if (mode === "prepare") {
 		assert.deepEqual(
 			Object.fromEntries(
 				candidate.artifacts
-					.filter((a) => !a.path.startsWith("source/"))
+					.filter(
+						(a) =>
+							!a.path.startsWith("source/") && (!a.path.startsWith("review/") || a.path in meta.targetDigests),
+					)
 					.map((a) => [a.path, createHash("sha256").update(a.bytes).digest("hex")]),
 			),
 			meta.targetDigests,
@@ -198,6 +255,8 @@ if (mode === "prepare") {
 				calls: checkpoint.loop.calls,
 				actions: checkpoint.loop.actions,
 				opening: checkpoint.loop.messages[0],
+				reduction: checkpoint.loop.reduction,
+				lastMessage: checkpoint.loop.messages.at(-1),
 			});
 		}
 		if (mode === "resume" || mode === "expand") {

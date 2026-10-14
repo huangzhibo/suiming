@@ -927,6 +927,11 @@ test("Source 审稿锚在抽取文件上的 finding 可以引原作：「抽取�
 		);
 		const quoteMissing = (error: unknown) => (error as { code?: string }).code === "review_quote_not_found";
 		assert.throws(() => compose("「旧友亲手烧掉了火船」"), quoteMissing, "两边都没有的转述照样拒绝");
+		assert.throws(
+			() => compose("档里写「劝黄盖销毁证据的旧相识」，原作是「旧友劝黄盖焚毁火船」"),
+			quoteMissing,
+			"真实审稿将准确的 artifact 引文与改写后的原作混引：不能只因其中一句存在就通过",
+		);
 		assert.throws(() => compose("「旧友劝他烧掉火船」", "design"), quoteMissing, "只有 Source 层能引原作");
 	});
 });
@@ -1013,8 +1018,9 @@ test("impact 与 search 也查 Source 的抽取：读到后文要回头修人物
 test("分段抽取：带 span 与 beatRange 的 source-extractor 直接读原文写这段的 Beat，只写自己号段与这段的笔记", async () => {
 	// Harness 设计第 9 节「Source 抽取的分工」：分段抽取 → 整合 → 补全 → 统一修。各段直接写 Beat（写好的 Beat 就是笔记
 	// 该有的样子），不建全书对象；号段与笔记路径由范围定，并行时写入不重叠。
-	await withProject(async (project) => {
+	await withProject(async (project, checkoutPath) => {
 		let system = "";
+		let parentInput = "";
 		let prompt = "";
 		const results: string[] = [];
 		const step = (next: () => ReturnType<typeof call>) => (context: Context) => {
@@ -1026,13 +1032,16 @@ test("分段抽取：带 span 与 beatRange 的 source-extractor 直接读原文
 			new SuimingHarness({
 				project,
 				models: gateway([
-					call("delegate", {
-						profile: "source-extractor",
-						sourceId: "访谈",
-						goal: "抽取第一段",
-						span: [0, total],
-						beatRange: { from: 101, to: 199 },
-					}),
+					(context) => {
+						parentInput = JSON.stringify(context);
+						return call("delegate", {
+							profile: "source-extractor",
+							sourceId: "访谈",
+							goal: "抽取第一段",
+							span: [0, total],
+							beatRange: { from: 101, to: 199 },
+						});
+					},
 					(context) => {
 						system = JSON.stringify(context.messages[0]);
 						prompt = JSON.stringify(context.messages[1]);
@@ -1051,6 +1060,19 @@ test("分段抽取：带 span 与 beatRange 的 source-extractor 直接读原文
 							content: note("f".repeat(64), [0, total], "黄盖找到火船，拒绝烧毁。"),
 						}),
 					),
+					// 真实补全时三段自行给笔记加版本后缀；应拒绝，并允许更新已有的唯一笔记。
+					step(() =>
+						call("write", {
+							path: "source/访谈/notes/0101-0199-r4.md",
+							content: note("f".repeat(64), [0, total], "另存一版。"),
+						}),
+					),
+					step(() =>
+						call("write", {
+							path: "source/访谈/notes/0101-0199.md",
+							content: note("f".repeat(64), [0, total], "黄盖找到火船，但拒绝烧毁。"),
+						}),
+					),
 					step(() => call("submit_task", { summary: "这段写完" })),
 					reply("好"),
 				]),
@@ -1059,12 +1081,22 @@ test("分段抽取：带 span 与 beatRange 的 source-extractor 直接读原文
 		);
 		assert.equal(outcome.failure, undefined);
 		assert.match(system, /分段抽取/u);
+		assert.match(
+			parentInput,
+			/补全时更新这份已有笔记/u,
+			"父 Agent 也须看到固定笔记的更新规则，避免委派时另加保护旧笔记的冲突要求",
+		);
 		assert.match(prompt, /beat-0101–beat-0199/u, "号段写进输入");
 		assert.match(prompt, /source\/访谈\/notes\/0101-0199\.md/u, "笔记路径写进输入");
+		assert.match(prompt, /唯一可写笔记/u, "固定笔记写权限须向模型说明");
+		assert.match(prompt, /已有则原地更新/u, "补全不会因保留旧笔记而另造版本文件");
 		assert.doesNotMatch(results[0] ?? "", /permission_denied/u, "号段内的 Beat 能写");
 		assert.match(results[1] ?? "", /permission_denied/u, "号段外的 Beat 不能写");
 		assert.match(results[2] ?? "", /permission_denied/u, "人物档归整合");
 		assert.doesNotMatch(results[3] ?? "", /permission_denied/u, "这段的笔记能写");
+		assert.match(results[4] ?? "", /permission_denied/u, "版本后缀不能绕过固定笔记写范围");
+		assert.doesNotMatch(results[5] ?? "", /permission_denied/u, "已有笔记可原地更新");
+		assert.match(await readFile(join(checkoutPath, "source/访谈/notes/0101-0199.md"), "utf8"), /但拒绝烧毁/u);
 	});
 });
 

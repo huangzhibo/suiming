@@ -625,7 +625,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				)
 					throw new SuimingHarnessError(
 						"delegation_too_large",
-						"子任务的开场输入过大，请把材料或情节范围拆小后再派；尚未发送模型请求。",
+						`子任务的开场输入过大（估计 ${Math.ceil(promptBytes * ratio)} token，当前模型预留后的上限 ${Math.floor(window * options.openingLimit)} token），请把材料或情节范围拆小，或换用更大窗口的模型；尚未发送模型请求。`,
 					);
 				if (!state.compacting && promptBytes * ratio > window * COMPACT_AT) {
 					const cut = compactionCut(state.messages, state.reduction?.throughMessage ?? 1, window);

@@ -86,7 +86,8 @@ const DelegateSchema = Type.Object(
 				{ from: Type.Integer({ minimum: 1, maximum: 9999 }), to: Type.Integer({ minimum: 1, maximum: 9999 }) },
 				{
 					additionalProperties: false,
-					description: "source-extractor 分段时这段可写的 Beat 号段，如 {from: 201, to: 299}；与 span 一起给",
+					description:
+						"source-extractor 分段时这段可写的 Beat 号段，如 {from: 201, to: 299}；与 span 一起给。同时可写固定笔记 notes/0201-0299.md（按四位号段生成），补全时更新这份已有笔记，不另建版本文件",
 				},
 			),
 		),
@@ -274,7 +275,7 @@ function delegation(session: HarnessSession, parent: TaskHandle): HarnessTool<ty
 			// 补全只预载本段，跨段依据按需读；保留同一 Source 的完整读取权限。
 			if (range !== undefined && params.span !== undefined) {
 				const [start, end] = params.span;
-				source = `本段原文 [${start}, ${end})；Beat 号段 beat-${beatNumber(range.from)}–beat-${beatNumber(range.to)}；这段的笔记写 ${segmentNotesPath(params.sourceId as string, range)}。\n${source}`;
+				source = `本段原文 [${start}, ${end})；Beat 号段 beat-${beatNumber(range.from)}–beat-${beatNumber(range.to)}；本任务唯一可写笔记是 ${segmentNotesPath(params.sourceId as string, range)}，已有则原地更新，续做也沿用；版本由 Canon 保存，不另加版本号或日期后缀。\n${source}`;
 				if (sourceIndexed) source += `\n\n${renderSourceRange(candidate, params.sourceId as string, range)}`;
 			}
 		} catch (error) {
@@ -476,13 +477,13 @@ function shortId(id: string): string {
 async function workSnapshot(session: HarnessSession, when: "会话开始" | "压缩上下文"): Promise<string> {
 	const frame = designFrame(session.base, { seeds: [] });
 	const status = await readProjectStatus(session.projectPort, await session.scan());
-	return `${when}时的作品快照（不随之后的修改与提交更新；当前状态以作者消息后的系统附注与 project_status 为准）：${JSON.stringify(status)}\n\n${when}时的作品：\n${frame.text}`;
+	return `${when}时的作品快照（只代表采集时，不随之后的修改与提交更新；作者消息附注也只代表收到那条消息时，最新状态用 project_status 查询）：${JSON.stringify(status)}\n\n${when}时的作品：\n${frame.text}`;
 }
 
 /**
  * 根 Agent 的一个 turn。会话第一次跑时开场是作品快照（workSnapshot），之后不再重写，所以标明是「会话开始时」的；
  * 之后作者消息从 inbox 进消息列表，每条后面附一行确定性状态（当前版本、是否有新提交、候选里未提交的文件数），
- * 在取走消息的那一刻现算——turn 中途 Agent 改过或提交过，附注要跟着变。
+ * 在取走消息的那一刻现算，并标明采集时点；后续修改不会重写历史附注，最新状态由 project_status 读取。
  */
 export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcome> {
 	const project = session.projectPort;
@@ -492,7 +493,7 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 		refreshOpening: () => workSnapshot(session, "压缩上下文"),
 		decorateInbox: async (text) => {
 			const current = await readProjectStatus(project, await session.scan(), { stale: false });
-			return `${text}\n\n[系统附注：当前版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个]`;
+			return `${text}\n\n[系统附注：收到这条消息时，版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个。此后修改不更新本附注，最新状态用 project_status 查询]`;
 		},
 		tools: (handle) => {
 			const delegate = delegation(session, handle);

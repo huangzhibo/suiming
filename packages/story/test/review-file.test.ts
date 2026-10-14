@@ -110,4 +110,14 @@ test("范围必须配得上层：source 审稿只能审一个 Source，design �
 		() => parseReviewFile("---\nlayer: text\n---\n缺字段\n", "review/x.md"),
 		(error) => code(error) === "invalid_review_file",
 	);
+	// 真实全 Source 核查中，通用子任务绕过 submit_review 手写成了另一套 finding 字段。
+	assert.throws(
+		() =>
+			parseReviewFile(
+				"---\nlayer: source\nscope: source:访谈\nrevision: candidate\nsubjects: {}\nverdict: revise\nfindings:\n  - id: source-001\n    severity: major\n    path: source/访谈/world/characters/黄盖.md\n    message: 入场基底混入了后续经历。\n    evidence: 黄盖的旧事\n    repair_layer: source\n    source_id: 访谈\n---\n辅助判断，未完成正式审稿。\n",
+				"review/source-auxiliary.md",
+			),
+		(error) => code(error) === "invalid_review_file",
+		"path/message/id 不能替代 anchor/issue，也不能把手写报告当作标准审稿",
+	);
 });
