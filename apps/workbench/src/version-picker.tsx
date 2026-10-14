@@ -6,6 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Book } from "./model.js";
 import { shortId } from "./model.js";
+import { rankVersion } from "./version-search.js";
 
 /** 版本编号来自 Canon 顺序；只改变展示顺序，不改变 rN 的含义。侧栏与两处比较入口共用。 */
 export function VersionPicker({
@@ -36,16 +37,9 @@ export function VersionPicker({
 				{open && (
 					<Command
 						defaultValue={selected ?? ""}
-						filter={(id, query, keywords) => {
-							const search = query.trim().toLowerCase();
-							const label = keywords?.[0] ?? "";
-							if (!search || search === label || search === label.slice(1) || search === id) return 1;
-							if (label.startsWith(search) || label.slice(1).startsWith(search)) return 0.8;
-							// 输入 21 是找版本，不把随机编号里碰巧有 21 的几十条混进来。
-							if (/^\d+$/u.test(search)) return 0;
-							if (id.startsWith(search)) return 0.6;
-							return id.includes(search) ? 0.4 : 0;
-						}}
+						filter={(id, query, keywords) =>
+							rankVersion(id, keywords?.[0] ?? "", query, book.data.revisions.length)
+						}
 					>
 						<CommandInput aria-label="搜索版本" placeholder="搜索版本号或提交编号…" />
 						<CommandList className="max-h-[min(320px,calc(var(--available-height)-80px))]">
