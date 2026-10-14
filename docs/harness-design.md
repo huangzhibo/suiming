@@ -390,7 +390,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 
 | 切片 | 内容 | 状态 |
 | --- | --- | --- |
-| C | loop 与 Context | 完成（2026-10-05）：模型按 turn 绑定、steering 只给根、turn 开始的状态行与结束对账、`write` / `edit` 带 `check`、`submit_review` 引文校验、窗口保护，以及最后落地的边界折叠与边界压缩。与原设计不同的三处——不按发送次数折、不做 `recall`、turn 结束后不自发摘要调用——理由见第 7 节 |
+| C | loop 与 Context | 完成（2026-10-05）：模型按 turn 绑定、steering 只给根、turn 开始的状态行与结束对账、`write` / `edit` 带 `check`、`submit_review` 引文校验、窗口保护，以及边界折叠。2026-10-15 对齐专用摘要，取代清理与边界压缩附注。与原设计不同的三处——不按发送次数折、不做 `recall`、turn 结束后不自发摘要调用——理由见第 7 节 |
 | E | 调研：三个工具、Researcher profile、config、安全边界、对账项（第 8.1–8.4、8.6 节） | 未做；`harness/research/` 预计新增约 400 行 |
 | F | 计算：`run_command`（Seatbelt profile、解释器探测、超时与输出上限、折叠；第 8.5 节） | 未做；`harness/sandbox/` 预计新增约 150 行，无新依赖 |
 
@@ -483,7 +483,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | Checker 在 `commit`；子智能体无 `commit` | 一旦失守直接坏作品 |
 | Seatbelt、私网拒绝、只 GET、只落文本 | 结构性边界，几十行 |
 | 写入前后的 hash、提交回执、lease、checkpoint 归档 | 前两样不为崩溃核对：hash 发现作者与 Agent 同时改一个文件，回执让被打断的 commit 说清提交成了没有；lease 判谁在跑；归档前 checkpoint 曾到 2.8 GB |
-| 折叠、边界压缩、`submit_review` 引文校验、turn 结束对账 | 第 7、6、3 节各自的数字 |
+| 折叠、摘要、`submit_review` 引文校验、turn 结束对账 | 第 7、6、3 节各自的数字 |
 | 一个 Project 一个 `running` session | 没有 worktree 后并行会互相覆盖；要并行再给 session 配工作目录 |
 | `story_guide` / `frame` / `write_context` / `project_status` / `search` / `impact` / `compact_context` | 原生匹配 Open Story Package 就是这几个 |
 | 未确认调用计数 | 作废的请求可能已计费，作者看得见，几行 |

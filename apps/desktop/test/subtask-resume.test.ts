@@ -34,6 +34,10 @@ test("子任务停下再续做：对话里是先后两段，前一段标已停�
 		await running.locator(":scope > summary").waitFor();
 		await running.locator(":scope > summary").click();
 		await running.getByText("执行中", { exact: true }).waitFor();
+		if (process.env.SUIMING_CAPTURE_DIR) {
+			await mkdir(process.env.SUIMING_CAPTURE_DIR, { recursive: true });
+			await page.screenshot({ path: join(process.env.SUIMING_CAPTURE_DIR, "running-after-reload.png") });
+		}
 		// 子任务读完第一个文件停在闸门上：点开这一行，再放第二次读取进来
 		const firstRead = running.locator("details.activity").filter({ hasText: "读取文件" });
 		await firstRead.locator("summary").click();
