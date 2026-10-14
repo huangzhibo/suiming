@@ -1,0 +1,230 @@
+{
+  "sessions": [
+    {
+      "sessionId": "session_2636e1925ec189c51124055d0016596b477b13af618ff1ace38a404e936e255c",
+      "status": "idle",
+      "turn": 4,
+      "usage": {
+        "calls": 35,
+        "confirmedCalls": 35,
+        "input": 51907,
+        "output": 5757,
+        "cacheRead": 670720,
+        "cacheWrite": 0,
+        "reasoning": 1241,
+        "totalTokens": 728384,
+        "costUsd": 0.228456
+      },
+      "eventCount": 600,
+      "userMessages": 4,
+      "observations": 107,
+      "types": {
+        "GENERATION": 35,
+        "GUARDRAIL": 3,
+        "TOOL": 64,
+        "AGENT": 1,
+        "SPAN": 4
+      },
+      "roots": [
+        {
+          "traceId": "b095f657fbd58c8427f2aa73e949cc25",
+          "turnId": "85ee6959-83fb-4e67-a505-1915f26e6540",
+          "outcome": "completed",
+          "level": "DEFAULT"
+        },
+        {
+          "traceId": "ea973905a8ba1f053d1cde0a130f1295",
+          "turnId": "9a102640-02ed-4863-82b8-ac09f9c77dec",
+          "outcome": "completed",
+          "level": "DEFAULT"
+        },
+        {
+          "traceId": "87dc7db9c8cacd9f55ce7fc87cbef639",
+          "turnId": "e9d4dd24-0c94-47c9-b4b5-2135b6dde895",
+          "outcome": "stopped",
+          "level": "WARNING"
+        },
+        {
+          "traceId": "0375f6b79739d7a1f76f26df8f3b4953",
+          "turnId": "1cc53319-c75a-4155-aa22-98e41f7333f7",
+          "outcome": "completed",
+          "level": "DEFAULT"
+        }
+      ]
+    },
+    {
+      "sessionId": "session_c0000291416c0949c93a63be35b592b2902895dea3e1b5783fdde9561d33a496",
+      "status": "idle",
+      "turn": 1,
+      "usage": {
+        "calls": 3,
+        "confirmedCalls": 3,
+        "input": 12803,
+        "output": 258,
+        "cacheRead": 6016,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 19077,
+        "costUsd": 0.028787599999999997
+      },
+      "eventCount": 109,
+      "userMessages": 1,
+      "observations": 7,
+      "types": {
+        "GENERATION": 3,
+        "TOOL": 3,
+        "SPAN": 1
+      },
+      "roots": [
+        {
+          "traceId": "0efc07d0d4aea260ae0010e6492b5ee9",
+          "turnId": "86709e55-f02e-460d-95bd-efe9051b71c4",
+          "outcome": "completed",
+          "level": "DEFAULT"
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task_9504b0a2-d63e-477c-920e-3de97cc11f22",
+      "status": "completed",
+      "usage": {
+        "calls": 5,
+        "confirmedCalls": 5,
+        "input": 9903,
+        "output": 1257,
+        "cacheRead": 25600,
+        "cacheWrite": 0,
+        "reasoning": 268,
+        "totalTokens": 36760,
+        "costUsd": 0.034936
+      }
+    }
+  ],
+  "history": [
+    {
+      "id": "b1c38c14ed4bffdd0ce51035e806eee5fc746a10",
+      "parentId": null
+    },
+    {
+      "id": "9028b1c1d13ece932f8f85f917f4e892482182a4",
+      "parentId": "b1c38c14ed4bffdd0ce51035e806eee5fc746a10"
+    },
+    {
+      "id": "25dd0478ef481b1d67aa8c3508b0338701b66883",
+      "parentId": "9028b1c1d13ece932f8f85f917f4e892482182a4"
+    },
+    {
+      "id": "f1529afe3b59b234fc3441de68ddbdbfeb332fb7",
+      "parentId": "25dd0478ef481b1d67aa8c3508b0338701b66883"
+    },
+    {
+      "id": "8e8aaab2b3a8d1c06eb19bacd30986f1baf028b1",
+      "parentId": "f1529afe3b59b234fc3441de68ddbdbfeb332fb7"
+    }
+  ],
+  "text": [
+    {
+      "path": "text/beat-0001.md",
+      "characters": 227,
+      "sha256": "04537dd6925a58078944c54da1bc19ebe2d66531d9529411c45ccc6cf7f09c0b"
+    },
+    {
+      "path": "text/beat-0002.md",
+      "characters": 239,
+      "sha256": "0ea0f0629db82a891fcfccb5750be8c64388c545af18b83a14de0c0a5d8efd70"
+    },
+    {
+      "path": "text/beat-0003.md",
+      "characters": 233,
+      "sha256": "aea459a70ec6ffa2d2302b537b2c3744137759f5693833cac5386db9c83f6176"
+    },
+    {
+      "path": "text/beat-0004.md",
+      "characters": 234,
+      "sha256": "4dba36b96f4b4420af2b3100a9f4c8d702d839b3817d5472342633dbcb5f1e24"
+    },
+    {
+      "path": "text/beat-0005.md",
+      "characters": 232,
+      "sha256": "3fa9f82bbba5a46beeafc8b21ecc185b1f2e732fcde36a63dae2c5728c99f65b"
+    },
+    {
+      "path": "text/beat-0006.md",
+      "characters": 243,
+      "sha256": "15a0df72ce3c233bfb4786960abfca4a1ecc4ea0fd35bbff356853d7f304fc66"
+    }
+  ],
+  "manual": {
+    "revisions": 5,
+    "dirty": false,
+    "reviewCurrent": false,
+    "errors": [],
+    "persisted": true
+  },
+  "checks": [
+    "AG-UI lifecycle valid",
+    "unique event ids",
+    "Langfuse generations match confirmed calls",
+    "unique generation model_call_id",
+    "all tool model_call_id linked",
+    "environment/release/entrypoint verified",
+    "six texts contain no exclamation marks",
+    "npm run check passed",
+    "npm test: 489 total, 484 passed, 5 external-service skips",
+    "Electron serial targeted: 3 passed, 0 skipped",
+    "Runtime Agent: 46 passed; final adjusted failure-message test passed"
+  ],
+  "baseCommit": "f518ef7",
+  "recoveryProbe": {
+    "sessionId": "session_e18d07c5-d1ff-4fd4-acdd-392f351225b5",
+    "taskId": "task_67987f0b-a085-44a8-b7eb-f19d906e8214",
+    "rootModel": "gpt-6.1-sol",
+    "realCalls": 6,
+    "syntheticCalls": 8,
+    "usage": {
+      "calls": 14,
+      "confirmedCalls": 14,
+      "input": 9669,
+      "output": 464,
+      "cacheRead": 43371,
+      "cacheWrite": 1905,
+      "reasoning": 86,
+      "totalTokens": 55409,
+      "costUsd": 0.022785999999999997
+    },
+    "observations": 26,
+    "tasks": 1,
+    "revisions": 2,
+    "childSpans": [
+      {
+        "traceId": "6072b813697ba1138dcbf30633e15221",
+        "level": "DEFAULT",
+        "taskId": "task_67987f0b-a085-44a8-b7eb-f19d906e8214"
+      },
+      {
+        "traceId": "aa3fba3e62b65f0984fef7e9c3f6e73c",
+        "level": "ERROR",
+        "taskId": "task_67987f0b-a085-44a8-b7eb-f19d906e8214"
+      }
+    ],
+    "roots": [
+      {
+        "outcome": "completed",
+        "traceId": "6072b813697ba1138dcbf30633e15221"
+      },
+      {
+        "outcome": "completed",
+        "traceId": "aa3fba3e62b65f0984fef7e9c3f6e73c"
+      }
+    ],
+    "resumeLinked": true
+  },
+  "probeCorrections": [
+    "Initial interruption command was invalid; actual interruption was application exit, not button stop.",
+    "Transient failure probe first recovered within automatic retries.",
+    "Second probe mixed src/dist exception identities; not product evidence.",
+    "Parallel native run had one timeout; required serial targeted rerun passed 3/3."
+  ]
+}

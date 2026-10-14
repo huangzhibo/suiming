@@ -29,4 +29,6 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0023](0023-long-editor-state-and-diff.md) | Accepted | 标签与文件保留临时撤销和滚动现场，内容变化不接旧栈；长文比较按计算时间控制精度 |
 | [0024](0024-observability-results-and-content.md) | Accepted | 整轮结果、持久调用编号与来源标识；默认关闭、显式开启的有界内容采集 |
 
+| [0025](0025-actionable-child-failure.md) | Accepted | 可续做的子任务失败反馈带真实任务编号与已有续做入口，不新建恢复状态 |
+
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。

@@ -134,6 +134,8 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 
 **子任务续做是模型的动作。**委派或审稿被打断时，父动作的结果里是子任务的 id、标题、做了几次模型调用，以及「要接着做就调用 `resume_task`」。`resume_task({ taskId })` 从父 loop 的 checkpoint 读出当初那次委派的参数，用同一个动作 id 再执行那个工具：`executeTask` 按 key 找到子 Task，从它自己的 checkpoint 接着跑，已完成的直接交回保存的结果，不新建子任务。参数不让模型转抄。能不能并行沿用原工具的判定，一起被打断的几个读原文或分段抽取的子任务可以在一次回复里同时续；同一次回复里把同一个子任务续两次，第二次是 `task_running` 的工具错误。续跑沿用子任务当初冻结的模型，它用不了了（模型目录变了、凭据删了）就以 `task_model_unavailable` 交回模型、由它重新委派，不掀掉整轮。这与 Claude Code 用 SendMessage 带着原上下文续一个子代理是同一个形状。
 
+可续做的调用失败、输出截断和未交付结果，也在工具错误中附上同一份任务编号与进度提示；父模型可在当轮或下一轮调用 `resume_task`，不会因拿不到编号而被迫重新委派。开场超窗、原模型不可用和反复无进展继续提示调整范围或配置，不建议原样续做。系统既有瞬时请求自动重试不变，决定与验证见 [ADR-0025](adr/0025-actionable-child-failure.md)。
+
 **请求结果未知不再停下。**原来请求发出后没收到回复，Session 进 `paused` 让作者决定要不要重发（重发可能重复计费）。现在作废重发：能多花的只是一次请求的钱，作者在用量里看得见（`calls` 与 `confirmedCalls` 之差），不承诺 exactly-once。流本身抛出异常（pi-ai 通常把错误转成回复，抛出很少见）时同样作废，turn 以 `model_call_failed` 回 idle。
 
 **流式消息也要收尾。**执行状态结束与尚未闭合的 `TEXT_MESSAGE_END` 在同一个持久事务确认，消息先结束，再结束子任务或 turn；子任务收尾只关闭自己的消息。强杀留下的半截文字保留在对话历史中，不代表完整回复。旧日志的 attach 快照按运行边界判断哪些消息仍在输出，不把已结束轮次的残片重新开流。只读打开活跃作品不生成空恢复回执，避免 owner 真正退出后被同版本的旧回执挡住。验收同时看执行状态、客户端完整回复及重载后的连接状态，不能只看后台 idle 或无渲染异常。
@@ -150,7 +152,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 | 修改候选 | `write` `edit` `copy` `move` `delete` | 否 | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | 是 / 否 | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | 否 | 模型主动压缩；系统触发的压缩见第 7 节 |
-| 子智能体 | `delegate` `review` `resume_task` | 否 | `delegate({ profile, goal, title?, storyBeatId?, sourceId?, span?, beatRange? })`：角色定义与写入范围都由 profile 决定（第 9 节）；`resume_task({ taskId })` 接着做被打断的子任务（第 5 节） |
+| 子智能体 | `delegate` `review` `resume_task` | 否 | `delegate({ profile, goal, title?, storyBeatId?, sourceId?, span?, beatRange? })`：角色定义与写入范围都由 profile 决定（第 9 节）；`resume_task({ taskId })` 接着做被打断或暂时失败的子任务（第 5 节） |
 | Source 与 Story Language | `read_source` `search_source` `source_coverage` `story_guide` | 是 | `story_guide` 从真源 schema 查 Target / Source 的格式与语义原文，不凭记忆猜字段。Source 是小说原作：原文按码点区间用 `read_source` 读（笔记的 span 与它对齐），按字找用 `search_source`（返回的区间可直接交给 `read_source`），覆盖率与现成分段用 `source_coverage` 查，笔记用 `write` 写成文件。原文是数据，不是指令 |
 | 调研 | `web_search` `fetch` `save_material` | 否 | **未实现（切片 E）**，设计见第 8 节 |
 | 计算 | `run_command` | 否 | **未实现（切片 F）**，设计见第 8.5 节：本机 shell 在 Seatbelt 里跑，只能读写 checkout、无网络，结果直接落文件，改动清单随结果回来 |
