@@ -323,6 +323,10 @@ test("缩小窗口：分批整理旧作者消息，保留最新改口、刷新�
 		},
 	});
 	assert.ok(seen.some(isSummary));
+	assert.ok(
+		seen.filter(isSummary).every((context) => JSON.stringify(context.messages).includes("取消悲剧结局")),
+		"每批摘要都看得到最新改口，避免把旧要求写成仍然有效",
+	);
 	const final = seen.at(-1);
 	assert.ok(final);
 	assert.match(JSON.stringify(final.messages), /取消悲剧结局/u);
@@ -469,4 +473,53 @@ test("摘要已落盘后进程退出：恢复直接应用已有结果，调用�
 	assert.equal(saved.calls.filter((c) => c.state === "received").length, count);
 	assert.ok(saved.calls.every((c) => c.usageRecorded));
 	assert.equal(saved.phase, "settled");
+});
+
+test("超限摘要之后遇到瞬时错误：普通重试不重复强制摘要，不误报第二次超限", async () => {
+	const { provider, model } = await fixture(1000000);
+	const checkpoint = await history(model, provider);
+	provider.setResponses([
+		overflow(1000, 900),
+		fauxAssistantMessage("原要求已整理。"),
+		fauxAssistantMessage("", { stopReason: "error", errorMessage: "server_busy" }),
+		fauxAssistantMessage("继续创作。"),
+	]);
+	const result = await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		checkpoint,
+		tools: [],
+		budget: { maxTurns: 10 },
+		transientRetry: { maxRetries: 1, baseDelayMs: 0 },
+	});
+	assert.equal(result.stop, "model_stopped");
+});
+
+test("摘要自身重试：摘要进度与退避进度的事件身份不冲突", async () => {
+	const { provider, model } = await fixture(8000);
+	const checkpoint = await history(model, provider);
+	provider.setResponses([
+		fauxAssistantMessage("", { stopReason: "error", errorMessage: "server_busy" }),
+		...Array.from(
+			{ length: 20 },
+			() => async (context: Transcript) =>
+				fauxAssistantMessage(isSummary(context) ? "新要求有效，继续第二节。" : "完成。"),
+		),
+	]);
+	const events = new Map<string, string>();
+	const result = await runTaskLoop({
+		model,
+		systemPrompt: "测试",
+		checkpoint,
+		tools: [],
+		budget: { maxTurns: 20 },
+		transientRetry: { maxRetries: 1, baseDelayMs: 0 },
+		onProgress: (id, label, status, summary) => {
+			const key = `${id}:${status}`;
+			const body = JSON.stringify({ label, status, summary });
+			if (events.has(key)) assert.equal(events.get(key), body);
+			events.set(key, body);
+		},
+	});
+	assert.equal(result.stop, "model_stopped");
 });

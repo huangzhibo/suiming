@@ -33,6 +33,21 @@ export function openTextMessages(events: readonly SessionEvent[]) {
 	return [...open.values()];
 }
 
+/** 当前 turn 尚在运行的活动；结束状态由执行存储与生命周期一起确认，不依赖进程的 finally。 */
+export function openActivities(events: readonly SessionEvent[]) {
+	const open = new Map<string, Extract<SessionEventBody, { type: EventType.ACTIVITY_SNAPSHOT }>>();
+	for (const { event } of events) {
+		if (
+			event.type !== EventType.ACTIVITY_SNAPSHOT ||
+			!["suiming.action", "suiming.progress"].includes(event.activityType)
+		)
+			continue;
+		if (event.content.status === "running") open.set(event.messageId, event);
+		else open.delete(event.messageId);
+	}
+	return [...open.values()];
+}
+
 /** 唯一 UI 事件日志；确认后发布，稳定 id 补发去重，订阅错误与持久错误分开处理。 */
 export class SessionEventStream {
 	readonly sessionId: string;

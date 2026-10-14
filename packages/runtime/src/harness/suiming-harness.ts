@@ -612,15 +612,12 @@ export class HarnessSession {
 		// metadata.suiming.taskId / taskKind 标，根 Agent 的 taskKind 是 "agent"。
 		const metadata = { suiming: { sessionId: this.sessionId } };
 		const subagentRunId = input.loopId === this.sessionId ? undefined : input.loopId;
-		const pending = new Map<string, { label: string; summary?: string }>();
 		const progress = (
 			id: string,
 			label: string,
 			status: "running" | "completed" | "failed" | "interrupted",
 			summary?: string,
 		) => {
-			if (status === "running") pending.set(id, { label, ...(summary === undefined ? {} : { summary }) });
-			else pending.delete(id);
 			this.events.emit(
 				{
 					type: EventType.ACTIVITY_SNAPSHOT,
@@ -633,92 +630,86 @@ export class HarnessSession {
 				`${id}:${status}`,
 			);
 		};
-		try {
-			const outcome = await runTaskLoop({
-				onProgress: progress,
-				model: input.model,
-				systemPrompt: input.systemPrompt,
-				...(input.refreshOpening === undefined ? {} : { refreshOpening: input.refreshOpening }),
-				...(input.prompt === undefined ? {} : { prompt: input.prompt }),
-				...(input.openingLimit === undefined ? {} : { openingLimit: input.openingLimit }),
-				loopId: input.loopId,
-				...(loop === undefined ? {} : { checkpoint: loop }),
-				...(input.captureSubmission === undefined ? {} : { captureSubmission: input.captureSubmission }),
-				saveCheckpoint: async (state) => {
-					await input.saveCheckpoint({ schemaVersion: 2, loop: state }, state);
-					// 请求一旦可能发出就记一次调用；按 commandId 幂等，重复保存不会重复计数。
-					const latest = state.calls.at(-1);
-					if (latest && latest.state !== "prepared") input.recordRequest(latest.id);
-				},
-				tools,
-				budget: { maxTurns: input.maxTurns },
-				...(this.#signal === undefined ? {} : { signal: this.#signal }),
-				telemetryContext: input.telemetry,
-				onTurnStart: () => {
-					this.throwIfInterrupted();
-					this.#throwIfUsageCheckpoint();
-				},
-				onModelCall: (usage, callId) => {
-					input.recordUsage(callId, usage);
-					this.#usageTokens += weightedUsage(usage);
-					if (Number.isFinite(usage.costUsd)) this.#spentUsd += usage.costUsd;
-				},
-				...(input.steering
-					? {
-							steering: () => this.#engine.project.readInbox(this.sessionId),
-							onSteer: (text: string, sequence: number) =>
-								this.events.message(
-									`${this.sessionId}:inbox:${sequence}`,
-									text,
-									true,
-									{ suiming: { sessionId: this.sessionId, inboxSequence: sequence } },
-									"user",
-								),
-							...(input.decorateInbox === undefined ? {} : { decorateSteering: input.decorateInbox }),
-						}
-					: {}),
-				onTextDelta: (delta, callId) => this.events.appendText(callId, delta, metadata, subagentRunId),
-				onMessage: (callId, message) => {
-					const content = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
-					const previous = this.events.durableEvent(`${callId}:start`);
-					this.events.message(
-						callId,
-						content,
-						true,
-						previous?.event.metadata ?? metadata,
-						"assistant",
-						subagentRunId,
-					);
-					if (input.steering && content) this.#lastReply = content;
-				},
-				onToolCall: (event) => {
-					pending.delete(event.actionId);
-					// 已发布活动保持原样，恢复不会因 UI 投影升级改写历史。
-					if (this.events.durableEvent(`${event.actionId}:result`) !== undefined) return;
-					this.events.emit(
-						{
-							type: EventType.ACTIVITY_SNAPSHOT,
-							messageId: event.actionId,
-							activityType: "suiming.action",
-							replace: true,
-							...(subagentRunId === undefined ? {} : { subagentRunId }),
-							content: {
-								label: event.toolName,
-								status: event.isError ? "failed" : "completed",
-								summary: event.summary,
-								...actionTarget(event.args),
-								isError: event.isError,
-							},
+		const outcome = await runTaskLoop({
+			onProgress: progress,
+			model: input.model,
+			systemPrompt: input.systemPrompt,
+			...(input.refreshOpening === undefined ? {} : { refreshOpening: input.refreshOpening }),
+			...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+			...(input.openingLimit === undefined ? {} : { openingLimit: input.openingLimit }),
+			loopId: input.loopId,
+			...(loop === undefined ? {} : { checkpoint: loop }),
+			...(input.captureSubmission === undefined ? {} : { captureSubmission: input.captureSubmission }),
+			saveCheckpoint: async (state) => {
+				await input.saveCheckpoint({ schemaVersion: 2, loop: state }, state);
+				// 请求一旦可能发出就记一次调用；按 commandId 幂等，重复保存不会重复计数。
+				const latest = state.calls.at(-1);
+				if (latest && latest.state !== "prepared") input.recordRequest(latest.id);
+			},
+			tools,
+			budget: { maxTurns: input.maxTurns },
+			...(this.#signal === undefined ? {} : { signal: this.#signal }),
+			telemetryContext: input.telemetry,
+			onTurnStart: () => {
+				this.throwIfInterrupted();
+				this.#throwIfUsageCheckpoint();
+			},
+			onModelCall: (usage, callId) => {
+				input.recordUsage(callId, usage);
+				this.#usageTokens += weightedUsage(usage);
+				if (Number.isFinite(usage.costUsd)) this.#spentUsd += usage.costUsd;
+			},
+			...(input.steering
+				? {
+						steering: () => this.#engine.project.readInbox(this.sessionId),
+						onSteer: (text: string, sequence: number) =>
+							this.events.message(
+								`${this.sessionId}:inbox:${sequence}`,
+								text,
+								true,
+								{ suiming: { sessionId: this.sessionId, inboxSequence: sequence } },
+								"user",
+							),
+						...(input.decorateInbox === undefined ? {} : { decorateSteering: input.decorateInbox }),
+					}
+				: {}),
+			onTextDelta: (delta, callId) => this.events.appendText(callId, delta, metadata, subagentRunId),
+			onMessage: (callId, message) => {
+				const content = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+				const previous = this.events.durableEvent(`${callId}:start`);
+				this.events.message(
+					callId,
+					content,
+					true,
+					previous?.event.metadata ?? metadata,
+					"assistant",
+					subagentRunId,
+				);
+				if (input.steering && content) this.#lastReply = content;
+			},
+			onToolCall: (event) => {
+				// 已发布活动保持原样，恢复不会因 UI 投影升级改写历史。
+				if (this.events.durableEvent(`${event.actionId}:result`) !== undefined) return;
+				this.events.emit(
+					{
+						type: EventType.ACTIVITY_SNAPSHOT,
+						messageId: event.actionId,
+						activityType: "suiming.action",
+						replace: true,
+						...(subagentRunId === undefined ? {} : { subagentRunId }),
+						content: {
+							label: event.toolName,
+							status: event.isError ? "failed" : "completed",
+							summary: event.summary,
+							...actionTarget(event.args),
+							isError: event.isError,
 						},
-						`${event.actionId}:result`,
-					);
-				},
-			});
-			return { loop: outcome };
-		} finally {
-			for (const [id, item] of pending)
-				progress(id, item.label, "interrupted", "本轮已结束；已有结果保留，未完成动作等待继续");
-		}
+					},
+					`${event.actionId}:result`,
+				);
+			},
+		});
+		return { loop: outcome };
 	}
 
 	/**

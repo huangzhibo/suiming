@@ -59,7 +59,14 @@ export function compactionContext(
 			return "";
 		})
 		.join("\n\n");
-	const content = `此前摘要：${previous ?? "无"}\n\n<历史数据>\n${source}\n</历史数据>`;
+	const latest = messages.findLast((message) => message.role === "user");
+	const latestText =
+		latest?.role === "user"
+			? typeof latest.content === "string"
+				? latest.content
+				: JSON.stringify(latest.content)
+			: "";
+	const content = `此前摘要：${previous ?? "无"}\n\n<历史数据>\n${source}\n</历史数据>\n\n最新输入（后续请求仍保留原话，冲突时以此为准）：\n${latestText}`;
 	if (Buffer.byteLength(content) / 3 > window * 0.8)
 		throw new SuimingHarnessError("context_overflow", "需整理的单条历史过大，请换用更大窗口的模型；原记录已保留。");
 	return {

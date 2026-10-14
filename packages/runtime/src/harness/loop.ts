@@ -627,14 +627,10 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 						"delegation_too_large",
 						"子任务的开场输入过大，请把材料或情节范围拆小后再派；尚未发送模型请求。",
 					);
-				if (
-					!state.compacting &&
-					(promptBytes * ratio > window * COMPACT_AT ||
-						(state.overflowRetried && state.calls.at(-1)?.purpose !== "compaction"))
-				) {
+				if (!state.compacting && promptBytes * ratio > window * COMPACT_AT) {
 					const cut = compactionCut(state.messages, state.reduction?.throughMessage ?? 1, window);
 					if (cut !== undefined) state.compacting = { throughMessage: cut };
-					else if (promptBytes * ratio > window || state.overflowRetried) throw contextOverflowError();
+					else if (promptBytes * ratio > window) throw contextOverflowError();
 				}
 				if (state.compacting) {
 					context = compactionContext(
@@ -779,6 +775,13 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			state.overflowRetried = true;
 			state.messages.pop();
 			state.actions = state.actions.filter((action) => action.modelCallId !== call.id);
+			const cut = compactionCut(
+				state.messages,
+				state.reduction?.throughMessage ?? 1,
+				options.model.model.contextWindow,
+			);
+			if (cut === undefined) throw contextOverflowError();
+			state.compacting = { throughMessage: cut };
 			state.phase = "ready";
 			await save();
 			continue;
@@ -794,10 +797,12 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				state.actions = state.actions.filter((action) => action.modelCallId !== call.id);
 				state.phase = "ready";
 				await save();
+				if (call.purpose === "compaction")
+					options.onProgress?.(call.id, "整理上下文", "failed", "请求失败，正在重试");
 				try {
 					const delay = Math.min(policy.baseDelayMs * 2 ** retries, TRANSIENT_RETRY.maxDelayMs);
 					options.onProgress?.(
-						call.id,
+						`retry:${call.id}`,
 						"自动重试",
 						"running",
 						`第 ${retries + 1} 次，${Math.ceil(delay / 1000)} 秒后重试`,
@@ -808,7 +813,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 				} catch {
 					throw interruptedError(options.signal);
 				}
-				options.onProgress?.(call.id, "自动重试", "completed");
+				options.onProgress?.(`retry:${call.id}`, "自动重试", "completed");
 				continue;
 			}
 			options.onProgress?.(

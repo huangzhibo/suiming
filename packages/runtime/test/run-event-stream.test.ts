@@ -198,3 +198,51 @@ test("合批消息先保存，恢复用完整响应补齐尾部并按 id 去重"
 	assert.equal(persisted.at(-1)?.event.type, EventType.TEXT_MESSAGE_END);
 	assert.equal(restored.messageText("message"), `${"第一段".repeat(200)}尾部`);
 });
+
+test("没有 finally 的崩溃收尾：子任务与整轮分别关闭执行中活动，已完成的不改", async () => {
+	await withSampleProject(async (project) => {
+		const execution = project.createExecutionState();
+		execution.createSession({ commandId: "create", id: "activity-crash", projectId: project.projectId });
+		execution.startTurn({
+			commandId: "start",
+			sessionId: "activity-crash",
+			lease: { ownerId: "test", pid: process.pid, hostname: hostname(), acquiredAt: new Date().toISOString() },
+		});
+		execution.addTask({ commandId: "child", id: "child", sessionId: "activity-crash", kind: "main", key: "child" });
+		const events = new SessionEventStream("activity-crash", undefined, {
+			history: project.readSessionEvents("activity-crash"),
+			persist: (event) => project.appendSessionEvents([event]),
+		});
+		for (const [id, type, status, child] of [
+			["root", "suiming.progress", "running", false],
+			["child", "suiming.action", "running", true],
+			["done", "suiming.action", "completed", false],
+		] as const)
+			events.emit({
+				type: EventType.ACTIVITY_SNAPSHOT,
+				messageId: id,
+				activityType: type,
+				replace: true,
+				...(child ? { subagentRunId: "child" } : {}),
+				content: { label: "验收", status },
+			});
+		const activities = () =>
+			new Map(
+				project
+					.readSessionEvents("activity-crash")
+					.flatMap(({ event }) =>
+						event.type === EventType.ACTIVITY_SNAPSHOT ? [[event.messageId, event.content.status] as const] : [],
+					),
+			);
+		execution.failTask({
+			commandId: "fail",
+			taskId: "child",
+			failure: { code: "crashed", message: "进程退出", retryable: true },
+		});
+		assert.equal(activities().get("child"), "interrupted");
+		assert.equal(activities().get("root"), "running");
+		execution.endTurn({ commandId: "end", sessionId: "activity-crash" });
+		assert.equal(activities().get("root"), "interrupted");
+		assert.equal(activities().get("done"), "completed");
+	});
+});

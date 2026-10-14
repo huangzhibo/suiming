@@ -15,7 +15,7 @@ import type {
 	SessionRecord,
 	TaskRecord,
 } from "../execution/types.js";
-import { openTextMessages, type SessionEvent } from "../harness/events.js";
+import { openActivities, openTextMessages, type SessionEvent } from "../harness/events.js";
 import type { ConfirmedStateEvent } from "../harness/state-events.js";
 import { ContentAddressedObjectStore } from "./content-addressed-object-store.js";
 import { leaseHolderAlive } from "./project-lock.js";
@@ -390,9 +390,26 @@ export class SqliteLocalStore {
 						"SELECT COALESCE(MAX(sequence), 1) AS sequence FROM session_events WHERE session_id = ? AND json_extract(event_json, '$.event.type') = 'RUN_STARTED'",
 					)
 					.get(event.sessionId) as { sequence: number };
-				for (const message of openTextMessages(
-					this.readSessionEvents(event.sessionId, Number(start.sequence) - 1),
-				)) {
+				const current = this.readSessionEvents(event.sessionId, Number(start.sequence) - 1);
+				for (const activity of openActivities(current)) {
+					if (event.event.type !== EventType.RUN_FINISHED && activity.subagentRunId !== event.event.subagentRunId)
+						continue;
+					this.#appendConfirmedEvents([
+						{
+							sessionId: event.sessionId,
+							id: `${activity.messageId}:interrupted`,
+							event: {
+								...activity,
+								content: {
+									...activity.content,
+									status: "interrupted",
+									summary: "执行已中断；已有结果保留，未完成动作等待继续",
+								},
+							},
+						},
+					]);
+				}
+				for (const message of openTextMessages(current)) {
 					if (event.event.type !== EventType.RUN_FINISHED && message.subagentRunId !== event.event.subagentRunId)
 						continue;
 					this.#appendConfirmedEvents([
