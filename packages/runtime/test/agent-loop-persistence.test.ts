@@ -149,6 +149,23 @@ test("流中断这类瞬时失败在同一个 turn 里退避重发：失败的�
 	assert.ok(!outcome.messages.some((message) => message.role === "assistant" && message.stopReason === "error"));
 });
 
+test("pi-ai 的服务繁忙与上游故障分类能让同一轮恢复，计费调用各自保留", async () => {
+	const { provider, options } = await fixture();
+	provider.setResponses([
+		...["server_busy", "servers are currently busy", "The upstream provider returned an error"].map((errorMessage) =>
+			fauxAssistantMessage("", { stopReason: "error", errorMessage }),
+		),
+		fauxAssistantMessage("恢复完成"),
+	]);
+	const outcome = await runTaskLoop({
+		...options,
+		budget: { maxTurns: 8 },
+		transientRetry: { maxRetries: 3, baseDelayMs: 0 },
+	});
+	assert.equal(outcome.stop, "model_stopped");
+	assert.equal(outcome.usage.calls, 4);
+});
+
 test("不可重试的失败立即报错；瞬时失败重试用尽也如实报 model_call_failed", async () => {
 	const unauthorized = await fixture();
 	unauthorized.provider.setResponses([
