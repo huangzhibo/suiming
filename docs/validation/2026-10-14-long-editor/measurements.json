@@ -1,0 +1,477 @@
+{
+  "method": "macOS Electron; synthetic numbered Chinese paragraphs; one baseline run and two post-fix runs per size; five insertions per run; milliseconds include automation and frame waits; after is the final source, after_first_fix precedes scroll refinement.",
+  "before": [
+    {
+      "size": 10000,
+      "actualChars": 10042,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 132
+        },
+        {
+          "name": "open-editor",
+          "ms": 842
+        },
+        {
+          "name": "insert",
+          "ms": 37
+        },
+        {
+          "name": "insert",
+          "ms": 24
+        },
+        {
+          "name": "insert",
+          "ms": 26
+        },
+        {
+          "name": "insert",
+          "ms": 24
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "undo",
+          "ms": 27
+        },
+        {
+          "name": "open-diff",
+          "ms": 258
+        },
+        {
+          "name": "switch-return",
+          "ms": 61
+        },
+        {
+          "name": "reload",
+          "ms": 156
+        }
+      ],
+      "undoAfterReturn": false,
+      "errors": []
+    },
+    {
+      "size": 100000,
+      "actualChars": 100056,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 225
+        },
+        {
+          "name": "open-editor",
+          "ms": 825
+        },
+        {
+          "name": "insert",
+          "ms": 42
+        },
+        {
+          "name": "insert",
+          "ms": 29
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "undo",
+          "ms": 49
+        },
+        {
+          "name": "open-diff",
+          "ms": 303
+        },
+        {
+          "name": "switch-return",
+          "ms": 66
+        },
+        {
+          "name": "reload",
+          "ms": 148
+        }
+      ],
+      "undoAfterReturn": false,
+      "errors": []
+    },
+    {
+      "size": 1000000,
+      "actualChars": 1000088,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 2247
+        },
+        {
+          "name": "open-editor",
+          "ms": 859
+        },
+        {
+          "name": "insert",
+          "ms": 92
+        },
+        {
+          "name": "insert",
+          "ms": 140
+        },
+        {
+          "name": "insert",
+          "ms": 57
+        },
+        {
+          "name": "insert",
+          "ms": 49
+        },
+        {
+          "name": "insert",
+          "ms": 51
+        },
+        {
+          "name": "undo",
+          "ms": 44
+        },
+        {
+          "name": "open-diff",
+          "ms": 330
+        },
+        {
+          "name": "switch-return",
+          "ms": 86
+        },
+        {
+          "name": "reload",
+          "ms": 368
+        }
+      ],
+      "undoAfterReturn": false,
+      "errors": []
+    }
+  ],
+  "after": [
+    {
+      "size": 10000,
+      "actualChars": 10042,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 78
+        },
+        {
+          "name": "open-editor",
+          "ms": 840
+        },
+        {
+          "name": "insert",
+          "ms": 38
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 24
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "undo",
+          "ms": 26
+        },
+        {
+          "name": "open-diff",
+          "ms": 259
+        },
+        {
+          "name": "switch-return",
+          "ms": 65
+        },
+        {
+          "name": "reload",
+          "ms": 138
+        }
+      ],
+      "undoAfterReturn": true,
+      "errors": []
+    },
+    {
+      "size": 100000,
+      "actualChars": 100056,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 208
+        },
+        {
+          "name": "open-editor",
+          "ms": 822
+        },
+        {
+          "name": "insert",
+          "ms": 38
+        },
+        {
+          "name": "insert",
+          "ms": 32
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "undo",
+          "ms": 36
+        },
+        {
+          "name": "open-diff",
+          "ms": 282
+        },
+        {
+          "name": "switch-return",
+          "ms": 55
+        },
+        {
+          "name": "reload",
+          "ms": 138
+        }
+      ],
+      "undoAfterReturn": true,
+      "errors": []
+    },
+    {
+      "size": 1000000,
+      "actualChars": 1000088,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 2219
+        },
+        {
+          "name": "open-editor",
+          "ms": 842
+        },
+        {
+          "name": "insert",
+          "ms": 86
+        },
+        {
+          "name": "insert",
+          "ms": 143
+        },
+        {
+          "name": "insert",
+          "ms": 40
+        },
+        {
+          "name": "insert",
+          "ms": 42
+        },
+        {
+          "name": "insert",
+          "ms": 58
+        },
+        {
+          "name": "undo",
+          "ms": 40
+        },
+        {
+          "name": "open-diff",
+          "ms": 325
+        },
+        {
+          "name": "switch-return",
+          "ms": 93
+        },
+        {
+          "name": "reload",
+          "ms": 214
+        }
+      ],
+      "undoAfterReturn": true,
+      "errors": []
+    }
+  ],
+  "after_first_fix": [
+    {
+      "size": 10000,
+      "actualChars": 10042,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 94
+        },
+        {
+          "name": "open-editor",
+          "ms": 822
+        },
+        {
+          "name": "insert",
+          "ms": 30
+        },
+        {
+          "name": "insert",
+          "ms": 24
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "undo",
+          "ms": 28
+        },
+        {
+          "name": "open-diff",
+          "ms": 278
+        },
+        {
+          "name": "switch-return",
+          "ms": 63
+        },
+        {
+          "name": "reload",
+          "ms": 148
+        }
+      ],
+      "undoAfterReturn": true,
+      "errors": []
+    },
+    {
+      "size": 100000,
+      "actualChars": 100056,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 219
+        },
+        {
+          "name": "open-editor",
+          "ms": 822
+        },
+        {
+          "name": "insert",
+          "ms": 39
+        },
+        {
+          "name": "insert",
+          "ms": 24
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "insert",
+          "ms": 24
+        },
+        {
+          "name": "insert",
+          "ms": 25
+        },
+        {
+          "name": "undo",
+          "ms": 49
+        },
+        {
+          "name": "open-diff",
+          "ms": 296
+        },
+        {
+          "name": "switch-return",
+          "ms": 55
+        },
+        {
+          "name": "reload",
+          "ms": 132
+        }
+      ],
+      "undoAfterReturn": true,
+      "errors": []
+    },
+    {
+      "size": 1000000,
+      "actualChars": 1000088,
+      "times": [
+        {
+          "name": "open-text",
+          "ms": 2238
+        },
+        {
+          "name": "open-editor",
+          "ms": 861
+        },
+        {
+          "name": "insert",
+          "ms": 186
+        },
+        {
+          "name": "insert",
+          "ms": 59
+        },
+        {
+          "name": "insert",
+          "ms": 41
+        },
+        {
+          "name": "insert",
+          "ms": 57
+        },
+        {
+          "name": "insert",
+          "ms": 50
+        },
+        {
+          "name": "undo",
+          "ms": 54
+        },
+        {
+          "name": "open-diff",
+          "ms": 380
+        },
+        {
+          "name": "switch-return",
+          "ms": 120
+        },
+        {
+          "name": "reload",
+          "ms": 207
+        }
+      ],
+      "undoAfterReturn": true,
+      "errors": []
+    }
+  ]
+}
