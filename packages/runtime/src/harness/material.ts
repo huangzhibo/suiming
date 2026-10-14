@@ -88,9 +88,7 @@ export function renderSourceNotes(candidate: ArtifactCandidate, sourceId: string
 		);
 	return coverage.notes
 		.map((note) => {
-			const artifact = candidate.artifacts.find(
-				(item) => item.identity.kind === "source-note" && item.identity.localId === note.id,
-			);
+			const artifact = candidate.artifacts.find((item) => item.path === note.path);
 			const body =
 				artifact === undefined ? "" : decoder.decode(artifact.bytes).replace(/^---\n[\s\S]*?\n---\n/u, "");
 			return `--- [${note.span[0]}, ${note.span[1]}) ${note.path} ---\n${body.trim()}`;
