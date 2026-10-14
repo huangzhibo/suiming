@@ -1,0 +1,496 @@
+{
+  "workload": {
+    "taskActions": 1314,
+    "runsPerCase": 3,
+    "timerIntervalMs": 10,
+    "cache": "每个 cold 样本新建 store 与 reader；不清操作系统文件缓存",
+    "backendRuntime": "Node 26",
+    "desktopRuntime": "Electron 44.6.0"
+  },
+  "backendBefore": [
+    {
+      "trial": 0,
+      "seed": "first",
+      "mode": "cold",
+      "ms": 382,
+      "maxDelayMs": 75,
+      "reads": 5474,
+      "bytes": 7528814,
+      "outputChars": 173
+    },
+    {
+      "trial": 0,
+      "seed": "first",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 173
+    },
+    {
+      "trial": 0,
+      "seed": "first",
+      "mode": "next",
+      "ms": 0,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 11362
+    },
+    {
+      "trial": 0,
+      "seed": "last",
+      "mode": "cold",
+      "ms": 372,
+      "maxDelayMs": 89,
+      "reads": 5474,
+      "bytes": 7528814,
+      "outputChars": 18770
+    },
+    {
+      "trial": 0,
+      "seed": "last",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 18770
+    },
+    {
+      "trial": 0,
+      "seed": "last",
+      "mode": "next",
+      "ms": 0,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 11362
+    },
+    {
+      "trial": 1,
+      "seed": "first",
+      "mode": "cold",
+      "ms": 356,
+      "maxDelayMs": 73,
+      "reads": 5474,
+      "bytes": 7528814,
+      "outputChars": 173
+    },
+    {
+      "trial": 1,
+      "seed": "first",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 173
+    },
+    {
+      "trial": 1,
+      "seed": "first",
+      "mode": "next",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 11362
+    },
+    {
+      "trial": 1,
+      "seed": "last",
+      "mode": "cold",
+      "ms": 338,
+      "maxDelayMs": 63,
+      "reads": 5474,
+      "bytes": 7528814,
+      "outputChars": 18770
+    },
+    {
+      "trial": 1,
+      "seed": "last",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 18770
+    },
+    {
+      "trial": 1,
+      "seed": "last",
+      "mode": "next",
+      "ms": 0,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 11362
+    },
+    {
+      "trial": 2,
+      "seed": "first",
+      "mode": "cold",
+      "ms": 337,
+      "maxDelayMs": 90,
+      "reads": 5474,
+      "bytes": 7528814,
+      "outputChars": 173
+    },
+    {
+      "trial": 2,
+      "seed": "first",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 173
+    },
+    {
+      "trial": 2,
+      "seed": "first",
+      "mode": "next",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 11362
+    },
+    {
+      "trial": 2,
+      "seed": "last",
+      "mode": "cold",
+      "ms": 318,
+      "maxDelayMs": 60,
+      "reads": 5474,
+      "bytes": 7528814,
+      "outputChars": 18770
+    },
+    {
+      "trial": 2,
+      "seed": "last",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 18770
+    },
+    {
+      "trial": 2,
+      "seed": "last",
+      "mode": "next",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 11362
+    }
+  ],
+  "backendAfter": [
+    {
+      "trial": 0,
+      "seed": "first",
+      "mode": "cold",
+      "ms": 6,
+      "maxDelayMs": 1,
+      "reads": 21,
+      "bytes": 42825,
+      "outputChars": 173
+    },
+    {
+      "trial": 0,
+      "seed": "first",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 173
+    },
+    {
+      "trial": 0,
+      "seed": "first",
+      "mode": "next",
+      "ms": 1,
+      "maxDelayMs": 1,
+      "reads": 2,
+      "bytes": 29230,
+      "outputChars": 11362
+    },
+    {
+      "trial": 0,
+      "seed": "last",
+      "mode": "cold",
+      "ms": 90,
+      "maxDelayMs": 2,
+      "reads": 1402,
+      "bytes": 2080736,
+      "outputChars": 18770
+    },
+    {
+      "trial": 0,
+      "seed": "last",
+      "mode": "repeat",
+      "ms": 3,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 18770
+    },
+    {
+      "trial": 0,
+      "seed": "last",
+      "mode": "next",
+      "ms": 1,
+      "maxDelayMs": 1,
+      "reads": 2,
+      "bytes": 29230,
+      "outputChars": 11362
+    },
+    {
+      "trial": 1,
+      "seed": "first",
+      "mode": "cold",
+      "ms": 2,
+      "maxDelayMs": 1,
+      "reads": 21,
+      "bytes": 42825,
+      "outputChars": 173
+    },
+    {
+      "trial": 1,
+      "seed": "first",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 173
+    },
+    {
+      "trial": 1,
+      "seed": "first",
+      "mode": "next",
+      "ms": 1,
+      "maxDelayMs": 1,
+      "reads": 2,
+      "bytes": 29230,
+      "outputChars": 11362
+    },
+    {
+      "trial": 1,
+      "seed": "last",
+      "mode": "cold",
+      "ms": 85,
+      "maxDelayMs": 1,
+      "reads": 1402,
+      "bytes": 2080736,
+      "outputChars": 18770
+    },
+    {
+      "trial": 1,
+      "seed": "last",
+      "mode": "repeat",
+      "ms": 2,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 18770
+    },
+    {
+      "trial": 1,
+      "seed": "last",
+      "mode": "next",
+      "ms": 1,
+      "maxDelayMs": 1,
+      "reads": 2,
+      "bytes": 29230,
+      "outputChars": 11362
+    },
+    {
+      "trial": 2,
+      "seed": "first",
+      "mode": "cold",
+      "ms": 2,
+      "maxDelayMs": 1,
+      "reads": 21,
+      "bytes": 42825,
+      "outputChars": 173
+    },
+    {
+      "trial": 2,
+      "seed": "first",
+      "mode": "repeat",
+      "ms": 0,
+      "maxDelayMs": 0,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 173
+    },
+    {
+      "trial": 2,
+      "seed": "first",
+      "mode": "next",
+      "ms": 1,
+      "maxDelayMs": 0,
+      "reads": 2,
+      "bytes": 29230,
+      "outputChars": 11362
+    },
+    {
+      "trial": 2,
+      "seed": "last",
+      "mode": "cold",
+      "ms": 90,
+      "maxDelayMs": 1,
+      "reads": 1402,
+      "bytes": 2080736,
+      "outputChars": 18770
+    },
+    {
+      "trial": 2,
+      "seed": "last",
+      "mode": "repeat",
+      "ms": 3,
+      "maxDelayMs": 1,
+      "reads": 0,
+      "bytes": 0,
+      "outputChars": 18770
+    },
+    {
+      "trial": 2,
+      "seed": "last",
+      "mode": "next",
+      "ms": 1,
+      "maxDelayMs": 0,
+      "reads": 2,
+      "bytes": 29230,
+      "outputChars": 11362
+    }
+  ],
+  "desktopAfter": [
+    {
+      "trial": 0,
+      "attachMs": 454,
+      "inputMs": 87,
+      "ipc": [
+        {
+          "mode": "cold-first",
+          "ms": 34
+        },
+        {
+          "mode": "repeat-first",
+          "ms": 2
+        },
+        {
+          "mode": "next",
+          "ms": 7
+        },
+        {
+          "mode": "last",
+          "ms": 369
+        }
+      ],
+      "mainMaxDelayMs": 6,
+      "warmClickMs": 174,
+      "geometries": [
+        {
+          "expanded": false,
+          "width": 375,
+          "scroll": 375,
+          "left": 0
+        },
+        {
+          "expanded": true,
+          "width": 1164,
+          "scroll": 1164,
+          "left": 0
+        }
+      ],
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "attachMs": 487,
+      "inputMs": 45,
+      "ipc": [
+        {
+          "mode": "cold-first",
+          "ms": 7
+        },
+        {
+          "mode": "repeat-first",
+          "ms": 1
+        },
+        {
+          "mode": "next",
+          "ms": 1
+        },
+        {
+          "mode": "last",
+          "ms": 340
+        }
+      ],
+      "mainMaxDelayMs": 54,
+      "warmClickMs": 141,
+      "geometries": [
+        {
+          "expanded": false,
+          "width": 375,
+          "scroll": 375,
+          "left": 0
+        },
+        {
+          "expanded": true,
+          "width": 1164,
+          "scroll": 1164,
+          "left": 0
+        }
+      ],
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "attachMs": 494,
+      "inputMs": 39,
+      "ipc": [
+        {
+          "mode": "cold-first",
+          "ms": 11
+        },
+        {
+          "mode": "repeat-first",
+          "ms": 1
+        },
+        {
+          "mode": "next",
+          "ms": 1
+        },
+        {
+          "mode": "last",
+          "ms": 275
+        }
+      ],
+      "mainMaxDelayMs": 59,
+      "warmClickMs": 191,
+      "geometries": [
+        {
+          "expanded": false,
+          "width": 375,
+          "scroll": 375,
+          "left": 0
+        },
+        {
+          "expanded": true,
+          "width": 1164,
+          "scroll": 1164,
+          "left": 0
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

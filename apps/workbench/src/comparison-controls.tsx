@@ -1,18 +1,15 @@
-import { ArrowDown, ArrowUp, ChevronDown, Columns2, RotateCcw, Rows3 } from "lucide-react";
+import { ArrowDown, ArrowUp, Columns2, RotateCcw, Rows3 } from "lucide-react";
 import type { RefObject } from "react";
-import { Button } from "@/components/ui/button";
 import {
-	DropdownMenu,
 	DropdownMenuCheckboxItem,
-	DropdownMenuContent,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
-	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ComparisonController, ComparisonStatus } from "./code-editor.js";
 import type { Book } from "./model.js";
 import { ToolButton } from "./ui-bits.js";
+import { VersionPicker } from "./version-picker.js";
 import type { ComparisonLayout, ViewState } from "./view-state.js";
 
 export function ComparisonActions({
@@ -123,28 +120,12 @@ export function ComparisonBaseline({
 }) {
 	if (view.diffExternal) return <span>外部文件 · 只读</span>;
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<Button size="xs" variant="ghost" aria-label="选择比较基线">
-						已提交 · {view.diffRevision ? book.revisionLabel(view.diffRevision) : "无版本"}
-						<ChevronDown data-icon="inline-end" />
-					</Button>
-				}
-			/>
-			<DropdownMenuContent align="start">
-				<DropdownMenuRadioGroup
-					value={view.diffRevision ?? ""}
-					onValueChange={(diffRevision) => patch({ diffRevision })}
-				>
-					{[...book.data.revisions].reverse().map((revision) => (
-						<DropdownMenuRadioItem key={revision.id} value={revision.id}>
-							{book.revisionLabel(revision.id)}
-							{revision.id === book.data.revisionId ? " · 最新提交" : ""}
-						</DropdownMenuRadioItem>
-					))}
-				</DropdownMenuRadioGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<VersionPicker
+			book={book}
+			selected={view.diffRevision}
+			label={`已提交 · ${view.diffRevision ? book.revisionLabel(view.diffRevision) : "无版本"}`}
+			name="选择比较基线"
+			onSelect={(diffRevision) => patch({ diffRevision })}
+		/>
 	);
 }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { executionJsonBytes, parseExecutionJson } from "../execution/execution-object-codec.js";
 
 type Node =
@@ -121,21 +122,83 @@ export class CheckpointArchive {
 		const value = parseExecutionJson(bytes, "Harness checkpoint") as { encoding?: string; root: Node };
 		// 历史恢复点的语义不变；旧的内联 JSON 可直接读取，后续写入统一使用片段引用。
 		if (value.encoding !== ENCODING) return value;
-		const decode = async (node: Node, depth = 0): Promise<unknown> => {
-			if (depth > 100) throw new Error("Checkpoint object reference is too deep or cyclic");
-			if (node === null || typeof node !== "object") return node;
-			if ("ref" in node) {
-				return decode(await this.#readNode(node.ref), depth + 1);
+		return this.#decode(value.root);
+	}
+
+	/** 只解开指定数组里键匹配的一项。详情查询不用读取恢复点的全部消息与其他结果；不改变落盘格式。 */
+	async readArrayEntry(bytes: Uint8Array, path: readonly string[], key: string, match: string): Promise<unknown> {
+		const value = parseExecutionJson(bytes, "Harness checkpoint") as { encoding?: string; root: Node };
+		if (value.encoding !== ENCODING) {
+			let current: unknown = value;
+			for (const field of path)
+				current =
+					current !== null && typeof current === "object"
+						? (current as Record<string, unknown>)[field]
+						: undefined;
+			return Array.isArray(current)
+				? current.find(
+						(item: unknown) =>
+							item !== null && typeof item === "object" && (item as Record<string, unknown>)[key] === match,
+					)
+				: undefined;
+		}
+		let node = value.root;
+		let depth = 0;
+		for (const field of path) {
+			({ node, depth } = await this.#resolve(node, depth));
+			if (node === null || typeof node !== "object" || !("object" in node)) return undefined;
+			const entry = node.object.find(([name]) => name === field);
+			if (entry === undefined) return undefined;
+			node = entry[1];
+			depth++;
+		}
+		const find = async (node: Node, depth: number): Promise<Node | undefined> => {
+			({ node, depth } = await this.#resolve(node, depth));
+			if (node === null || typeof node !== "object") return undefined;
+			if ("chunks" in node) {
+				// 每块最多 16 项，命中即止；冷读大量 SQLite 节点时让出主进程，避免一次排上千次同步读取。
+				for (const chunk of node.chunks) {
+					const found = await find(chunk, depth + 1);
+					if (found !== undefined) return found;
+					await yieldToEventLoop();
+				}
+				return undefined;
 			}
-			if ("array" in node) return Promise.all(node.array.map((item) => decode(item, depth + 1)));
-			if ("chunks" in node) return (await Promise.all(node.chunks.map((item) => decode(item, depth + 1)))).flat();
-			if ("object" in node)
-				return Object.fromEntries(
-					await Promise.all(node.object.map(async ([key, item]) => [key, await decode(item, depth + 1)])),
-				);
-			throw new Error("Invalid checkpoint node");
+			if (!("array" in node)) return undefined;
+			const found = await Promise.all(
+				node.array.map(async (item) => {
+					const record = await this.#resolve(item, depth + 1);
+					if (record.node === null || typeof record.node !== "object" || !("object" in record.node))
+						return undefined;
+					const entry = record.node.object.find(([name]) => name === key);
+					return entry && (await this.#decode(entry[1], record.depth + 1)) === match ? item : undefined;
+				}),
+			);
+			return found.find((item) => item !== undefined);
 		};
-		return decode(value.root);
+		const found = await find(node, depth);
+		return found === undefined ? undefined : this.#decode(found);
+	}
+
+	async #resolve(node: Node, depth: number): Promise<{ node: Node; depth: number }> {
+		if (depth > 100) throw new Error("Checkpoint object reference is too deep or cyclic");
+		if (node !== null && typeof node === "object" && "ref" in node)
+			return this.#resolve(await this.#readNode(node.ref), depth + 1);
+		return { node, depth };
+	}
+
+	async #decode(node: Node, depth = 0): Promise<unknown> {
+		if (depth > 100) throw new Error("Checkpoint object reference is too deep or cyclic");
+		if (node !== null && typeof node === "object" && "ref" in node)
+			return this.#decode(await this.#readNode(node.ref), depth + 1);
+		if (node === null || typeof node !== "object") return node;
+		if ("array" in node) return Promise.all(node.array.map((item) => this.#decode(item, depth + 1)));
+		if ("chunks" in node) return (await Promise.all(node.chunks.map((item) => this.#decode(item, depth + 1)))).flat();
+		if ("object" in node)
+			return Object.fromEntries(
+				await Promise.all(node.object.map(async ([key, item]) => [key, await this.#decode(item, depth + 1)])),
+			);
+		throw new Error("Invalid checkpoint node");
 	}
 
 	#readNode(id: string): Promise<Node> {

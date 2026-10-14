@@ -130,7 +130,7 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 		assert.equal(await button("下一个变更文件").getAttribute("aria-disabled"), "true");
 		await button("上一个变更文件").press("Enter");
 		await button("选择作品版本").click();
-		await page.getByRole("menuitemradio", { name: /^r1 ·/ }).click();
+		await page.getByRole("option", { name: /^r1 / }).click();
 		await page.getByRole("heading", { name: "当前文件在这个版本没有变更", exact: true }).waitFor();
 		await button("查看本版本的变更").click();
 		await page.locator(".cm-host").waitFor();

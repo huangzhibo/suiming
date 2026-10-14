@@ -12,8 +12,8 @@ export interface ActionDetail {
 
 /** 一次最多给这么多码点；斗破 120 章那次对话里最长的工具结果约 4 万字。 */
 const MAX_OUTPUT_CODE_POINTS = 100_000;
-/** 解开的 checkpoint 留几份：作者往往在同一个 loop 里接连点开几个动作，整读一份要几十到两百多毫秒。 */
-const CACHED_LOOPS = 4;
+/** 最近恢复点的入口保留四份；具体节点复用 Archive 的有界缓存。 */
+const CACHED_CHECKPOINTS = 4;
 
 /**
  * 从跑这个动作的 loop 的 checkpoint 里读它的完整输入与输出（Harness 设计第 11 节）。事件流只带一句摘要，
@@ -22,7 +22,7 @@ const CACHED_LOOPS = 4;
 export class ActionDetailReader {
 	readonly #archive: CheckpointArchive;
 	readonly #objects: { readExecutionObject(id: string): Promise<{ bytes: Uint8Array }> };
-	readonly #loops = new Map<string, Promise<LoopCheckpoint>>();
+	readonly #checkpoints = new Map<string, Promise<Uint8Array>>();
 
 	constructor(objects: ConstructorParameters<typeof CheckpointArchive>[0]) {
 		this.#archive = new CheckpointArchive(objects);
@@ -30,7 +30,12 @@ export class ActionDetailReader {
 	}
 
 	async read(checkpointId: string, actionId: string): Promise<ActionDetail | undefined> {
-		const action = (await this.#loop(checkpointId)).actions.find((item) => item.id === actionId);
+		const action = (await this.#archive.readArrayEntry(
+			await this.#checkpoint(checkpointId),
+			["loop", "actions"],
+			"id",
+			actionId,
+		)) as LoopCheckpoint["actions"][number] | undefined;
 		if (action === undefined) return undefined;
 		const text = action.message?.content.map((part) => (part.type === "text" ? part.text : "")).join("");
 		const codePoints = text === undefined ? [] : Array.from(text);
@@ -47,24 +52,21 @@ export class ActionDetailReader {
 		};
 	}
 
-	#loop(checkpointId: string): Promise<LoopCheckpoint> {
-		let loop = this.#loops.get(checkpointId);
-		// 命中的挪到最新，挤掉的是最久没点的
-		if (loop !== undefined) {
-			this.#loops.delete(checkpointId);
-			this.#loops.set(checkpointId, loop);
-		} else {
-			loop = this.#objects
-				.readExecutionObject(checkpointId)
-				.then(async ({ bytes }) => ((await this.#archive.read(bytes)) as { loop: LoopCheckpoint }).loop);
-			this.#loops.set(checkpointId, loop);
-			loop.catch(() => this.#loops.delete(checkpointId));
-			for (const key of this.#loops.keys()) {
-				if (this.#loops.size <= CACHED_LOOPS) break;
-				this.#loops.delete(key);
-			}
+	#checkpoint(checkpointId: string): Promise<Uint8Array> {
+		let pending = this.#checkpoints.get(checkpointId);
+		if (pending !== undefined) this.#checkpoints.delete(checkpointId);
+		else {
+			pending = this.#objects.readExecutionObject(checkpointId).then(({ bytes }) => bytes);
+			void pending.catch(() => {
+				if (this.#checkpoints.get(checkpointId) === pending) this.#checkpoints.delete(checkpointId);
+			});
 		}
-		return loop;
+		this.#checkpoints.set(checkpointId, pending);
+		for (const key of this.#checkpoints.keys()) {
+			if (this.#checkpoints.size <= CACHED_CHECKPOINTS) break;
+			this.#checkpoints.delete(key);
+		}
+		return pending;
 	}
 }
 

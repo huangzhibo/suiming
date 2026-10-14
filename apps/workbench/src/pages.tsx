@@ -4,13 +4,6 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -33,7 +26,6 @@ import {
 	KIND_LABEL,
 	type ReviewReport,
 	reviewsFor,
-	shortId,
 	stripFrontmatter,
 	versionPage,
 } from "./model.js";
@@ -49,6 +41,7 @@ import {
 	ToolButton,
 	toneText,
 } from "./ui-bits.js";
+import { VersionPicker } from "./version-picker.js";
 import type { OpenPage, PageState } from "./view-state.js";
 
 const CodeEditor = lazy(() => import("./code-editor.js"));
@@ -749,28 +742,13 @@ export function VersionPage({
 		<div className="flex min-h-0 flex-1 flex-col">
 			<div className="shrink-0 border-b border-hair-2 px-4 py-2" data-version-context>
 				<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							render={
-								<Button size="xs" variant="outline" aria-label="选择作品版本">
-									{label}
-									<ChevronDown data-icon="inline-end" />
-								</Button>
-							}
-						/>
-						<DropdownMenuContent align="start">
-							<DropdownMenuRadioGroup
-								value={revisionId}
-								onValueChange={(id) => open(versionPage(id), { versionFile: selected })}
-							>
-								{book.data.revisions.map((item) => (
-									<DropdownMenuRadioItem key={item.id} value={item.id}>
-										{book.revisionLabel(item.id)} · {shortId(item.id)}
-									</DropdownMenuRadioItem>
-								))}
-							</DropdownMenuRadioGroup>
-						</DropdownMenuContent>
-					</DropdownMenu>
+					<VersionPicker
+						book={book}
+						selected={revisionId}
+						label={label}
+						name="选择作品版本"
+						onSelect={(id) => open(versionPage(id), { versionFile: selected })}
+					/>
 					<Popover open={filesOpen} onOpenChange={setFilesOpen}>
 						<PopoverTrigger
 							render={

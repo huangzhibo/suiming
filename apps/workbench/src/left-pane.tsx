@@ -15,6 +15,7 @@ import {
 } from "./model.js";
 import { verdictLabel } from "./review-verdict.js";
 import { Hint, OverflowHint, PanelToolbar, reviewCurrencyLabel, reviewLayerLabel, ToolButton } from "./ui-bits.js";
+import { VersionPicker } from "./version-picker.js";
 import type { ViewState } from "./view-state.js";
 
 export interface PaneProps {
@@ -421,7 +422,8 @@ export function SourcesPane({ book, reviews, page, open }: PaneProps) {
 						`${book.data.files.filter((file) => file.dirty).length} 个文件与 ${book.headLabel} 不同`,
 						() => open(CANDIDATE_VERSION),
 					)}
-				{[...book.data.revisions]
+				{book.data.revisions
+					.slice(-10)
 					.reverse()
 					.map((revision) =>
 						item(
@@ -432,6 +434,17 @@ export function SourcesPane({ book, reviews, page, open }: PaneProps) {
 							() => open(versionPage(revision.id)),
 						),
 					)}
+				{book.data.revisions.length > 10 && (
+					<div className="px-2 py-1">
+						<VersionPicker
+							book={book}
+							selected={currentVersion}
+							label={`查找全部 ${book.data.revisions.length} 个版本`}
+							name="查找历史版本"
+							onSelect={(id) => open(versionPage(id))}
+						/>
+					</div>
+				)}
 			</List>
 		</>
 	);

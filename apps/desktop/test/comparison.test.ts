@@ -65,7 +65,7 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		await right.waitFor();
 		const currentNode = await right.elementHandle();
 		await page.getByRole("button", { name: "选择比较基线", exact: true }).click();
-		await page.getByRole("menuitemradio", { name: "r1", exact: true }).click();
+		await page.getByRole("option", { name: /^r1 / }).click();
 		await left.getByText("开场：初稿。", { exact: true }).waitFor();
 		assert.equal(await currentNode?.evaluate((node) => node.isConnected), true, "换基线不重建右侧编辑器");
 		assert.equal((await snapshot()).documents[target].content, draft);
@@ -141,7 +141,7 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		await page.getByRole("button", { name: "切换为单栏差异", exact: true }).click();
 		await page.locator('.cm-host[data-layout="unified"]').waitFor();
 		await page.getByRole("button", { name: "选择比较基线", exact: true }).click();
-		await page.getByRole("menuitemradio", { name: "r2 · 最新提交", exact: true }).click();
+		await page.getByRole("option", { name: /^r2 / }).click();
 		await page.getByRole("button", { name: "上一处差异", exact: true }).click();
 		await page.locator(".cm-deletedChunk").filter({ hasText: "开场：第二版" }).waitFor();
 		await page.getByRole("button", { name: "还原当前差异", exact: true }).click();
@@ -176,7 +176,7 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		await page.getByRole("menuitemradio", { name: "跟随窗口宽度", exact: true }).click();
 		await handle.waitFor();
 		await page.getByRole("button", { name: "选择比较基线", exact: true }).click();
-		await page.getByRole("menuitemradio", { name: "r1", exact: true }).click();
+		await page.getByRole("option", { name: /^r1 / }).click();
 		await page.reload();
 		await right.waitFor();
 		assert.equal((await snapshot()).documents[target].content, draft);

@@ -203,9 +203,9 @@ function ActionDetail({
 	const detail = query.data;
 	const output = detail.output === undefined ? undefined : outputView(detail.output);
 	return (
-		<div className="action-detail mt-1.5 grid gap-1.5 text-foreground/80">
+		<div className="action-detail mt-1.5 grid grid-cols-1 gap-1.5 text-foreground/80">
 			<DetailFields fields={detailFields(detail.input)} />
-			<div className="grid gap-1.5">
+			<div className="grid grid-cols-1 gap-1.5">
 				<p className="text-muted-foreground">结果</p>
 				{output === undefined ? (
 					<p>还没交回。</p>
@@ -327,7 +327,7 @@ function ActionRun({
 				{run.label} {run.rows.length} 次{run.failed ? `，${run.failed} 次失败` : ""}
 			</summary>
 			{expanded && (
-				<div className="mt-1 ml-4 grid gap-1">
+				<div className="mt-1 ml-4 grid grid-cols-1 gap-1">
 					{run.rows.map((activity) => (
 						<ActionRow
 							key={activity.id}
@@ -422,7 +422,7 @@ function SubtaskGroup({
 				</span>
 			</summary>
 			{expanded && (
-				<div className="mt-1 ml-4 grid gap-1">
+				<div className="mt-1 ml-4 grid grid-cols-1 gap-1">
 					{delegation && (
 						<ActionRow
 							sessionId={sessionId}
@@ -601,7 +601,10 @@ export function Transcript({
 					) : group.taskId === undefined ? (
 						// 根 Agent 的动作直接排在对话里，同类连着的并成一行；点开任何一行看完整输入与输出。
 						group.rows.some((row) => !delegating.has(row.id)) && (
-							<div key={group.rows[0]?.id} className="actions grid gap-1 text-xs text-muted-foreground">
+							<div
+								key={group.rows[0]?.id}
+								className="actions grid grid-cols-1 gap-1 text-xs text-muted-foreground"
+							>
 								<ActionList
 									sessionId={sessionId}
 									taskId={undefined}

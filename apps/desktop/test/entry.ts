@@ -272,6 +272,20 @@ if (process.argv.includes("--subtask-resume-test")) {
 		fauxAssistantMessage("两个人物都读过了。"),
 	]);
 }
+if (process.argv.includes("--action-layout-test")) {
+	provider.setResponses([
+		fauxAssistantMessage(
+			fauxToolCall("delegate", {
+				profile: "main",
+				goal: `读取人物档并核对：${"longreference".repeat(5)}`,
+				title: "核对人物",
+			}),
+		),
+		fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" })),
+		fauxAssistantMessage(fauxToolCall("submit_task", { summary: "已核对人物档" })),
+		fauxAssistantMessage("已核对。"),
+	]);
+}
 const credentials =
 	modelTest && process.env.SUIMING_CONFIG_PATH
 		? new JsonFileCredentialStore({ path: `${process.env.SUIMING_CONFIG_PATH}.auth.json` })
