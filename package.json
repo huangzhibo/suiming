@@ -19,7 +19,7 @@
 		"check:types": "tsc -b --pretty false && tsc -p tsconfig.tests.json --pretty false",
 		"format": "biome check --write .",
 		"dev:api": "node --env-file-if-exists=.env --import tsx apps/api/src/bin.ts",
-		"test": "node --import tsx --test packages/story/test/*.test.ts packages/runtime/test/*.test.ts packages/sdk/test/*.test.ts packages/cloud-postgres/test/*.test.ts packages/cloud-s3/test/*.test.ts apps/api/test/*.test.ts apps/cli/test/*.test.ts apps/workbench/test/*.test.ts",
+		"test": "node --import tsx --test packages/story/test/*.test.ts packages/runtime/test/*.test.ts packages/sdk/test/*.test.ts packages/cloud-postgres/test/*.test.ts packages/cloud-s3/test/*.test.ts apps/api/test/*.test.ts apps/cli/test/*.test.ts apps/workbench/test/*.test.ts scripts/*.test.mjs",
 		"generate:constitution": "node scripts/generate-constitution.mjs",
 		"check:constitution": "node scripts/generate-constitution.mjs --check",
 		"generate:story-language": "node scripts/generate-story-language.mjs",
@@ -33,10 +33,14 @@
 		"regression:harness": "npm run build && node --env-file-if-exists=.env --import tsx scripts/harness-regression.mjs",
 		"check:design-system": "npm run lint -w @suiming/workbench",
 		"package:mac": "npm run build:desktop && node scripts/package-macos.mjs",
+		"check:mac-release": "node scripts/macos-release.mjs check",
+		"rehearse:mac": "node scripts/macos-release.mjs rehearse",
+		"release:mac": "node scripts/macos-release.mjs release",
 		"test:mac-package": "node --import tsx --test apps/desktop/test/packaged-smoke.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.15",
+		"@electron/osx-sign": "2.7.1",
 		"@electron/packager": "20.3.0",
 		"@types/node": "24.19.1",
 		"esbuild": "0.28.2",

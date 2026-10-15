@@ -38,3 +38,37 @@ npm run package:mac
 - **新构建已改变数据格式，旧版无法读取**：保留当前完整目录，用升级前冷备份复制出恢复目录，再用兼容旧构建打开。必要时恢复升级前应用数据；不要只倒回数据库或拼接不同时点的 objects。升级后的新创作仍留在原目录，另行核对转移，不能静默覆盖。
 
 删除 / 替换 `.app` 不会主动删除作品、Canon 或对话。完整冷备份是回退依据；快照导出只有一个作品版本，不能替代它。自动更新、通用迁移平台与热备份均未新增。
+
+## 签名与公证准备
+
+同一份预览 `.app` 可交给 `scripts/macos-release.mjs` 处理。脚本只复制到**尚不存在的新目录**，不覆盖输入、日常应用或作品；复用 `@electron/osx-sign` 与 Apple 命令，不引入发行服务。当前已完成本地签名演练与故障检查，正式 Developer ID / Apple 公证仍待身份就绪后实测，见[签名验收](validation/2026-10-15-macos-signing/README.md)。
+
+维护者需要一次性在本机准备：
+
+1. 具有相应权限的 Apple Developer Program 团队；安装 **Developer ID Application 证书及其私钥**，建议使用专用钥匙串。Apple Development 或 Developer ID Installer 不能替代。用 `security find-identity -v -p codesigning` 获取证书 SHA-1 指纹，只提供指纹和必要的钥匙串路径，不在聊天、仓库或日志中发送私钥。
+2. 在终端交互运行 `xcrun notarytool store-credentials suiming-notary`，按提示输入获授权的 Apple ID、Team ID 和 app-specific password；可附 `--keychain <专用钥匙串路径>`。密码只存本机钥匙串，只需向执行者提供 profile 名和钥匙串路径。不要把密码放到命令行、`.env` 或提交记录。
+3. 正式包完成后，准备可供验证的独立 arm64 Mac 或干净 macOS 虚拟机。通过浏览器下载保留 quarantine 的包，在默认安全设置下首次打开；这一步不能由本机直接执行二进制代替。
+
+```sh
+export SUIMING_MAC_SIGN_IDENTITY='<40 位证书 SHA-1 指纹>'
+export SUIMING_MAC_NOTARY_PROFILE='suiming-notary'
+# 使用专用钥匙串时另设 SUIMING_MAC_KEYCHAIN；脚本不修改系统搜索列表。
+npm run check:mac-release
+npm run release:mac -- dist/macos/Suiming-darwin-arm64/Suiming.app dist/macos-release
+```
+
+检查会验证可用 Developer ID 身份及 profile 的 Apple 认证；缺项即停止，不自动选其他身份或降级。正式模式启用 Hardened Runtime，只申请 Electron V8 所需的 `allow-jit`，要求安全时间戳；不启用 `get-task-allow`、任意未签名代码或库校验例外。该最小配置仍须用真实 Developer ID 包验收，不能由 ad-hoc 演练推定支持。
+
+流程依次签署所有嵌套代码、严格验证、上传公证、保存编号、等待 Accepted、获取日志、向 `.app` staple 票据，再验证票据、签名和 Gatekeeper。全部通过后才重新压缩成 `Suiming-notarized.zip` 并生成 SHA-256 校验文件；`submission.zip` 是公证输入，不能作为最终发行包。每次发布独立目录，文件名不替代应用内的正式版本号和源码标识。
+
+公证等待超时 / 断网时保留 `notary-result.json` 中的编号；不要重跑 release 来重复上传。用 `notarytool wait <编号> --keychain-profile <profile>` 继续查询（专用钥匙串继续传 `--keychain`），Accepted 后取 `notarytool log`、执行 `stapler staple` / `validate`、`codesign --verify --deep --strict` 与 `spctl --assess --type execute`，全部通过才用 `ditto -c -k --sequesterRsrc --keepParent` 重新归档并生成校验和。Invalid 则先看公证日志、修正原因，重新签名后作为新提交。若上传结果本身丢失，先用 `notarytool history` 找回，不能假设没上传成功。
+
+无开发者身份时只运行本地演练：
+
+```sh
+npm run rehearse:mac -- dist/macos/Suiming-darwin-arm64/Suiming.app dist/macos-adhoc
+```
+
+输出明确命名为 `Suiming-local-adhoc.zip`，不调用公证、不用现有证书。ad-hoc 没有 Team ID，同团队动态库校验会导致 Electron 在启动前退出，因此**只有演练模式**增加 `disable-library-validation`；没有关闭 Gatekeeper 或移除 quarantine。该包不能正式分发，运行成功也不等于正式签名成功。
+
+依据：[Apple 公证工作流](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)、[Electron 签名工具](https://github.com/electron/osx-sign)、[Electron 公证说明](https://github.com/electron/notarize)。

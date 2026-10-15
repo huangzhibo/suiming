@@ -58,7 +58,7 @@ test("macOS 安装包：首次启动、新建、替换安装、启动拒绝与�
 			service.close();
 		}
 	}
-	await install(previousZip);
+	await install(currentZip);
 	let app = await launchDesktop({ directory, executablePath });
 	try {
 		const page = await app.firstWindow();
@@ -144,6 +144,7 @@ test("macOS 安装包：首次启动、新建、替换安装、启动拒绝与�
 		assert.deepEqual(await snapshot(), expected, "安装和重载不丢版本、候选、任务、消息，不增加调用");
 		report[label] = true;
 	}
+	await install(previousZip);
 	await openAndCheck("before-upgrade", true);
 	// 冷备份包括整个作品和本次隔离的界面状态；不能只备份可见文件或导出的作品快照。
 	await cp(project, join(directory, "backup"), { recursive: true });
