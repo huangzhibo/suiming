@@ -26,3 +26,9 @@
 - 宿主屏幕锁定时 macOS 不让窗口进全屏。原生全屏放在独立的 `native-fullscreen.test.ts`，不让它挡住普通窗口的分栏、导航与草稿回归；锁屏时仍报失败，不能跳过或伪造窗口状态来宣称通过，解锁后补跑。
 - **faux 回复不要用计时器和界面操作赛跑。**「连续对话」曾让被停下的那次回复先睡 1.5 秒、赌「停止」点击先到；负载高时点击晚到，停止落空，两条回复同文，strict mode 报错，被记成偶发失败两周多。它还藏住了一个产品缺陷：停止落在请求记为 `effect_pending`、实际还没发出时，下一句会停在「模型请求结果待确认」（2026-10-01 修掉，回归在 `agent.test.ts`）。要让操作落在请求进行中，faux 回复就等 `options.signal` 的 abort，或者等 `entry.ts` 里的测试闸门（`gate(name)`，测试用 `launch.ts` 的 `openGate` 放行；2026-10-04 把首条回复的 1200ms、对话框测试的 700ms 与 1800ms 三处 sleep 换成了闸门）；要验证停止落在某个确定时刻的结果，就去单测里用 `saveExecutionObject` 钩子把停止钉在那次 checkpoint 上。
 - **交付界面改动时，要确认作者正开着的那个窗口真的更新了。**重新构建不会刷新已经打开的 renderer：先确认作者的输入已保留，再刷新 renderer，并看新分类、主题色与入口在窗口里实际可见；不能只拿隔离测试的截图说作者当前的窗口已经更新。
+
+## 安装包验收
+
+- `npm run package:mac` 从 npm 已安装的桌面生产依赖闭包打包；不要把整个仓库交给打包器，那里有 .env、测试入口与本机资料。`ELECTRON_ZIP_DIR` 可复用与版本、架构完全匹配的官方 zip 缓存。
+- `npm run test:mac-package` 单独跑 `test/packaged-smoke.ts`，要求 `SUIMING_TEST_MAC_ZIP` 与 `SUIMING_TEST_PREVIOUS_MAC_ZIP`；从 zip 解出完整应用，复用 `launchDesktop({ executablePath })` 启动生产入口，不退回 test-dist。不要与其他桌面 E2E 同时跑，以免窗口焦点相互干扰。
+- 新增启动打开错误时同时检查最近作品重开与 `--project` 两条路径。错误须通过现有工作台提示可见，不能只有 console，也不能因为打开失败而不创建窗口。

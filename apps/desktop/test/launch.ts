@@ -25,6 +25,8 @@ export interface DesktopLaunch {
 	directory: string;
 	/** 启动时打开的作品；不给就不带 --project。 */
 	project?: string;
+	/** 安装包验收用真实 .app 可执行文件；不加载测试入口。 */
+	executablePath?: string;
 	/** entry.ts 认的测试开关，如 --recovery-test。 */
 	flags?: readonly string[];
 	/** 在隔离环境之上再加的变量。 */
@@ -35,8 +37,11 @@ export interface DesktopLaunch {
 /** 所有桌面 E2E 的唯一启动入口：测试入口、隔离的环境、这次测试自己的 user-data。 */
 export function launchDesktop(options: DesktopLaunch): Promise<ElectronApplication> {
 	return electron.launch({
+		...(options.executablePath === undefined
+			? {}
+			: { executablePath: options.executablePath, cwd: options.directory }),
 		args: [
-			resolve("apps/desktop/test-dist/entry.js"),
+			...(options.executablePath === undefined ? [resolve("apps/desktop/test-dist/entry.js")] : []),
 			...(options.project === undefined ? [] : [`--project=${options.project}`]),
 			`--user-data-dir=${join(options.directory, "app-data")}`,
 			...(options.flags ?? []),

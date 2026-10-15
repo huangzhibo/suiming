@@ -76,6 +76,7 @@ export function startDesktop(
 		options.telemetry ?? telemetryFromEnvironment(process.env, { entrypoint: "desktop", release: app.getVersion() });
 	let window: BrowserWindow | undefined;
 	let workspace: LocalWorkspace | undefined;
+	let startupFailure: DesktopCommandFailure | undefined;
 	let quitting = false;
 	let quitRequested = false;
 	let notifying = false;
@@ -104,7 +105,7 @@ export function startDesktop(
 		if (workspace?.activeSessionIds().length) throw new Error("当前作品的对话还在运行，请先停止再切换作品。");
 		// macOS 的 /var 是 /private/var 的符号链接；统一成真实路径，最近列表才不会把同一作品记两次。
 		const path = await realpath(requested).catch(() => requested);
-		// 像 Obsidian 打开任意文件夹一样：目录还没有 .suiming 时就地初始化，作品仍只是目录，.suiming 只是版本库。
+		// 目录还没有 .suiming 时就地初始化执行登记；作品版本在 .git 的 Canon ref，.suiming 保存对话。
 		// scaffold 是幂等的，只补缺失的 index.yaml 等最小 Design；已有作品文件直接成为第一个版本。
 		// 「打开」一个既非空、又没有任何作品文件的目录（例如误选 ~/Documents）时拒绝，不往里写东西。
 		const project = await LocalProjectService.open(path).catch(async (error: unknown) => {
@@ -147,6 +148,7 @@ export function startDesktop(
 			},
 			telemetry.context,
 		);
+		startupFailure = undefined;
 		const { watch } = await import("node:fs");
 		const watcher = watch(path, { recursive: true }, (_event, filename) => {
 			if (filename && !filename.startsWith(".suiming")) changed();
@@ -261,7 +263,10 @@ export function startDesktop(
 				if (!event.senderFrame || !trusted(event.senderFrame.url)) throw new Error("Untrusted renderer");
 				try {
 					if (!workspace)
-						return { ok: false, error: { code: "workspace_not_open", message: "请先打开或创建作品" } };
+						return {
+							ok: false,
+							error: startupFailure ?? { code: "workspace_not_open", message: "请先打开或创建作品" },
+						};
 					if (!Object.hasOwn(LOCAL_COMMANDS, request.command)) throw new Error("Unknown command");
 					return { ok: true, value: await workspace.invoke(request.command, request.input as never) };
 				} catch (error) {
@@ -326,15 +331,14 @@ export function startDesktop(
 			const explicit = process.argv
 				.find((argument) => argument.startsWith("--project="))
 				?.slice("--project=".length);
-			if (explicit) await openProject(resolve(explicit));
-			else {
-				const stored = await readStored();
-				if (stored.path) {
-					try {
-						await openProject(stored.path);
-					} catch (error) {
-						console.error("作品重开失败：", error instanceof Error ? error.message : error);
-					}
+			const initialPath = explicit ? resolve(explicit) : (await readStored()).path;
+			if (initialPath) {
+				try {
+					await openProject(initialPath);
+				} catch (error) {
+					// 启动失败也必须有窗口；复用工作台错误显示与打开入口，不把升级失败伪装成首次启动。
+					startupFailure = commandFailure(error);
+					console.error("作品打开失败：", startupFailure.message);
 				}
 			}
 			createWindow();

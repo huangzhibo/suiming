@@ -201,7 +201,7 @@ Cloud 按 ADR-0008 冻结投入：共享契约变了，已有 adapter 随之修�
 ## 10. 存储与安全
 
 - **Local Canon：作品目录的 git 仓**，`refs/suiming/canon` 是权威；revision = commit，快照 = tree，history = 祖先链。提交回执写成 commit message 的 `Suiming-Command-Id` / `Suiming-Fingerprint` trailer，崩溃后按 commandId 核对。
-- **Local 执行：`.suiming/local.sqlite`**，只存执行数据与部署登记——Session / Task、持久事件、inbox、命令回执、执行对象、「哪个目录是哪个 Project」和 remote binding。它不持有 Canon。大执行对象的字节进 `.suiming/objects` 的 content-addressed 目录。库只认 schema v6，旧版本不升级：旧执行数据本来就不迁，把旧库挪走重新 init 即接上 git 里的版本链（[Harness 设计](harness-design.md)第 12 节）。
+- **Local 执行：`.suiming/local.sqlite`**，只存执行数据与部署登记——Session / Task、持久事件、inbox、命令回执、执行对象、「哪个目录是哪个 Project」和 remote binding。它不持有 Canon。大执行对象的字节进 `.suiming/objects` 的 content-addressed 目录。库只认 schema v6，尚不提供跨 schema 转换；遇到不兼容格式先保全整个作品目录，再用兼容版本读取旧对话。另建副本移出执行目录只能继续作品，不能算对话迁移；具体见[恢复边界](repository-recovery.md)与[安装回退](macos-preview.md)。
 - Cloud：PostgreSQL 与 S3-compatible 对象存储承担同等语义。
 - 模型凭据只有一条路：pi-ai 的 `Models.login(provider, type, interaction)`，API key 与 OAuth 都走它，凭据只落在用户级 credential store 或环境变量，配置只保存非敏感路由，renderer 不读取 secret。认证按实际 provider 能力处理，不按订阅标签拒绝 automation；未验证的登录方式不标为支持。
 - 执行点重新检查项目边界与 baseRevision，不依赖模型自觉遵守；trace 默认不采集 prompt 与正文。

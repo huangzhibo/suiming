@@ -31,10 +31,13 @@
 		"check:workbench": "tsc -p apps/workbench/tsconfig.json --pretty false",
 		"test:desktop": "npm run build:desktop && esbuild apps/desktop/test/entry.ts --bundle --packages=external --external:../dist/main.js --platform=node --format=esm --outdir=apps/desktop/test-dist && node --import tsx --test --test-concurrency=1 apps/desktop/test/*.test.ts",
 		"regression:harness": "npm run build && node --env-file-if-exists=.env --import tsx scripts/harness-regression.mjs",
-		"check:design-system": "npm run lint -w @suiming/workbench"
+		"check:design-system": "npm run lint -w @suiming/workbench",
+		"package:mac": "npm run build:desktop && node scripts/package-macos.mjs",
+		"test:mac-package": "node --import tsx --test apps/desktop/test/packaged-smoke.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.15",
+		"@electron/packager": "20.3.0",
 		"@types/node": "24.19.1",
 		"esbuild": "0.28.2",
 		"playwright": "1.63.0",

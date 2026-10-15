@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /** 读作品时的安静加载态。 */
 export function LoadingScreen() {
@@ -25,7 +26,7 @@ export function WelcomeScreen({
 	onChoose: (create: boolean) => void;
 }) {
 	return (
-		<main className="relative h-screen bg-background px-[12vw] py-[14vh]">
+		<main className={cn("relative h-screen overflow-y-auto bg-background px-[12vw]", error ? "py-12" : "py-[14vh]")}>
 			<div className="drag absolute inset-x-0 top-0 h-12" />
 			<div className="mb-11 grid size-[54px] place-items-center rounded-xl bg-muted font-serif text-[29px] text-foreground">
 				燧
@@ -33,16 +34,33 @@ export function WelcomeScreen({
 			<span className="text-[10px] font-semibold tracking-[2px] text-muted-foreground">
 				SUIMING / 长篇创作工作台
 			</span>
-			<h1 className="my-[22px] font-serif text-[51px] leading-[1.6] font-medium tracking-[3px]">
-				让你的故事，
-				<br />
-				从火种成为世界。
+			<h1
+				className={cn(
+					"my-[22px] font-serif font-medium",
+					error ? "text-2xl" : "text-[51px] leading-[1.6] tracking-[3px]",
+				)}
+			>
+				{error ? (
+					"作品未能打开"
+				) : (
+					<>
+						让你的故事，
+						<br />
+						从火种成为世界。
+					</>
+				)}
 			</h1>
-			<p className="text-sm leading-[2] text-muted-foreground">
-				阅读、写作、推敲人物与因果。
-				<br />
-				与专属 Agent 一起，让每一次修改都有来处。
-			</p>
+			{error ? (
+				<p role="alert" className="text-sm leading-relaxed whitespace-pre-wrap wrap-anywhere text-destructive">
+					{error}
+				</p>
+			) : (
+				<p className="text-sm leading-[2] text-muted-foreground">
+					阅读、写作、推敲人物与因果。
+					<br />
+					与专属 Agent 一起，让每一次修改都有来处。
+				</p>
+			)}
 			<div className="mt-8 mb-6 flex gap-3">
 				<Button size="lg" onClick={() => onChoose(false)}>
 					打开作品 ↗
@@ -52,11 +70,6 @@ export function WelcomeScreen({
 				</Button>
 			</div>
 			<p className="text-[11px] text-muted-foreground">作品保存在你的电脑上，不需要云端账号。</p>
-			{error && (
-				<p role="alert" className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-destructive">
-					{error}
-				</p>
-			)}
 		</main>
 	);
 }
