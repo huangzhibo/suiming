@@ -280,6 +280,9 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				event.preventDefault();
 				setPanePriority("left");
 				patch({ side: "search", sideOpen: true });
+				requestAnimationFrame(() =>
+					document.querySelector<HTMLInputElement>("#workbench-left [data-search-input]")?.focus(),
+				);
 			}
 			if (event.key === "Escape") {
 				setSelectedText("");
@@ -575,6 +578,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				>
 					{kind === "empty" && (
 						<EmptyPage
+							autoFocus={groupId === layout.activeGroup}
 							filesLoading={directory.isLoading}
 							book={book}
 							files={

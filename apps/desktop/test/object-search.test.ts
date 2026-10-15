@@ -52,6 +52,10 @@ test("对象搜索：精确标题优先，全部结果可达，返回与重载�
 		await last.waitFor();
 		assert.equal(await search.inputValue(), "intent/");
 		assert.equal(await results.count(), 81);
+		await eventually(
+			() => last.evaluate((element) => element === element.ownerDocument.activeElement),
+			"返回长结果列表后焦点回到刚打开的条目，而不是屏幕外的搜索框",
+		);
 		await eventually(async () => {
 			const item = await last.boundingBox();
 			const area = await page.locator('[data-scroll-key="empty"]').boundingBox();
@@ -59,6 +63,10 @@ test("对象搜索：精确标题优先，全部结果可达，返回与重载�
 		}, "返回后原结果仍在可视区域，不跳回列表顶部");
 		await page.reload();
 		await last.waitFor();
+		await eventually(
+			() => last.evaluate((element) => element === element.ownerDocument.activeElement),
+			"重载恢复结果焦点",
+		);
 		assert.equal(await search.inputValue(), "intent/");
 		assert.equal(await results.count(), 81);
 		await search.fill("notes/");
@@ -77,8 +85,23 @@ test("对象搜索：精确标题优先，全部结果可达，返回与重载�
 			"目录回复已拦住",
 		);
 		await page.getByText("正在读取文件…", { exact: true }).waitFor();
+		const composer = page.getByRole("textbox", { name: "输入消息", exact: true });
+		for (
+			let i = 0;
+			i < 100 && !(await composer.evaluate((element) => element === element.ownerDocument.activeElement));
+			i++
+		)
+			await page.keyboard.press("Tab");
+		assert.equal(await composer.evaluate((element) => element === element.ownerDocument.activeElement), true);
 		await app.evaluate(() => (globalThis as Fixture).workspaceTestCallbacks.release?.());
 		await rawLast.waitFor();
+		assert.equal(
+			await composer.evaluate((element) => element === element.ownerDocument.activeElement),
+			true,
+			"迟到的目录不抢走对话输入焦点",
+		);
+		await page.keyboard.insertText("目录加载期间的草稿");
+		assert.equal(await composer.inputValue(), "目录加载期间的草稿");
 		await eventually(async () => {
 			const item = await rawLast.boundingBox();
 			const area = await page.locator('[data-scroll-key="empty"]').boundingBox();

@@ -128,7 +128,7 @@ export interface PageState {
 	reviewPane: "current" | "reviewed";
 	checkFilter: { severity: "all" | "error" | "warning"; query: string };
 	versionFile: string;
-	objectSearch: { query: string; limit: number };
+	objectSearch: { query: string; limit: number; selected?: string };
 }
 export interface WorkbenchTab {
 	id: string;

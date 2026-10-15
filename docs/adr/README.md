@@ -31,7 +31,7 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0025](0025-actionable-child-failure.md) | Accepted | 可续做的子任务失败反馈带真实任务编号与已有续做入口，不新建恢复状态 |
 | [0026](0026-harness-context-lifecycle.md) | Accepted | 保留原始历史，请求投影按窗口摘要；复用现有 loop、checkpoint 与观测，反馈沿用 AG-UI |
 | [0027](0027-repository-recovery-boundaries.md) | Accepted | 完整冷备份复用自含目录，Canon 历史显式传递；恢复先保全，对话不与作品快照混装 |
-
 | [0028](0028-macos-preview-delivery.md) | Accepted | 自含 macOS 预览应用与真实安装测试；同格式替换和完整冷备份回退，启动失败必须可见 |
+| [0029](0029-search-keyboard-continuity.md) | Accepted | 搜索到编辑保持焦点与返回条目，两个搜索入口共用键盘行为，更多结果完整可达 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。

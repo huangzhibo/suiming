@@ -13,6 +13,8 @@
 
 ## 最近有效验收
 
+2026-10-15：[键盘连续操作与焦点恢复](validation/2026-10-15-keyboard-flow/README.md)补齐新标签输入、重复唤起搜索、结果方向键和长列表返回焦点；侧栏超过 60 项可继续展开，展开后进入新增条目。隔离桌面验证编辑保存、未保存关闭取消、外部冲突、设置与菜单退出、窄窗和分屏；没有改变作品 / 执行边界或重做可视化。
+
 2026-10-15：按作者要求暂缓正式签名、公证及后续下载首次安装验证，保留已完成的本地准备，继续自主验证日常使用。[作品入口与失败保全](validation/2026-10-15-project-entry/README.md)已覆盖取消选择、非空目录误选、路径移动、权限拒绝及草稿重载；新建不会再在资料目录写入作品，失效路径有重新选择指引。没有新增作品管理层或要求作者投入测试反馈。
 
 2026-10-15：隔离 OAuth 服务下，真实 Electron 与独立 CLI 并发刷新只兑换一次令牌；刷新取消、迟到响应与重新登录并发、网络恢复均通过。桌面第二轮写候选后授权失效，重载并经设置重新登录，沿原 Session 完成第三轮；Canon、候选文件、历史和输入草稿保留。修正认证恢复指引，未新增刷新机制；这不是实际服务商撤销凭据的验证，见[认证验收](validation/2026-10-15-auth-recovery/README.md)。
@@ -33,7 +35,7 @@
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
 | 自动检查 | 最近全仓检查通过；最近一次全仓测试 510 项中 505 通过、5 skip；工作台 75 / 75 | 外部集成的 skip 不记通过；此前一次性 PostgreSQL / MinIO 集成有独立通过记录。签名准备切片复跑全仓测试，含 8 条公证故障契约；受控 OAuth 不计真实服务商验证 |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 48 / 48 通过、0 skip，含 macOS 原生全屏、隔离认证恢复与启动失败 | [安装验收](validation/2026-10-15-macos-install/README.md)；这是安装切片的完整复跑；本轮新增作品入口并定向复跑 14 / 14，见[记录](validation/2026-10-15-project-entry/README.md)。此前工具开始、重载与子任务恢复见[对齐验收](validation/2026-10-15-harness-alignment/README.md) |
+| 桌面与窗口 | 完整桌面 56 / 56 通过、0 skip，含键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [键盘验收](validation/2026-10-15-keyboard-flow/README.md)是本轮完整复跑；此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 

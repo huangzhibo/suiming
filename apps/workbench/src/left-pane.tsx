@@ -1,4 +1,6 @@
 import { ArrowDownWideNarrow, ChevronRight, ChevronsUpDown, Hash, LocateFixed, Search } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
 	type Book,
@@ -14,6 +16,7 @@ import {
 	versionPage,
 } from "./model.js";
 import { verdictLabel } from "./review-verdict.js";
+import { focusNewSearchResult, navigateSearch } from "./search-keyboard.js";
 import { Hint, OverflowHint, PanelToolbar, reviewCurrencyLabel, reviewLayerLabel, ToolButton } from "./ui-bits.js";
 import { VersionPicker } from "./version-picker.js";
 import type { ViewState } from "./view-state.js";
@@ -460,18 +463,21 @@ export function SearchPane({
 }: PaneProps & { query: string; setQuery(value: string): void }) {
 	const needle = query.trim().toLowerCase();
 	const files = book.data.files.filter((file) => file.kind !== "story-index");
-	const results = (
-		needle
-			? files.filter((file) => `${book.title(file)} ${file.localId} ${file.path}`.toLowerCase().includes(needle))
-			: files.slice(0, 12)
-	).slice(0, 60);
+	const [expanded, setExpanded] = useState({ query, limit: 60 });
+	const limit = expanded.query === query ? expanded.limit : 60;
+	const matches = needle
+		? files.filter((file) => `${book.title(file)} ${file.localId} ${file.path}`.toLowerCase().includes(needle))
+		: files.slice(0, 12);
+	const results = matches.slice(0, limit);
 	return (
-		<>
+		<div className="flex min-h-0 flex-1 flex-col" data-search>
 			<PanelToolbar className="gap-2 px-2.5">
 				<div className="flex h-7 flex-1 items-center gap-1.5 rounded-md border bg-white px-2 text-faint">
 					<Search className="size-[12px]" />
 					<Input
 						aria-label="搜索作品"
+						data-search-input
+						onKeyDown={navigateSearch}
 						placeholder="搜索标题、人物、读者期待…"
 						value={query}
 						autoFocus
@@ -483,7 +489,10 @@ export function SearchPane({
 			<List>
 				<div className="group-head">
 					<span>
-						{results.length} 个结果 · {needle ? "按标题、id 与路径" : "最近条目"}
+						{results.length < matches.length
+							? `已显示 ${results.length} / ${matches.length} 个结果`
+							: `${results.length} 个结果`}
+						{!needle && " · 输入关键词查找全部作品"}
 					</span>
 				</div>
 				{results.map((file) => (
@@ -493,14 +502,29 @@ export function SearchPane({
 						className="item-btn"
 						data-on={page === file.path}
 						data-page={file.path}
+						data-search-result
+						onKeyDown={navigateSearch}
 						onClick={() => open(file.path, file.kind === "story-beat" ? { beatView: "design" } : undefined)}
 					>
 						<span className="truncate text-[12.5px]">{book.title(file)}</span>
 						<span className="truncate text-[11px] text-muted-foreground">{file.path}</span>
 					</button>
 				))}
+				{results.length < matches.length && (
+					<Button
+						variant="outline"
+						size="sm"
+						className="mt-3"
+						onClick={(event) => {
+							setExpanded({ query, limit: limit + 60 });
+							focusNewSearchResult(event.currentTarget, results.length);
+						}}
+					>
+						显示更多结果
+					</Button>
+				)}
 				{needle && results.length === 0 && <p className="side-note">没有匹配「{query}」的作品内容。</p>}
 			</List>
-		</>
+		</div>
 	);
 }
