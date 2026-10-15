@@ -1,22 +1,23 @@
-import { X } from "lucide-react";
+import { CircleAlert, Save, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { StoryAxis } from "./axis/StoryAxis.js";
 import { invoke } from "./bridge.js";
 import { CheckPage } from "./check-page.js";
 import type { ComparisonController, ComparisonStatus } from "./code-editor.js";
+import { CommandError } from "./command-error.js";
 import { ComparisonActions, ComparisonBaseline, ComparisonOptions } from "./comparison-controls.js";
 import { DocumentToolbar } from "./document-toolbar.js";
 import { EmptyPage } from "./empty-page.js";
 import { Markdown } from "./markdown.js";
-import { CANDIDATE_VERSION, pageTarget, stripFrontmatter, textPathFor } from "./model.js";
+import { CANDIDATE_VERSION, pageTarget, stripFrontmatter } from "./model.js";
 import { NavigationSurface } from "./navigation-surface.js";
 import { ArtifactPage, IssuePage, VersionPage } from "./pages.js";
 import { captureReadingSelection, restoreReadingSelection } from "./reading-selection.js";
 import { SelectionBar } from "./selection-bar.js";
 import { TabStrip } from "./tab-strip.js";
-import { Hint } from "./ui-bits.js";
+import { Hint, ToolButton } from "./ui-bits.js";
 import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
 import {
@@ -56,6 +57,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		notice,
 		setNotice,
 		busy,
+		setBusy,
 	} = useWorkspace();
 	const {
 		group,
@@ -122,6 +124,26 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	const [closeRequest, setCloseRequest] = useState<{ tabId?: string; paths: string[] } | null>(null);
 	const bodyRef = useRef<HTMLDivElement>(null);
 	const mainRef = useRef<HTMLElement>(null);
+	const [statusOpen, setStatusOpen] = useState(false);
+	const [saveError, setSaveError] = useState("");
+	const statusRef = useRef<HTMLDivElement>(null);
+	const returnFocus = useRef<HTMLElement | null>(null);
+	const documentKey = `${tab?.id}:${editPath}`;
+	const latestDocumentKey = useRef(documentKey);
+	latestDocumentKey.current = documentKey;
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 换文档时关闭上一个文档的临时处理入口
+	useEffect(() => {
+		setStatusOpen(false);
+		setSaveError("");
+	}, [tab?.id, editPath]);
+	const focusEditor = () =>
+		mainRef.current?.querySelector<HTMLElement>(
+			'.cm-merge-b [contenteditable="true"], .cm-editor [contenteditable="true"]',
+		) ?? null;
+	const showStatus = () => {
+		returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		setStatusOpen(true);
+	};
 
 	const comparisonController = useRef<ComparisonController | null>(null);
 	const [comparisonStatus, setComparisonStatus] = useState<ComparisonStatus | null>(null);
@@ -157,6 +179,8 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				[editPath]: { content: buffer, baseContent: editFile.content, baseSHA: editFile.sha256 },
 			},
 		}));
+		setSaveError("");
+		setStatusOpen(false);
 		setError("");
 		setNotice("外部版本已设为基线；编辑内容仍保留，请完成合并后保存。");
 	};
@@ -213,14 +237,46 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		const draft = live.current.documents[path];
 		if (!draft) return;
 		const args = { path, content: draft.content, expectedSHA: restoreMissing ? null : draft.baseSHA };
-		const storyFile = book?.byPath.has(path) || book?.order.some((id) => textPathFor(id) === path);
 		const result = await invoke("workspace.file.save", args);
 		setView((v) => savedDocument(v, path, result.content, result.sha256));
 		await queryClient.invalidateQueries({ queryKey: ["file", shown?.projectId, path] });
 		setError("");
-		setNotice(storyFile ? "已保存，尚未提交" : "已保存");
+		setNotice("已保存");
 	}
-	const save = () => savePath(editPath);
+	// 文档保存错误由本文件的处理入口负责，不再写入全局提示造成重复。
+	const save = async (restoreMissing = false) => {
+		if (busy) return;
+		if (!restoreMissing && (missingFile || conflict !== undefined)) {
+			showStatus();
+			return;
+		}
+		const savingDocument = documentKey;
+		const origin = document.activeElement;
+		setBusy(true);
+		setSaveError("");
+		try {
+			await savePath(editPath, restoreMissing);
+			refresh();
+			if (latestDocumentKey.current !== savingDocument) return;
+			setStatusOpen(false);
+			if (
+				layoutLive.current.activeGroup === group &&
+				(document.activeElement === origin ||
+					document.activeElement === document.body ||
+					statusRef.current?.contains(document.activeElement))
+			) {
+				focusEditor()?.focus();
+			}
+		} catch (failure) {
+			await queryClient.invalidateQueries({ queryKey: ["file", shown?.projectId, editPath] });
+			if (latestDocumentKey.current !== savingDocument) return;
+			if (!(failure instanceof CommandError && failure.code === "checkout_edit_conflict"))
+				setSaveError(failure instanceof Error ? failure.message : String(failure));
+			showStatus();
+		} finally {
+			setBusy(false);
+		}
+	};
 	const go = (direction: "back" | "forward") =>
 		setView((v) => historyMove(v, direction, !!v.tabs[v.active] && protectedLocation(v.tabs[v.active]?.location, v)));
 	const activate = (index: number) => setView((v) => ({ ...v, active: index }));
@@ -272,7 +328,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			}
 			if ((event.metaKey || event.ctrlKey) && event.key === "s") {
 				event.preventDefault();
-				if (changed) void act(save);
+				if (changed) void save();
 			}
 			if ((event.metaKey || event.ctrlKey) && event.key === "e" && editable && kind !== "diff") {
 				event.preventDefault();
@@ -295,6 +351,10 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		window.addEventListener("keydown", key);
 		return () => window.removeEventListener("keydown", key);
 	});
+	const updateBuffer = (content: string) => {
+		setBuffer(content);
+		if (notice === "已保存") setNotice("");
+	};
 	const beginEdit = (path: string) =>
 		patch({
 			targetPath: path,
@@ -307,6 +367,22 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	// 页面对象消失时，原编辑目标（可能是正文）仍由草稿持有；切阅读不能把它换成缺失的设计路径。
 	const finishTask = () => patch({ edit: "read", targetPath: !file && changed ? editPath : "" });
 
+	const documentProblem =
+		missingFile && changed
+			? "文件已移除"
+			: conflict !== undefined
+				? "外部修改冲突"
+				: saveError
+					? "保存失败"
+					: kind === "artifact" && fileDiagnostic
+						? "文件格式有误"
+						: kind === "artifact" && primary.error && file
+							? "文件读取失败"
+							: "";
+	useEffect(() => {
+		if (!documentProblem) setStatusOpen(false);
+	}, [documentProblem]);
+
 	// 外壳只在作品读到之后才画出各窗格，这里只是让类型收窄。
 	if (!shown || !book) return null;
 	const data = shown;
@@ -317,6 +393,107 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	);
 	const textCount = book.order.filter((id) => book.text(id)).length;
 	const dirtyCount = data.files.filter((item) => item.dirty).length;
+	const feedback =
+		groupId === layout.activeGroup && !closeRequest
+			? error ||
+				(typeof notice === "object" ? notice.text : notice) ||
+				(projection.error ? `作品暂时无法解析，请在文件树中修复：${projection.error.message}` : "")
+			: "";
+	const documentActions = (
+		<>
+			{documentProblem && (
+				<Popover
+					open={statusOpen}
+					onOpenChange={(on, details) => {
+						if (!on && (details.reason === "outside-press" || details.reason === "focus-out"))
+							returnFocus.current = null;
+						if (on)
+							returnFocus.current =
+								focusEditor() ??
+								(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+						setStatusOpen(on);
+					}}
+				>
+					<Hint content={`${documentProblem} · 查看处理方式`}>
+						<PopoverTrigger render={<Button variant="ghost" size="xs" aria-label={documentProblem} />}>
+							<CircleAlert className="size-4 text-amber" />
+							<span className="document-status-label">{documentProblem}</span>
+						</PopoverTrigger>
+					</Hint>
+					<PopoverContent
+						ref={statusRef}
+						initialFocus={(interaction) => interaction === "keyboard" || interaction === ""}
+						align="end"
+						className="w-80 max-w-[calc(100vw-24px)] max-h-[70vh] overflow-auto"
+						finalFocus={() => {
+							if (layoutLive.current.activeGroup !== group || latestDocumentKey.current !== documentKey)
+								return false;
+							const active = document.activeElement;
+							if (
+								active instanceof HTMLElement &&
+								active !== document.body &&
+								active !== returnFocus.current &&
+								!statusRef.current?.contains(active) &&
+								active.getAttribute("aria-label") !== documentProblem
+							)
+								return false;
+							return returnFocus.current?.isConnected ? returnFocus.current : false;
+						}}
+					>
+						<PopoverTitle>{documentProblem}</PopoverTitle>
+						<PopoverDescription>
+							{missingFile
+								? "原文件已被删除或移动，未保存的编辑已保留。恢复会在原路径重新创建文件；若文件已改名，请从文件树打开新路径。"
+								: conflict !== undefined
+									? "未保存的编辑已保留。请先比较外部文件与当前草稿，再决定如何合并。"
+									: saveError || fileDiagnostic || primary.error?.message}
+						</PopoverDescription>
+						<code className="break-all text-xs text-muted-foreground">{editPath}</code>
+						{saveError && (missingFile || conflict !== undefined) && (
+							<p role="alert" className="text-destructive">
+								{saveError}
+							</p>
+						)}
+						{missingFile ? (
+							<Button size="sm" disabled={busy} onClick={() => void save(true)}>
+								恢复到原路径
+							</Button>
+						) : conflict !== undefined ? (
+							<div className="flex flex-col gap-2">
+								{kind !== "diff" || !view.diffExternal ? (
+									<Button
+										size="sm"
+										onClick={() => {
+											setStatusOpen(false);
+											beginDiff(editPath, true);
+										}}
+									>
+										比较外部修改
+									</Button>
+								) : null}
+								{kind === "diff" && view.diffExternal && (
+									<Button size="sm" onClick={rebase}>
+										以外部版本为合并基线
+									</Button>
+								)}
+							</div>
+						) : (
+							saveError && (
+								<Button size="sm" disabled={busy} onClick={() => void save()}>
+									重试保存
+								</Button>
+							)
+						)}
+					</PopoverContent>
+				</Popover>
+			)}
+			{changed && !missingFile && conflict === undefined && !saveError && (
+				<ToolButton label="保存 ⌘S" disabled={busy} onClick={() => void save()}>
+					<Save />
+				</ToolButton>
+			)}
+		</>
+	);
 	const split = (orientation: "horizontal" | "vertical", paired = false) => {
 		setLayout((current) => {
 			let base = current;
@@ -350,6 +527,15 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			className={`relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white min-h-0`}
 		>
 			<DocumentToolbar
+				documentActions={documentActions}
+				discard={
+					changed
+						? () => {
+								setCloseRequest({ paths: [editPath] });
+								setError("");
+							}
+						: undefined
+				}
 				book={book}
 				view={view}
 				file={file}
@@ -403,117 +589,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				}
 				system={(path) => void act(() => invoke("workspace.file.open", { path, action: "reveal" }))}
 			/>
-			{kind === "artifact" && fileDiagnostic && (
-				<p role="status" className="border-b bg-amber-bg px-4 py-2 text-xs text-amber">
-					{fileDiagnostic}
-					{editable ? " 可切换到编辑视图修复。" : ""}
-				</p>
-			)}
-			{primary.error && kind === "artifact" && !missingFile && (
-				<p role="status" className="border-b bg-amber-bg px-4 py-2 text-xs text-amber">
-					当前文件无法读取：{primary.error.message}。已有草稿仍保留。
-				</p>
-			)}
-			{/* 只在需要作者动手时出现：有未保存的修改。保存后不再常驻「已保存」——文件与最新版本不同由标题下的「未提交」说，
-			    同一个事实不在一屏里说三遍（2026-10-01 作者看到「候选已保存」与两处「候选未提交」并列，以为是两种矛盾的状态）。 */}
-			{changed && (
-				<div className="flex shrink-0 items-center justify-end gap-2 border-b px-3 py-1.5">
-					<span className="text-[11px] text-amber">未保存</span>
-					<Button
-						variant="outline"
-						size="xs"
-						onClick={() => {
-							setCloseRequest({ paths: [editPath] });
-							setError("");
-						}}
-					>
-						取消编辑
-					</Button>
-					<Button size="xs" disabled={busy} onClick={() => act(save)}>
-						保存 ⌘S
-					</Button>
-				</div>
-			)}
-			{groupId === layout.activeGroup && (error || notice || projection.error) && (
-				<div
-					className={`flex shrink-0 justify-between gap-3 px-4 py-2 text-xs leading-normal [overflow-wrap:anywhere] ${error || (typeof notice === "object" && notice.tone === "warn") ? "bg-[#f7e9df] text-[#995934]" : "bg-green-bg text-[#1f4d37]"}`}
-					role="status"
-				>
-					<span>
-						{error ||
-							(typeof notice === "object" ? notice.text : notice) ||
-							`作品暂时无法解析，请在文件树中修复：${projection.error?.message}`}
-						{!error && typeof notice === "object" && notice.action && (
-							<Button
-								variant="link"
-								size="xs"
-								className="ml-2 h-auto p-0 text-xs text-inherit underline"
-								data-page={notice.action.page}
-								onClick={() => notice.action && open(notice.action.page)}
-							>
-								{notice.action.label}
-							</Button>
-						)}
-					</span>
-					<Hint content={"关闭提示"}>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-xs"
-							className="size-5 text-inherit hover:bg-black/5"
-							onClick={() => {
-								setError("");
-								setNotice("");
-							}}
-							aria-label="关闭提示"
-						>
-							<X className="size-[12px]" />
-						</Button>
-					</Hint>
-				</div>
-			)}
-			{missingFile && changed && (
-				<Alert className="mx-4 my-3 w-auto shrink-0">
-					<AlertTitle>文件已被删除或移动</AlertTitle>
-					<AlertDescription>
-						<p>
-							草稿仍保留在 <code className="break-all">{editPath}</code>
-							。若文件已改名，请从文件树打开新路径；恢复会在原路径写入草稿。
-						</p>
-						<Button
-							variant="outline"
-							size="xs"
-							disabled={busy}
-							onClick={() => {
-								const tabId = tab?.id;
-								void act(async () => {
-									await savePath(editPath, true);
-									// 只将刚消失的恢复按钮焦点交回原编辑器；异步期间已切页或改焦点就不抢回。
-									if (
-										live.current.tabs[live.current.active]?.id === tabId &&
-										document.activeElement === document.body
-									)
-										mainRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus();
-								});
-							}}
-						>
-							恢复到原路径
-						</Button>
-					</AlertDescription>
-				</Alert>
-			)}
-			{conflict !== undefined && (
-				<div className="mx-4 my-3 shrink-0 rounded-lg border border-amber-line bg-amber-bg px-3.5 py-3 text-xs leading-[1.7]">
-					<strong>文件在外部发生了修改</strong>
-					<p className="mt-1 mb-2 text-ink-3">你的编辑保留在这里。先比较两个版本，再决定如何合并。</p>
-					<Button variant="outline" size="xs" className="mr-1.5" onClick={() => beginDiff(editPath, true)}>
-						比较外部修改
-					</Button>
-					<Button variant="outline" size="xs" onClick={rebase}>
-						以外部版本为合并基线
-					</Button>
-				</div>
-			)}
 			{(kind === "artifact" || kind === "file") && view.edit === "edit" && editable && (
 				<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 					<Suspense fallback={<p className="p-5 text-[11.5px] text-muted-foreground">正在打开编辑器…</p>}>
@@ -534,9 +609,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							onPosition={(position) =>
 								patch({ editors: { ...view.editors, [`${editPath}:${view.edit}`]: position } })
 							}
-							onChange={(value) => {
-								setBuffer(value);
-							}}
+							onChange={updateBuffer}
 							onSelection={(value) => setSelectedText(value.slice(0, 12000))}
 						/>
 					</Suspense>
@@ -583,7 +656,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 								onPosition={(position) =>
 									patch({ editors: { ...view.editors, [`${editPath}:diff`]: position } })
 								}
-								onChange={setBuffer}
+								onChange={updateBuffer}
 								comparison={{
 									controller: comparisonController,
 									layout: comparisonLayout,
@@ -840,14 +913,46 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				showAgent={showAgent}
 				refresh={refresh}
 			/>
-			{/* 紧凑状态栏：贴底单行 24px，窄窗按信息组换行，不遮住内容与操作。 */}
+			{/* 紧凑状态栏：贴底单行 24px，长反馈按需展开，不推移或遮住内容。 */}
 			<div
-				className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-x-4 px-3 text-xs leading-6 whitespace-nowrap text-muted-foreground"
+				className="flex min-w-0 shrink-0 items-center justify-end gap-x-3 px-3 text-xs leading-6 whitespace-nowrap text-muted-foreground"
 				role="status"
 				aria-label="作品与当前对象状态"
 			>
+				{feedback && (
+					<div className="mr-auto flex min-w-0 items-center gap-1">
+						<Popover>
+							<PopoverTrigger render={<Button variant="ghost" size="xs" className="min-w-0 shrink" />}>
+								{(error || projection.error || (typeof notice === "object" && notice.tone === "warn")) && (
+									<CircleAlert className="size-3 shrink-0 text-amber" />
+								)}
+								<span className="truncate">{feedback}</span>
+							</PopoverTrigger>
+							<PopoverContent side="top" align="start" className="max-w-[calc(100vw-24px)]">
+								<PopoverTitle>{error || projection.error ? "操作未完成" : "操作结果"}</PopoverTitle>
+								<PopoverDescription className="break-words">{feedback}</PopoverDescription>
+							</PopoverContent>
+						</Popover>
+						{!error && typeof notice === "object" && notice.action && (
+							<Button variant="outline" size="xs" onClick={() => notice.action && open(notice.action.page)}>
+								{notice.action.label}
+							</Button>
+						)}
+						<ToolButton
+							label="关闭提示"
+							className="size-6"
+							side="top"
+							onClick={() => {
+								setError("");
+								setNotice("");
+							}}
+						>
+							<X />
+						</ToolButton>
+					</div>
+				)}
 				{/* 底栏只说整部作品：版本、未提交与正文进度。字数、属性这类对象信息在页面标题下。 */}
-				<span>
+				<span className="shrink-0">
 					{book.headLabel} ·{" "}
 					{data.dirty ? (
 						<Button
@@ -863,7 +968,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 						"已提交"
 					)}
 				</span>
-				<span>
+				<span className="document-progress shrink-0">
 					正文 {textCount} / {book.order.length}
 				</span>
 			</div>
@@ -908,8 +1013,12 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				paths={closeRequest?.paths}
 				busy={busy}
 				error={error}
-				onCancel={() => setCloseRequest(null)}
+				onCancel={() => {
+					setCloseRequest(null);
+					setError("");
+				}}
 				onDiscard={() => {
+					setSaveError("");
 					discard(closeRequest?.paths ?? []);
 					finishClose();
 				}}

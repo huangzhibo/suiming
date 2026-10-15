@@ -171,7 +171,7 @@ export function useWorkspaceGroup(groupId: string | undefined, { onOpen }: { onO
 			),
 		);
 		setError("");
-		// 一次性提示跟着那一刻：换页之后「已保存，尚未提交」这类话可能已经不是事实。
+		// 一次性提示跟着那一刻：换页之后「已保存」这类话可能已经不是事实。
 		setNotice("");
 		onOpen?.();
 	};

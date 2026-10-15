@@ -221,13 +221,13 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.locator(".cm-editor .cm-content").first().click();
 		await page.keyboard.press("Meta+A");
 		await page.keyboard.insertText("主角的计谋必须当场付出不可逆的代价。");
-		await page.getByText("未保存", { exact: true }).waitFor();
+		await page.locator('.tab-btn[data-active="true"] [aria-label="未保存"]').waitFor();
 		await page.reload();
-		await page.getByText("未保存", { exact: true }).waitFor();
+		await page.locator('.tab-btn[data-active="true"] [aria-label="未保存"]').waitFor();
 		assert.equal(app.process().exitCode, null);
 		assert.ok(!(await readFile(join(root, "intent/计谋的代价.md"), "utf8")).includes("不可逆"));
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.ok((await readFile(join(root, "intent/计谋的代价.md"), "utf8")).includes("不可逆"));
 		await page.getByRole("button", { name: "切换到阅读视图", exact: true }).click();
 		await page.getByRole("button", { name: "更多", exact: true }).click();
@@ -375,13 +375,15 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.keyboard.press("Meta+A");
 		await page.keyboard.insertText("军杖落到第三十下，黄盖背上已经见了血。他抬头看了周瑜一眼，仍然一声没吭。");
 		await writeFile(join(root, "text/beat-0001.md"), "外部作者修改：黄盖在军杖落下前停了一下。\n");
-		await page.getByText("文件在外部发生了修改", { exact: true }).waitFor();
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).waitFor();
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).click();
 		await page.getByRole("button", { name: "比较外部修改", exact: true }).click();
 		await page.locator(".cm-mergeView").waitFor();
 		await page.screenshot({ path: "/tmp/suiming-desktop-qa/conflict.png" });
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).click();
 		await page.getByRole("button", { name: "以外部版本为合并基线", exact: true }).click();
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "提交版本", exact: true }).click();
 		await page.getByText("已提交一个新版本", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();
@@ -504,7 +506,11 @@ test("Electron typed IPC：编辑 CAS、版本比较、窗口重载只 attach、
 		await page.getByRole("button", { name: "后退", exact: true }).click();
 		assert.equal(await page.locator(".tab-btn").count(), 2, "后退保留未保存的原 tab");
 		await page.locator(".tab-btn").first().locator("button").first().click();
-		await page.getByRole("button", { name: "取消编辑", exact: true }).click();
+		await page
+			.getByRole("toolbar", { name: "文档工具", exact: true })
+			.getByRole("button", { name: "更多", exact: true })
+			.click();
+		await page.getByRole("menuitem", { name: "放弃未保存修改…", exact: true }).click();
 		await page.getByRole("dialog").getByRole("button", { name: "放弃修改", exact: true }).click();
 		await page.getByRole("button", { name: "展开左栏", exact: true }).click();
 		await page.getByRole("button", { name: "收起左栏", exact: true }).waitFor();
@@ -863,7 +869,7 @@ test("导航与文件：侧栏独立、共享草稿、固定与新开、关闭�
 		await page.locator(".cm-content").click();
 		await page.keyboard.press("Meta+End");
 		await page.keyboard.insertText("\n第一份共享草稿");
-		await page.getByText("未保存", { exact: true }).waitFor();
+		await page.locator('.tab-btn[data-active="true"] [aria-label="未保存"]').waitFor();
 		await page.locator('.beat-row[data-page$="beat-0002.md"]').click();
 		assert.equal(await page.locator(".tab-btn").count(), 2);
 		await page.locator(".tab-btn").first().locator("button").first().click();

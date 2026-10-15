@@ -161,7 +161,7 @@ for (const size of [100_000, 1_000_000])
 			await editor.waitFor();
 			assert.equal((await snapshot()).documents[path].content, final, "未保存的长正文重载后逐字保留");
 			await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-			await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+			await page.getByText("已保存", { exact: true }).waitFor();
 			assert.equal(await readFile(join(root, path), "utf8"), final);
 			await page.reload();
 			await editor.waitFor();

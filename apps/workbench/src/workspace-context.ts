@@ -4,8 +4,8 @@ import type { useEditorHistory } from "./use-editor-history.js";
 import type { WorkspaceLayout } from "./workspace-layout.js";
 
 /**
- * 一次性提示。检查结果这类需要作者去看的，带一个打开详情页的动作；`warn` 用与错误同一种底色，
- * 未通过的检查不该显示成绿色。
+ * 一次性提示。检查结果这类需要作者去看的，带一个打开详情页的动作；`warn` 用警示图标标明需要处理，
+ * 文档窗格在既有状态栏显示，不再增加横幅。
  */
 export type Notice = string | { text: string; tone: "ok" | "warn"; action?: { label: string; page: string } };
 

@@ -60,7 +60,7 @@ test("跨作品组合：未保存正文遇到外部修改，切换、重载与�
 		await page.getByRole("radio", { name: "正文", exact: true }).click();
 		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
 		await editor.fill("作品0原文。\n作者未保存补写。\n");
-		await page.getByText("未保存", { exact: true }).waitFor();
+		await page.locator('.tab-btn[data-active="true"] [aria-label="未保存"]').waitFor();
 		await page.getByRole("radio", { name: "设计", exact: true }).click();
 		await app.evaluate(() => {
 			(globalThis as Pending).workspaceTestCallbacks.command = "workspace.file.read";
@@ -83,18 +83,20 @@ test("跨作品组合：未保存正文遇到外部修改，切换、重载与�
 		await page.getByRole("radio", { name: "正文", exact: true }).click();
 		await editor.waitFor();
 		assert.match(await editor.innerText(), /作者未保存补写/u);
-		await page.getByText("文件在外部发生了修改", { exact: true }).waitFor();
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).waitFor();
 		await page.reload();
-		await page.getByText("文件在外部发生了修改", { exact: true }).waitFor();
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).waitFor();
 		assert.match(await editor.innerText(), /作者未保存补写/u);
 		assert.equal(await readFile(join(roots[0], path), "utf8"), "作品0原文。\n外部补写。\n");
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).click();
 		await page.getByRole("button", { name: "比较外部修改", exact: true }).click();
 		await page.locator(".cm-merge-a .cm-content").filter({ hasText: "外部补写" }).waitFor();
 		await page.locator(".cm-merge-b .cm-content").filter({ hasText: "作者未保存补写" }).waitFor();
 		await page.locator(".cm-merge-b .cm-content").fill("作品0原文。\n外部补写。\n作者未保存补写。\n");
+		await page.getByRole("button", { name: "外部修改冲突", exact: true }).click();
 		await page.getByRole("button", { name: "以外部版本为合并基线", exact: true }).click();
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		await page.getByRole("button", { name: "提交版本", exact: true }).click();
 		await page.getByText("已提交一个新版本", { exact: true }).waitFor();
 		assert.equal(await readFile(join(roots[0], path), "utf8"), "作品0原文。\n外部补写。\n作者未保存补写。\n");

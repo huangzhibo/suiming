@@ -22,7 +22,7 @@ test("快捷键 ⌘T / ⌘W / ⌘E / ⌘S / ⌘K、关标签时「保存并继�
 	const errors = collectPageErrors(page);
 	const tabs = page.locator(".tab-btn");
 	const editor = page.locator(".cm-editor .cm-content");
-	const unsaved = page.getByText("未保存", { exact: true });
+	const unsaved = page.locator('.tab-btn[data-active="true"] [aria-label="未保存"]');
 	const text = () => readFile(join(root, "text/beat-0001.md"), "utf8");
 	try {
 		await page.locator('.beat-row[data-page$="beat-0001.md"]').click();

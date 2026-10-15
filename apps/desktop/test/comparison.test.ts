@@ -185,7 +185,7 @@ test("独立版本比较：单栏与并排、共享草稿、固定基线、撤�
 		await page.screenshot({ path: "/tmp/suiming-comparison-split-wide.png" });
 		const frozen = (await snapshot()).groups[0].tabs[1].location.diffRevision;
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.equal(await readFile(join(root, target), "utf8"), draft);
 		await page.getByRole("button", { name: "提交版本", exact: true }).click();
 		await page.getByText("已提交一个新版本", { exact: true }).waitFor();

@@ -44,9 +44,13 @@ export function DocumentToolbar({
 	selectContent,
 	comparisonActions,
 	comparisonOptions,
+	documentActions,
+	discard,
 }: {
 	comparisonActions?: ReactNode;
 	comparisonOptions?: ReactNode;
+	documentActions?: ReactNode;
+	discard: (() => void) | undefined;
 	book: Book;
 	view: ViewState;
 	file: FileEntry | undefined;
@@ -127,6 +131,7 @@ export function DocumentToolbar({
 	return (
 		<PanelToolbar
 			className="document-toolbar grid gap-1 text-xs text-muted-foreground"
+			role="toolbar"
 			aria-label="文档工具"
 			data-content-switch={beat}
 			data-comparison={kind === "diff" || kind === "version"}
@@ -245,6 +250,7 @@ export function DocumentToolbar({
 						)}
 					</>
 				)}
+				{documentActions}
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
@@ -268,6 +274,12 @@ export function DocumentToolbar({
 								</DropdownMenuRadioGroup>
 								<DropdownMenuSeparator />
 							</>
+						)}
+						{discard && (
+							<DropdownMenuGroup>
+								<DropdownMenuItem onClick={discard}>放弃未保存修改…</DropdownMenuItem>
+								<DropdownMenuSeparator />
+							</DropdownMenuGroup>
 						)}
 						{comparisonOptions}
 						<DropdownMenuGroup>

@@ -54,7 +54,7 @@ test("统一文档：文件树准确切换设计与正文，草稿分别保存�
 		await page.locator(".cm-content").fill(updatedDesign);
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).waitFor({ state: "hidden" });
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.equal(await readFile(join(root, design), "utf8"), updatedDesign);
 		assert.equal(await readFile(join(root, prose), "utf8"), "原来的正文。", "保存设计不能覆盖正文草稿");
 		await proseFile.click();
@@ -77,19 +77,21 @@ test("统一文档：文件树准确切换设计与正文，草稿分别保存�
 		assert.equal(await page.locator(".tab-btn").count(), 1);
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).waitFor({ state: "hidden" });
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.equal(await readFile(join(root, prose), "utf8"), "未保存的正文草稿。");
 		// 路径能识别但 frontmatter 损坏时，仍能看到诊断并进入同一编辑器修复。
 		await writeFile(join(root, design), "---\ntitle: [未闭合\n---\n仍可修复。");
 		await designFile.click();
 		await page.getByRole("button", { name: "切换到阅读视图", exact: true }).click();
-		await page.getByText(/可切换到编辑视图修复/).waitFor();
+		await page.getByRole("button", { name: "文件格式有误", exact: true }).click();
+		await page.getByRole("dialog", { name: "文件格式有误", exact: true }).waitFor();
+		await page.keyboard.press("Escape");
 		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
 		await page.locator(".cm-content").filter({ hasText: "title: [未闭合" }).waitFor();
 		await page.locator(".cm-content").fill(originalDesign);
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
 		await page.getByRole("button", { name: "保存 ⌘S", exact: true }).waitFor({ state: "hidden" });
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.equal(await readFile(join(root, design), "utf8"), originalDesign);
 		assert.deepEqual(errors, []);
 	} finally {
@@ -206,7 +208,7 @@ test("内容意图与通用分屏：空正文回退、独立导航、共享草�
 		assert.equal(await page.locator("[data-pane-id]").count(), 2);
 		assert.equal(await page.locator(".tab-btn").count(), 4, "设计页也保护同一情节的未保存稿，合并不丢弃标签");
 		await pane().getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-		await pane().getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await pane().getByText("已保存", { exact: true }).waitFor();
 		assert.match(await readFile(join(root, "text/beat-0002.md"), "utf8"), /两边共享的最终草稿/);
 		await pane().getByRole("button", { name: "关闭标签", exact: true }).click();
 		await pane().getByRole("button", { name: "关闭标签", exact: true }).click();

@@ -1,4 +1,4 @@
-# 当前状态（2026-10-15）
+# 当前状态（2026-10-16）
 
 本文只回答三件事：什么已经成立、证据到哪一级、还有哪些已知缺陷。形状以[系统架构](architecture.md)与 [Harness 设计](harness-design.md)为准；接下来做什么只在[路线图](roadmap.md)第 6 节维护，发生过什么见[变更记录](changelog.md)。
 
@@ -12,6 +12,8 @@
 - **证据边界**：最高到「真实调用」。真实写作、真实流中断恢复与大型作品浏览均有证据；抽取原作、合成规模测试和少量正文不等于 Agent 完成真实长篇，也不能代替作者对文学效果的判断。
 
 ## 最近有效验收
+
+2026-10-16：按 [ADR-0032](adr/0032-document-shell-feedback.md) 收敛文档外壳与反馈：保存并入文档工具栏，去掉独立编辑操作行、重复横幅和恢复卡片；文件状态按需展开，通用回执进入底栏，继续输入清除已保存回执。人物、情节、期待及比较页面保留各自操作。隔离验收覆盖空间占用、冲突 / 删除恢复、鼠标与键盘焦点、切页和重载，见[文档外壳验收](validation/2026-10-16-document-shell/README.md)。
 
 2026-10-16：[外部文件与草稿恢复](validation/2026-10-15-external-file-recovery/README.md)补齐删除、重命名、未保存编辑、切页和重载的组合。已打开的路径继续核对磁盘，读取失败不展示旧缓存；草稿与正文编辑目标保留，缺失文件可明确恢复到原路径，仍经原保存命令的 CAS，不自动提交或搬移到新路径。普通窗口及窄窗验证焦点、光标和撤销，规则见 [ADR-0031](adr/0031-external-file-draft-recovery.md)。
 
@@ -35,9 +37,9 @@
 | 大量版本与长对话 | 10 / 100 / 500 版本检索、键盘和文件保持；真实 1314 动作历史按需加载，侧栏 / 主工作面不溢出 | [规模操作验收](validation/2026-10-14-version-and-conversation/README.md)；不等于长篇持续运行性能验收 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 479 / 479、0 skip，工作台 75 / 75 包含在其中；新增缺失文件保存与恢复的 CAS 验收 | 见[外部文件验收](validation/2026-10-15-external-file-recovery/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 479 / 479、0 skip，工作台 75 / 75 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[文档外壳验收](validation/2026-10-16-document-shell/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 65 / 65 通过、0 skip，含外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [外部文件与草稿恢复](validation/2026-10-15-external-file-recovery/README.md)为最新完整复跑；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 67 / 67 通过、0 skip，含文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [文档外壳与状态反馈](validation/2026-10-16-document-shell/README.md)为最新完整复跑；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 

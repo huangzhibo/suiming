@@ -11,6 +11,7 @@ import { collectPageErrors, eventually, launchDesktop } from "./launch.js";
 
 declare const window: { suiming: DesktopBridge };
 declare const innerWidth: number;
+declare function requestAnimationFrame(callback: (time: number) => void): number;
 // 短 fixture 全部在视口内；innerText 会把 contenteditable 的空行重复算入，逐行读取真实文档文本。
 const editorText = (editor: Locator) =>
 	editor.locator(".cm-line").evaluateAll((lines) => lines.map((line) => line.textContent).join("\n"));
@@ -74,22 +75,24 @@ for (const target of ["world/characters/黄盖.md", "text/beat-0001.md", "notes.
 			await page.keyboard.insertText("\n保留未保存的句子。");
 			const draft = await editorText(editor);
 			const tabId = await page.locator('.tab-btn[data-active="true"]').getAttribute("data-tab-id");
+			const contentTop = (await page.locator(".cm-host").boundingBox())?.y;
 			await rm(join(root, target));
-			await page.getByText("文件已被删除或移动", { exact: true }).waitFor();
-			const alert = page.getByRole("alert").filter({ hasText: "文件已被删除或移动" });
-			assert.equal(
-				await alert.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-				true,
-				"提示不横向溢出",
-			);
+			await page.getByRole("button", { name: "文件已移除", exact: true }).waitFor();
+			assert.equal(await page.getByRole("dialog").count(), 0, "外部变化只标记状态，不弹层打断");
+			assert.equal((await page.locator(".cm-host").boundingBox())?.y, contentTop, "文件状态不推移编辑内容");
 			assert.equal(await editorText(editor), draft);
 			assert.equal(await focused(editor), true, "外部变化不抢焦点");
 			await page.keyboard.press("Meta+s");
-			await page
-				.getByRole("status")
-				.filter({ hasText: /文件已|文件不存在/ })
-				.first()
-				.waitFor();
+			const recovery = page.getByRole("dialog", { name: "文件已移除", exact: true });
+			await recovery.waitFor();
+			assert.equal(await page.getByText("文件已被删除或移动", { exact: true }).count(), 0, "没有重复的横幅或卡片");
+			const rect = await recovery.boundingBox();
+			assert.ok(
+				rect && rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= (await page.evaluate(() => innerWidth)),
+				"处理入口在窗口内",
+			);
+			await page.keyboard.press("Escape");
+			await eventually(() => focused(editor), "关闭恢复入口返回原编辑器");
 			await assert.rejects(readFile(join(root, target)), { code: "ENOENT" });
 			await page.keyboard.press("Meta+t");
 			await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).waitFor();
@@ -104,7 +107,7 @@ for (const target of ["world/characters/黄盖.md", "text/beat-0001.md", "notes.
 			await eventually(() => focused(editor), "缺失文档从阅读仍可回到草稿编辑");
 			assert.equal(await editorText(editor), draft);
 			await page.reload();
-			await page.getByText("文件已被删除或移动", { exact: true }).waitFor();
+			await page.getByRole("button", { name: "文件已移除", exact: true }).waitFor();
 			await eventually(() => focused(editor), "重载后恢复草稿编辑焦点");
 			assert.equal(await editorText(editor), draft);
 			await page.keyboard.press("Meta+w");
@@ -115,7 +118,15 @@ for (const target of ["world/characters/黄盖.md", "text/beat-0001.md", "notes.
 			await page.keyboard.press("Escape");
 			await eventually(() => focused(editor), "保存失败取消关闭回到草稿");
 			await mkdir("/tmp/suiming-external-files-qa", { recursive: true });
-			await page.screenshot({ path: `/tmp/suiming-external-files-qa/${target.split("/").at(-1)}.png` });
+			await page.screenshot({
+				animations: "disabled",
+				path: `/tmp/suiming-external-files-qa/${target.split("/").at(-1)}.png`,
+			});
+			await page.getByRole("button", { name: "文件已移除", exact: true }).click();
+			await page.screenshot({
+				animations: "disabled",
+				path: `/tmp/suiming-external-files-qa/details-${target.split("/").at(-1)}.png`,
+			});
 			await page.getByRole("button", { name: "恢复到原路径", exact: true }).click();
 			await eventually(
 				async () =>
@@ -154,7 +165,7 @@ for (const [originalPath, renamedPath] of [
 			const oldTab = await page.locator('.tab-btn[data-active="true"]').getAttribute("data-tab-id");
 			const original = await readFile(join(root, originalPath), "utf8");
 			await rename(join(root, originalPath), join(root, renamedPath));
-			await page.getByText("文件已被删除或移动", { exact: true }).waitFor();
+			await page.getByRole("button", { name: "文件已移除", exact: true }).waitFor();
 			await page.keyboard.press("Meta+t");
 			await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).fill(renamedPath);
 			await page.keyboard.press("Enter");
@@ -164,32 +175,41 @@ for (const [originalPath, renamedPath] of [
 			await eventually(() => focused(editor), "返回旧路径聚焦");
 			assert.equal(await editorText(editor), draft);
 			await page.reload();
-			await page.getByText("文件已被删除或移动", { exact: true }).waitFor();
+			await page.getByRole("button", { name: "文件已移除", exact: true }).waitFor();
 			await editor.waitFor();
 			assert.equal(await editorText(editor), draft);
 			await assert.rejects(readFile(join(root, originalPath)), { code: "ENOENT" });
 			// 原路径被另一位写入者恢复时只更新冲突提示，不搬走草稿或抢走正在输入消息的焦点。
 			const composer = page.getByRole("textbox", { name: "输入消息", exact: true });
+			await page.getByRole("button", { name: "文件已移除", exact: true }).click();
+			await page.getByRole("dialog", { name: "文件已移除", exact: true }).waitFor();
+			await composer.click();
 			await composer.fill("尚未发送的消息");
+			assert.equal(await focused(composer), true, "点击对话关闭详情，不被拉回编辑器");
 			const external = `${original}\n外部新内容。`;
 			await writeFile(join(root, originalPath), external);
-			await page.getByText("文件在外部发生了修改", { exact: true }).waitFor();
+			await page.getByRole("button", { name: "外部修改冲突", exact: true }).waitFor();
 			assert.equal(await focused(composer), true);
 			await page.keyboard.insertText("仍在这里。");
 			assert.equal(await composer.inputValue(), "尚未发送的消息仍在这里。");
 			assert.equal(await page.getByRole("button", { name: "恢复到原路径", exact: true }).count(), 0);
-			await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
+			await editor.click();
+			await page.keyboard.press("Meta+s");
+			await page.getByRole("dialog", { name: "外部修改冲突", exact: true }).waitFor();
+			await page.keyboard.press("Escape");
 			assert.equal(await readFile(join(root, originalPath), "utf8"), external);
+			await page.getByRole("button", { name: "外部修改冲突", exact: true }).click();
 			await page.getByRole("button", { name: "比较外部修改", exact: true }).click();
 			await page.locator(".cm-merge-a .cm-content").filter({ hasText: "外部新内容" }).waitFor();
 			await page.locator(".cm-merge-b .cm-content").filter({ hasText: "旧路径未保存草稿" }).waitFor();
 			await page.locator(".cm-merge-b .cm-content").click();
 			await page.keyboard.press("Meta+a");
 			await page.keyboard.insertText(`${external}\n旧路径未保存草稿。`);
+			await page.getByRole("button", { name: "外部修改冲突", exact: true }).click();
 			await page.getByRole("button", { name: "以外部版本为合并基线", exact: true }).click();
 			await page.getByText("外部版本已设为基线；编辑内容仍保留，请完成合并后保存。", { exact: true }).waitFor();
 			await page.getByRole("button", { name: "保存 ⌘S", exact: true }).click();
-			await page.getByText(originalPath === "notes.md" ? "已保存" : "已保存，尚未提交", { exact: true }).waitFor();
+			await page.getByText("已保存", { exact: true }).waitFor();
 			assert.equal(
 				await readFile(join(root, originalPath), "utf8"),
 				`${external}\n旧路径未保存草稿。`,
@@ -246,14 +266,14 @@ test("未创建的正文：首次草稿不误报外部删除，重载后可以�
 		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
 		await eventually(() => focused(editor), "首次正文可直接编辑");
 		await page.keyboard.insertText("首次写下的正文。");
-		await page.getByText("未保存", { exact: true }).waitFor();
+		await page.locator('.tab-btn[data-active="true"] [aria-label="未保存"]').waitFor();
 		assert.equal(await page.getByText("文件已被删除或移动", { exact: true }).count(), 0);
 		await page.reload();
 		await eventually(() => focused(editor), "新正文草稿重载后恢复焦点");
 		assert.equal(await editorText(editor), "首次写下的正文。");
 		assert.equal(await page.getByText("文件已被删除或移动", { exact: true }).count(), 0);
 		await page.keyboard.press("Meta+s");
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.equal(await readFile(join(root, "text/beat-0002.md"), "utf8"), "首次写下的正文。");
 		assert.deepEqual(errors, []);
 	} finally {
@@ -283,11 +303,82 @@ test("情节设计被移动：正文草稿不随页面对象消失，读编切�
 		await eventually(() => focused(editor), "重载保留正文目标");
 		assert.equal(await editorText(editor), draft);
 		await page.keyboard.press("Meta+s");
-		await page.getByText("已保存，尚未提交", { exact: true }).waitFor();
+		await page.getByText("已保存", { exact: true }).waitFor();
 		assert.equal(await readFile(join(root, "text/beat-0001.md"), "utf8"), draft);
 		await assert.rejects(readFile(join(root, design)), { code: "ENOENT" });
 		await writeFile(join(root, design), original);
 		await page.getByRole("radio", { name: "正文", exact: true }).waitFor();
+		assert.equal(await editorText(editor), draft);
+		assert.deepEqual(errors, []);
+	} finally {
+		await close();
+	}
+});
+
+test("文档外壳：正常编辑不增加工具行，窄窗操作与反馈不挤占内容", { timeout: 45000 }, async () => {
+	const { app, page, editor, errors, close } = await fixture();
+	try {
+		await page.getByRole("radio", { name: "正文", exact: true }).click();
+		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
+		await eventually(() => focused(editor), "进入编辑");
+		const toolbar = page.getByRole("toolbar", { name: "文档工具", exact: true });
+		const before = await page.locator(".cm-host").boundingBox();
+		await page.keyboard.insertText("未保存的修改。");
+		const save = page.getByRole("button", { name: "保存 ⌘S", exact: true });
+		await save.waitFor();
+		assert.equal(
+			await toolbar.getByRole("button", { name: "保存 ⌘S", exact: true }).count(),
+			1,
+			"保存必须在既有工具栏中",
+		);
+		const after = await page.locator(".cm-host").boundingBox();
+		assert.equal(after?.y, before?.y, "修改不推移编辑内容");
+		assert.equal(await page.getByText("未保存", { exact: true }).count(), 0, "只通过标签标记未保存");
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
+		await page.waitForFunction(() => innerWidth === 960);
+		await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+		assert.equal(await toolbar.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), true);
+		await save.click();
+		await page.getByText("已保存", { exact: true }).waitFor();
+		await eventually(() => focused(editor), "按钮保存后继续编辑");
+		assert.equal((await page.locator(".cm-host").boundingBox())?.y, before?.y, "保存反馈不挤占内容");
+		await mkdir("/tmp/suiming-document-shell-qa", { recursive: true });
+		await page.screenshot({ animations: "disabled", path: "/tmp/suiming-document-shell-qa/normal-narrow.png" });
+		await page.keyboard.insertText("继续修改。");
+		await page.getByRole("img", { name: "未保存", exact: true }).waitFor();
+		assert.equal(await page.getByText("已保存", { exact: true }).count(), 0, "继续输入后不残留已保存反馈");
+		assert.deepEqual(errors, []);
+	} finally {
+		await close();
+	}
+});
+
+test("文件状态详情：外部冲突解除后收起，再次冲突不自动展开", { timeout: 45000 }, async () => {
+	const { root, page, editor, errors, close } = await fixture();
+	try {
+		await page.keyboard.press("Meta+t");
+		await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).fill("notes.md");
+		await page.keyboard.press("Enter");
+		await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
+		await eventually(() => focused(editor), "开始编辑");
+		await page.keyboard.press("Meta+End");
+		await page.keyboard.insertText("作者草稿。");
+		const draft = await editorText(editor);
+		const path = join(root, "notes.md");
+		const original = await readFile(path, "utf8");
+		await writeFile(path, `${original}外部修改。`);
+		const trigger = page.getByRole("button", { name: "外部修改冲突", exact: true });
+		await trigger.click();
+		const details = page.getByRole("dialog", { name: "外部修改冲突", exact: true });
+		await details.waitFor();
+		await writeFile(path, original);
+		await details.waitFor({ state: "hidden" });
+		await trigger.waitFor({ state: "hidden" });
+		await editor.click();
+		await writeFile(path, `${original}另一次外部修改。`);
+		await trigger.waitFor();
+		assert.equal(await details.count(), 0, "新的后台冲突只显示状态入口");
+		assert.equal(await focused(editor), true);
 		assert.equal(await editorText(editor), draft);
 		assert.deepEqual(errors, []);
 	} finally {
