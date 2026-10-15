@@ -25,7 +25,7 @@ export function sessionProblem(session: SessionSummary) {
 		model_provider_disabled: { title: "提供商已停用", hint: "在设置中启用此提供商，或选择其他模型。已有凭据保留。" },
 		model_credentials_missing: { title: "提供商连接不可用", hint: "从输入框的模型菜单打开设置，重新连接提供商。" },
 		model_not_found: { title: "当前模型不可用", hint: "从输入框的模型菜单选择可用模型后继续。" },
-		model_call_failed: { title: "模型调用失败", hint: "查看原因；再发一条消息即可重试。" },
+		model_call_failed: { title: "模型调用失败", hint: "查看原因并处理后，再发一条消息继续。" },
 	};
 	return {
 		...(known[code] ?? { title: "这一轮没有正常结束", hint: "查看原因后继续，已保存的结果与提交都会保留。" }),

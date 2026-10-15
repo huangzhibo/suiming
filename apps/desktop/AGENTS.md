@@ -18,6 +18,7 @@
 ## 桌面 E2E
 
 - **启动一律经 `apps/desktop/test/launch.ts` 的 `launchDesktop`。**它把 `SUIMING_CONFIG_PATH` / `SUIMING_AUTH_PATH` 指到这次测试的临时目录，去掉开发 shell 里的 `SUIMING_*`、各家 API key 与 Langfuse / OTel 变量：2026-10-04 之前只有设置页这样做，其余用例读的是维护者本机的 `~/.suiming`，结果随本机配置变。渲染层报错用 `collectPageErrors` 收、结尾断言为空；断言「提示没出现」用 `assertNoTooltip`（等一会儿再数会在 Tooltip 的 400ms 延迟下空过）；等主进程状态用 `eventually` / `waitForSessionIdle`——**`page.waitForFunction` 不 await 异步谓词**，返回的 Promise 是真值，立刻放行，模型选择测试里两处等待因此一直是空等。
+- 测试入口经 esbuild 打包相对路径的测试 helper，第三方包与 `../dist/main.js` 保持 external（见 `npm run test:desktop`）。把产品 main 一起打包会改变它的 `import.meta.url`，使 preload / renderer 定位失效；不打包测试 helper 又会让 Electron 找不到仅有 TypeScript 源码的 fixture。
 - **失败先查是不是测试没跟上产品，不要默认记成「环境问题」。**2026-09-11 的 `de3ee55` 让模型选择器只列已配置且启用的提供商、把「尚未连接」改成「未配置凭据」，「设置页」E2E 却还要在无凭据环境里先选一个 DeepSeek 模型——之后每次整套跑都失败，被记成「缺凭据、开发 shell 的环境变量漏进来」记了两周多。判别办法：单跑同一条，看失败点是断言文本 / 流程还是时序；稳定失败就是测试或产品真的不对。
 - **选元素用语义属性（`data-beat`、`data-volume`、`data-axis-band` 这类），不要按样式值。**故事轴 E2E 曾用 `rect[fill="#fafafa"]` 找背景带，2026-09-16 开 `no-raw-colors` 把它换成 `var(--muted)` 后这条 E2E 就一直超时，而那次提交只跑了 check 与单测。改颜色、类名、尺寸这类样式后要跑 `npm run test:desktop`。
 - **缩窗或 reload 之后不要立刻 `count()`。**「提示」用例曾在 `setSize` 到 960×640 后立刻数左栏按钮，拿到的是回流前的快照，负载高时两种导航形态都数不到、或数到缩窗前的旧按钮；「先等三个入口之一出现再分支」也不够，旧布局同样满足那个等待。要先等渲染进程看到新宽度、再等两帧让 ResizeObserver 与重渲染落地，然后才分支（2026-10-02，「分栏调宽」那条同形）。

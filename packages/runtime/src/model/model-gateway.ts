@@ -186,6 +186,12 @@ function tracedStream(
 ): AssistantMessageEventStream {
 	const outer = createAssistantMessageEventStream();
 	let terminal: AssistantMessageEvent | undefined;
+	// pi-ai 的 stream 已把认证异常转为标准 error 事件，只剩 message；限定其刷新错误前缀，
+	// 保留原原因供诊断与瞬时重试判断，不把网络失败一概说成账号失效，也不另做刷新。
+	const authFailureMessage = (message: string): string =>
+		message.startsWith(`OAuth refresh failed for ${snapshot.provider}:`)
+			? `${snapshot.provider} 授权刷新失败。请先检查网络；若授权已失效，请到设置的「提供商」中重新登录，再回到原对话继续。原因：${message}`
+			: message;
 	const syntheticError = (message: string): AssistantMessageEvent => ({
 		type: "error",
 		reason: "error",
@@ -204,7 +210,7 @@ function tracedStream(
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 			},
 			stopReason: "error",
-			errorMessage: message,
+			errorMessage: authFailureMessage(message),
 			timestamp: Date.now(),
 		},
 	});
@@ -221,7 +227,16 @@ function tracedStream(
 					span.setAttributes({ "langfuse.observation.completion_start_time": new Date().toISOString() });
 				}
 				if (event.type === "done" || event.type === "error") {
-					terminal = event;
+					terminal =
+						event.type === "error" && event.error.errorMessage
+							? {
+									...event,
+									error: {
+										...event.error,
+										errorMessage: authFailureMessage(event.error.errorMessage),
+									},
+								}
+							: event;
 					break;
 				}
 				outer.push(event);

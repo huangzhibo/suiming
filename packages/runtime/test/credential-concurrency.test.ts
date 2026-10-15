@@ -87,7 +87,7 @@ test("刷新进行中断开账号：断开排在刷新之后，刷新写回的�
 	}
 });
 
-test("两个进程同时发现 token 快到期时只刷新一次：OpenAI 的 refresh token 用过一次就作废", async () => {
+test("两个存储实例同时发现 token 快到期时只刷新一次：OpenAI 的 refresh token 用过一次就作废", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-auth-refresh-once-"));
 	try {
 		const path = join(root, "auth.json");

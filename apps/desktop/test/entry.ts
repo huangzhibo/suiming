@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { JsonFileCredentialStore, LocalModelSettings, loadModelRoutingConfig, ModelGateway } from "@suiming/runtime";
 import { app, type BrowserWindow, ipcMain, screen } from "electron";
+import { oauthFixture } from "../../../packages/runtime/test/oauth-fixture.js";
 import { startDesktop } from "../dist/main.js";
 
 /**
@@ -400,6 +401,14 @@ if (modelTest) {
 	await settings.save({ profile: "main", ...profile, thinking: "low" });
 	await settings.save({ profile: "reviewer", ...profile });
 	startDesktop({ settings, models: async () => new ModelGateway(models, (await loadModelRoutingConfig()).config) });
+} else if (process.argv.includes("--oauth-recovery-test")) {
+	const endpoint = process.env.SUIMING_TEST_OAUTH_ENDPOINT;
+	const auth = process.env.SUIMING_AUTH_PATH;
+	if (!endpoint || !auth) throw new Error("Missing isolated OAuth configuration");
+	const fixture = oauthFixture(auth, endpoint);
+	const settings = new LocalModelSettings({ models: fixture.models, credentials: fixture.credentials });
+	await settings.save({ profile: "main", provider: "isolated-oauth", model: "story" });
+	startDesktop({ settings, models: async () => fixture.gateway });
 } else if (process.argv.includes("--unconfigured-model-test")) startDesktop();
 else
 	startDesktop({
