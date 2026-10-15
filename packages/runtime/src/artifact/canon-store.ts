@@ -3,8 +3,7 @@ import type { ArtifactCandidate, ArtifactCandidateValidator, ChangeSet, ProjectR
 /**
  * Canon 存储：已提交的版本化 Story Artifact 的唯一权威（不变量 3）。
  *
- * 目前只有 git 实现（`GitCanonStore`）跑这套契约测试（`test/canon-store-contract.ts`）；Cloud 走自己的 store 接口与
- * 测试，给 Cloud 换存储时先让它满足这个接口（不变量 3，[ADR-0010](../../../../docs/adr/0010-git-as-canon-storage-engine.md)）。
+ * git 实现（`GitCanonStore`）通过契约测试（`test/canon-store-contract.ts`）；未来新增存储实现也必须通过同一契约。
  * 执行数据——Session / Task、事件、inbox、execution object——不在这个面上，它们留在 SQLite。
  * 审稿与 Source 笔记是普通 artifact，随 tree 走；正文时效、审稿时效这些派生状态由
  * `artifact/derived.ts` 用 `history` + `fileDigests` 算出来，不落在存储里。

@@ -54,7 +54,7 @@ Workspace 或 ProjectRevision 可以只包含部分 StoryText，也可以保留�
 
 时效与覆盖率不存文件，按需派生：审稿的主体（design 层是整套 Design，text 层是范围内正文及各 Beat 的 Design 闭包，source 层是该 Source 的材料与 extraction）在当前候选里的摘要与 `subjects` 一致就是 `current`；有主体变了、或审稿之后才成为主体的文件，就是 `stale` 并列出这些路径；Source 的覆盖率由笔记派生。这些派生值只能说明对象是否已经变化，不能证明模型理解正确，也不拥有作品接受权。写作过程中的探索性意见通常只留在运行 trace 里；不要增加 waiver、override、批准 DAG 或面向作者的 hash 工作流。
 
-本地的 Open Story Directory 是 git 仓库，历史随 clone / bundle 走；Open Story Package 是没有历史的快照，导入即一次提交，此后的时效从导入版本起算。本地数据库、临时 Context、cache 和 remote binding 进入 `.suiming/` 或被丢弃。
+本地的 Open Story Directory 是 git 仓库，历史随 clone / bundle 走；Open Story Package 是没有历史的快照，导入即一次提交，此后的时效从导入版本起算。本地执行数据库、对话与执行对象保存在 `.suiming/`，不进入作品包；完整备份必须连同它们和 `.git/` 一起保留。临时 Context 与 cache 属于可重建数据。
 
 ## Release
 

@@ -18,7 +18,7 @@ import type { ArtifactCandidate, ProjectRevision } from "./types.js";
 
 /**
  * 从版本历史派生的状态（[派生状态设计](../../../../docs/derived-evidence-design.md) 3.2）。
- * 这些函数只读 Canon 历史与当前候选，不落盘；Local（git）与 Cloud（PostgreSQL）实现同一个读取面。
+ * 这些函数只读 Canon 历史与当前候选，不落盘；通过 git 的历史读取面获取版本。
  */
 export interface RevisionHistoryReader {
 	/** 从创世到 head 的祖先链，最老的在前。 */

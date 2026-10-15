@@ -6,7 +6,6 @@ import { stripVTControlCharacters } from "node:util";
 import {
 	ArtifactError,
 	type CheckDiagnostic,
-	type CloudProjectStore,
 	checkDiagnostic,
 	checkStoryText,
 	checkSummary,
@@ -18,7 +17,6 @@ import {
 	inspectRelease,
 	inspectStorySourcesCandidate,
 	JsonFileCredentialStore,
-	LocalCloudSyncService,
 	type LocalProjectDiff,
 	LocalProjectService,
 	LocalSessionController,
@@ -123,21 +121,11 @@ export interface SuimCliIo {
 	resolveModelGateway?(options: { configPath?: string; authPath?: string }): Promise<ModelGateway>;
 	/** 观测后端；缺省按 LANGFUSE_* 环境变量决定，没有就 NOOP。测试注入自己的。 */
 	telemetry?: SuimingTelemetry;
-	cloudDefaults?(options: {
-		configPath?: string;
-	}): { endpoint?: string; actorId?: string } | Promise<{ endpoint?: string; actorId?: string }>;
-	resolveCloudProjectStore?(options: { endpoint: string; actorId: string }): Promise<CloudProjectStore>;
 }
 
 interface GlobalOptions {
 	json?: boolean;
 	project?: string;
-}
-
-interface CloudConnectionOptions {
-	endpoint?: string;
-	actor?: string;
-	config?: string;
 }
 
 interface CommandFailure {
@@ -494,58 +482,6 @@ async function modelGateway(io: SuimCliIo, options: { config?: string; auth?: st
 /** 每轮用量检查点从同一份 config.toml 读（`--config` 指定时读那份），每个 turn 开始读一次。 */
 function usageCheckpoint(options: { config?: string }): () => Promise<number> {
 	return () => loadUsageCheckpoint(options.config === undefined ? {} : { configPath: resolve(options.config) });
-}
-
-function cliConfigurationError(code: string, message: string): Error & { code: string } {
-	return Object.assign(new Error(message), { name: "SuimCliConfigurationError", code });
-}
-
-async function cloudConnection(
-	io: SuimCliIo,
-	options: CloudConnectionOptions,
-	boundEndpoint?: string,
-): Promise<{ endpoint: string; actorId: string; store: CloudProjectStore }> {
-	const defaults =
-		(await io.cloudDefaults?.({
-			...(options.config === undefined ? {} : { configPath: resolve(options.config) }),
-		})) ?? {};
-	const endpoint = options.endpoint?.trim() || boundEndpoint?.trim() || defaults.endpoint?.trim();
-	if (endpoint === undefined || endpoint.length === 0) {
-		throw cliConfigurationError(
-			"cloud_endpoint_missing",
-			"必须通过 --endpoint、本地 remote binding、SUIMING_CLOUD_ENDPOINT 或 ~/.suiming/config.toml 指定 Cloud endpoint",
-		);
-	}
-	const actorId = options.actor?.trim() || defaults.actorId?.trim();
-	if (actorId === undefined || actorId.length === 0) {
-		throw cliConfigurationError(
-			"cloud_actor_missing",
-			"必须通过 --actor、SUIMING_CLOUD_ACTOR_ID 或 ~/.suiming/config.toml 指定 Cloud actor id",
-		);
-	}
-	if (io.resolveCloudProjectStore === undefined) {
-		throw cliConfigurationError("cloud_transport_unavailable", "这个 suim 构建没有带 Cloud transport");
-	}
-	return { endpoint, actorId, store: await io.resolveCloudProjectStore({ endpoint, actorId }) };
-}
-
-async function withCloudSync<T>(
-	io: SuimCliIo,
-	path: string,
-	options: CloudConnectionOptions,
-	operation: (service: LocalCloudSyncService) => Promise<T> | T,
-): Promise<T> {
-	return withProject(path, async (local) => {
-		const connection = await cloudConnection(io, options, local.remoteBinding()?.endpoint);
-		return operation(
-			new LocalCloudSyncService({
-				local,
-				cloud: connection.store,
-				endpoint: connection.endpoint,
-				actorId: connection.actorId,
-			}),
-		);
-	});
 }
 
 async function withProject<T>(path: string, operation: (service: LocalProjectService) => Promise<T> | T): Promise<T> {
@@ -1250,148 +1186,6 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 				);
 			},
 		);
-
-	const cloud = program.command("cloud").description("与 Suiming Cloud 同步已提交的 revision");
-	cloud
-		.command("checkout")
-		.description("从某个已提交的 Cloud revision 建立 Local Project 的 checkout")
-		.argument("<cloud-project-id>")
-		.argument("<destination>")
-		.option("--endpoint <url>", "Cloud Domain API 地址")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.option("--revision <id>", "要 checkout 的 Cloud ProjectRevision")
-		.option("--local-project-id <id>", "显式指定 Local Project id")
-		.action(
-			async (
-				cloudProjectId: string,
-				destination: string,
-				options: CloudConnectionOptions & { revision?: string; localProjectId?: string },
-			) => {
-				await execute("cloud.checkout", async () => {
-					const connection = await cloudConnection(io, options);
-					const checkedOut = await LocalCloudSyncService.checkout({
-						cloud: connection.store,
-						endpoint: connection.endpoint,
-						actorId: connection.actorId,
-						cloudProjectId,
-						destinationPath: resolve(io.cwd(), destination),
-						...(options.revision === undefined ? {} : { cloudRevisionId: options.revision }),
-						...(options.localProjectId === undefined ? {} : { localProjectId: options.localProjectId }),
-					});
-					try {
-						return {
-							project: projectData(checkedOut.local),
-							binding: checkedOut.binding,
-							cloudRevision: revisionSummary(checkedOut.cloudRevision),
-						};
-					} finally {
-						checkedOut.local.close();
-					}
-				});
-			},
-		);
-
-	cloud
-		.command("import")
-		.description("用本地已提交的 head 创建 Cloud Project 并绑定")
-		.argument("<cloud-project-id>")
-		.option("--endpoint <url>", "Cloud Domain API 地址")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.requiredOption("--idempotency-key <key>", "可安全重试请求的稳定 key")
-		.option("--allow-dirty", "忽略只在 checkout 里的修改，导入本地已提交的 head")
-		.action(
-			async (
-				cloudProjectId: string,
-				options: CloudConnectionOptions & { idempotencyKey: string; allowDirty?: boolean },
-			) => {
-				await execute("cloud.import", () =>
-					withCloudSync(io, projectPath(program), options, async (service) => {
-						const imported = await service.import({
-							cloudProjectId,
-							idempotencyKey: options.idempotencyKey,
-							...(options.allowDirty === true ? { allowDirtyCheckout: true } : {}),
-						});
-						return { binding: imported.binding, revision: revisionSummary(imported.revision) };
-					}),
-				);
-			},
-		);
-
-	cloud
-		.command("link")
-		.description("绑定内容相同的本地与 Cloud 已提交 revision")
-		.argument("<cloud-project-id>")
-		.option("--endpoint <url>", "Cloud Domain API 地址")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.option("--revision <id>", "要绑定的 Cloud ProjectRevision")
-		.action(async (cloudProjectId: string, options: CloudConnectionOptions & { revision?: string }) => {
-			await execute("cloud.link", () =>
-				withCloudSync(io, projectPath(program), options, async (service) => ({
-					binding: await service.link({
-						cloudProjectId,
-						...(options.revision === undefined ? {} : { cloudRevisionId: options.revision }),
-					}),
-				})),
-			);
-		});
-
-	cloud
-		.command("status")
-		.description("比较本地与 Cloud 的已提交 head")
-		.option("--endpoint <url>", "覆盖已绑定的 Cloud endpoint")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.action(async (options: CloudConnectionOptions) => {
-			await execute("cloud.status", () =>
-				withCloudSync(io, projectPath(program), options, (service) => service.status()),
-			);
-		});
-
-	cloud
-		.command("push")
-		.description("推送本地已提交的 revision，并合并互不重叠的 Cloud 改动")
-		.option("--endpoint <url>", "覆盖已绑定的 Cloud endpoint")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.requiredOption("--idempotency-key <key>", "可安全重试请求的稳定 key")
-		.option("--allow-dirty", "忽略只在 checkout 里的修改，推送本地已提交的 head")
-		.action(async (options: CloudConnectionOptions & { idempotencyKey: string; allowDirty?: boolean }) => {
-			await execute("cloud.push", () =>
-				withCloudSync(io, projectPath(program), options, (service) =>
-					service.push({
-						idempotencyKey: options.idempotencyKey,
-						...(options.allowDirty === true ? { allowDirtyCheckout: true } : {}),
-					}),
-				),
-			);
-		});
-
-	cloud
-		.command("pull")
-		.description("把 Cloud 的已提交改动拉进干净的本地 checkout")
-		.option("--endpoint <url>", "覆盖已绑定的 Cloud endpoint")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.action(async (options: CloudConnectionOptions) => {
-			await execute("cloud.pull", () =>
-				withCloudSync(io, projectPath(program), options, (service) => service.pull()),
-			);
-		});
-
-	cloud
-		.command("unlink")
-		.description("解除本地的 remote binding，两边的 Project 都不删除")
-		.option("--endpoint <url>", "覆盖已绑定的 Cloud endpoint")
-		.option("--actor <id>", "已认证的 Cloud actor id")
-		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
-		.action(async (options: CloudConnectionOptions) => {
-			await execute("cloud.unlink", () =>
-				withCloudSync(io, projectPath(program), options, (service) => ({ binding: service.unlink() })),
-			);
-		});
 
 	try {
 		await program.parseAsync([...argv], { from: "user" });

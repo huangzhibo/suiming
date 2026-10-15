@@ -19,9 +19,6 @@ import {
 	readOpenStoryDirectory,
 } from "@suiming/runtime";
 import {
-	SuimCliCloudCheckoutDataSchema,
-	SuimCliCloudStatusDataSchema,
-	SuimCliCloudSyncDataSchema,
 	SuimCliContextCompileDataSchema,
 	SuimCliDesignImpactDataSchema,
 	SuimCliDiffDataSchema,
@@ -43,10 +40,9 @@ import {
 import { parse } from "smol-toml";
 import type { Static } from "typebox";
 import { Value } from "typebox/value";
-import { InMemoryCloudProjectStore } from "../../../packages/runtime/test/in-memory-cloud.js";
 import { runSuimCli, SUIM_CLI_EXIT } from "../src/cli.js";
 import { HOST_IDS, installHost } from "../src/host-install.js";
-import { type CloudHarness, fixture, harness, jsonCommand, replyGateway, response } from "./cli-harness.js";
+import { fixture, harness, jsonCommand, replyGateway, response } from "./cli-harness.js";
 
 function designRunGateway(
 	content = "---\nstyle_refs: [style_contemporary_restraint]\n---\n主角不能靠巧合取胜，揭示必须带来不可恢复且当场可见的代价。\n",
@@ -467,126 +463,6 @@ test("session send --events 在最终响应之前逐行输出 SessionEvent 信�
 		);
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
-	}
-});
-
-test("Cloud CLI 只同步 committed revision，并贯通 import、link、push、checkout、pull 与 unlink", async () => {
-	const primaryPath = await fixture();
-	const peerPath = await fixture();
-	const checkoutRoot = await mkdtemp(join(tmpdir(), "suiming-cloud-checkout-"));
-	const checkoutPath = join(checkoutRoot, "story");
-	const cloud: CloudHarness = {
-		store: new InMemoryCloudProjectStore(),
-		endpoint: "https://cloud.example.test/api",
-		actorId: "author-1",
-	};
-	try {
-		assert.equal((await jsonCommand(primaryPath, ["init", primaryPath])).exitCode, SUIM_CLI_EXIT.success);
-		const imported = await jsonCommand(
-			primaryPath,
-			[
-				"cloud",
-				"import",
-				"cloud-story",
-				"--endpoint",
-				cloud.endpoint,
-				"--actor",
-				cloud.actorId,
-				"--idempotency-key",
-				"import-1",
-			],
-			undefined,
-			cloud,
-		);
-		assert.equal(imported.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(imported.value));
-		assert.equal(imported.value.command, "cloud.import");
-		assert.equal(Value.Check(SuimCliSuccessSchema, imported.value), true);
-
-		const initialStatus = await jsonCommand(
-			primaryPath,
-			["cloud", "status", "--actor", cloud.actorId],
-			undefined,
-			cloud,
-		);
-		assert.equal(initialStatus.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(initialStatus.value));
-		assert.equal(Value.Check(SuimCliCloudStatusDataSchema, initialStatus.value.data), true);
-		assert.equal((initialStatus.value.data as { state: string }).state, "in_sync");
-
-		assert.equal((await jsonCommand(peerPath, ["init", peerPath])).exitCode, SUIM_CLI_EXIT.success);
-		const linked = await jsonCommand(
-			peerPath,
-			["cloud", "link", "cloud-story", "--endpoint", cloud.endpoint, "--actor", cloud.actorId],
-			undefined,
-			cloud,
-		);
-		assert.equal(linked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(linked.value));
-		assert.equal(linked.value.command, "cloud.link");
-		const peerUnlinked = await jsonCommand(peerPath, ["cloud", "unlink", "--actor", cloud.actorId], undefined, cloud);
-		assert.equal(peerUnlinked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(peerUnlinked.value));
-
-		const intentPath = join(primaryPath, "intent", "计谋的代价.md");
-		await writeFile(intentPath, `${await readFile(intentPath, "utf8")}\n本地追加约束。\n`);
-		assert.equal((await jsonCommand(primaryPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
-		const pushed = await jsonCommand(
-			primaryPath,
-			["cloud", "push", "--actor", cloud.actorId, "--idempotency-key", "push-1"],
-			undefined,
-			cloud,
-		);
-		assert.equal(pushed.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(pushed.value));
-		assert.equal(Value.Check(SuimCliCloudSyncDataSchema, pushed.value.data), true, JSON.stringify(pushed.value.data));
-		assert.equal((pushed.value.data as { before: { state: string } }).before.state, "local_ahead");
-
-		const checkedOut = await jsonCommand(
-			primaryPath,
-			["cloud", "checkout", "cloud-story", checkoutPath, "--endpoint", cloud.endpoint, "--actor", cloud.actorId],
-			undefined,
-			cloud,
-		);
-		assert.equal(checkedOut.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(checkedOut.value));
-		assert.equal(
-			Value.Check(SuimCliCloudCheckoutDataSchema, checkedOut.value.data),
-			true,
-			JSON.stringify(checkedOut.value.data),
-		);
-
-		const characterPath = join(checkoutPath, "world", "characters", "黄盖.md");
-		await writeFile(characterPath, `${await readFile(characterPath, "utf8")}\nCloud checkout 追加事实。\n`);
-		assert.equal((await jsonCommand(checkoutPath, ["commit"])).exitCode, SUIM_CLI_EXIT.success);
-		const checkoutPush = await jsonCommand(
-			checkoutPath,
-			["cloud", "push", "--actor", cloud.actorId, "--idempotency-key", "push-2"],
-			undefined,
-			cloud,
-		);
-		assert.equal(checkoutPush.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(checkoutPush.value));
-
-		const cloudAhead = await jsonCommand(
-			primaryPath,
-			["cloud", "status", "--actor", cloud.actorId],
-			undefined,
-			cloud,
-		);
-		assert.equal((cloudAhead.value.data as { state: string }).state, "cloud_ahead");
-		const pulled = await jsonCommand(primaryPath, ["cloud", "pull", "--actor", cloud.actorId], undefined, cloud);
-		assert.equal(pulled.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(pulled.value));
-		assert.equal(Value.Check(SuimCliCloudSyncDataSchema, pulled.value.data), true);
-		assert.match(await readFile(join(primaryPath, "world", "characters", "黄盖.md"), "utf8"), /Cloud checkout/u);
-
-		const unlinked = await jsonCommand(primaryPath, ["cloud", "unlink", "--actor", cloud.actorId], undefined, cloud);
-		assert.equal(unlinked.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(unlinked.value));
-		const statusAfterUnlink = await jsonCommand(
-			primaryPath,
-			["cloud", "status", "--actor", cloud.actorId],
-			undefined,
-			cloud,
-		);
-		assert.equal(statusAfterUnlink.exitCode, SUIM_CLI_EXIT.notFound);
-		assert.equal((statusAfterUnlink.value.error as { code: string }).code, "cloud_sync_not_linked");
-	} finally {
-		await rm(primaryPath, { recursive: true, force: true });
-		await rm(peerPath, { recursive: true, force: true });
-		await rm(checkoutRoot, { recursive: true, force: true });
 	}
 });
 

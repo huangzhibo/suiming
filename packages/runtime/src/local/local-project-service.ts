@@ -60,7 +60,7 @@ const EXECUTION_OBJECT_COLLECTION_GRACE_MS = 60 * 60 * 1000;
 
 import { sha256Buffer } from "@suiming/story";
 import { GitCanonStore } from "../artifact/git-canon-store.js";
-import type { ExecutionObjectCollection, LocalExecutionObject, LocalRemoteBinding } from "./sqlite-local-store.js";
+import type { ExecutionObjectCollection, LocalExecutionObject } from "./sqlite-local-store.js";
 import { type LocalProjectRecord, SqliteLocalStore, type SqliteLocalStoreOptions } from "./sqlite-local-store.js";
 
 /** 作品在本地的当前样子：登记信息来自 SQLite，`headRevisionId` 只来自作品仓的 canon ref。 */
@@ -356,21 +356,6 @@ export class LocalProjectService {
 		return this.#head;
 	}
 
-	remoteBinding(): LocalRemoteBinding | undefined {
-		this.#requireOpen();
-		return this.#store.remoteBinding(this.projectId);
-	}
-
-	setRemoteBinding(binding: Omit<LocalRemoteBinding, "projectId" | "updatedAt">): LocalRemoteBinding {
-		this.#requireOpen();
-		return this.#store.setRemoteBinding({ projectId: this.projectId, ...binding });
-	}
-
-	clearRemoteBinding(): LocalRemoteBinding | undefined {
-		this.#requireOpen();
-		return this.#store.clearRemoteBinding(this.projectId);
-	}
-
 	/** checkout 相对 head 的差异；`suim status` 与 `suim diff` 是同一份数据的两种用法。 */
 	async status(): Promise<LocalProjectDiff> {
 		return (await this.#buildCheckoutCandidate()).diff;
@@ -395,7 +380,7 @@ export class LocalProjectService {
 
 	/**
 	 * 作者、host agent 与 Agent 共用的提交路径：扫 checkout diff → Checker → 推进 canon ref → 同步 checkout。
-	 * 系统生成的 ChangeSet（导入原作、发布、Cloud pull）走 `commitManagedChangeSet`，要求 checkout 干净。带 `command` 时
+	 * 系统生成的 ChangeSet（导入原作、发布）走 `commitManagedChangeSet`，要求 checkout 干净。带 `command` 时
 	 * 额外写一条回执，动作结果没存上就被打断时，续跑用 `committedRevision` 查它，告诉模型这次提交其实成了。
 	 */
 	async commitCheckout(command?: ProjectCommitCommand): Promise<LocalProjectCommitResult> {
@@ -466,7 +451,7 @@ export class LocalProjectService {
 
 	/**
 	 * 恢复一个历史快照，但不倒拨 head：目标内容会形成当前 head 的新子 revision。
-	 * 这样 session 基线、历史和 remote binding 都保持单调可审计。
+	 * 这样 session 基线和历史 都保持单调可审计。
 	 */
 	async rollbackRevision(targetRevisionId: string): Promise<LocalProjectRollbackResult> {
 		this.#requireOpen();

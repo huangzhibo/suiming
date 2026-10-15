@@ -7,7 +7,7 @@
 ## 制品形态
 
 - **Story Artifact** 是按 Story Language identity 独立寻址的一份作品内容，例如 Intent、StoryBeat、Character、StoryText 或 Source material。
-- **Open Story Directory** 是 Story Artifact 的标准可编辑目录表示；本地创建、repository-native project 和 Cloud checkout 都使用它。本地的 Open Story Directory 同时是一个 git 仓库，版本历史随它走。
+- **Open Story Directory** 是 Story Artifact 的标准可编辑目录表示；本地创建与 repository-native project 都使用它。本地的 Open Story Directory 同时是一个 git 仓库，版本历史随它走。
 - **Open Story Package** 是某个明确 ProjectRevision 的封闭、可验证快照，与 Open Story Directory 使用同一逻辑路径空间；它可以表现为目录、归档或上传流。
 - **repository-native project** 是 Open Story Directory 加可选 Git、AGENTS.md、Skills、说明文档等仓库辅助文件。repository-native 是继续支持的作品形态，不等于旧 `suiming-story` Runtime。
 

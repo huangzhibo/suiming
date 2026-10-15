@@ -44,13 +44,6 @@ export const SUIM_CLI_COMMANDS = [
 	"session.show",
 	"session.events",
 	"rank",
-	"cloud.checkout",
-	"cloud.import",
-	"cloud.link",
-	"cloud.status",
-	"cloud.push",
-	"cloud.pull",
-	"cloud.unlink",
 ] as const;
 
 export type SuimCliCommand = (typeof SUIM_CLI_COMMANDS)[number];
@@ -214,101 +207,6 @@ export const SuimCliHistoryDataSchema = Type.Object(
 		projectId: Type.String({ minLength: 1 }),
 		headRevisionId: Type.String({ minLength: 1 }),
 		revisions: Type.Array(revisionSchema),
-	},
-	{ additionalProperties: false },
-);
-
-const cloudBindingSchema = Type.Object(
-	{
-		projectId: Type.String({ minLength: 1 }),
-		endpoint: Type.String({ minLength: 1 }),
-		cloudProjectId: Type.String({ minLength: 1 }),
-		lastSyncedCloudRevisionId: Type.String({ minLength: 1 }),
-		lastSyncedLocalRevisionId: Type.String({ minLength: 1 }),
-		lastSyncedContentFingerprint: Type.String({ pattern: "^sha256:[a-f0-9]{64}$" }),
-		updatedAt: Type.String({ minLength: 1 }),
-	},
-	{ additionalProperties: false },
-);
-
-const cloudSyncFileStateSchema = Type.Object(
-	{
-		path: Type.String({ minLength: 1 }),
-		mediaType: Type.String({ minLength: 1 }),
-		contentSha256: Type.String({ pattern: "^[a-f0-9]{64}$" }),
-		byteLength: Type.Integer({ minimum: 0 }),
-	},
-	{ additionalProperties: false },
-);
-
-const cloudSyncDeltaSchema = Type.Object(
-	{
-		key: Type.String({ minLength: 1 }),
-		kind: Type.Literal("story"),
-		change: Type.Union([Type.Literal("added"), Type.Literal("modified"), Type.Literal("deleted")]),
-		before: Type.Optional(cloudSyncFileStateSchema),
-		after: Type.Optional(cloudSyncFileStateSchema),
-	},
-	{ additionalProperties: false },
-);
-
-const cloudSyncConflictSchema = Type.Object(
-	{
-		key: Type.String({ minLength: 1 }),
-		kind: Type.Literal("story"),
-		description: Type.String({ minLength: 1 }),
-		base: Type.Optional(cloudSyncFileStateSchema),
-		local: Type.Optional(cloudSyncFileStateSchema),
-		cloud: Type.Optional(cloudSyncFileStateSchema),
-	},
-	{ additionalProperties: false },
-);
-
-export const SuimCliCloudStatusDataSchema = Type.Object(
-	{
-		state: Type.Union([
-			Type.Literal("in_sync"),
-			Type.Literal("local_ahead"),
-			Type.Literal("cloud_ahead"),
-			Type.Literal("diverged_mergeable"),
-			Type.Literal("conflict"),
-		]),
-		dirtyCheckout: Type.Boolean(),
-		binding: cloudBindingSchema,
-		localHeadRevisionId: Type.String({ minLength: 1 }),
-		cloudHeadRevisionId: Type.String({ minLength: 1 }),
-		localChanges: Type.Array(cloudSyncDeltaSchema),
-		cloudChanges: Type.Array(cloudSyncDeltaSchema),
-		conflicts: Type.Array(cloudSyncConflictSchema),
-	},
-	{ additionalProperties: false },
-);
-
-export const SuimCliCloudCheckoutDataSchema = Type.Object(
-	{
-		project: SuimCliProjectDataSchema,
-		binding: cloudBindingSchema,
-		cloudRevision: revisionSchema,
-	},
-	{ additionalProperties: false },
-);
-
-export const SuimCliCloudImportDataSchema = Type.Object(
-	{ binding: cloudBindingSchema, revision: revisionSchema },
-	{ additionalProperties: false },
-);
-
-export const SuimCliCloudBindingDataSchema = Type.Object(
-	{ binding: cloudBindingSchema },
-	{ additionalProperties: false },
-);
-
-export const SuimCliCloudSyncDataSchema = Type.Object(
-	{
-		before: SuimCliCloudStatusDataSchema,
-		after: SuimCliCloudStatusDataSchema,
-		localRevisionCreated: Type.Boolean(),
-		cloudRevisionCreated: Type.Boolean(),
 	},
 	{ additionalProperties: false },
 );
@@ -756,7 +654,7 @@ export const SuimCliSessionShowDataSchema = Type.Object(
 
 /**
  * CLI 的命令目录：每条命令绑定自己的输出 schema。CLI 输出前按它校验，测试与 host 也按它读取。
- * 桌面 IPC（`LOCAL_COMMANDS`）与 Cloud Domain API（`DOMAIN_API_ROUTES`）各有一份，三份共用 domain-schema
+ * 桌面 IPC（`LOCAL_COMMANDS`）另有一份，两份共用 domain-schema
  * 里的领域对象；为什么不合成一份见系统架构第 8 节。
  */
 export const SUIM_CLI_COMMAND_DATA = {
@@ -788,13 +686,6 @@ export const SUIM_CLI_COMMAND_DATA = {
 	"session.show": SuimCliSessionShowDataSchema,
 	"session.events": SuimCliSessionEventsDataSchema,
 	rank: SuimCliRankDataSchema,
-	"cloud.checkout": SuimCliCloudCheckoutDataSchema,
-	"cloud.import": SuimCliCloudImportDataSchema,
-	"cloud.link": SuimCliCloudBindingDataSchema,
-	"cloud.status": SuimCliCloudStatusDataSchema,
-	"cloud.push": SuimCliCloudSyncDataSchema,
-	"cloud.pull": SuimCliCloudSyncDataSchema,
-	"cloud.unlink": SuimCliCloudBindingDataSchema,
 } as const satisfies Record<SuimCliCommand, TSchema>;
 
 /** 成功响应是按命令 discriminated 的联合：`data` 与 `command` 绑定，不再是一个松散的 schema 联合。 */

@@ -107,7 +107,7 @@ function bytesByPath(files: readonly OpenPackageFile[]): Map<string, string> {
 	return new Map(files.map((item) => [item.path, decoder.decode(item.bytes)]));
 }
 
-type DirectoryFixtureKind = "repository-native" | "export-directory" | "cloud-checkout";
+type DirectoryFixtureKind = "repository-native" | "export-directory" | "local-checkout";
 
 async function createDirectoryFixture(kind: DirectoryFixtureKind): Promise<string> {
 	const root = await mkdtemp(join(tmpdir(), `suiming-${kind}-`));
@@ -124,9 +124,9 @@ async function createDirectoryFixture(kind: DirectoryFixtureKind): Promise<strin
 		await writeFile(join(root, "AGENTS.md"), "# Repository instructions\n");
 		await writeFile(join(root, "intent", ".draft.swp"), "temporary");
 	}
-	if (kind === "cloud-checkout") {
+	if (kind === "local-checkout") {
 		await mkdir(join(root, ".suiming"), { recursive: true });
-		await writeFile(join(root, ".suiming", "remote.json"), '{"projectId":"cloud-project"}\n');
+		await writeFile(join(root, ".suiming", "workspace.json"), '{"projectId":"local-project"}\n');
 	}
 	return root;
 }
@@ -147,9 +147,9 @@ test("开放作品包导入导出保持未修改 artifact 的路径、media type
 	);
 });
 
-test("repository-native、export directory 与 Cloud checkout 共用目录 codec", async () => {
+test("repository-native、export directory 与本地 checkout 共用目录 codec", async () => {
 	const expected = designPackage();
-	for (const kind of ["repository-native", "export-directory", "cloud-checkout"] as const) {
+	for (const kind of ["repository-native", "export-directory", "local-checkout"] as const) {
 		const root = await createDirectoryFixture(kind);
 		try {
 			const scanned = await readOpenStoryDirectory(root);
@@ -185,7 +185,7 @@ test("repository-native、export directory 与 Cloud checkout 共用目录 codec
 					]),
 				);
 			}
-			if (kind === "cloud-checkout") {
+			if (kind === "local-checkout") {
 				assert.deepEqual(scanned.ignored, [{ path: ".suiming", kind: "private" }]);
 			}
 		} finally {
@@ -355,19 +355,6 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 	assert.equal(committed.parentId, base.id);
 	assert.notEqual(committed.id, base.id);
 	assert.equal(store.headRevisionId("project-1"), committed.id);
-	// version id 是内容寻址的：同样内容在任何 store 里都是同一个 id。
-	const other = new InMemoryArtifactStore();
-	const otherBase = importOpenPackage(
-		other,
-		"project-x",
-		designPackage(),
-		storyPackageCodec,
-		validateStoryProjectCandidate,
-	);
-	assert.deepEqual(
-		store.readRevisionArtifacts(base.id).map((artifact) => artifact.artifactVersionId),
-		other.readRevisionArtifacts(otherBase.id).map((artifact) => artifact.artifactVersionId),
-	);
 	assert.equal(
 		bytesByPath(exportOpenPackage(store, "project-1", base.id)).get("intent/计谋的代价.md"),
 		decoder.decode(currentIntent.bytes),

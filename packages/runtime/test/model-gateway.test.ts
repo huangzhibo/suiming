@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -7,7 +7,6 @@ import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-work
 import { InMemoryTelemetryContext } from "@earendil-works/pi-telemetry";
 import {
 	JsonFileCredentialStore,
-	loadCloudConnectionConfig,
 	loadModelRoutingConfig,
 	ModelGateway,
 	ModelGatewayError,
@@ -15,7 +14,7 @@ import {
 	type ModelRoutingConfig,
 } from "../src/index.js";
 
-test("用户 config.toml 与环境覆盖按固定优先级解析", async () => {
+test("旧配置含 cloud 段时模型仍按固定优先级解析，加载不改写配置", async () => {
 	const root = await mkdtemp(join(tmpdir(), "suiming-model-config-"));
 	const configPath = join(root, "config.toml");
 	try {
@@ -49,6 +48,7 @@ endpoint = "https://cloud.user.example/api"
 actor_id = "author-user"
 `,
 		);
+		const originalConfig = await readFile(configPath, "utf8");
 		const loaded = await loadModelRoutingConfig({
 			configPath,
 			environment: {
@@ -57,6 +57,7 @@ actor_id = "author-user"
 				SUIMING_SOURCE_READER_MODEL_ID: "environment-reader-model",
 			},
 		});
+		assert.equal(await readFile(configPath, "utf8"), originalConfig);
 		assert.deepEqual(loaded.config.profiles.main, {
 			provider: "user-provider",
 			model: "environment-model",
@@ -81,28 +82,6 @@ actor_id = "author-user"
 		assert.equal(loaded.diagnostic.profiles.reviewer.providerSource, "user-config");
 		assert.equal(loaded.diagnostic.profiles.reviewer.optionsSource, "environment");
 		assert.deepEqual(loaded.diagnostic.profiles.main.optionKeys, ["maxTokens", "reasoningEffort", "retry"]);
-	} finally {
-		await rm(root, { recursive: true, force: true });
-	}
-});
-
-test("Cloud connection 复用 ~/.suiming/config.toml，环境变量保持更高优先级", async () => {
-	const root = await mkdtemp(join(tmpdir(), "suiming-cloud-config-"));
-	const configPath = join(root, "config.toml");
-	try {
-		await writeFile(
-			configPath,
-			'version = 1\n[cloud]\nendpoint = "https://cloud.user.example/api"\nactor_id = "author-user"\n',
-		);
-		const loaded = await loadCloudConnectionConfig({
-			configPath,
-			environment: { SUIMING_CLOUD_ACTOR_ID: "author-environment" },
-		});
-		assert.deepEqual(loaded.config, {
-			endpoint: "https://cloud.user.example/api",
-			actorId: "author-environment",
-		});
-		assert.equal(loaded.diagnostic.configFile, "loaded");
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}

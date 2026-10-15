@@ -34,16 +34,6 @@ export interface LocalProjectRecord {
 	updatedAt: string;
 }
 
-export interface LocalRemoteBinding {
-	projectId: string;
-	endpoint: string;
-	cloudProjectId: string;
-	lastSyncedCloudRevisionId: string;
-	lastSyncedLocalRevisionId: string;
-	lastSyncedContentFingerprint: string;
-	updatedAt: string;
-}
-
 export interface LocalExecutionObject {
 	id: string;
 	mediaType: string;
@@ -97,14 +87,6 @@ function nonempty(value: string, label: string): string {
 	return normalized;
 }
 
-function contentFingerprint(value: string): string {
-	const normalized = value.trim();
-	if (!/^sha256:[a-f0-9]{64}$/u.test(normalized)) {
-		throw new ArtifactError("invalid_local_store_input", "remote.lastSyncedContentFingerprint is invalid");
-	}
-	return normalized;
-}
-
 function projectRecord(row: Record<string, unknown>): LocalProjectRecord {
 	return {
 		id: row.id as string,
@@ -124,7 +106,7 @@ function json<T>(value: string, label: string): T {
 
 /**
  * 本地执行存储：Session / Task、事件、inbox、命令回执与执行对象，
- * 外加「哪个目录是哪个 Project」和 Cloud 绑定。
+ * 外加「哪个目录是哪个 Project」的登记。
  *
  * **它不再持有 Canon。**已提交的版本化 Story Artifact 全部在作品目录的 git 仓里（`GitCanonStore`，
  * [ADR-0010](../../../../docs/adr/0010-git-as-canon-storage-engine.md)）。曾经的
@@ -462,60 +444,6 @@ export class SqliteLocalStore {
 					fingerprint: row.fingerprint,
 					result: json<unknown>(row.result_json, "execution_command_receipts"),
 				};
-	}
-
-	setRemoteBinding(binding: Omit<LocalRemoteBinding, "updatedAt">): LocalRemoteBinding {
-		this.project(binding.projectId);
-		const value: LocalRemoteBinding = {
-			projectId: binding.projectId,
-			endpoint: nonempty(binding.endpoint, "remote.endpoint"),
-			cloudProjectId: nonempty(binding.cloudProjectId, "remote.cloudProjectId"),
-			lastSyncedCloudRevisionId: nonempty(binding.lastSyncedCloudRevisionId, "remote.lastSyncedCloudRevisionId"),
-			lastSyncedLocalRevisionId: nonempty(binding.lastSyncedLocalRevisionId, "remote.lastSyncedLocalRevisionId"),
-			lastSyncedContentFingerprint: contentFingerprint(binding.lastSyncedContentFingerprint),
-			updatedAt: this.#timestamp(),
-		};
-		this.#database
-			.prepare(
-				"INSERT INTO remote_bindings (project_id, endpoint, cloud_project_id, last_synced_cloud_revision_id, last_synced_local_revision_id, last_synced_content_fingerprint, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET endpoint = excluded.endpoint, cloud_project_id = excluded.cloud_project_id, last_synced_cloud_revision_id = excluded.last_synced_cloud_revision_id, last_synced_local_revision_id = excluded.last_synced_local_revision_id, last_synced_content_fingerprint = excluded.last_synced_content_fingerprint, updated_at = excluded.updated_at",
-			)
-			.run(
-				value.projectId,
-				value.endpoint,
-				value.cloudProjectId,
-				value.lastSyncedCloudRevisionId,
-				value.lastSyncedLocalRevisionId,
-				value.lastSyncedContentFingerprint,
-				value.updatedAt,
-			);
-		return value;
-	}
-
-	remoteBinding(projectId: string): LocalRemoteBinding | undefined {
-		const row = this.#database
-			.prepare(
-				"SELECT project_id, endpoint, cloud_project_id, last_synced_cloud_revision_id, last_synced_local_revision_id, last_synced_content_fingerprint, updated_at FROM remote_bindings WHERE project_id = ?",
-			)
-			.get(projectId) as Record<string, unknown> | undefined;
-		return row === undefined
-			? undefined
-			: {
-					projectId: row.project_id as string,
-					endpoint: row.endpoint as string,
-					cloudProjectId: row.cloud_project_id as string,
-					lastSyncedCloudRevisionId: row.last_synced_cloud_revision_id as string,
-					lastSyncedLocalRevisionId: row.last_synced_local_revision_id as string,
-					lastSyncedContentFingerprint: contentFingerprint(row.last_synced_content_fingerprint as string),
-					updatedAt: row.updated_at as string,
-				};
-	}
-
-	clearRemoteBinding(projectId: string): LocalRemoteBinding | undefined {
-		this.project(projectId);
-		const previous = this.remoteBinding(projectId);
-		if (previous !== undefined)
-			this.#database.prepare("DELETE FROM remote_bindings WHERE project_id = ?").run(projectId);
-		return previous;
 	}
 
 	/**
@@ -875,15 +803,6 @@ export class SqliteLocalStore {
 				object_hash TEXT,
 				created_at TEXT NOT NULL,
 				CHECK ((inline_bytes IS NULL) <> (object_hash IS NULL))
-			) STRICT;
-			CREATE TABLE IF NOT EXISTS remote_bindings (
-				project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-				endpoint TEXT NOT NULL,
-				cloud_project_id TEXT NOT NULL,
-				last_synced_cloud_revision_id TEXT NOT NULL,
-				last_synced_local_revision_id TEXT NOT NULL,
-				last_synced_content_fingerprint TEXT NOT NULL,
-				updated_at TEXT NOT NULL
 			) STRICT;
 			CREATE TABLE IF NOT EXISTS sessions (
 				id TEXT PRIMARY KEY,

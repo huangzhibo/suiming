@@ -7,12 +7,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
-import {
-	type CloudProjectStore,
-	ModelGateway,
-	materializeOpenStoryDirectorySnapshot,
-	type OpenPackageFile,
-} from "@suiming/runtime";
+import { ModelGateway, materializeOpenStoryDirectorySnapshot, type OpenPackageFile } from "@suiming/runtime";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
 import { runSuimCli, type SuimCliIo } from "../src/cli.js";
 
@@ -21,12 +16,6 @@ export interface CliHarness {
 	stdout: string[];
 	stderr: string[];
 	interrupt(): void;
-}
-
-export interface CloudHarness {
-	store: CloudProjectStore;
-	endpoint: string;
-	actorId: string;
 }
 
 const encoder = new TextEncoder();
@@ -69,7 +58,7 @@ export function extractedSourceFiles(sourceId: string): OpenPackageFile[] {
 	];
 }
 
-export function harness(cwd: string, models?: ModelGateway, cloud?: CloudHarness): CliHarness {
+export function harness(cwd: string, models?: ModelGateway): CliHarness {
 	const stdout: string[] = [];
 	const stderr: string[] = [];
 	const interruptHandlers = new Set<() => void>();
@@ -88,12 +77,6 @@ export function harness(cwd: string, models?: ModelGateway, cloud?: CloudHarness
 				return () => interruptHandlers.delete(handler);
 			},
 			...(models === undefined ? {} : { resolveModelGateway: async () => models }),
-			...(cloud === undefined
-				? {}
-				: {
-						cloudDefaults: () => ({ endpoint: cloud.endpoint, actorId: cloud.actorId }),
-						resolveCloudProjectStore: async () => cloud.store,
-					}),
 		},
 	};
 }
@@ -109,8 +92,8 @@ export function response(output: readonly string[]): Record<string, unknown> {
 	return JSON.parse(output[0] as string) as Record<string, unknown>;
 }
 
-export async function jsonCommand(cwd: string, args: readonly string[], models?: ModelGateway, cloud?: CloudHarness) {
-	const cli = harness(cwd, models, cloud);
+export async function jsonCommand(cwd: string, args: readonly string[], models?: ModelGateway) {
+	const cli = harness(cwd, models);
 	const exitCode = await runSuimCli(["--json", ...args], cli.io);
 	return { cli, exitCode, value: response(cli.stdout) };
 }

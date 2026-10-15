@@ -12,11 +12,11 @@ import type {
 	ArtifactCandidate,
 	ArtifactCandidateValidator,
 	ArtifactContent,
+	ArtifactIdentity,
 	ArtifactVersion,
 	CandidateArtifact,
 	ChangeSet,
 	ProjectRevision,
-	RevisionArtifact,
 } from "./types.js";
 import { artifactVersionId } from "./version-storage.js";
 
@@ -36,8 +36,8 @@ function requireMediaType(mediaType: string): void {
 }
 
 /**
- * 进程内的 Artifact store：runtime session 在一个 ProjectRevision 上的工作集。
- * version id 与 SQLite / Cloud 一样是内容寻址（`av_` + mediaType 与内容 hash），
+ * 开放作品包导入导出的进程内 Artifact store，不承载本地 Canon 或 Session。
+ * version id 是内容寻址（`av_` + mediaType 与内容 hash），
  * 同样内容在任何 store 里都是同一个 version；revision id 没有独立序列，
  * 基线 revision 沿用部署 store 的 id，新 revision 用随机 id（ADR-0009 决定 4）。
  */
@@ -45,7 +45,7 @@ function requireMediaType(mediaType: string): void {
 interface StoredRevision {
 	id: string;
 	parentId: string | null;
-	artifacts: (RevisionArtifact & { path: string })[];
+	artifacts: { identity: ArtifactIdentity; artifactVersionId: string; path: string }[];
 }
 
 export class InMemoryArtifactStore {
@@ -100,14 +100,6 @@ export class InMemoryArtifactStore {
 	readRevision(revisionId: string): ProjectRevision {
 		const revision = this.#requireRevision(revisionId);
 		return { id: revision.id, parentId: revision.parentId };
-	}
-
-	/** 版本里的逐 artifact 清单。只有 Cloud 的 store 需要它（`readVersion` 的归属校验）。 */
-	readRevisionArtifacts(revisionId: string): RevisionArtifact[] {
-		return this.#requireRevision(revisionId).artifacts.map((artifact) => ({
-			identity: copyArtifactIdentity(artifact.identity),
-			artifactVersionId: artifact.artifactVersionId,
-		}));
 	}
 
 	readProjectRevision(projectId: string, revisionId: string): ProjectRevision {

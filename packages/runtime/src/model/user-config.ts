@@ -56,23 +56,7 @@ interface ParsedUserConfig {
 	version: number;
 	profiles: Partial<Record<ModelProfileId, ParsedProfile>>;
 	disabledProviders?: string[];
-	cloud?: { endpoint?: string; actorId?: string };
 	session?: { usageCheckpoint?: number };
-}
-
-export interface CloudConnectionConfig {
-	endpoint?: string;
-	actorId?: string;
-}
-
-export interface LoadCloudConnectionConfigOptions {
-	configPath?: string;
-	environment?: ModelEnvironment;
-}
-
-export interface LoadedCloudConnectionConfig {
-	config: CloudConnectionConfig;
-	diagnostic: { configPath: string; configFile: "loaded" | "missing" };
 }
 
 export type ModelConfigValueSource = "environment" | "user-config" | "main-default" | "default-empty";
@@ -146,7 +130,7 @@ function optionValue(value: unknown, label: string): ModelOptionValue {
 
 /**
  * ~/.suiming/config.toml：TOML 语法交给 smol-toml，这里只校验 Suiming 认识的形状。
- * 根只有 version、models、cloud、session；profile 只有 provider、model、thinking、options；未知表和键直接报错，不静默忽略。
+ * 根使用 version、models、session；旧 cloud 段只容忍存在、不解析；profile 只有 provider、model、thinking、options；未知表和键直接报错，不静默忽略。
  */
 export function parseModelRoutingToml(source: string): ParsedUserConfig {
 	let raw: unknown;
@@ -164,16 +148,6 @@ export function parseModelRoutingToml(source: string): ParsedUserConfig {
 		throw configError("config.toml must declare an integer version");
 	}
 	if (version !== 1) throw configError(`config.toml version must be 1, received ${version}`);
-
-	let cloud: ParsedUserConfig["cloud"];
-	if (root.cloud !== undefined) {
-		const table = requireTable(root.cloud, "cloud");
-		rejectUnknownKeys(table, ["endpoint", "actor_id"], "cloud");
-		cloud = {
-			...(table.endpoint === undefined ? {} : { endpoint: requireString(table.endpoint, "cloud.endpoint") }),
-			...(table.actor_id === undefined ? {} : { actorId: requireString(table.actor_id, "cloud.actor_id") }),
-		};
-	}
 
 	let session: ParsedUserConfig["session"];
 	if (root.session !== undefined) {
@@ -232,7 +206,6 @@ export function parseModelRoutingToml(source: string): ParsedUserConfig {
 		version,
 		profiles,
 		...(disabledProviders === undefined ? {} : { disabledProviders }),
-		...(cloud === undefined ? {} : { cloud }),
 		...(session === undefined ? {} : { session }),
 	};
 }
@@ -363,34 +336,6 @@ export async function loadModelRoutingConfig(
 			...(parsed.disabledProviders === undefined ? {} : { disabledProviders: parsed.disabledProviders }),
 		},
 		diagnostic: { configPath, configFile, profiles: diagnostics },
-	};
-}
-
-export async function loadCloudConnectionConfig(
-	options: LoadCloudConnectionConfigOptions = {},
-): Promise<LoadedCloudConnectionConfig> {
-	const environment = options.environment ?? process.env;
-	const environmentPath = optionalEnvironmentValue(environment, CONFIG_PATH_ENV);
-	const configPath = options.configPath ?? environmentPath ?? join(homedir(), ".suiming", "config.toml");
-	let parsed: ParsedUserConfig = { version: 1, profiles: {} };
-	let configFile: LoadedCloudConnectionConfig["diagnostic"]["configFile"] = "missing";
-	try {
-		parsed = parseModelRoutingToml(await readFile(configPath, "utf8"));
-		configFile = "loaded";
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-		if (options.configPath !== undefined || environmentPath !== undefined) {
-			throw new ModelGatewayError("cloud_config_not_found", `Suiming config file does not exist: ${configPath}`);
-		}
-	}
-	const endpoint = optionalEnvironmentValue(environment, "SUIMING_CLOUD_ENDPOINT") ?? parsed.cloud?.endpoint;
-	const actorId = optionalEnvironmentValue(environment, "SUIMING_CLOUD_ACTOR_ID") ?? parsed.cloud?.actorId;
-	return {
-		config: {
-			...(endpoint === undefined ? {} : { endpoint }),
-			...(actorId === undefined ? {} : { actorId }),
-		},
-		diagnostic: { configPath, configFile },
 	};
 }
 

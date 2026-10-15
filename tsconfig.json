@@ -1,13 +1,20 @@
 {
 	"files": [],
 	"references": [
-		{ "path": "packages/story" },
-		{ "path": "packages/sdk" },
-		{ "path": "packages/runtime" },
-		{ "path": "packages/cloud-s3" },
-		{ "path": "packages/cloud-postgres" },
-		{ "path": "apps/api" },
-		{ "path": "apps/cli" },
-		{ "path": "apps/desktop" }
+		{
+			"path": "packages/story"
+		},
+		{
+			"path": "packages/sdk"
+		},
+		{
+			"path": "packages/runtime"
+		},
+		{
+			"path": "apps/cli"
+		},
+		{
+			"path": "apps/desktop"
+		}
 	]
 }

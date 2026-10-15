@@ -9,7 +9,7 @@ import type { SessionEvent } from "./events.js";
  * Harness 对 Project 的全部依赖，`SuimingHarness` 只认这个端口。
  *
  * 「deployment-neutral Runtime」过去是一句不成立的声称：`SuimingHarnessOptions.project` 的类型是
- * 具体类 `LocalProjectService`，Cloud 接不进来的直接原因就是这个。端口只列 harness 真正调用的成员；
+ * 具体类 `LocalProjectService`，使执行与本地存储实现耦合。端口只列 harness 真正调用的成员；
  * 新增成员必须先有 harness 的调用点，不为「Cloud 以后可能要」预留。
  */
 export interface HarnessProjectPort {

@@ -4,8 +4,8 @@
  *
  * - `*_not_found` / `*_not_initialized` / `*_not_linked`：not_found
  * - `*_conflict` / `*_locked` / `*_lock_lost` / `*_already_*` / `*_stale` / `*_mismatch` / `*_busy` / `session_not_*` /
- *   `cloud_sync_*` / `*dirty_checkout`：conflict
- * - 凭据、认证、配置、endpoint、transport、migration、`domain_api_*`、模型调用失败：configuration
+ *   `*dirty_checkout`：conflict
+ * - 凭据、认证、配置、endpoint、transport、migration、模型调用失败：configuration
  * - `invalid_*` / `duplicate_*` / `unsupported_*` / `unexpected_*` / `unsafe_*` / `orphan_*` / `missing_*` /
  *   `*_check_failed` / `*_not_extracted` / `*_incomplete` / `*_cycle` / `*_missing`：validation
  * - `*_corrupt` / `*_integrity_error` / `*_store_error`：internal
@@ -35,8 +35,6 @@ const OVERRIDES: Readonly<Record<string, SuimErrorCategory>> = {
 	review_scope_unknown_beat: "validation",
 	review_exists: "conflict",
 	story_directory_not_empty: "conflict",
-	cloud_last_owner: "conflict",
-	cloud_no_changes: "conflict",
 	model_call_failed: "configuration",
 	model_provider_disabled: "configuration",
 	task_model_unavailable: "configuration",
@@ -46,9 +44,6 @@ const OVERRIDES: Readonly<Record<string, SuimErrorCategory>> = {
 	artifact_not_in_candidate: "not_found",
 	path_identity_mismatch: "validation",
 	model_config_not_found: "configuration",
-	cloud_config_not_found: "configuration",
-	cloud_access_denied: "configuration",
-	cloud_authentication_failed: "configuration",
 	permission_denied: "configuration",
 	local_project_closed: "internal",
 	invalid_cli_response: "internal",
@@ -58,13 +53,10 @@ const OVERRIDES: Readonly<Record<string, SuimErrorCategory>> = {
 const RULES: readonly [RegExp, SuimErrorCategory][] = [
 	[/(_not_found|_not_initialized|_not_linked)$/u, "not_found"],
 	[
-		/(^|_)conflict(_|$)|_locked$|_lock_lost$|_already_|_stale$|_mismatch$|_busy$|^session_not_|^cloud_sync_|dirty_checkout$/u,
+		/(^|_)conflict(_|$)|_locked$|_lock_lost$|_already_|_stale$|_mismatch$|_busy$|^session_not_|dirty_checkout$/u,
 		"conflict",
 	],
-	[
-		/credential|authenticat|_config(_|$)|_endpoint|transport|_migration(_|$)|^domain_api_|_requires_|_forbidden$|^cloud_actor_/u,
-		"configuration",
-	],
+	[/credential|authenticat|_config(_|$)|_endpoint|transport|_migration(_|$)|_requires_|_forbidden$/u, "configuration"],
 	[/_corrupt$|_integrity_error$|_store_error$/u, "internal"],
 	[
 		/^(invalid|duplicate|unsupported|unexpected|unsafe|orphan|empty|no|missing)_|_invalid$|_check_failed$|_not_extracted$|_not_current$|_incomplete$|_cycle$|_missing$|_too_large$/u,

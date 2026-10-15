@@ -13,7 +13,7 @@ const localSatisfiesPort: (service: LocalProjectService) => HarnessProjectPort =
 void localSatisfiesPort;
 
 test("harness 不再依赖 local 的任何具体实现", () => {
-	// 端口化前 SuimingHarnessOptions.project 的类型是 LocalProjectService，这是 Cloud 接不进来的
+	// 端口化前 SuimingHarnessOptions.project 的类型是 LocalProjectService，这是执行与本地存储耦合的
 	// 直接原因。这条断言守住结果：harness 目录不得再 import local。
 	const dir = fileURLToPath(new URL("../src/harness/", import.meta.url));
 	const offenders = readdirSync(dir)

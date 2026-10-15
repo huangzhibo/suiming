@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
 	ArtifactError,
@@ -164,35 +165,46 @@ test("project lock 带等待：锁文件刚建好还没写完、或刚被放掉�
 	}
 });
 
-test("SQLite 本地 Project 登记与 remote binding 跨重启保持", async () => {
+test("旧 SQLite 的登记、执行对象和已停用绑定在重开后保持，既有对象 ID 不变", async () => {
 	const fixture = await createLocalFixture();
 	try {
 		let store = openStore(fixture);
 		store.createProject({ projectId: "project-1", checkoutPath: fixture.checkoutPath });
-		store.setRemoteBinding({
-			projectId: "project-1",
-			endpoint: "https://cloud.example.invalid",
-			cloudProjectId: "cloud-project-1",
-			lastSyncedCloudRevisionId: "cloud-revision-1",
-			lastSyncedLocalRevisionId: "0".repeat(40),
-			lastSyncedContentFingerprint: `sha256:${"a".repeat(64)}`,
-		});
+		const bytes = new TextEncoder().encode("旧对话的执行对象");
+		const mediaType = "text/plain";
+		const object = await store.saveExecutionObject(mediaType, bytes);
+		const expectedId = `eo_${createHash("sha256").update(mediaType).update("\0").update(sha256(bytes)).digest("hex")}`;
+		assert.equal(object.id, expectedId);
 		store.close();
-
+		// 按旧版表形状建立磁盘 fixture，不通过已经删除的 Cloud 接口。
+		const previous = new DatabaseSync(fixture.databasePath);
+		previous.exec(`CREATE TABLE IF NOT EXISTS remote_bindings (
+			project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+			endpoint TEXT NOT NULL, cloud_project_id TEXT NOT NULL,
+			last_synced_cloud_revision_id TEXT NOT NULL, last_synced_local_revision_id TEXT NOT NULL,
+			last_synced_content_fingerprint TEXT NOT NULL, updated_at TEXT NOT NULL
+		) STRICT;`);
+		previous
+			.prepare("INSERT INTO remote_bindings VALUES (?, ?, ?, ?, ?, ?, ?)")
+			.run(
+				"project-1",
+				"https://example.invalid",
+				"old-project",
+				"old-revision",
+				"0".repeat(40),
+				`sha256:${"a".repeat(64)}`,
+				"2026-09-03T02:00:00.000Z",
+			);
+		const oldRows = previous.prepare("SELECT * FROM remote_bindings").all();
+		previous.close();
 		store = openStore(fixture);
 		assert.equal(store.project("project-1").checkoutPath, fixture.checkoutPath);
-		assert.deepEqual(store.remoteBinding("project-1"), {
-			projectId: "project-1",
-			endpoint: "https://cloud.example.invalid",
-			cloudProjectId: "cloud-project-1",
-			lastSyncedCloudRevisionId: "cloud-revision-1",
-			lastSyncedLocalRevisionId: "0".repeat(40),
-			lastSyncedContentFingerprint: `sha256:${"a".repeat(64)}`,
-			updatedAt: "2026-09-03T02:00:00.000Z",
-		});
-		assert.equal(store.clearRemoteBinding("project-1")?.cloudProjectId, "cloud-project-1");
-		assert.equal(store.remoteBinding("project-1"), undefined);
+		assert.deepEqual((await store.readExecutionObject(expectedId)).bytes, bytes);
+		assert.equal((await store.saveExecutionObject(mediaType, bytes)).id, expectedId);
 		store.close();
+		const after = new DatabaseSync(fixture.databasePath);
+		assert.deepEqual(after.prepare("SELECT * FROM remote_bindings").all(), oldRows);
+		after.close();
 	} finally {
 		await cleanupFixture(fixture);
 	}

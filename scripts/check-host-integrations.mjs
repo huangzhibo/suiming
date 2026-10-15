@@ -15,7 +15,7 @@ if (frontmatter === undefined) {
 	if (!/^description: .+$/mu.test(frontmatter)) errors.push("shared Skill must have a non-empty description");
 }
 
-/** 命令目录是唯一真源：Skill 必须提到每一条本地命令的 `suim --json <phrase>` 写法；Cloud 命令随 Cloud 冻结。 */
+/** 命令目录是唯一真源：Skill 必须提到每一条本地命令的 `suim --json <phrase>` 写法。 */
 function cliPhrase(command) {
 	const [group, name] = command.split(".");
 	if (name === undefined) return group;
@@ -23,7 +23,7 @@ function cliPhrase(command) {
 	if (command === "read.search") return "search";
 	return `${group} ${name}`;
 }
-const hostCommands = SUIM_CLI_COMMANDS.filter((command) => !command.startsWith("cloud."));
+const hostCommands = SUIM_CLI_COMMANDS;
 const requiredContractFragments = [
 	...hostCommands.map((command) => `suim --json ${cliPhrase(command)}`),
 	"suim.cli.v1",

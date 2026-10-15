@@ -114,55 +114,7 @@ export type {
 	ChangeOperation,
 	ChangeSet,
 	ProjectRevision,
-	RevisionArtifact,
 } from "./artifact/types.js";
-/** Cloud 的 ArtifactVersion id 由 mediaType 与内容 hash 派生；PostgreSQL store 读回时用同一个公式核对。 */
-export { artifactVersionId } from "./artifact/version-storage.js";
-export type {
-	CloudProjectRevisionDiff,
-	CloudProjectView,
-	CloudRevisionView,
-	CommitCloudProjectSnapshotInput,
-	DiffCloudProjectRevisionsInput,
-	ImportCloudProjectSnapshotInput,
-} from "./cloud/cloud-project-service.js";
-export { CloudProjectService } from "./cloud/cloud-project-service.js";
-export type {
-	CloudProjectRecord,
-	CloudProjectRevision,
-	CloudProjectRevisionSnapshot,
-	CloudProjectStore,
-	CommitCloudProjectInput,
-	CreateCloudProjectInput,
-	ReadCloudProjectInput,
-	ReadCloudProjectRevisionInput,
-	SetCloudProjectMemberInput,
-} from "./cloud/cloud-project-store.js";
-export {
-	cloudChangeOperationPayload,
-	cloudCommitProjectIdempotencyPayload,
-	cloudCreateProjectIdempotencyPayload,
-	cloudIdempotencyFingerprint,
-	cloudSetProjectMemberIdempotencyPayload,
-	normalizeCloudProjectStoreString,
-} from "./cloud/cloud-project-store.js";
-export { CloudStoreError } from "./cloud/errors.js";
-export type { CloudObjectStore, CloudStoredObject } from "./cloud/object-store.js";
-export { cloudObjectKey } from "./cloud/object-store.js";
-export type { CloudPostgresMigration } from "./cloud/postgres-migrations.js";
-export { CLOUD_POSTGRES_MIGRATIONS } from "./cloud/postgres-migrations.js";
-export type {
-	PrepareCloudArtifactVersionOptions,
-	PreparedCloudArtifactVersion,
-} from "./cloud/prepare-artifact-version.js";
-export { prepareCloudArtifactVersion } from "./cloud/prepare-artifact-version.js";
-export type { CloudProjectCapability, CloudProjectRole } from "./cloud/project-access.js";
-export {
-	assertCloudProjectCapability,
-	CLOUD_PROJECT_CAPABILITIES,
-	CLOUD_PROJECT_ROLES,
-	canUseCloudProjectCapability,
-} from "./cloud/project-access.js";
 export { ExecutionStateError } from "./execution/errors.js";
 export type {
 	AddTaskInput,
@@ -240,7 +192,6 @@ export type {
 	ExecutionObjectCollection,
 	LocalExecutionObject,
 	LocalProjectRecord,
-	LocalRemoteBinding,
 	SqliteLocalStoreOptions,
 } from "./local/sqlite-local-store.js";
 export { SqliteLocalStore } from "./local/sqlite-local-store.js";
@@ -283,9 +234,6 @@ export {
 	telemetryFromEnvironment,
 } from "./model/telemetry.js";
 export type {
-	CloudConnectionConfig,
-	LoadCloudConnectionConfigOptions,
-	LoadedCloudConnectionConfig,
 	LoadedModelRoutingConfig,
 	LoadModelRoutingConfigOptions,
 	ModelConfigValueSource,
@@ -293,37 +241,7 @@ export type {
 	ModelRoutingConfigDiagnostic,
 } from "./model/user-config.js";
 export {
-	loadCloudConnectionConfig,
 	loadModelRoutingConfig,
 	loadUsageCheckpoint,
 	parseModelRoutingToml,
 } from "./model/user-config.js";
-export type {
-	DomainApiCloudProjectStoreOptions,
-	DomainApiProjectClient,
-} from "./sync/domain-api-cloud-project-store.js";
-export { DomainApiCloudProjectStore } from "./sync/domain-api-cloud-project-store.js";
-export { CloudSyncError } from "./sync/errors.js";
-export type {
-	CheckoutCloudProjectInput,
-	CheckoutCloudProjectResult,
-	ImportLocalCloudProjectInput,
-	LinkLocalCloudProjectInput,
-	LocalCloudSyncResult,
-	LocalCloudSyncServiceOptions,
-	LocalCloudSyncState,
-	LocalCloudSyncStatus,
-	PushLocalCloudProjectInput,
-} from "./sync/local-cloud-sync-service.js";
-export { LocalCloudSyncService } from "./sync/local-cloud-sync-service.js";
-export type {
-	MergeOpenStoryFilesResult,
-	OpenStorySyncConflict,
-	OpenStorySyncDelta,
-	OpenStorySyncFileState,
-} from "./sync/open-story-merge.js";
-export {
-	compareOpenStoryFiles,
-	mergeOpenStoryFiles,
-	openStoryContentFingerprint,
-} from "./sync/open-story-merge.js";

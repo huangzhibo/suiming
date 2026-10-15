@@ -3,7 +3,7 @@ import { type Static, Type } from "typebox";
 /**
  * 领域对象的共用 schema。
  *
- * 三套命令目录（CLI / 桌面 IPC / Cloud HTTP）曾各自定义同一批对象，`run.list` 因此在 CLI 与 IPC 下
+ * 早期命令目录曾各自定义同一批对象，`run.list` 因此在 CLI 与 IPC 下
  * 有两份不兼容的形状，同名却不同字段。这里是这些对象的唯一定义，三个传输都从这里取；传输之间的差异
  * 只能是命名与信封，不能是内容。
  */
