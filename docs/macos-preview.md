@@ -41,6 +41,8 @@ npm run package:mac
 
 ## 签名与公证准备
 
+2026-10-15 按作者要求暂缓正式签名、公证及后续下载首次安装验证；以下步骤保留给恢复对外发行时使用，当前无需购买会员或提供凭据，不阻塞本机功能验证。
+
 同一份预览 `.app` 可交给 `scripts/macos-release.mjs` 处理。脚本只复制到**尚不存在的新目录**，不覆盖输入、日常应用或作品；复用 `@electron/osx-sign` 与 Apple 命令，不引入发行服务。当前已完成本地签名演练与故障检查，正式 Developer ID / Apple 公证仍待身份就绪后实测，见[签名验收](validation/2026-10-15-macos-signing/README.md)。
 
 维护者需要一次性在本机准备：

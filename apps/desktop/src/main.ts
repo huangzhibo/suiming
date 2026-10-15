@@ -105,6 +105,20 @@ export function startDesktop(
 		if (workspace?.activeSessionIds().length) throw new Error("当前作品的对话还在运行，请先停止再切换作品。");
 		// macOS 的 /var 是 /private/var 的符号链接；统一成真实路径，最近列表才不会把同一作品记两次。
 		const path = await realpath(requested).catch(() => requested);
+		const entries = await readdir(path).catch((error: NodeJS.ErrnoException) => {
+			if (error.code === "ENOENT")
+				throw new Error(
+					`找不到作品文件夹：${path}\n如果作品已移动或外置磁盘尚未连接，请连接磁盘或用「打开作品」选择现在的位置。`,
+				);
+			if (error.code === "ENOTDIR")
+				throw new Error(`作品路径不是文件夹：${path}\n请用「打开作品」选择作品所在的文件夹。`);
+			if (error.code === "EACCES" || error.code === "EPERM")
+				throw new Error(`无法读取作品文件夹：${path}\n请检查文件夹的访问权限，再用「打开作品」重试。`);
+			throw error;
+		});
+		// 「新建」只接受空目录；Finder 的目录元数据不算内容，其他隐藏文件仍须保留。
+		if (create && entries.some((entry) => entry !== ".DS_Store"))
+			throw new Error("新建作品请选择空文件夹。这个文件夹已有内容；若要继续已有作品，请使用「打开作品」。");
 		// 目录还没有 .suiming 时就地初始化执行登记；作品版本在 .git 的 Canon ref，.suiming 保存对话。
 		// scaffold 是幂等的，只补缺失的 index.yaml 等最小 Design；已有作品文件直接成为第一个版本。
 		// 「打开」一个既非空、又没有任何作品文件的目录（例如误选 ~/Documents）时拒绝，不往里写东西。
@@ -113,7 +127,7 @@ export function startDesktop(
 			const scanned = await readOpenStoryDirectory(path);
 			const hasStoryFiles = scanned.files.some((file) => classifyOpenStoryDirectoryFile(file.path) === "story");
 			// 目录扫描只列作品相关文件；判断“是否空目录”要看真实条目，隐藏文件与 .suiming 不算。
-			const visibleEntries = (await readdir(path)).filter((entry) => !entry.startsWith("."));
+			const visibleEntries = entries.filter((entry) => !entry.startsWith("."));
 			if (!create && !hasStoryFiles && visibleEntries.length > 0)
 				throw new Error(
 					"这个文件夹里没有作品文件，也不是空目录。请选择 Open Story Directory，或用「新建作品」选一个空目录。",
