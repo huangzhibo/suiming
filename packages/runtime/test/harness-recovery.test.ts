@@ -249,11 +249,16 @@ test("模型回复没收到就退出：续跑作废那次请求，用当前消�
 test("停在一批动作中间时工具面变了：照样续上，被打断的动作补结果，新请求用新的工具声明", async () => {
 	const { provider, model } = await fixture();
 	provider.setResponses([
-		fauxAssistantMessage(fauxToolCall("slow", {})),
+		fauxAssistantMessage(fauxToolCall("slow", {}, { id: "call-v1-history" })),
 		async (context) => {
-			// faux 拿到的是折好的 transcript，工具声明在开头那条 system 消息里。
-			assert.ok(JSON.stringify(context).includes("v2"));
-			assert.ok(!JSON.stringify(context).includes("v1"));
+			// 只检查当前工具声明；历史调用 ID 可以含 v1，不能把它误判成旧工具仍在。
+			assert.deepEqual(
+				context.messages
+					.filter((message) => message.role === "system")
+					.flatMap((message) => message.toolsAdded ?? [])
+					.map((tool) => [tool.name, tool.description]),
+				[["slow", "v2"]],
+			);
 			return fauxAssistantMessage("完成");
 		},
 	]);
