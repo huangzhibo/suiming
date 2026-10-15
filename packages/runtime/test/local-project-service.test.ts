@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { GitCanonStore } from "../src/artifact/git-canon-store.js";
+import { agentTurn } from "../src/harness/agent.js";
+import { CheckpointArchive } from "../src/harness/checkpoint-archive.js";
 import {
 	ArtifactError,
 	composeReviewFile,
@@ -15,10 +17,12 @@ import {
 	reviewCurrency,
 	reviewsIn,
 	SqliteLocalStore,
+	SuimingHarness,
 	targetArtifactIdentity,
 	textCurrencies,
 	validateStoryProjectCandidate,
 } from "../src/index.js";
+import { call, fauxGateway, reply, say } from "./harness-fixtures.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
 const encoder = new TextEncoder();
@@ -475,8 +479,9 @@ test("canon ref 丢了（例如 .git 被删）时 open 拒绝，不把没过 Che
 	const fixture = await createServiceFixture();
 	try {
 		const service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath, projectId: "project-1" });
+		const history = await service.history();
 		service.close();
-		await rm(join(fixture.checkoutPath, ".git"), { recursive: true, force: true });
+		await rename(join(fixture.checkoutPath, ".git"), join(fixture.root, "git-backup"));
 		const characterPath = join(fixture.checkoutPath, "world", "characters", "黄盖.md");
 		await writeFile(characterPath, "---\nname: 黄盖\nfamily:\n  parent: [不存在的人]\n---\n错误引用。\n");
 
@@ -485,17 +490,22 @@ test("canon ref 丢了（例如 .git 被删）时 open 拒绝，不把没过 Che
 			(error: unknown) =>
 				error instanceof ArtifactError &&
 				error.code === "local_project_canon_missing" &&
-				error.message.includes(".suiming/local.sqlite"),
+				error.message.includes("先保留整个作品目录") &&
+				error.message.includes("恢复 refs/suiming/canon") &&
+				!error.message.includes("挪走"),
 		);
 		await assert.rejects(readFile(join(fixture.checkoutPath, ".git", "HEAD")), { code: "ENOENT" });
 
-		// 照提示挪走执行库后走 init：非法 checkout 被 Checker 拒绝，改好了才建出新的创世版本。
-		await rename(join(fixture.checkoutPath, ".suiming", "local.sqlite"), join(fixture.root, "local.sqlite.bak"));
-		await assert.rejects(LocalProjectService.init({ checkoutPath: fixture.checkoutPath }));
-		await writeFile(characterPath, "---\nname: 黄盖\n---\n改好了。\n");
-		const reinitialized = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath });
-		assert.equal((await reinitialized.status()).state, "clean");
-		reinitialized.close();
+		// 恢复原 .git，保留原版本与候选；不以重建创世版本冒充恢复。
+		await rename(join(fixture.root, "git-backup"), join(fixture.checkoutPath, ".git"));
+		const recovered = await LocalProjectService.open(fixture.checkoutPath);
+		try {
+			assert.deepEqual(await recovered.history(), history);
+			assert.match(await readFile(characterPath, "utf8"), /错误引用/u);
+			await assert.rejects(recovered.commitCheckout(), "找回 Canon 不等于候选绕过 Checker");
+		} finally {
+			recovered.close();
+		}
 	} finally {
 		await cleanup(fixture);
 	}
@@ -598,5 +608,98 @@ test("init 校验失败不留下 .suiming：锁建出的目录随失败收回，
 		assert.equal(await readFile(join(root, ".suiming/keep.txt"), "utf8"), "mine\n");
 	} finally {
 		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("完整冷备份在新目录保留 Canon、未提交文件、对话与子任务，沿原会话继续而不重跑旧动作", async () => {
+	const fixture = await createServiceFixture();
+	let service: LocalProjectService | undefined;
+	try {
+		service = await LocalProjectService.init({ checkoutPath: fixture.checkoutPath });
+		const models = fauxGateway(
+			"backup-faux",
+			[
+				call("delegate", { profile: "main", goal: "把长期选择写入 intent/选择.md" }),
+				call("write", { path: "intent/选择.md", content: "选择要有代价。" }),
+				call("submit_task", { summary: "已写入长期选择。" }),
+				call("commit", { summary: "保存长期选择" }),
+				reply("历史回复，需要完整保留。".repeat(8000)),
+			],
+			{ main: "main", reviewer: "main" },
+		);
+		const first = await say(new SuimingHarness({ project: service, models }), "请保留角色选择的代价。");
+		assert.equal(first.failure, undefined);
+		await writeFile(join(fixture.checkoutPath, "world/places/赤壁.md"), "第三版赤壁。\n");
+		await service.commitCheckout();
+		await writeFile(join(fixture.checkoutPath, "intent/未提交.md"), "候选也必须随完整备份保留。\n");
+		await writeFile(join(fixture.checkoutPath, "README.md"), "仓库辅助文件也要保留。\n");
+		service.queueInbox(first.sessionId, "迁移后继续，保留旧消息。", "backup-inbox");
+		const history = await service.history();
+		assert.equal(history.length, 3);
+		const initial = service;
+		const snapshots = await Promise.all(history.map((r) => initial.exportRevision(r.id)));
+		const candidate = await service.checkoutCandidate();
+		const entities = service.loadExecutionEntities();
+		const events = service.readSessionEvents(first.sessionId);
+		const checkpoints = await Promise.all(
+			[...entities.sessions, ...entities.tasks].map(async (entity) => {
+				assert.ok(entity.checkpointRef);
+				return new CheckpointArchive(initial).read(
+					(await initial.readExecutionObject(entity.checkpointRef.id)).bytes,
+				);
+			}),
+		);
+		service.close();
+		const backup = join(fixture.root, "backup");
+		await cp(fixture.checkoutPath, backup, { recursive: true, errorOnExist: true, force: false });
+		// 恢复到新目录，备份保持不动；移开旧位置可暴露意外读取旧绝对路径。
+		await rename(fixture.checkoutPath, join(fixture.root, "old-location"));
+		const restored = join(fixture.root, "restored");
+		await cp(backup, restored, { recursive: true, errorOnExist: true, force: false });
+		service = await LocalProjectService.open(restored);
+		assert.deepEqual(await service.history(), history);
+		const recovered = service;
+		assert.deepEqual(await Promise.all(history.map((r) => recovered.exportRevision(r.id))), snapshots);
+		assert.deepEqual(await service.checkoutCandidate(), candidate);
+		assert.deepEqual(service.loadExecutionEntities(), entities);
+		assert.deepEqual(service.readSessionEvents(first.sessionId), events);
+		assert.equal(service.project().checkoutPath, await realpath(restored));
+		assert.equal(await readFile(join(restored, "README.md"), "utf8"), "仓库辅助文件也要保留。\n");
+		for (const [i, entity] of [...entities.sessions, ...entities.tasks].entries()) {
+			assert.ok(entity.checkpointRef);
+			assert.deepEqual(
+				await new CheckpointArchive(service).read(
+					(await service.readExecutionObject(entity.checkpointRef.id)).bytes,
+				),
+				checkpoints[i],
+			);
+			if ("result" in entity && entity.result) await service.readExecutionObject(entity.result.id);
+		}
+		let requests = 0;
+		const continued = new SuimingHarness({
+			project: service,
+			models: fauxGateway(
+				"backup-faux",
+				[
+					(context) => {
+						requests++;
+						const messages = JSON.stringify(context.messages);
+						assert.match(messages, /请保留角色选择的代价/u);
+						assert.match(messages, /历史回复，需要完整保留/u);
+						assert.match(messages, /迁移后继续，保留旧消息/u);
+						return reply("迁移后接着同一对话。");
+					},
+				],
+				{ main: "main", reviewer: "main" },
+			),
+		});
+		assert.equal((await continued.turn(first.sessionId, {}, (handle) => agentTurn(handle))).failure, undefined);
+		assert.equal(requests, 1, "只发起新一轮请求，不重放已完成任务");
+		assert.equal(service.loadExecutionEntities().tasks.length, entities.tasks.length);
+		assert.deepEqual(await service.history(), history, "打开和继续对话不凭空产生版本");
+		assert.equal((await service.status()).state, "dirty", "未提交候选没有被自动提交或覆盖");
+	} finally {
+		service?.close();
+		await cleanup(fixture);
 	}
 });

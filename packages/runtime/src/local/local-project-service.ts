@@ -317,10 +317,10 @@ export class LocalProjectService {
 			} catch (error) {
 				if (!(error instanceof ArtifactError && error.code === "project_not_found")) throw error;
 				// 已登记但没有 canon ref：.git 被删或换掉了。不能就地按 checkout 建创世版本——那会绕过 Checker，
-				// 执行库里的 session 也还指着已经不存在的版本。让作者挪走执行库重新 init，init 会先过 Checker。
+				// 执行库里的 session 也还指着原版本。优先找回 Canon，不能把重置说成恢复。
 				throw new ArtifactError(
 					"local_project_canon_missing",
-					`作品目录里找不到 refs/suiming/canon（.git 可能被删除或替换过）：${paths.checkoutPath}。把 .suiming/local.sqlite 挪走后重新打开作品（或 suim init），当前目录过了检查会成为新的创世版本；原来的对话记录留在挪走的文件里。`,
+					`作品目录里找不到 refs/suiming/canon：${paths.checkoutPath}。先保留整个作品目录（含 .git、.suiming 与未提交文件），从完整备份找回 .git；若目录来自 git clone，须从原仓库或 bundle 显式恢复 refs/suiming/canon 后再打开。不要用重新初始化代替历史恢复；仅有当前作品文件无法找回原版本链，对话也需要 .suiming 内的执行库与 objects 一起保留。`,
 				);
 			}
 			const service = new LocalProjectService(paths, store, canon, project.id, head);

@@ -841,7 +841,7 @@ export class SqliteLocalStore {
 			if (versions.length !== 1 || versions[0] !== LOCAL_STORE_SCHEMA_VERSION)
 				throw new ArtifactError(
 					"unsupported_local_store_schema",
-					`本地执行库 ${this.databasePath} 是 v${versions.join(" / v")}，这一版只认 v${LOCAL_STORE_SCHEMA_VERSION}，不再从旧版本升级。旧执行数据不迁移；作品版本在作品目录 git 仓的 refs/suiming/canon 里，不受影响：把 .suiming/local.sqlite 挪走后重新打开作品（或 suim init），原来的版本链会接上。`,
+					`本地执行库 ${this.databasePath} 是 v${versions.join(" / v")}，这一版只认 v${LOCAL_STORE_SCHEMA_VERSION}，不能自动升级。先退出使用此作品的应用和 CLI，完整备份作品目录，包含 .git、.suiming/local.sqlite、可能存在的 SQLite 日志和 .suiming/objects；需要原对话时，用兼容的旧版打开备份副本。若只继续作品，可在另一个完整副本中移出整个 .suiming 后重新打开（或 suim init），接上 git 的 Canon 历史；旧对话不会自动迁入。`,
 				);
 		}
 		this.#database.exec(`

@@ -365,7 +365,7 @@ Electron 主进程拥有 Runtime、数据库连接、凭据与 session owner。r
 
 checkpoint 按下文 [checkpoint 归档](#checkpoint-归档)的片段引用保存。
 
-**旧库不升级，旧执行数据不迁。**库只认 v6，遇到旧版本在模型调用前拒绝打开（`unsupported_local_store_schema`），提示把 `.suiming/local.sqlite` 挪走后重开；作品版本在 git 里，不受影响。不为过去的运行数据维护第二内核。旧执行数据不迁是 2026-09-13 作者定的：eval-022 的 4 个 Run / 480 条事件采用的作品结论都在 Canon 里，一个字不丢，不为四个 Run 写转换器。
+**开发期旧库不自动转换，恢复先保全数据。**库只认 v6，遇到旧版本在模型调用前拒绝打开（`unsupported_local_store_schema`），不修改旧表。先退出写入进程，完整备份 `.git`、整个 `.suiming` 与作品文件，使用兼容版本读取原对话。若明确只继续作品，可在另一完整副本中移出整个 `.suiming` 再打开，接回 git 中的 Canon；旧对话不会自动迁入。不能只挪 SQLite 而遗漏日志与 execution objects，具体步骤见[仓库迁移与恢复](repository-recovery.md)。2026-09-13 不为四个旧 Run 写转换器是一次开发期取舍，不是未来升级可丢作者对话的承诺；正式发行仍需按实际支持版本完成升级保全验收，不建立第二执行内核。
 
 **Cloud 没有执行。**执行 adapter 已删，Cloud 只剩 Canon 与显式同步，理由与解冻时的接口位置（`HarnessProjectPort`）见[系统架构](architecture.md)第 9 节。「Local 与 Cloud 服从同一状态转换、每类存储跑同一套契约测试」这条随之从规范里撤下，等有第二个实现再写回来。
 

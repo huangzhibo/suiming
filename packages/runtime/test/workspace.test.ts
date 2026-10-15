@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -199,7 +199,7 @@ test("状态与产品事件原子确认：事件 INSERT 失败时 turn 不会先
 		);
 	}));
 
-test("本地执行库只认 v6：旧版本打开时说清怎么办且不动库；把库挪走再 init，接上 git 里原来的版本链", async () => {
+test("本地执行库只认 v6：旧版本打开时说清怎么办且不动库；把整个执行目录挪走再 init，接上 git 里原来的版本链", async () => {
 	// 2026-10-02 删掉 v1→v6 的迁移链（删前确认在用作品都已是 v6）。旧执行数据本来就不迁，作品版本在 git 里。
 	const root = await mkdtemp(join(tmpdir(), "suiming-old-store-"));
 	try {
@@ -219,15 +219,16 @@ test("本地执行库只认 v6：旧版本打开时说清怎么办且不动库�
 		database.close();
 		await assert.rejects(LocalProjectService.open(root), (error: unknown) => {
 			assert.equal((error as { code?: string }).code, "unsupported_local_store_schema");
-			assert.match((error as Error).message, /v4.*v6.*local\.sqlite.*init/su);
+			assert.match((error as Error).message, /v4.*v6/su);
+			assert.match((error as Error).message, /完整备份.*objects/su);
+			assert.match((error as Error).message, /对话不会自动迁入/u);
 			return true;
 		});
 		const untouched = new DatabaseSync(databasePath, { readOnly: true });
 		assert.deepEqual(tables(untouched), before, "旧库不建表、不改版本");
 		untouched.close();
 
-		for (const name of await readdir(join(root, ".suiming")))
-			if (name.startsWith("local.sqlite")) await rename(join(root, ".suiming", name), join(root, `${name}.old`));
+		await rename(join(root, ".suiming"), join(root, ".suiming-backup"));
 		const reopened = await LocalProjectService.init({ checkoutPath: root });
 		try {
 			assert.equal(reopened.project().headRevisionId, head);
