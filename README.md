@@ -186,7 +186,7 @@ npm run format         # biome 自动格式化
 - 提交信息用 `type(scope): 中文摘要`，正文写为什么。文档与代码注释用中文。
 - 开源前的开发历史压成了一个基线提交（`chore: 开源基线（MIT）`）；文档里 2026-10-03 及之前的提交号指那段历史，在本仓里查不到（见 AGENTS.md）。
 
-Cloud（PostgreSQL / S3 上的作品存储与显式同步）目前冻结：`npm run dev:api` 能起开发进程，配置见 [`.env.example`](.env.example)，但不在当前开发重点内。
+Cloud 是未来可选扩展；旧实现已删除，当前产品不提供云同步。见 [ADR-0030](docs/adr/0030-remove-frozen-cloud.md)。
 
 ## 文档
 
@@ -207,14 +207,11 @@ apps/
   desktop/   Electron 主进程：持有 Runtime 与凭据
   workbench/ React 作者工作台，经 typed IPC 接入桌面
   cli/       suim 命令行与给程序用的 JSON 契约
-  api/       Cloud Domain API（冻结）
 
 packages/
   story/     Story Language、Story Core、Checker（不依赖网络、数据库与模型）
   runtime/   作品存储、SuimingHarness（Agent loop 与恢复）、事件、模型网关、本地服务
   sdk/       命令目录、领域 schema 与事件信封
-  cloud-postgres/  Cloud 的 PostgreSQL 存储
-  cloud-s3/        Cloud 的 S3 兼容对象存储
 
 integrations/  Codex / Claude Code / Grok 的薄接入（Skill 与入口说明）
 story-language/  Story Language 文档（生成进 packages/story）

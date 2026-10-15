@@ -32,20 +32,20 @@
 
 ## 3. 产品入口
 
-各入口属于同一个 Suiming 产品，共用 Story Language、Checker、版本事务和 Cloud 同步语义。**桌面端是最终核心产品和主要作者工作台。**Cloud 目前只提供可选的 Canon 存储与显式同步，远程运行、跨设备服务与 Cloud Web 是解冻后的扩展；CLI 与 coding-agent integrations 是开发者、自动化和 host-native 入口。执行模型见 [Harness 设计](harness-design.md)，交互规范见[作者工作台设计](workbench-design.md)。
+各入口属于同一个 Suiming 产品，共用 Story Language、Checker、版本事务。**桌面端是最终核心产品和主要作者工作台。**Cloud 仅保留未来产品方向，旧实现已删除；远程运行、跨设备服务与 Cloud Web 启动时按届时核心设计；CLI 与 coding-agent integrations 是开发者、自动化和 host-native 入口。执行模型见 [Harness 设计](harness-design.md)，交互规范见[作者工作台设计](workbench-design.md)。
 
 | 入口 | 主要体验 | 模型与运行方式 |
 | --- | --- | --- |
 | 本地桌面端（核心产品） | 在一个工作台内阅读与编辑正文、查看 Design / 人物 / 知情 / Contract、与 Agent 协作、比较 revision 与 Review 证据 | Runtime 在 Electron 主进程运行，renderer 经 IPC 接入；使用本地 model profile，不依赖 Cloud 服务 |
 | Codex / Claude Code / Grok integrations | 在用户已有 coding-agent 产品中直接读取和修改 repository-native 作品 | 使用 host 自己的模型、会话和文件工具，通过平台 instructions / Skills 与 `suim --json` 调用 Suiming 能力 |
-| Cloud Web（可选扩展，当前不实施） | 跨设备进行 Agent 对话、创作和作品浏览；复用桌面工作台视图 | 解冻时由共享 Harness 接 Cloud host；今天的 Cloud 只有 Canon 与显式同步 |
+| Cloud Web（可选扩展，当前不实施） | 跨设备进行 Agent 对话、创作和作品浏览；复用桌面工作台视图 | 未来复用共享 Harness 与领域核心；当前没有 Cloud 实现 |
 
 必须满足：
 
 - 桌面主进程直接持有 Runtime，renderer 经 typed IPC 接入，不 shell out 或解析 CLI，也不经 localhost HTTP。
 - Codex / Claude Code / Grok integrations 是正式产品入口，不是“碰巧能编辑文件”；adapter 只是薄的 instructions / Skills 与命令契约，见[系统架构](architecture.md)第 8 节。
 - host-native 模式复用 host 已配置的模型与凭据；在桌面里对话或显式执行 `suim session send` 才进入 Suiming Agent 并按 model profile 调模型；`suim rank` 的评委同样按 `judge` profile 调用。
-- 本地模式不要求 Cloud account。Cloud 连接与作品同步都是可选能力。
+- 本地模式不要求 Cloud account。Cloud 是未来可选扩展。
 - 自然语言是主要创作入口；作者不需要理解文件路径、hash、Task DAG、Context id 或模型路由才能完成作品。
 - 桌面端必须把作品工作台与自然 AI 对话合为一个连续体验：正文有良好的阅读与编辑体验，对话与作品同屏联动，activity 渐进披露，revision 结果可以直接回到权威 diff 和原始 Artifact；不能退化成后台 dashboard、只读文件查看器或作品页面旁的聊天挂件。后续 Web 复用这一产品能力。
 - 桌面工作台必须提供完整 StoryOutline、人物时点视图、Contract 生命周期、World 使用位置、StoryText、Review、运行进度和 revision diff；所有视图都能回到原始 Artifact。
@@ -55,7 +55,7 @@
 ### 4.1 一个作品模型
 
 - **Story Artifact** 是按 Story Language identity 独立寻址的作品内容，也是作品长期记忆。
-- **Open Story Directory** 是标准可编辑目录表示；桌面、CLI、本地 integrations、Cloud checkout 和 repository-native project 使用同一种格式。
+- **Open Story Directory** 是标准可编辑目录表示；桌面、CLI、本地 integrations 和 repository-native project 使用同一种格式。
 - **Open Story Package** 是某个明确 ProjectRevision 的封闭、可验证快照，与目录使用相同逻辑路径。
 - **repository-native project** 是 Open Story Directory（它本身就是 git 仓，见 4.3）加可选的 AGENTS.md、Skills 和说明文档，不是另一种 Story Language 或旧 Runtime 的同义词。
 
@@ -81,8 +81,8 @@ Story Artifact 与 Story Language 是作品语义真源；机器 schema 必须�
 ### 4.3 开放与可移植
 
 - 完整作品必须可读、可验证、可导入、可导出并可继续创作，不能依赖 Suiming Cloud 才能解释。
-- 未修改 Artifact 经目录、Package 和 Cloud round-trip 后保持准确内容字节；修改时只重写实际变化的 Artifact。
-- 本地作品目录就是 git 仓，历史随它走；审稿与笔记是普通作品文件，正文与审稿的时效从历史派生，不另存 evidence。部署 identity、凭据、session、cache、trace、remote binding 和本地私有状态不进入作品包。
+- 未修改 Artifact 经目录和 Package round-trip 后保持准确内容字节；修改时只重写实际变化的 Artifact。
+- 本地作品目录就是 git 仓，历史随它走；审稿与笔记是普通作品文件，正文与审稿的时效从历史派生，不另存 evidence。部署 identity、凭据、session、cache、trace 和本地私有状态不进入作品包。
 - 仓库辅助文件可以与作品共存，但不能被误认或上传为 Story Artifact。
 - 当前产品只接受当前格式。仍有价值的开发期旧数据直接一次性重写，不承担旧格式或旧 CLI 的兼容要求。
 
@@ -143,7 +143,7 @@ StoryText 必须把既定变化实现为读者能够经历的行动、对白、�
 
 ## 7. Local 与 Cloud
 
-Local Project 与 Cloud Project 拥有独立 revision identity，不共享可写数据库，也不后台双写。同步必须由作者显式发起、结果可核对，冲突必须报告，不能用时间戳或 last-write-wins 静默覆盖；凭据、Local Store、运行缓存和未选择的 trace 不上传。同步动词与语义见[系统架构](architecture.md)第 9 节。
+未来实现 Cloud 时，本地与远端不共享可写数据库，也不后台双写。同步必须由作者显式发起、结果可核对，冲突必须报告，不能用时间戳或 last-write-wins 静默覆盖；凭据、Local Store、运行缓存和未选择的 trace 不上传。当前删除范围与未来边界见[系统架构](architecture.md)第 9 节。
 
 ## 8. 质量学习与验证
 

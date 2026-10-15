@@ -8,7 +8,7 @@
 
 - **执行**：只有 Session（根 Agent，一份连续的消息列表，idle / running）与 Task（子智能体）。Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径。创作路径没有预算，只有每轮用量检查点（[Harness 设计](harness-design.md)第 10 节）。
 - **作品**：本地作品目录就是 git 仓，`refs/suiming/canon` 只由过 Checker 的提交推进；SQLite 只存执行数据。审稿与材料笔记是普通作品文件，正文 / 审稿时效与 Source 覆盖率从 git 历史派生。
-- **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。Cloud 只剩 Canon 与显式同步，产品冻结。
+- **入口**：Electron 桌面是核心产品；`suim` CLI 与 Codex / Claude Code / Grok 三个 host 共用同一 Runtime 与 Checker。旧 Cloud 实现已删除，未来按届时核心重新设计。
 - **证据边界**：最高到「真实调用」。真实写作、真实流中断恢复与大型作品浏览均有证据；抽取原作、合成规模测试和少量正文不等于 Agent 完成真实长篇，也不能代替作者对文学效果的判断。
 
 ## 最近有效验收
@@ -33,9 +33,9 @@
 | 大量版本与长对话 | 10 / 100 / 500 版本检索、键盘和文件保持；真实 1314 动作历史按需加载，侧栏 / 主工作面不溢出 | [规模操作验收](validation/2026-10-14-version-and-conversation/README.md)；不等于长篇持续运行性能验收 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；最近一次全仓测试 510 项中 505 通过、5 skip；工作台 75 / 75 | 外部集成的 skip 不记通过；此前一次性 PostgreSQL / MinIO 集成有独立通过记录。签名准备切片复跑全仓测试，含 8 条公证故障契约；受控 OAuth 不计真实服务商验证 |
+| 自动检查 | 最近全仓检查通过；全仓 478 / 478、0 skip，工作台 75 / 75 包含在其中；数据保全定向复验 56 / 56 | 旧 Cloud 实现与 32 条专属测试一并删除，包含此前 5 条外部集成 skip；数量减少不是覆盖率提升。见[删除与保全验收](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 56 / 56 通过、0 skip，含键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [键盘验收](validation/2026-10-15-keyboard-flow/README.md)是本轮完整复跑；此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 56 / 56 通过、0 skip，含键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [删除 Cloud 后的复验](validation/2026-10-15-remove-cloud/README.md)为最新完整复跑；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 
@@ -53,7 +53,6 @@
 | 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/workbench` | Electron E2E、真实模型创作闭环与 231 情节隔离副本走查 |
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
-| Cloud Canon 与显式同步 | `packages/cloud-*`、`apps/api` | 机制；真实 PostgreSQL 18.6 与 MinIO 上 11 项集成测试 2026-09-30 真跑通过 |
 | 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |
 | 盲评 `suim rank` | `harness/rank-experiment.ts` | 机制；与作者判断的一致率还没量过。两种口径见[路线图](roadmap.md)第 5 节 |
 | 长篇 | — | 无 |
@@ -74,7 +73,7 @@
 - **作者体验**：v7 工作台已在 2 Beat 样例上验收。Library 有最近作品列表与打开 / 新建，打开任意 Open Story Directory 会就地初始化；旧仓格式不迁移，初始化失败时文件夹保持原样。上下文栏与右栏可以拖拽调宽（[调宽验收](validation/2026-09-09-pane-resize/README.md)）。邻域图只画 frontmatter 声明的引用，看二跳就再点一次，不推断隐含关系。finding 的 Runtime 锚点仍只到文件，段落定位是窗口用审稿引文在 mdast 上对出来的，Reviewer 没引原文时退回到只锚文件。同一个文件被编辑器 buffer 与外部改动（作者、host agent、Agent）同时修改时只做 CAS 比较，入口是「比较外部修改」，不自动解决，也不覆盖任何一方。
 - **A / B 决策卡**（针对一段给两个改法让作者选）还没做，但不是做不了：零件都在，缺的只是 `validateProductEvent` 的 CUSTOM 白名单里的一个事件名，以及一次「作者读到一段不满意」的真实场景来定给几个改法、怎么呈现。它也是「作者否决」这类证据最干净的采集口。零件清单见[作者工作台设计](workbench-design.md) 4.4 节「A / B 决策卡」。
 - **发行与认证**：已有 macOS arm64 自含 `.app` / zip 预览与同格式手工替换、冷备份回退验收；签名 / 公证脚本、ad-hoc 演练和篡改拒绝已验证，真实 Developer ID、公证、独立机器下载首次打开尚未完成，现按作者要求暂缓；没有自动更新器，详见[安装验收](validation/2026-10-15-macos-install/README.md)。设置页的登录向导接通了 pi-ai 全部 provider 的 API key / OAuth 流程（浏览器回调、设备码、手动粘贴授权码都能转述）。到「真实调用」的：API key（另经桌面 E2E）；`openai` 的 Sign in with ChatGPT——2026-10-02 登录并真实调用，10-03 凭据文件在一次真实刷新中被重写，当天 CLI 连跑多个一到两小时的运行没有一次因凭据失败。隔离服务的失效恢复与并发刷新已通过真实桌面 / CLI 组合验收，凭据轮换仍复用 pi-ai 和原文件锁；实际服务商的 refresh token 撤销及重新登录尚未验证，`openai-codex`、Anthropic 等其余 provider 的 OAuth 也不能因此标为已支持。订阅额度与作者自己的 Codex 共用，界面上的花费是按 API 价的估算，不是扣费。本地执行库暂不做跨 schema 转换，遇到旧版会拒绝且不改表；提示先完整备份、用兼容版本读取旧对话，只续作品则另建完整副本处理。同为 v6 / 当前 Story Language 的两个开发构建已验证替换安装与回退；不等于跨 schema 或历史正式版本升级已解决。启动失败现在通过原有工作台显示原因并可打开其他作品；正式交付仍须保证旧作品与对话可取回，不能以执行数据可丢代替。
-- **命令与 Cloud**：本地 typed IPC 命令有 SDK 目录与双向校验，但命令目录仍是三份，三个传输的适配都是手写的，理由见[系统架构](architecture.md)。Cloud 只剩 Canon 与同步，Cloud Harness host 与同等原子事件验收保持冻结；`CanonStore` 契约测试目前只有 git 一个实现在跑，Cloud 走的是自己的 store 接口与自己的测试。
+- **命令边界**：CLI 与桌面 IPC 保留两份手写传输目录，共用领域 schema 和摘要投影，理由见[系统架构](architecture.md)。旧 Cloud API、存储 adapter、同步服务与专属协议已按 [ADR-0030](adr/0030-remove-frozen-cloud.md) 删除。未来 Cloud 不是当前能力或桌面验收缺口。
 - **模型预检范围**：启动只预检这次对话用的模型。没单独配置的角色从 2026-10-05 起跟随对话的模型，预检查过的就是它们要用的；单独配置过的 writer / reviewer / source-extractor 不在预检里，凭据或模型有问题时失败发生在 turn 中途、token 已经花掉。可续做的调用失败现会给父模型真实 Task ID 和已有 `resume_task` 入口，独立模型失败、重载与原任务续做已定向验证；这不等于所有角色都做过提前预检。按实际会用到的 profile 预检需要先知道 Agent 会不会委派，未实现。
 - **无人值守没有方向闸**：创作路径没有预算，兜底有 `run_no_progress`、每轮用量检查点与作者打断。检查点保证没人看着时一轮最多用掉约一次整本抽取的量（GPT-6.1 Sol 上约 $12），但它只封住用量、不判断方向，**停不住「持续产出但方向错了」的 turn**，只能靠作者发现（完整说明见 [Harness 设计](harness-design.md)第 10 节）。检查点的阈值作者在设置页或 config.toml 的 `session.usage_checkpoint` 调。带交付工具的子任务另有 `unsubmittedStops >= 3` 的收口，那不是方向闸。真正的结构性改善是让作者补充的意图能沉淀回作品，见 [AGENTS.md](../AGENTS.md) 不变量 5。
 - **长期意图已验证短场景的持续维护，尚非全面覆盖**：六节三轮真实创作已验证首次写回、后续改口替换同一意图文件、保留未撤销偏好和新对话仅读复用，见[组合验收](validation/2026-10-14-continuous-recovery/README.md)。写回仍由 prompt 指导；每轮确定性对账只显示哪些文件改变，不判断全部要求是否正确保存。脚本偏好不冒充作者判断，多来源矛盾消解、长期组织和大上下文压缩后保持仍无充分证据。
@@ -90,7 +89,7 @@
 
 ## 可以声明的能力与限制
 
-可以声明：共享领域内核、Local / Cloud Canon 与显式同步、CLI 与三个 host adapter 成立；自有 Harness、自主 Agent、标准事件与 Electron 创作闭环已实现，经过机制、真实进程与真实调用的验证。
+可以声明：共享领域内核、本地 git Canon、开放作品格式、CLI 与三个 host adapter 成立；自有 Harness、自主 Agent、标准事件与 Electron 创作闭环已实现，经过机制、真实进程与真实调用的验证。
 
 不能声明：完整长篇文学质量、不劣于 host 的文学效果、桌面产品全部视觉与性能目标、正式发行、生产多用户 Cloud 或 SOTA。2026-09-06 的作者盲读仍优先于更早的「效果不劣于」判断。
 

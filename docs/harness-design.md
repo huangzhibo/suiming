@@ -332,7 +332,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 ## 11. 桌面、命令、事件与 owner
 
-命令目录由 `packages/sdk` 定义（为什么是三份，见[系统架构](architecture.md)第 8 节）。session 相关的命令如下；只在一个传输上有的命令标了出处（CLI 是 `SUIM_CLI_COMMANDS`，IPC 是桌面的 `LOCAL_COMMANDS`）：
+命令目录由 `packages/sdk` 定义（为什么是两份，见[系统架构](architecture.md)第 8 节）。session 相关的命令如下；只在一个传输上有的命令标了出处（CLI 是 `SUIM_CLI_COMMANDS`，IPC 是桌面的 `LOCAL_COMMANDS`）：
 
 | 命令 | 语义 |
 | --- | --- |
@@ -361,13 +361,13 @@ Electron 主进程拥有 Runtime、数据库连接、凭据与 session owner。r
 | `tasks(id, session_id, status, data_json)` | kind、key、parent action id、model（冻结）、checkpointRef、usage、result / failure（初始 prompt 在它自己的 checkpoint 里，见第 5 节） |
 | `session_inbox(session_id, sequence, text, queued_at)` | 作者消息队列；第一条消息也在这里 |
 | `session_events(session_id, sequence, event_json)` | AG-UI 事件日志 |
-| `execution_command_receipts` / `execution_objects` / `projects` / `remote_bindings` | 命令回执、执行对象、「哪个目录是哪个 Project」的部署登记、remote binding |
+| `execution_command_receipts` / `execution_objects` / `projects` | 命令回执、执行对象、「哪个目录是哪个 Project」的部署登记 |
 
 checkpoint 按下文 [checkpoint 归档](#checkpoint-归档)的片段引用保存。
 
 **开发期旧库不自动转换，恢复先保全数据。**库只认 v6，遇到旧版本在模型调用前拒绝打开（`unsupported_local_store_schema`），不修改旧表。先退出写入进程，完整备份 `.git`、整个 `.suiming` 与作品文件，使用兼容版本读取原对话。若明确只继续作品，可在另一完整副本中移出整个 `.suiming` 再打开，接回 git 中的 Canon；旧对话不会自动迁入。不能只挪 SQLite 而遗漏日志与 execution objects，具体步骤见[仓库迁移与恢复](repository-recovery.md)。2026-09-13 不为四个旧 Run 写转换器是一次开发期取舍，不是未来升级可丢作者对话的承诺；正式发行仍需按实际支持版本完成升级保全验收，不建立第二执行内核。
 
-**Cloud 没有执行。**执行 adapter 已删，Cloud 只剩 Canon 与显式同步，理由与解冻时的接口位置（`HarnessProjectPort`）见[系统架构](architecture.md)第 9 节。「Local 与 Cloud 服从同一状态转换、每类存储跑同一套契约测试」这条随之从规范里撤下，等有第二个实现再写回来。
+**Cloud 实现已删除。**未来远程部署复用届时的领域与 Harness，不预建第二套状态机，见 [ADR-0030](adr/0030-remove-frozen-cloud.md)。
 
 **模块边界**（从目录树读不出来的）：
 
@@ -447,7 +447,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 启动 / 恢复的初始化 I/O 失败 | 记录原因、释放 lease；checkout 不动 | `agent`「turn 开始时读取作品失败：回 idle 记一句并释放 lease，下一句直接重试」「续跑时读取权威状态失败也释放 lease，并保留 checkout 里的候选文件」 |
 | 收口等待本身卡住 | 有界返回，不把调用方挂死 | `local-session-controller`「waitForIdle 有界：请求收不了口时按时返回，不把调用方挂死」 |
 
-测试层次不变：状态转换单测、faux provider 故障注入、真实 SQLite 重开与进程退出、PostgreSQL adapter 契约、真实模型跨能力委托、Electron 生命周期、作者长篇盲评。上表除 `desktop.test.ts` 那条属于 Electron 生命周期，其余都在前四层；真实模型那一层目前只有样例作品与 eval-022 的局部闭环。
+测试层次不变：状态转换单测、faux provider 故障注入、真实 SQLite 重开与进程退出、真实模型跨能力委托、Electron 生命周期、作者长篇盲评。上表除 `desktop.test.ts` 那条属于 Electron 生命周期，其余都在前三层；真实模型那一层目前只有样例作品与 eval-022 的局部闭环。
 
 ## 15. 已决定与待定
 

@@ -1,6 +1,6 @@
 # 技术栈
 
-本文记录已确认的技术选择及其边界。技术服务产品目标，不定义 Story Language；框架发生变化时，Story Artifact、Domain API 和 Eval 语义应保持稳定。
+本文记录已确认的技术选择及其边界。技术服务产品目标，不定义 Story Language；框架发生变化时，Story Artifact、领域 API 和 Eval 语义应保持稳定。
 
 桌面产品由自有 Runtime / SuimingHarness + pi-ai 支撑：执行方向见 [ADR-0012](adr/0012-own-suiming-harness.md)与 [Harness 设计](harness-design.md)，桌面目标见 [ADR-0011](adr/0011-desktop-product-and-autonomous-runtime.md)，完成度见[当前状态](current-status.md)。
 
@@ -8,21 +8,18 @@
 
 | 层 | 技术 | 用途 |
 | --- | --- | --- |
-| Runtime | Node.js 24；Electron 内置 Node 需实测兼容 | 本地与 Cloud 共享 TypeScript Runtime；桌面在主进程内运行 |
+| Runtime | Node.js 24；Electron 内置 Node 需实测兼容 | 桌面与 CLI 共享 TypeScript Runtime；桌面在主进程内运行 |
 | Language | TypeScript 6，strict | 全部业务代码与协议 |
 | Schema | TypeBox 1.x | Story Language、能力输入输出和 HTTP schema |
 | Monorepo | npm 11 Workspaces | 少量 app/package 的直接管理；暂不引入 Turborepo/Nx |
-| API | Fastify + TypeBox + OpenAPI | Cloud Domain API、鉴权与类型化诊断 |
 | 工作台前端 | React 19 + Vite + TanStack Query + shadcn/ui + Streamdown（Markdown 渲染，含流式）+ CodeMirror 6（源码编辑与 merge 比较） | 桌面首先实现，后续 Cloud Web 复用作品编辑与复杂视图；正文、设计文档与 Agent 消息共用一条 Markdown 管线 |
 | 基础 UI 控件 | shadcn/ui（`base-vega` 样式，底层原语是 Base UI；2026-10-06 由 Radix 换过来）+ Tailwind v4；已接入 `apps/workbench`（组件源码在 `src/components/ui`，由 shadcn CLI 生成后随仓库维护，`shadcn` 作开发依赖钉住版本并提供组件用到的 `shadcn/tailwind.css`） | 导航、按钮、表单、菜单、弹层与分栏基础；故事可视化和作品语义由 Suiming 负责。为什么换见下文 |
 | AI 交互客户端 | AG-UI 官方客户端 `@ag-ui/client`（2026-10-05 起，替换 TanStack AI）；已接 typed IPC | 把 AG-UI 事件拼成消息、按运行生命周期校验整条流；只实现长连接的 `connect()`，不用它的 `run()` 与 HTTP 传输 |
 | Desktop | Electron 44；首个工作台已实现 | 作者面向的本地界面；主进程直接运行 `packages/runtime`，渲染层经 typed IPC，不起 localhost HTTP |
-| CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation 与 Cloud sync |
+| CLI | Commander + TypeBox-derived JSON schema | `suim` executable、host-agent commands、headless automation |
 | Host integrations | Codex / Claude Code / Grok 原生 instructions、Skills 与 `suim --json` | 在现有 coding-agent 产品中直接创作同一个 Local Project |
-| Cloud Database | PostgreSQL + Kysely | Cloud Canon 事务（Project、ArtifactVersion、ProjectRevision）、权限与同步；没有执行数据，也不做数据库搜索 |
 | Local Canon | 作品目录的 git 仓（isomorphic-git）| `refs/suiming/canon` 是权威：revision = commit，快照 = tree，history = 祖先链 |
 | Local Store | SQLite（Node `node:sqlite`）+ content-addressed object directory | **只有执行数据**：Session / Task、inbox、持久事件、命令回执、执行对象、部署登记与同步状态 |
-| Cloud Object | S3-compatible API；开发环境 MinIO | 大 artifact（如 Source 原文）与导出包 |
 | 界面事件 | AG-UI 标准事件 + 类型化 Suiming 扩展；已替换旧事件词汇 | 一份持久事件契约，经进程内 subscription 与桌面 IPC 消费；不长期双写两套协议 |
 | Model | `@earendil-works/pi-ai` | 多 provider 调用、tool calling、structured output 与 streaming |
 | Agent Harness | Suiming 自行实现，参考 pi-agent-core 逻辑 | 唯一模型 / 工具循环、持久动作、交接、控制与恢复；pi-agent-core 依赖已删除，没有预算，有每轮用量检查点（[Harness 设计](harness-design.md)第 10 节） |
@@ -34,11 +31,9 @@
 
 ## 2. 为什么选择这套组合
 
-### Fastify + TypeBox
+### TypeBox 机器边界
 
-Cloud Domain API 同时服务 Web、本地同步和远程外部 Agent，不能只存在于前端框架的 Server Function 中。Fastify 提供轻量服务端和成熟插件边界，TypeBox 让 runtime validation、TypeScript 类型与 OpenAPI 使用同一 schema。
-
-不采用 tRPC 作为唯一 API，也不让 Web 解析 CLI 输出。内部 Agent 直接调用 Domain Service，HTTP 只承担远程边界。
+TypeBox 定义领域对象与命令的机器边界，CLI JSON 和桌面 typed IPC 共用 schema。内部 Agent 直接调用领域服务，不经过 CLI 或 HTTP。Cloud 旧实现与专属依赖已删除；未来启用时再评估传输技术。
 
 ### React + Vite + TanStack
 
@@ -50,7 +45,7 @@ renderer 用 `@ag-ui/client` 管理对外消息（`apps/workbench/src/desktop-ag
 
 **为什么从 TanStack AI 换成 `@ag-ui/client`（2026-10-05）。**TanStack AI 在本仓只用来拼消息：`useChat` 的 `send` 抛错、`isLoading` 恒为 false，它还内嵌另一份 `@ag-ui/core`（0.1.1-canary），`bridge.ts` 靠一次类型强转把两边接起来。AG-UI 的 core 与 client 到了 1.0，换过来之后全链路只剩一份协议版本，拼消息用协议自带的那份逻辑。代价是多了 RxJS 等依赖、没有官方 React 层（自己写了 `useConversation`）；以及官方客户端按运行生命周期校验整条流，Runtime 因此改成每个事件都落在某次运行之内（新建 session 不再发 `suiming.session`，没跑过的对话快照为空，`run-event-stream.test.ts` 守着）。sdk 与 workbench 的 AG-UI 版本要一起升。
 
-首期不采用 Next.js，也不依赖仍在演进的 TanStack Start 全栈层。未来营销站、公开 Reader 或需要 SSR 的产品入口独立评估，不能反向改变作者端 Domain API。
+首期不采用 Next.js，也不依赖仍在演进的 TanStack Start 全栈层。未来营销站、公开 Reader 或需要 SSR 的产品入口独立评估，不能反向改变作者端领域 API。
 
 产品与交互真源见[作者工作台设计](workbench-design.md)，参考 Langfuse 界面模式的边界在它的第 8 节。
 
@@ -64,7 +59,7 @@ Electron 是核心作者应用；`apps/desktop` 承载主进程 / preload，`app
 
 ### CLI
 
-`suim` **无子命令时只打印用法**，不进入任何交互界面；`session send` 提供 headless Agent，其余领域与 Cloud 子命令调用同一 application service。所有供 host adapter 使用的命令都提供版本化 JSON schema 与明确 exit code。
+`suim` **无子命令时只打印用法**，不进入任何交互界面；`session send` 提供 headless Agent，其余领域子命令调用同一 application service。所有供 host adapter 使用的命令都提供版本化 JSON schema 与明确 exit code。
 
 ### Coding-agent integrations
 
@@ -76,27 +71,15 @@ host-native 模式使用 Codex / Claude Code / Grok 已配置的模型、凭据�
 
 界面事件用 AG-UI 标准消息、工具、Step / Activity 和交互生命周期承载通用事件，以 TypeBox 校验的 Suiming 扩展表达作品版本与持久 session 状态；标准 schema 复用上游，不手抄字段表。选它而不是继续自定义 RunEvent，也不是在 RunEvent 之外另建一层 AG-UI 投影：前者要自己维护通用协议、消息状态和界面集成，后者要长期维护两套事件词汇与映射；原生 AG-UI 加受校验的扩展只留一份界面事件契约，还能复用通用客户端。采用标准不消除业务定制，也不保证总成本一定低于自研。
 
-事件契约与恢复规则（持久序号、先持久后发布、attach 只读、`threadId` / `runId` 的对应）见[系统架构](architecture.md) 6.5 与 [Harness 设计](harness-design.md)第 11 节。Cloud 侧没有事件存储，Cloud 产品继续冻结。
-
-### Cloud PostgreSQL + Kysely
-
-PostgreSQL 保存 Cloud 的作品 revision、ChangeSet、权限与审计。Story Search 不在数据库里：它是纯函数 `searchStoryCandidate`（[系统架构](architecture.md) 6.3），Cloud 现在不提供搜索，将来要有也调它。基于表达意图检索 Story Artifact 是稳定领域能力，将来换 embedding 或专用检索服务属于可替换实现，要经中文长篇消融证明收益。Kysely 保留 SQL 与事务心智模型，不要求把 Story Artifact 变成 ORM entity，也不引入代码生成客户端。
-
-只使用 Kysely 的公开 PostgreSQL dialect、transaction 与 SQL 能力，不自定义 SQL dialect，不让查询构建器进入 Story Core。
-
-数据库 driver 与 adapter 位于独立 `@suiming/cloud-postgres` 包，`packages/runtime` 只保留领域 port、reference semantics 和不可变 migration catalog，不直接依赖 Kysely / `pg`。composition root 创建并负责关闭 connection pool。migration runner 在一个 PostgreSQL transaction 中先取得固定 advisory lock，再核对 `suiming.schema_migrations` 是当前 catalog 的连续前缀与 checksum；所有待执行 statement 和 history insert 一起提交，任何失败都不留下半次 schema。多个 API 实例并发启动时允许等待同一 lock，不能各自猜测 migration 状态。
-
-`PostgresCloudProjectStore` 在 object write 和 Checker 完成后才开启数据库 transaction；transaction 持有 Project row lock，重新检查 capability、幂等 receipt 与 base revision，再一起写入 ArtifactVersion reference、ChangeSet、ProjectRevision、head 和 receipt。ArtifactVersion 以 media type 与内容 hash 派生稳定 ID，文本可 inline，大对象只保存规范 object key；同 key 并发请求读取同一 receipt，不会生成两个 revision。数据库中的 ChangeSet JSONB 引用 ArtifactVersion，不复制 base64 大内容。
-
-`packages/cloud-postgres` 只有 `PostgresCloudProjectStore` 与 `PostgresArtifactVersionStorage`，即 Canon 与同步。Cloud 没有执行，为什么删、解冻时从哪里接，见[系统架构](architecture.md)第 9 节。
+事件契约与恢复规则（持久序号、先持久后发布、attach 只读、`threadId` / `runId` 的对应）见[系统架构](architecture.md) 6.5 与 [Harness 设计](harness-design.md)第 11 节。
 
 ### Local SQLite 与 Open Story Directory
 
-本地产品使用 Node.js 自带的 `node:sqlite`，避免要求用户安装 PostgreSQL、Docker 或 Cloud account。SQLite 只保存执行数据与部署登记——Session、Task、inbox、持久事件、命令回执与同步元数据；作品版本在作品目录的 git 仓里；大型或二进制字节进入 `.suiming` 下按内容寻址的 object directory。作品的事务与 baseRevision 语义由 git Canon 承担（`CanonStore` 契约，`change_set_stale` 拒绝陈旧基线），与 Cloud 的 PostgreSQL 实现是同一套语义；SQLite 这边只对执行数据做版本检查，保留本机进程锁并以每次领取的 ownerId 拒绝旧 owner 写入，不模拟分布式 Worker 服务。
+本地产品使用 Node.js 自带的 `node:sqlite`，避免要求用户安装 PostgreSQL、Docker 或 Cloud account。SQLite 只保存执行数据与部署登记——Session、Task、inbox、持久事件、命令回执；作品版本在作品目录的 git 仓里；大型或二进制字节进入 `.suiming` 下按内容寻址的 object directory。作品的事务与 baseRevision 语义由 git Canon 承担（`CanonStore` 契约，`change_set_stale` 拒绝陈旧基线）；SQLite 这边只对执行数据做版本检查，保留本机进程锁并以每次领取的 ownerId 拒绝旧 owner 写入，不模拟分布式 Worker 服务。
 
-Open Story Directory 是 Local Project 的 checkout，也是 repository-native integrations 和 `cloud checkout` 的统一目录格式。外部工具可以直接修改它，Runtime 通过确定性扫描和内容 hash 计算 status / diff，经 Checker 后在内部生成 ChangeSet；外部工具不提交 ChangeSet schema。更新多文件 checkout 时使用 journal + 临时文件 + atomic rename，并在下次启动时恢复；SQLite transaction 与文件系统无法假装成一个跨介质事务。
+Open Story Directory 是 Local Project 的 checkout，也是 repository-native integrations 的目录格式。外部工具可以直接修改它，Runtime 通过确定性扫描和内容 hash 计算 status / diff，经 Checker 后在内部生成 ChangeSet；外部工具不提交 ChangeSet schema。更新多文件 checkout 时使用 journal + 临时文件 + atomic rename，并在下次启动时恢复；SQLite transaction 与文件系统无法假装成一个跨介质事务。
 
-`.suiming` 不属于开放作品格式，不随 export 或默认 Cloud push 上传。remote binding 也位于其中，但 secret 只保存在用户级配置、环境变量或 OS credential store。作品目录本身就是 git 仓：ProjectRevision 是 `refs/suiming/canon` 上的 commit，作者或 host 自己的普通 commit 只是候选，进不了 Canon（[系统架构](architecture.md) 4.3）。
+`.suiming` 不属于开放作品格式，不随作品 export 导出；secret 只保存在用户级配置、环境变量或 OS credential store。作品目录本身就是 git 仓：ProjectRevision 是 `refs/suiming/canon` 上的 commit，作者或 host 自己的普通 commit 只是候选，进不了 Canon（[系统架构](architecture.md) 4.3）。
 
 本地修改命令需要 project-scoped process lock；所有提交仍检查 baseRevision。文件枚举与 Open Story Package 使用同一个 story package codec：识别的 Artifact 进入 snapshot，`.suiming` / `.git` 和明确的仓库辅助文件不进入，Story Language 保留路径下的未知文件则报错，避免静默丢失。扫描拒绝 project root 外 symlink / path traversal。host 侧的 `rg` 只用于召回可读 checkout 内容，结果仍要回到已识别 artifact 才能作依据；Suiming Agent 没有 `rg`，搜索走 `searchStoryCandidate`。
 
@@ -104,13 +87,13 @@ Runtime 只实现当前 story package codec，不读取旧 `.suim`，也不提�
 
 ### OpenTelemetry + Langfuse
 
-Suiming 直接使用 OpenTelemetry 埋点，现有 pi-telemetry 显式 TelemetryContext port 与 NOOP 保留，不引入 Agent framework integration。Local / Cloud composition root 负责 SDK 与 exporter。每次进程内驱动使用有限 trace，模型、工具与 Checker 形成 span；恢复沿用同一个 Session / Task，以新 trace 关联，不能让跨重启的 Session 对应一个必须恢复的长 span。
+Suiming 直接使用 OpenTelemetry 埋点，现有 pi-telemetry 显式 TelemetryContext port 与 NOOP 保留，不引入 Agent framework integration。桌面与 CLI composition root 负责 SDK 与 exporter。每次进程内驱动使用有限 trace，模型、工具与 Checker 形成 span；恢复沿用同一个 Session / Task，以新 trace 关联，不能让跨重启的 Session 对应一个必须恢复的长 span。
 
-Langfuse 是可选的 OpenTelemetry 后端，用于查看调用树、经数据策略允许的 Prompt 与响应、延迟、token、缓存、成本、错误和辅助 score。它帮助我们避免自建通用 trace UI，但可关闭、替换或自托管，故障不能影响创作和任务恢复。CLI 退出时调用有界 shutdown，由 SDK 导出已结束的 span 并关闭 provider，不再叠加两次等待；桌面主进程在 5 秒的退出窗口内为保存和观测收尾分配时间。Cloud API 接线随真实 engine host 实现推进。执行存储保留恢复所需消息、准确调用绑定与 Context 引用、动作结果、权威用量和 trace 关联；数据归属见 Harness 设计。trace 可丢失，不能作为这些数据的唯一保存位置。
+Langfuse 是可选的 OpenTelemetry 后端，用于查看调用树、经数据策略允许的 Prompt 与响应、延迟、token、缓存、成本、错误和辅助 score。它帮助我们避免自建通用 trace UI，但可关闭、替换或自托管，故障不能影响创作和任务恢复。CLI 退出时调用有界 shutdown，由 SDK 导出已结束的 span 并关闭 provider，不再叠加两次等待；桌面主进程在 5 秒的退出窗口内为保存和观测收尾分配时间。执行存储保留恢复所需消息、准确调用绑定与 Context 引用、动作结果、权威用量和 trace 关联；数据归属见 Harness 设计。trace 可丢失，不能作为这些数据的唯一保存位置。
 
 桌面主进程 → Workspace → Controller → Harness → Gateway 全程接了观测。开发时从仓库根目录运行 `npm run dev:desktop`，启动脚本加载根 `.env`，已有进程环境优先；直接运行 Electron 需由启动环境提供配置。Langfuse keys 只留在主进程。OTLP 发送 v4 header，并向子 observation 传播 session、turn / Task 与 project 的可筛选关联字段。Review 归属父 Task；模型、工具与阶段提交 Checker 分别记录。缓存 token 按互斥分类上报，费用使用实际消息用量中的金额。默认不采集 prompt / 正文，通用异常仅记录类型；导出失败或超时用脱敏诊断码报告，不影响领域结果。验收见[Langfuse 检查与修复](validation/2026-09-11-langfuse-audit.md)。
 
-Langfuse 的 Prompt、Dataset、Experiment 和 Score 不作为 Suiming 真源。故事专属 Eval 需要绑定完整 ProjectRevision、Context、候选、随机重复、paired blind result、作者修改和发布反馈，由 Suiming 保存；需要观察时可以把其 score 副本发送给 Langfuse。完整 Prompt、provider payload 和 stream event 不默认长期复制进 Cloud PostgreSQL 或 Local SQLite。
+Langfuse 的 Prompt、Dataset、Experiment 和 Score 不作为 Suiming 真源。故事专属 Eval 需要绑定完整 ProjectRevision、Context、候选、随机重复、paired blind result、作者修改和发布反馈，由 Suiming 保存；需要观察时可以把其 score 副本发送给 Langfuse。完整 Prompt、provider payload 和 stream event 不默认长期复制进 Local SQLite。
 
 ### `@earendil-works/pi-ai`
 
@@ -158,16 +141,13 @@ thinking = "low"
 [models.profiles.source-reader.options]
 maxTokens = 32768
 
-[cloud]
-endpoint = "https://cloud.suiming.example"
-actor_id = "author-id"
 ```
 
 `main` 以外的 profile（`writer`、`reviewer`、`source-reader`、`source-extractor`、`judge`）都可省略，省略时跟随这次对话的模型（`ModelGateway.followsConversation`；2026-10-05 之前复用 `main`，作者给一段对话另选了模型，委派出去的子任务仍用默认模型）。只设了 `options` 或 `thinking` 的算单独配置，模型沿用 `main`。这不是自动 Router，而是按 Task kind 选择并冻结实际 profile。`thinking` 是设置页写的档位，绑定时由 Gateway 转成 provider 的 API 参数（[Harness 设计](harness-design.md)「对话模型选择与默认配置」）；provider 的原生参数也可以直接写在 `options` 里。
 
 示例沿用本项目真实调用过的 provider / 模型（`deepseek-flash` 是 DeepSeek 官方 V4.1 Flash 在 pi-ai 目录里的 id；旧的 `deepseek-v4-flash` 已从官方 provider 目录消失，写它会报找不到模型），不表示已证明它的文学质量最优；模型 id 随 pi-ai 升级可能再变，以安装版本的目录为准。正式盲排实验按协议选择 `judge`，不在可复制配置中留下虚构模型名。实际可用参数以安装版本的 provider schema 为准。
 
-`[cloud]` 只保存非敏感 endpoint 与本地登录主体；`suim cloud` 的解析优先级为命令行 → `SUIMING_CLOUD_*` 环境覆盖 → 用户配置。endpoint 另有一层：已经建立的 remote binding 保存该 Project 实际使用的 endpoint，它只让位于命令行，优先于环境覆盖与用户配置。API key、OAuth token、Cloud access token 和其它秘密不写入 `config.toml`。Suiming 为 `pi-ai` 注入持久 `CredentialStore`：首期可以使用权限为 `0600` 的 `~/.suiming/auth.json`，macOS 后续可由同一 store port 改接 Keychain；Cloud 使用加密 secret store。本地开发期 Cloud SDK composition root 从 `SUIMING_CLOUD_ACCESS_TOKEN` 注入 Bearer token，正式登录态再接独立的系统 credential store。用户级模型认证按 provider id 保存，例如 `qwen-token-plan-cn` 与 `qwen-token-plan-individual` 是两个独立 credential scope。
+旧配置的 `[cloud]` 段不再生效，加载时忽略它，不重写用户文件。API key 与 OAuth token 不写入 config.toml；pi-ai 的 CredentialStore 使用权限为 0600 的用户级 auth.json，macOS Keychain 可按同一凭据端口扩展。凭据按 provider id 隔离。
 
 `[models].disabled_providers` 保存本机停用的 provider id，未列出的默认启用。它独立于凭据与 profile；模型目录隐藏停用项，Model Gateway 拒绝新绑定（包括显式模型选择），冻结绑定继续按 turn 的绑定快照恢复。桌面开关经唯一 SDK 命令 `models.provider.setEnabled` 写入同一 config.toml，不另建偏好数据库。
 
@@ -177,20 +157,12 @@ actor_id = "author-id"
 
 凭据按 provider 的实际认证接口、权限、额度和错误处理接入。删除仅依据 `isSubscription` 或 provider 名单禁止 automation 的判断，以及仅服务于此的 `ModelCredentialUse`、CLI 选项和观测字段；不保留虚假的用途开关。当前代码已删除该规则及其专用配置。某个 OAuth provider 在 pi 中存在，不等于 Suiming 已完成登录、刷新、取消与恢复验收，也不等于标准 API 能消费另一产品的订阅。
 
-### Cloud S3-compatible Object Storage
-
-PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、媒体、导出包、备份，以及恢复、审计或 Eval 明确需要长期保存的大型 Context 与模型输出进入对象存储。普通 trace payload 服从观测后端的保留策略，不默认再复制一份。对象存储中的长期对象由数据库保存引用、权限、类型和生命周期。
-
-本地没有 ArtifactVersion（作品版本是 git blob），只有执行对象沿用同一套内容标识与 inline 判定（`artifact/version-storage.ts`）。Cloud 对外置内容先以 SHA-256 key 幂等写对象存储，并核对返回的 hash、key 与 byte length，再在 PostgreSQL transaction 中写 ArtifactVersion 引用和推进 Project head；对象写失败时不开始数据库提交，数据库失败时只可能留下未引用对象，由后续 GC 回收。不得用“先推进 revision、再补传对象”的顺序制造可见但无法读取的 Canon。
-
-独立 `@suiming/cloud-s3` 使用 AWS SDK v3 实现该 port。逻辑 key 固定为 `objects/sha256/<prefix>/<hash>`，部署 prefix 只作用于 bucket 内的物理路径；写入同时携带 SHA-256 checksum、hash 与 byte-length metadata，读取必须重新计算内容 hash 并交叉核对响应长度、metadata 与可用 checksum。S3 client 由 deployment composition 创建并显式关闭，AWS 默认 credential chain 与显式 S3-compatible endpoint 均留在 adapter 边界。真实 MinIO 测试已覆盖跨实例读取、重复 put、输入拷贝、损坏对象拒绝、not-found 与幂等删除。
-
 ## 3. 暂不引入
 
 | 技术 | 暂不采用的原因 | 重新评估条件 |
 | --- | --- | --- |
 | TypeScript 7（原生编译器） | 2026-10-07 评估：在本仓上 0 错误、182 个 JS 产物逐字节相同，`npm run check` 22.6 s → 13.5 s，只省约 10 s。7.0 没有编程接口，工作台设计系统检查用的 `@typescript-eslint/parser` 只支持到 6.0，要靠官方的两版并存（`@typescript/native` 指向 7、`typescript` 别名到 `@typescript/typescript6`）——实测不冲突，但多一个过渡状态，编辑器与命令行也不是同一个版本。同日查的主流：VS Code、typescript-eslint 自己两版并存，Electron、pi 只装 7；Playwright、Vite、Next.js、Vue、Angular、Astro、TanStack Query 与两家模型 SDK 仍在 6.0 | TypeScript 7.1 正式版（计划 2026-11-24，带稳定的编程接口）发布、typescript-eslint 也发布了支持 7.1 的版本，就直接换成只装一份 7；检查速度先成了瓶颈、或 typescript-eslint 迟迟不跟，就用并存方案 |
-| Redis / BullMQ | 增加一致性与运维边界；Cloud 现在没有执行，也就没有任务队列 | Cloud 执行解冻后，任务领取成为可测瓶颈 |
+| Redis / BullMQ | 增加一致性与运维边界；本地没有分布式任务队列需求 | 远程执行成为真实需求且任务领取出现可测瓶颈 |
 | Tauri | Runtime 是 Node，Tauri 需要把它做成 sidecar 并经 IPC / HTTP 通信，把 Electron 主进程能直接消掉的进程边界加回来 | Runtime 不再依赖 Node，或 Electron 体积成为分发的实证障碍 |
 | Obsidian 插件 | 最快能用，但产品会绑在别人的平台、插件模型和私有状态上，与拒绝 fork coding agent 的理由相同 | 不重新评估；把目录当 vault 打开阅读不在此限 |
 | ClickHouse | 适合海量 trace 分析，不适合 Story Canon | 官方云观测量超出 Langfuse/托管后端能力 |
@@ -212,19 +184,10 @@ PostgreSQL 保存普通 Markdown/JSON artifact 和元数据；超大 Source、�
 桌面是核心本地发行物；host integrations 由 host 调用同一个 `suim`。本地作品能力不依赖 Cloud：
 
 ```text
-Electron renderer → typed IPC → 主进程 Runtime → SQLite + 对象目录
+Electron renderer → typed IPC → 主进程 Runtime → git Canon + SQLite / 对象目录
                                       ├→ SuimingHarness → pi-ai → model provider
-suim CLI      → 同一 Runtime           └→ optional Cloud SDK
+suim CLI      → 同一 Runtime           └→ 本地作品目录
 Codex / Claude Code / Grok → checkout + suim 领域命令
 ```
 
-Cloud 现在只有一个应用，承担 Canon 与显式同步：
-
-```text
-api ──→ PostgreSQL
- └───→ S3-compatible Object Storage
-
-api ┄┄OpenTelemetry（尚未接线）┄┄→ optional Langfuse
-```
-
-Cloud 开发环境使用 PostgreSQL 与 MinIO；API 从显式环境配置建立连接并有界关闭。当前静态 bearer token 只用于单 actor 开发，生产 identity 冻结。Cloud Web 与执行 host 冻结，解冻时从哪里接见[系统架构](architecture.md)第 9 节；共享契约变了，已有 adapter 随之修正，但不借此启动 Cloud Web 或远程 Agent 产品建设。
+Cloud 代码已移除。未来按 [ADR-0030](adr/0030-remove-frozen-cloud.md) 从届时核心设计，不维护第二套冻结部署。

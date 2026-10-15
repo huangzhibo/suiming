@@ -10,14 +10,14 @@
 2. 先把共享 Runtime 的恢复与事务接缝做正确，再接 renderer；Local / Cloud 不复制引擎，不在 UI 临时实现执行状态机。
 3. 复用 pi-ai 模型协议，参考 pi-agent-core 逻辑自行实现唯一 Harness；执行状态、Context、交接与作品事务直接结合，不建设通用 Agent 平台或第二执行后端。
 4. 每阶段交付一个可验证的纵向结果；真实作品、revision 和作者记录先备份，不能随执行数据迁移丢弃。
-5. Dataset 来自真实创作；机制测试不能代替模型与作者证据。Cloud Web、生产 identity / 计费和全功能 MCP 保持冻结，已有 persistence / protocol adapter 随共享契约修正。
+5. Dataset 来自真实创作；机制测试不能代替模型与作者证据。Cloud Web、生产 identity / 计费和全功能 MCP 保持冻结，旧 Cloud 实现已删除，不维护冻结 adapter。
 
 ## 2. 里程碑总览
 
 | 里程碑 | 状态 | 结果与边界 |
 | --- | --- | --- |
 | M1–M3 | 完成 | 共享领域 Runtime、目录 codec、SQLite、CLI 与三个 host 入口 |
-| M4 Cloud Runtime | 收缩后冻结 | PostgreSQL / S3 Canon、Domain API 与显式同步；没有执行，解冻时的接口位置见[系统架构](architecture.md)第 9 节 |
+| M4 Cloud Runtime | 旧实现已删除，暂不实施 | 未来基于届时核心重新设计，见 [ADR-0030](adr/0030-remove-frozen-cloud.md) |
 | M5 Creative Loop | 领域能力完成，真实长篇未完成 | 已有局部真实创作与作者反馈；R / C 质量工作贯穿以下 S 阶段 |
 | S0–S4 桌面工作台与自主 Agent | 完成，已收敛到 Session 模型 | 见第 4 节；现在的形状以 Harness 设计、系统架构与作者工作台设计为准 |
 | S5 长篇、可视化与发行 | 进行中 | 2026-09-16 重构后第一次真实对话已存为基线；3 卷 30 Beat、作者选择、可视化深化与可安装桌面应用未完成 |
@@ -91,7 +91,7 @@ Harness 余下的切片（E：research 工具；F：`run_command`）见 [Harness
 
 Cloud Web 复用桌面已完成的 React 工作台与同一事件契约，不再创建另一套 UI 或 Agent。解冻条件保留真实创作、质量与产品正确性证据；进入前明确远程作者编辑和候选持久化边界，复用现有 artifact / commit 语义，不预建 Cloud Draft 服务。
 
-届时补齐共享 SuimingHarness 的 Cloud host、远程身份与权限、SSE attach 和远程编辑恢复；生产 identity / 计费、多人协作与全功能 MCP 独立按真实需求验收。现有 PostgreSQL / S3 / sync adapter 不因冻结而允许与共享契约脱节。
+届时基于共享 SuimingHarness、Canon 与开放作品格式重新设计远程执行、身份、同步与恢复，不沿用旧存储或协议作为既定前提。生产 identity / 计费、多人协作与全功能 MCP 按真实需求独立验收。
 
 ## 6. 立即执行队列
 
@@ -122,6 +122,8 @@ Cloud Web 复用桌面已完成的 React 工作台与同一事件契约，不再
 2026-10-15 已建立[macOS 自含预览与安装回退验收](validation/2026-10-15-macos-install/README.md)：生产 `.app` 的首次启动、新建、同格式构建替换与冷备份回退均在隔离目录验证；启动失败原因不再只留日志。当前只覆盖本机 arm64、执行库 v6 与相同 Story Language，不等于签名发行或历史版本迁移。
 
 2026-10-15 已完成[签名准备与 ad-hoc 演练](validation/2026-10-15-macos-signing/README.md)：复用官方签名工具及 Apple 命令，补齐公证失败停止与编号保留，修复本地演练的启动崩溃并验证新包冷启动和数据保全。本机没有 Developer ID Application、未指定公证 profile；所需身份与操作已集中列入[准备指南](macos-preview.md#签名与公证准备)。这些前提齐备前，正式发行项保持待验，不重复跑 ad-hoc 来替代。
+
+2026-10-15 按 [ADR-0030](adr/0030-remove-frozen-cloud.md) 删除旧 Cloud 实现、同步命令及专属依赖，保留本地 Canon、作品格式与对话恢复；验证记录见[删除与保全验收](validation/2026-10-15-remove-cloud/README.md)。不把已删除的 Cloud 用例列为桌面待补测试，未来 Cloud 启动时按届时核心重新设计。
 
 1. **继续自主验证日常使用与恢复体验。**
    - 2026-10-15 按作者要求暂缓正式 Developer ID 签名、公证及其后续下载首次安装验收；不要求现在购买会员或准备身份。这些是对外发行前的待办，不阻塞本机功能验证，也不因暂缓而宣称发行完成。

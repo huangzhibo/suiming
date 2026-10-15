@@ -12,7 +12,7 @@ Codex、Claude Code 和 Grok Build integrations 共用 [`shared/suiming/SKILL.md
 
 安装由 `suim init --agent <host>`（新作品）或 `suim update --agent <host>`（已初始化作品补接或刷新）完成。在作品目录运行不带 `--agent` 的 `suim update` 会刷新全部已安装接入；未初始化的目录先运行 `suim init`。
 
-安装写入 Skill、随 Skill 一起的 `story-language/` 文档、host 的 agent 文件（目前只有 Codex 有）、入口文件（`AGENTS.md` / `CLAUDE.md`）里的 Suiming 标记段和 `.gitignore` 标记段。标记段只刷新标记之间的内容，其余保留。写入的都是仓库辅助文件，不修改作品 artifact，也不登录 Cloud。
+安装写入 Skill、随 Skill 一起的 `story-language/` 文档、host 的 agent 文件（目前只有 Codex 有）、入口文件（`AGENTS.md` / `CLAUDE.md`）里的 Suiming 标记段和 `.gitignore` 标记段。标记段只刷新标记之间的内容，其余保留。写入的都是仓库辅助文件，不修改作品 artifact。
 
 装好后在作品目录打开 host，直接说明创作要求，例如：
 

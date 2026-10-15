@@ -18,7 +18,7 @@
 - **(b) 那之后有没有变？变了哪些？**
 - **(c) 模型 / Reviewer 当时读了什么？**
 
-Canon 是带历史的版本库：每个 revision 是一整棵树，祖先链是历史（本地是 git；Cloud 还没接上同一套契约，见第 3.2 节末）。于是：
+Canon 是带历史的版本库：每个 revision 是一整棵树，祖先链是历史（当前实现是 git）。于是：
 
 - (a) = **X 最后一次变化所在的 revision**（`writtenAt(path)`），那个 revision 下的树就是当时的 Design。不需要另存一份 hash 表——树本身就是 hash 表。
 - (b) = 两个 revision 之间**相关路径**的 diff。「相关」不是整个 Design（那样任何改动都让全书正文变黄，等于没有信号），而是 X 的 **Design 闭包**：Writer 写那份正文时拿到的 Design——这个 Beat 自己、它 refs 的人物 / 地点 / 资源 / World 文档、只出现在它硬状态变化里的人物与物品、它碰到的 Contract、适用的 Intent、`world/core` 与 story index。这就是「Design 变了会不会影响这份正文」的边界。实现是 `designClosurePaths`，它与 Write Context 都从 `beatDesign`（`artifact/beat-design.ts`）取这份选择，`write-context.test.ts` 断言两边一个文件不多不少（同日早些时候两边还各写一份：Writer 拿不到 world/core 与只在 changes 里出现的参与者，闭包却算上了；2026-10-04 改；此前借用 Design Frame，Frame 会载入整卷的 Beat 与全部 Contract、Intent，同卷任何一节一改，整卷正文都被标成 design-changed）。别的 Beat 的 `changes` 会改变这一节进入时的硬状态，按文件比时不算进来；人物已死仍被引用这类由 Checker 报。story index 只按这个 Beat 的那一段算：所在卷的 id 与标题、故事顺序里的前一个与后一个 Beat；整份 `index.yaml` 变了而这一段没变，不算变化。不这样的话，斗破 host 运行在全书末尾加一卷续写，原作 27 篇正文全成了 design-changed，连载式写法每加一节都会这样。
@@ -57,7 +57,7 @@ Checker 对它们只查形状：`review/**` 与 `source/<id>/notes/**` 的 front
 
 谁在用：Agent 查覆盖率用 `source_coverage` 工具，CLI 是 `suim source list` 的 `coverage`，Source 审稿与合并任务的输入（`renderSourceNotes`）读同一份，桌面还没有覆盖率视图；`suim review show` 是读文件加 `reviewCurrency`；`suim release status` / `publish` 用 `releaseReadiness`，`publish` 仍生成 `release/**`。桌面每个 Beat 显示「写于哪个版本 · 设计未变 / 设计已变：N 个文件」，只给个数，`changed` 的清单还没在界面上列出；审稿页与故事轴的审稿泳道读 `review/**` 加 `reviewCurrency`，finding 的段落锚点由 `anchors.ts` 从引文派生。
 
-可移植与 Cloud：Open Story Directory 是 git 仓，`git clone` / `git bundle` 带走历史，派生状态在任何一处算出来都一样。Open Story Package 是快照，没有历史：导入即一次提交，所有正文的 `writtenAt` 就是导入 revision，全部 `current`。这是如实的——快照里本来就没有更早的信息；原先整包搬 evidence，局部改动就全丢，反而更脆。`RevisionHistoryReader` 目前只有 git 实现，Cloud PostgreSQL 还没接上 `CanonStore` 契约，也不算这些派生状态（AGENTS.md 不变量 3）；接上之后用两个 snapshot 的 hash 表相减就能跑同一份代码。
+可移植：Open Story Directory 是 git 仓，`git clone` / `git bundle` 带走历史，派生状态在任何一处算出来都一样。Open Story Package 是快照，没有历史：导入即一次提交，所有正文的 `writtenAt` 就是导入 revision，全部 `current`。这是如实的——快照里本来就没有更早的信息；原先整包搬 evidence，局部改动就全丢，反而更脆。`RevisionHistoryReader` 当前由 git 实现；未来新增存储必须通过 Canon 契约并提供同等历史读取能力。
 
 ## 4. 拆掉的代码
 
