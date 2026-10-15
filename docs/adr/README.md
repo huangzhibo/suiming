@@ -34,4 +34,6 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0028](0028-macos-preview-delivery.md) | Accepted | 自含 macOS 预览应用与真实安装测试；同格式替换和完整冷备份回退，启动失败必须可见 |
 | [0029](0029-search-keyboard-continuity.md) | Accepted | 搜索到编辑保持焦点与返回条目，两个搜索入口共用键盘行为，更多结果完整可达 |
 
+| [0030](0030-remove-frozen-cloud.md) | Accepted | 删除冻结 Cloud 实现与专属协议，保留本地核心和数据，未来按届时核心重建 |
+
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。
