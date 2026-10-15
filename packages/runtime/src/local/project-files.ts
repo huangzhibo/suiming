@@ -182,8 +182,23 @@ export async function saveProjectFile(
 ) {
 	const lock = await LocalProjectLock.acquire(root, { waitMs: 5000 });
 	try {
-		const current = await readProjectFile(root, input.path);
+		const current = await readProjectFile(root, input.path).catch((error: unknown) => {
+			// 显式恢复缺失的辅助文件也走同一份 CAS；普通保存不把删除当成空文件覆盖。
+			if (error instanceof ArtifactError && error.code === "file_not_found") {
+				if (input.expectedSHA === null) return absentStoryFile(input.path, classify(input.path), true);
+				throw new ArtifactError(
+					"checkout_edit_conflict",
+					"文件已被删除或移动；草稿仍保留，请恢复到原路径或打开新路径",
+				);
+			}
+			throw error;
+		});
 		if (!current.writable) throw new ArtifactError("file_write_forbidden", "该文件仅供查看");
+		if (current.sha256 === null && input.expectedSHA !== null)
+			throw new ArtifactError(
+				"checkout_edit_conflict",
+				"文件已被删除或移动；草稿仍保留，请恢复到原路径或打开新路径",
+			);
 		if (current.sha256 !== input.expectedSHA)
 			throw new ArtifactError("checkout_edit_conflict", "文件已被外部修改；请比较差异后再保存");
 		const env = new ConfinedExecutionEnv({

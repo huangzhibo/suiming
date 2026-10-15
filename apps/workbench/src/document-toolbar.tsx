@@ -66,11 +66,16 @@ export function DocumentToolbar({
 	selectContent(view: BeatView): void;
 }) {
 	const kind = pageKind(view.page);
-	const raw = kind === "file" || kind === "diff" ? pageTarget(view.page) : file?.path;
+	const raw =
+		kind === "file" || kind === "diff" ? pageTarget(view.page) : kind === "artifact" ? view.page : file?.path;
 	const beat = kind === "artifact" && file?.kind === "story-beat" && file.namespace === "target";
 	const textPath = beat && file ? textPathFor(file.localId) : "";
 	const current =
-		view.edit !== "read" && view.targetPath ? view.targetPath : beat && view.beatView === "text" ? textPath : raw;
+		(view.edit !== "read" || !file) && view.targetPath
+			? view.targetPath
+			: beat && view.beatView === "text"
+				? textPath
+				: raw;
 	const history = view.tabs[view.active];
 	const breadcrumbs: { label: string; action?: () => void }[] = [];
 	if (kind === "file" && raw) {
@@ -254,7 +259,7 @@ export function DocumentToolbar({
 								<DropdownMenuRadioGroup
 									value={view.edit}
 									onValueChange={(value) => {
-										if (value === "read") patch({ edit: "read", targetPath: "" });
+										if (value === "read") finish();
 										else edit(current);
 									}}
 								>
@@ -306,7 +311,7 @@ export function DocumentToolbar({
 							</>
 						)}
 						{current && !fileAvailable && (
-							<p className="px-2 py-1 text-xs text-muted-foreground">正文尚未保存，暂不能定位文件。</p>
+							<p className="px-2 py-1 text-xs text-muted-foreground">当前路径没有文件，暂不能定位。</p>
 						)}
 					</DropdownMenuContent>
 				</DropdownMenu>

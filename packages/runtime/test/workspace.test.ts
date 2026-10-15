@@ -721,3 +721,41 @@ test("运行中停用提供商拒绝新的 send，保留当前回复与凭据，
 			await rm(configRoot, { recursive: true, force: true });
 		}
 	}));
+
+test("外部删除与重命名：普通保存拒绝，显式恢复沿用空基线 CAS 且不覆盖后来文件", async () =>
+	fixture(async (project, root) => {
+		const workspace = new LocalWorkspace(project, async () => {
+			throw new Error("不能调用模型");
+		});
+		const head = project.project().headRevisionId;
+		for (const path of ["world/characters/黄盖.md", "notes.md"]) {
+			if (path === "notes.md") await writeFile(join(root, path), "辅助笔记");
+			const original = await workspace.invoke("workspace.file.read", { path });
+			await rename(join(root, path), join(root, `${path}.moved`));
+			await assert.rejects(
+				workspace.invoke("workspace.file.save", {
+					path,
+					content: "旧草稿",
+					expectedSHA: original.sha256,
+				}),
+			);
+			await assert.rejects(readFile(join(root, path)), { code: "ENOENT" });
+			await workspace.invoke("workspace.file.save", { path, content: "恢复的草稿", expectedSHA: null });
+			assert.equal(await readFile(join(root, path), "utf8"), "恢复的草稿");
+			assert.equal(await readFile(join(root, `${path}.moved`), "utf8"), original.content);
+			await assert.rejects(
+				workspace.invoke("workspace.file.save", {
+					path,
+					content: "不得覆盖",
+					expectedSHA: null,
+				}),
+				{ code: "checkout_edit_conflict" },
+			);
+			assert.equal(await readFile(join(root, path), "utf8"), "恢复的草稿");
+		}
+		for (const path of ["../escaped.md", ".git/deleted.md", ".suiming/deleted.md"])
+			await assert.rejects(
+				workspace.invoke("workspace.file.save", { path, content: "不能越界", expectedSHA: null }),
+			);
+		assert.equal(project.project().headRevisionId, head);
+	}));

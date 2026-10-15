@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StoryAxis } from "./axis/StoryAxis.js";
 import { invoke } from "./bridge.js";
@@ -103,6 +104,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		changed,
 		anyChanged,
 		conflict,
+		missingFile,
 		rawFile,
 		fileDiagnostic,
 		editable,
@@ -155,6 +157,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				[editPath]: { content: buffer, baseContent: editFile.content, baseSHA: editFile.sha256 },
 			},
 		}));
+		setError("");
 		setNotice("外部版本已设为基线；编辑内容仍保留，请完成合并后保存。");
 	};
 	const restoredFor = useRef("");
@@ -206,10 +209,10 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		document.addEventListener("selectionchange", onSelect);
 		return () => document.removeEventListener("selectionchange", onSelect);
 	}, [view.edit, setSelectedText, setSelPara, patch]);
-	async function savePath(path: string) {
+	async function savePath(path: string, restoreMissing = false) {
 		const draft = live.current.documents[path];
 		if (!draft) return;
-		const args = { path, content: draft.content, expectedSHA: draft.baseSHA };
+		const args = { path, content: draft.content, expectedSHA: restoreMissing ? null : draft.baseSHA };
 		const storyFile = book?.byPath.has(path) || book?.order.some((id) => textPathFor(id) === path);
 		const result = await invoke("workspace.file.save", args);
 		setView((v) => savedDocument(v, path, result.content, result.sha256));
@@ -301,7 +304,8 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		setLayout((current) =>
 			openComparison(current, group, path, external ? null : (shown?.revisionId ?? null), external),
 		);
-	const finishTask = () => patch({ edit: "read", targetPath: "" });
+	// 页面对象消失时，原编辑目标（可能是正文）仍由草稿持有；切阅读不能把它换成缺失的设计路径。
+	const finishTask = () => patch({ edit: "read", targetPath: !file && changed ? editPath : "" });
 
 	// 外壳只在作品读到之后才画出各窗格，这里只是让类型收窄。
 	if (!shown || !book) return null;
@@ -405,7 +409,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					{editable ? " 可切换到编辑视图修复。" : ""}
 				</p>
 			)}
-			{primary.error && kind === "artifact" && (
+			{primary.error && kind === "artifact" && !missingFile && (
 				<p role="status" className="border-b bg-amber-bg px-4 py-2 text-xs text-amber">
 					当前文件无法读取：{primary.error.message}。已有草稿仍保留。
 				</p>
@@ -467,6 +471,36 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 						</Button>
 					</Hint>
 				</div>
+			)}
+			{missingFile && changed && (
+				<Alert className="mx-4 my-3 w-auto shrink-0">
+					<AlertTitle>文件已被删除或移动</AlertTitle>
+					<AlertDescription>
+						<p>
+							草稿仍保留在 <code className="break-all">{editPath}</code>
+							。若文件已改名，请从文件树打开新路径；恢复会在原路径写入草稿。
+						</p>
+						<Button
+							variant="outline"
+							size="xs"
+							disabled={busy}
+							onClick={() => {
+								const tabId = tab?.id;
+								void act(async () => {
+									await savePath(editPath, true);
+									// 只将刚消失的恢复按钮焦点交回原编辑器；异步期间已切页或改焦点就不抢回。
+									if (
+										live.current.tabs[live.current.active]?.id === tabId &&
+										document.activeElement === document.body
+									)
+										mainRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus();
+								});
+							}}
+						>
+							恢复到原路径
+						</Button>
+					</AlertDescription>
+				</Alert>
 			)}
 			{conflict !== undefined && (
 				<div className="mx-4 my-3 shrink-0 rounded-lg border border-amber-line bg-amber-bg px-3.5 py-3 text-xs leading-[1.7]">
