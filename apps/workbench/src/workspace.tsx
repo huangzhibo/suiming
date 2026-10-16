@@ -12,6 +12,7 @@ import {
 	Table2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AgentPanel } from "./agent-panel.js";
 import { bridge, invoke } from "./bridge.js";
@@ -112,6 +113,7 @@ function WorkspaceShell() {
 	} = useWorkspace();
 	const { updateComposer, onSubmitted, completeAttachment, isCurrentProject, savePosition } = composerActions;
 	const [libraryOpen, setLibraryOpen] = useState(false);
+	const [recovery, setRecovery] = useState<{ projectId: string; message: string } | null>(null);
 	const {
 		layoutLive,
 		live,
@@ -167,8 +169,19 @@ function WorkspaceShell() {
 	}, [refresh, queryClient]);
 	// 项目恢复保留缺失页面与草稿；作品解析失败时仍可进入文件树。
 	useEffect(() => {
-		if (!shown || projectId === shown.projectId) return;
-		const loaded = loadWorkspace(shown.projectId);
+		if (!shown || projectId === shown.projectId || recovery?.projectId === shown.projectId) return;
+		let loaded: ReturnType<typeof loadWorkspace>;
+		try {
+			loaded = loadWorkspace(shown.projectId);
+		} catch (failure) {
+			setRecovery({
+				projectId: shown.projectId,
+				message: failure instanceof Error ? failure.message : String(failure),
+			});
+			setProjectId("");
+			return;
+		}
+		setRecovery(null);
 		const restored = book ? resolveWorkspaceDocuments(loaded, book) : loaded;
 		const stored = groupView(restored);
 		const fallback =
@@ -183,7 +196,7 @@ function WorkspaceShell() {
 			})),
 		);
 		setProjectId(shown.projectId);
-	}, [shown, projectId, book, projection.isError, setLayout, setProjectId]);
+	}, [shown, projectId, book, projection.isError, setLayout, setProjectId, recovery]);
 	useEffect(() => {
 		if (!book || projectId !== book.data.projectId) return;
 		setLayout((current) => resolveWorkspaceDocuments(current, book));
@@ -251,6 +264,27 @@ function WorkspaceShell() {
 			/>
 		);
 
+	// 只有成功恢复后才挂载可编辑工作面；失败时不向该作品写入任何默认状态。
+	if (recovery?.projectId === shown.projectId)
+		return (
+			<main className="relative grid h-screen place-items-center bg-background p-8">
+				<div className="drag absolute inset-x-0 top-0 h-12" />
+				<div className="max-w-lg space-y-4">
+					<h1 className="text-xl font-semibold">本机草稿未能恢复</h1>
+					<p role="alert" className="text-sm leading-relaxed text-muted-foreground">
+						{recovery.message}
+					</p>
+					<div className="flex flex-wrap gap-3">
+						<Button onClick={() => setRecovery(null)}>重试恢复</Button>
+						<Button variant="outline" onClick={() => void act(() => bridge().chooseProject(false))}>
+							打开其他作品
+						</Button>
+					</div>
+					{error && <p className="text-sm text-destructive">{error}</p>}
+				</div>
+			</main>
+		);
+	if (projectId !== shown.projectId) return <LoadingScreen />;
 	const data = shown;
 	const backlinks = file ? backlinksFor(book, file.path) : [];
 	const textCount = book.order.filter((id) => book.text(id)).length;

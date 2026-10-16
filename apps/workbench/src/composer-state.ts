@@ -160,12 +160,13 @@ export async function contentFingerprint(content: string): Promise<string> {
 	return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-/** 本机草稿恢复：字段逐个校验，不认识的丢掉；输入只有 attachments 一种表示。 */
+/** 本机草稿恢复：内容字段校验失败就停止恢复，未知辅助字段丢掉；输入只有 attachments 一种表示。 */
 export function restoreComposerDrafts(value: unknown): Record<string, ComposerDraft> {
-	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+	if (value === undefined) return {};
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("本机对话草稿格式无效");
 	return Object.fromEntries(
 		Object.entries(value).flatMap(([key, value]) => {
-			if (!value || typeof value !== "object") return [];
+			if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("本机对话草稿格式无效");
 			const saved = value as Partial<ComposerDraft>;
 			const attachments: ComposerAttachment[] = Array.isArray(saved.attachments)
 				? saved.attachments.filter(
@@ -179,6 +180,19 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 					)
 				: [];
 			const pending = saved.pending;
+			if (
+				typeof saved.goal !== "string" ||
+				!Array.isArray(saved.attachments) ||
+				attachments.length !== saved.attachments.length ||
+				(saved.model !== undefined && !validModelChoice(saved.model)) ||
+				(pending !== undefined &&
+					(!pending ||
+						typeof pending.id !== "string" ||
+						typeof pending.text !== "string" ||
+						(pending.sessionId !== undefined && typeof pending.sessionId !== "string") ||
+						(pending.model !== undefined && !validModelChoice(pending.model))))
+			)
+				throw new Error("本机对话草稿不完整");
 			return [
 				[
 					key,

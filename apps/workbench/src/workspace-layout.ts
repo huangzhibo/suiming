@@ -271,6 +271,20 @@ function restoreTabs(value: unknown): WorkbenchTab[] {
 /** 存储只读一次；失效的分屏布局不能连带丢掉可恢复的标签、文件草稿与未确认提交。 */
 export function restoreWorkspace(value: unknown): WorkspaceLayout {
 	const parsed = record(value);
+	if (value !== null && (typeof value !== "object" || Array.isArray(value))) throw new Error("本机草稿记录格式无效");
+	if (parsed.documents !== undefined) {
+		if (!parsed.documents || typeof parsed.documents !== "object" || Array.isArray(parsed.documents))
+			throw new Error("本机文件草稿格式无效");
+		for (const value of Object.values(parsed.documents)) {
+			const draft = record(value);
+			if (
+				typeof draft.content !== "string" ||
+				typeof draft.baseContent !== "string" ||
+				!(draft.baseSHA === null || typeof draft.baseSHA === "string")
+			)
+				throw new Error("本机文件草稿不完整");
+		}
+	}
 	const state: WorkbenchState = {
 		...DEFAULT_VIEW,
 		...Object.fromEntries(
@@ -352,10 +366,14 @@ export function restoreWorkspace(value: unknown): WorkspaceLayout {
 }
 export function loadWorkspace(project: string): WorkspaceLayout {
 	try {
-		return restoreWorkspace(JSON.parse(localStorage.getItem(storageKey(project)) ?? "null"));
-	} catch {
-		// 无法解析的界面偏好不阻止打开作品。
-		return workspaceLayout();
+		const raw = localStorage.getItem(storageKey(project));
+		if (raw === null) return workspaceLayout();
+		const value: unknown = JSON.parse(raw);
+		if (value === null) throw new Error("empty stored record");
+		return restoreWorkspace(value);
+	} catch (cause) {
+		// 其中含作者草稿；失败不是「没有记录」，调用方不得保存默认布局覆盖原数据。
+		throw new Error("无法恢复本机草稿，原记录已保留。请重试；若仍失败，请先备份桌面应用数据再排查。", { cause });
 	}
 }
 export function saveWorkspace(project: string, layout: WorkspaceLayout): void {

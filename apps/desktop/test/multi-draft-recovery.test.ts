@@ -275,3 +275,82 @@ test("多文件草稿存储失败：切换与退出可取消，恢复存储后�
 		await rm(directory, { recursive: true, force: true });
 	}
 });
+
+test("草稿恢复失败保留原记录，重试与跨作品返回不以空布局覆盖内容", { timeout: 60000 }, async () => {
+	const { directory, roots } = await fixture();
+	const app = await launchDesktop({ directory, project: roots[0] });
+	try {
+		const page = await app.firstWindow();
+		page.setDefaultTimeout(7000);
+		const errors = collectPageErrors(page);
+		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
+		const id = (await page.evaluate(() => window.suiming.invoke("workspace.show", {}))).projectId;
+		const editor = await openFile(page, targets[2]);
+		await page.keyboard.press("Meta+End");
+		await page.keyboard.insertText("读取失败也不能丢失。");
+		const draft = await editorText(editor);
+		await page.getByRole("textbox", { name: "输入消息", exact: true }).fill("不能丢的未发送消息");
+		await eventually(
+			async () => (await stored(page, id)).composerDrafts.new?.goal === "不能丢的未发送消息",
+			"输入持久化",
+		);
+		const raw = await page.evaluate((id) => localStorage.getItem(`suiming.${id}.view`), id);
+		assert.ok(raw);
+		await page.addInitScript(() => {
+			const read = Storage.prototype.getItem;
+			const corruptProject = sessionStorage.getItem("draft-corrupt-project");
+			if (corruptProject) {
+				localStorage.setItem(`suiming.${corruptProject}.view`, "{broken-author-draft");
+				sessionStorage.removeItem("draft-corrupt-project");
+			}
+			Storage.prototype.getItem = function (key: string) {
+				if (
+					key.startsWith("suiming.") &&
+					key.endsWith(".view") &&
+					read.call(sessionStorage, "draft-read-fault") === "yes"
+				)
+					throw new Error("草稿读取故障注入");
+				return read.call(this, key);
+			};
+		});
+		await page.evaluate(() => sessionStorage.setItem("draft-read-fault", "yes"));
+		await page.reload();
+		await page.getByRole("heading", { name: "本机草稿未能恢复", exact: true }).waitFor();
+		assert.equal(await page.getByLabel("编辑文件内容", { exact: true }).count(), 0);
+		await page.evaluate(() => sessionStorage.removeItem("draft-read-fault"));
+		assert.equal(await page.evaluate((id) => localStorage.getItem(`suiming.${id}.view`), id), raw);
+		await page.getByRole("button", { name: "重试恢复", exact: true }).click();
+		await eventually(() => focused(editor), "恢复后原编辑器聚焦");
+		assert.equal(await editorText(editor), draft);
+		assert.equal(
+			await page.getByRole("textbox", { name: "输入消息", exact: true }).inputValue(),
+			"不能丢的未发送消息",
+		);
+		await page.evaluate((id) => sessionStorage.setItem("draft-corrupt-project", id), id);
+		await page.reload();
+		await page.getByRole("heading", { name: "本机草稿未能恢复", exact: true }).waitFor();
+		await page.getByRole("button", { name: "重试恢复", exact: true }).click();
+		await page.getByRole("heading", { name: "本机草稿未能恢复", exact: true }).waitFor();
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
+		await page.waitForFunction(() => (globalThis as unknown as { innerWidth: number }).innerWidth === 960);
+		await mkdir("/tmp/suiming-architecture-qa", { recursive: true });
+		await page.screenshot({ path: "/tmp/suiming-architecture-qa/draft-recovery.png", animations: "disabled" });
+		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1440, 900));
+		await page.waitForFunction(() => (globalThis as unknown as { innerWidth: number }).innerWidth === 1440);
+		await app.evaluate(({ dialog }, path) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [path] })) as typeof dialog.showOpenDialog;
+		}, roots[1]);
+		await page.getByRole("button", { name: "打开其他作品", exact: true }).click();
+		await page.getByRole("button", { name: "切换作品", exact: true }).waitFor();
+		assert.equal(await page.evaluate((id) => localStorage.getItem(`suiming.${id}.view`), id), "{broken-author-draft");
+		// 模拟备份中找回原记录；返回故障作品应继续原编辑现场。
+		await page.evaluate(({ id, raw }) => localStorage.setItem(`suiming.${id}.view`, raw), { id, raw });
+		await switchProject(app, page, roots[0]);
+		await eventually(() => focused(editor), "跨作品返回后聚焦保留");
+		assert.equal(await editorText(editor), draft);
+		assert.deepEqual(errors, []);
+	} finally {
+		await app.close();
+		await rm(directory, { recursive: true, force: true });
+	}
+});

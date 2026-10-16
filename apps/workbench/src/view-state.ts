@@ -22,7 +22,7 @@ export function resolveComparisonLayout(preference: ComparisonLayout | null, wid
 }
 export type EditMode = "read" | "edit";
 
-/** 可恢复的客户端 view state：路由、选择、展开与面板，不是作品或运行真源。 */
+/** 客户端工作区：布局偏好可归一化；文件与对话草稿是作者数据，恢复失败不能默认清空。 */
 export interface WorkbenchState extends ComposerState {
 	tabs: WorkbenchTab[];
 	active: number;
