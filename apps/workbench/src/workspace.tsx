@@ -501,7 +501,10 @@ function WorkspaceShell() {
 								onSwitch={(choose) =>
 									act(async () => {
 										saveWorkspace(projectId, layoutLive.current);
-										if (await choose()) setProjectId("");
+										if (await choose()) {
+											setLibraryOpen(false);
+											setProjectId("");
+										}
 									})
 								}
 							/>
