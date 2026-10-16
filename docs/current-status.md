@@ -6,7 +6,7 @@
 
 ## 概览
 
-桌面工作台与自主 Agent 的主路径已贯通，首轮桌面可用性验收完成。当前进入持续使用验证：短样例可以完成真实创作闭环，长篇副本可以浏览、搜索与核对修改，但还没有完整长篇质量、长期运行性能或正式发行的证据。
+桌面工作台与自主 Agent 的主路径已贯通，可用性阶段已按[路线图](roadmap.md)第 6 节的出口于 2026-10-17 结束，转向斗破留出续写的全流程。短样例可以完成真实创作闭环，长篇副本可以浏览、搜索与核对修改，但还没有完整长篇质量、长期运行性能或正式发行的证据。
 
 - **执行**：只有 Session（根 Agent，一份连续的消息列表，idle / running）与 Task（子智能体）。Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一份候选和一条提交路径。创作路径没有预算，只有每轮用量检查点（[Harness 设计](harness-design.md)第 10 节）。
 - **作品**：本地作品目录就是 git 仓，`refs/suiming/canon` 只由过 Checker 的提交推进；SQLite 只存执行数据。审稿与材料笔记是普通作品文件，正文 / 审稿时效与 Source 覆盖率从 git 历史派生。
@@ -54,7 +54,7 @@
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
 | 自动检查 | 最近全仓检查通过；全仓 498 / 498、0 skip，工作台 82 / 82 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 85 / 85 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 86 / 86 通过、0 skip（2026-10-17 在 `a79c5b4` 上复跑），含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 
