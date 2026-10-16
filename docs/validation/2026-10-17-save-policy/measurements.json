@@ -1,0 +1,172 @@
+{
+  "date": "2026-10-17",
+  "productionDefaultsChanged": false,
+  "realModelCalls": 0,
+  "debounceMs": 1500,
+  "checks": 26,
+  "results": [
+    {
+      "mode": "manual",
+      "name": "尚未停顿就交付，计时保存不能保证 Agent 读到最新编辑",
+      "passed": true,
+      "agentSawFreshEdit": false
+    },
+    {
+      "mode": "manual",
+      "name": "多文件、定向交付与合法半句话进入 Canon",
+      "passed": true,
+      "beforeCounts": {
+        "saves": 0,
+        "agentReads": 1
+      },
+      "initialAgentSawAuthorEdit": false,
+      "unrelatedHalfSentenceInCandidate": false,
+      "checkerPassed": true,
+      "halfSentenceInCanon": false
+    },
+    {
+      "mode": "manual",
+      "name": "作者落盘后拒绝 Agent 旧整篇结果",
+      "passed": true
+    },
+    {
+      "mode": "manual",
+      "name": "Agent 先写后保存受阻、不覆盖、不反复重试",
+      "passed": true
+    },
+    {
+      "mode": "manual",
+      "name": "保存回执迟到、继续输入、切到另一文件",
+      "passed": true
+    },
+    {
+      "mode": "manual",
+      "name": "外部删除后保留草稿且不复活文件",
+      "passed": true
+    },
+    {
+      "mode": "manual",
+      "name": "未完成 YAML 的候选与提交边界",
+      "passed": true,
+      "unfinishedSyntaxInCandidate": false,
+      "canonUnchanged": true
+    },
+    {
+      "mode": "handoff",
+      "name": "尚未停顿就交付，计时保存不能保证 Agent 读到最新编辑",
+      "passed": true,
+      "agentSawFreshEdit": true
+    },
+    {
+      "mode": "handoff",
+      "name": "多文件、定向交付与合法半句话进入 Canon",
+      "passed": true,
+      "beforeCounts": {
+        "saves": 1,
+        "agentReads": 1
+      },
+      "initialAgentSawAuthorEdit": true,
+      "unrelatedHalfSentenceInCandidate": false,
+      "checkerPassed": true,
+      "halfSentenceInCanon": false
+    },
+    {
+      "mode": "handoff",
+      "name": "作者落盘后拒绝 Agent 旧整篇结果",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "Agent 先写后保存受阻、不覆盖、不反复重试",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "保存回执迟到、继续输入、切到另一文件",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "外部删除后保留草稿且不复活文件",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "未完成 YAML 的候选与提交边界",
+      "passed": true,
+      "unfinishedSyntaxInCandidate": true,
+      "canonUnchanged": true
+    },
+    {
+      "mode": "idle",
+      "name": "尚未停顿就交付，计时保存不能保证 Agent 读到最新编辑",
+      "passed": true,
+      "agentSawFreshEdit": false
+    },
+    {
+      "mode": "idle",
+      "name": "多文件、定向交付与合法半句话进入 Canon",
+      "passed": true,
+      "beforeCounts": {
+        "saves": 2,
+        "agentReads": 1
+      },
+      "initialAgentSawAuthorEdit": true,
+      "unrelatedHalfSentenceInCandidate": true,
+      "checkerPassed": true,
+      "halfSentenceInCanon": true
+    },
+    {
+      "mode": "idle",
+      "name": "作者落盘后拒绝 Agent 旧整篇结果",
+      "passed": true
+    },
+    {
+      "mode": "idle",
+      "name": "Agent 先写后保存受阻、不覆盖、不反复重试",
+      "passed": true
+    },
+    {
+      "mode": "idle",
+      "name": "保存回执迟到、继续输入、切到另一文件",
+      "passed": true
+    },
+    {
+      "mode": "idle",
+      "name": "外部删除后保留草稿且不复活文件",
+      "passed": true
+    },
+    {
+      "mode": "idle",
+      "name": "未完成 YAML 的候选与提交边界",
+      "passed": true,
+      "unfinishedSyntaxInCandidate": true,
+      "canonUnchanged": true
+    },
+    {
+      "mode": "handoff",
+      "name": "全选交付也会提交合法半句话",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "批量第二份失败，阻止 Agent 开始并保留部分保存事实",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "批量交付固定点击时快照，排队期间的新输入留在草稿",
+      "passed": true
+    },
+    {
+      "mode": "idle",
+      "name": "中文组合输入、模式切换取消计时器与只读操作",
+      "passed": true
+    },
+    {
+      "mode": "handoff",
+      "name": "窄窗与一次真实按钮写入",
+      "passed": true
+    }
+  ]
+}

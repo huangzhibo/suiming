@@ -1,5 +1,7 @@
 # 变更记录
 
+- **2026-10-17** 完成三种保存时机的隔离原型对照：手动保存、交给 Agent 时同步所选文件、停顿 1.5 秒后保存。复用生产编辑器、保存回执归并、文件 CAS、Agent 工具与 Git Canon，验证多文件、迟到结果、保存失败和半成品进入候选 / Canon 的影响；纠正「有 Agent 就必须手动保存」的过度推断。未修改生产默认、执行协议或数据格式，推荐与证据边界见[实验记录](validation/2026-10-17-save-policy/README.md)。
+
 - **2026-10-17** 补齐共享 checkout 的双向覆盖保护：Agent 整篇替换、复制覆盖与删除核对本轮读取版本，读后作者保存会拒绝旧结果；局部编辑保留其他段落。修复移动文件时复制旧内容后误删作者新内容的竞态，读取按原始字节记版本，兼容 BOM 与二进制附件。不新增自动保存、worktree 或持久写入日志，桌面沿用现有冲突比较。全仓检查、489 / 489 测试、完整隔离 Electron 76 / 76 通过，最终相关 4 / 4 复验；真实模型 3 轮、15 次调用验证冲突后重读、续写及附件操作。决策见 [ADR-0035](adr/0035-shared-checkout-write-protection.md)，过程和边界见[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)。
 
 - **2026-10-17** 整理文档编辑与导航职责：`useWorkspaceGroup` 不再转发当前文档查询，保存、冲突与处理弹层焦点集中在每个窗格的 `useDocumentEditing`，标签关联路径与关闭确认复用原导航和布局模块。保留现有 CAS、共享草稿、查询与视觉，新增迟到保存回执和最后持有者验收；完整隔离 Electron 74 / 74 通过，0 skip。设计见 [ADR-0034](adr/0034-local-architecture-consolidation.md)，验证见[架构收敛验收](validation/2026-10-17-architecture-consolidation/README.md)。
