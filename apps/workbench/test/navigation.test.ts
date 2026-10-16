@@ -60,3 +60,11 @@ test("重复视图共享文件草稿，保存途中继续输入不会丢失；�
 	state = savedDocument(state, "text/a.md", "second", "h3");
 	assert.deepEqual(state.documents, {});
 });
+test("合并已推进基线，迟到保存回执不能清除后来重新输入的同文草稿", () => {
+	const before = editDocument(initial(), "text/a.md", "作者原稿", { content: "base", sha256: "h1" });
+	const oldDraft = before.documents["text/a.md"];
+	const merged = savedDocument(before, "text/a.md", "作者原稿", "h2", oldDraft);
+	const current = editDocument(merged, "text/a.md", "作者原稿", { content: "Agent 合并", sha256: "h3" });
+	assert.equal(savedDocument(current, "text/a.md", "作者原稿", "h2", oldDraft), current);
+	assert.equal(current.documents["text/a.md"]?.baseSHA, "h3");
+});

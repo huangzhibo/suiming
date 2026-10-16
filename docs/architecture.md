@@ -127,6 +127,8 @@ Agent 直接在作者的 checkout 上工作，与作者、host agent 共用一�
 
 候选不是 Canon。Agent 的阶段提交走与作者的「提交」按钮、host 的 `suim commit` 完全相同的 `commitCheckout`，只多一个 commandId 回执：动作结果没存上就被打断时，续跑按它告诉模型这次提交其实成了。成功后 session 基线推到新版本，同一 turn 可以继续工作；一次提交不会自动结束这一轮。被打断的动作不重做也不核对，补一条「执行时被打断」交给模型（[Harness 设计](harness-design.md)第 5 节）；重复提交的第二次 diff 为空，不会多出版本。
 
+桌面文件访问还可经临时编辑器端口同步对应草稿，继续使用原保存 CAS 与共享草稿；无独立草稿库或执行队列，CLI 不连接桌面缓冲。同步、冲突合并与 Canon 提交的边界见 [ADR-0036](adr/0036-agent-editor-sync.md)。
+
 ### 6.3 Context 与 Frame
 
 Context 由四个维度决定：语义层（Source、Design、StoryText）、观察入口（Book、Volume、Beat、Character、读者、Contract、Place、Resource）、时间边界、证据边界。它们形式化为纯函数 `Frame(layer, camera, t, evidence)`：`t` 只使用 StoryBeat 展示顺序，系统不维护故事内年代；Frame 只投影确定性事实，包括在场、`refs` 闭包、重放到 `t` 的硬状态、人物与读者的知情、Contract 生命周期、真实前文；人物此刻相信什么是模型推断，不是 Frame 的字段。

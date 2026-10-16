@@ -1,0 +1,54 @@
+{
+  "passed": true,
+  "sessionId": "session_136cd995df6658e974e3dba4788a627c510234d951a763cdde535d7633fd182e",
+  "modelElapsedMs": 27514,
+  "usage": {
+    "calls": 3,
+    "confirmedCalls": 3,
+    "input": 15672,
+    "output": 526,
+    "cacheRead": 8832,
+    "cacheWrite": 0,
+    "reasoning": 39,
+    "totalTokens": 25030,
+    "costUsd": 0.0374872
+  },
+  "targetOnly": true,
+  "conflictMerged": true,
+  "canonUnchanged": true,
+  "reloadPreserved": true,
+  "pageErrors": [],
+  "verificationNote": "UI、文件与重载断言已通过；探针读取 checkpoint 的参数错误已修正，对同一副本补验。模型主动 inspect 后合并，没有先触发自动保存失败，未要求固定工具顺序或重跑模型。",
+  "toolSequence": [
+    {
+      "tool": "read",
+      "editor": true,
+      "merge": false
+    },
+    {
+      "tool": "read",
+      "editor": true,
+      "merge": false
+    },
+    {
+      "tool": "story_guide",
+      "editor": false,
+      "merge": false
+    },
+    {
+      "tool": "story_guide",
+      "editor": false,
+      "merge": false
+    },
+    {
+      "tool": "write",
+      "editor": false,
+      "merge": true
+    },
+    {
+      "tool": "write",
+      "editor": false,
+      "merge": true
+    }
+  ]
+}

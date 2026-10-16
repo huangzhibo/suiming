@@ -1,0 +1,11 @@
+{
+  "version": "2.1.301",
+  "targetOnly": true,
+  "readEditWrite": true,
+  "otherToolsSkipped": true,
+  "cleanSkipped": true,
+  "disabledSkipped": true,
+  "failedSaveContinues": true,
+  "unavailableContinues": true,
+  "scope": "发行包函数 + 模拟文档接口；不等于实际 IDE 并发验收"
+}

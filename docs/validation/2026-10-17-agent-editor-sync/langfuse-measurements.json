@@ -1,0 +1,18 @@
+{
+  "sessionId": "session_136cd995df6658e974e3dba4788a627c510234d951a763cdde535d7633fd182e",
+  "traceId": "b901c73137d0afaaf5a617670434663f",
+  "expectedGenerations": 3,
+  "observedGenerations": 2,
+  "expectedTools": 6,
+  "observedTools": 2,
+  "turnObserved": true,
+  "entrypoint": [
+    "desktop"
+  ],
+  "contentCapture": [
+    "disabled"
+  ],
+  "observedGenerationCostUsd": 0.0244112,
+  "complete": false,
+  "note": "按 session 与按时间范围两次查询一致，第一批 1 个模型调用及 4 个工具 observation 未返回；执行 checkpoint 完整。未取得对应导出诊断，不能确定是导出失败还是后端处理缺失，也不补造 trace。"
+}

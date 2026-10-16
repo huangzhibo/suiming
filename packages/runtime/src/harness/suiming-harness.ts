@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
+import type { EditorFileHandler } from "@suiming/sdk";
 import {
 	EventType,
 	type ModelChoice,
@@ -43,6 +44,7 @@ import type { CandidateScanner } from "./tools.js";
 import { textWrittenWithoutContext, turnSummary } from "./turn-summary.js";
 
 export interface SuimingHarnessOptions {
+	editorFiles?: EditorFileHandler;
 	project: HarnessProjectPort;
 	models: ModelGateway;
 	/** turn / Task span 的根；模型调用 span 挂在它们下面。缺省 NOOP。 */
@@ -328,6 +330,11 @@ export class HarnessSession {
 		return this.#engine.project.readInbox(this.sessionId).filter((item) => item.sequence > consumed);
 	}
 
+	#editorOptions(): { editorFiles?: EditorFileHandler } {
+		const handler = this.#engine.editorFiles;
+		return handler ? { editorFiles: (request, signal) => handler(request, signal ?? this.#signal) } : {};
+	}
+
 	/** 根 Agent 的一个 turn：从 session 的 checkpoint 续，模型停下即返回。 */
 	async runRoot(spec: RootLoopSpec): Promise<RootLoopOutcome> {
 		this.throwIfInterrupted();
@@ -336,7 +343,7 @@ export class HarnessSession {
 		const model = await this.#engine.bindModel("main", record.model);
 		// 根 Agent 的写范围是整个 checkout（.git / .suiming 与 host 接入目录除外，由 ConfinedExecutionEnv 拦），
 		// 合法性在 commit 时由 Checker 判；只有子任务按角色缩小写范围（Harness 设计第 6 节）。
-		const env = new ConfinedExecutionEnv({ rootPath: this.checkoutPath, policy: "write" });
+		const env = new ConfinedExecutionEnv({ rootPath: this.checkoutPath, policy: "write", ...this.#editorOptions() });
 		const restored = await this.#restore(record.checkpointRef);
 		// 模型已经停下、inbox 也没有新消息：不该开新的模型调用。
 		if (restored !== undefined && restored.loop.phase === "settled" && this.pendingInbox().length === 0)
@@ -473,6 +480,7 @@ export class HarnessSession {
 		const env = new ConfinedExecutionEnv({
 			rootPath: this.checkoutPath,
 			policy: spec.policy,
+			...this.#editorOptions(),
 			...(spec.writable === undefined ? {} : { writable: spec.writable }),
 			...(spec.readable === undefined ? {} : { readable: spec.readable }),
 		});
@@ -819,6 +827,7 @@ async function turnStart(session: HarnessSession): Promise<TurnStart | undefined
  * 自有内循环与 AG-UI 事件。turn 是它唯一的驱动单位。
  */
 export class SuimingHarness {
+	readonly editorFiles: EditorFileHandler | undefined;
 	readonly project: HarnessProjectPort;
 	readonly checkpoints: CheckpointArchive;
 	readonly telemetry: TelemetryContext;
@@ -827,6 +836,7 @@ export class SuimingHarness {
 	readonly #usageCheckpoint: () => number | Promise<number>;
 
 	constructor(options: SuimingHarnessOptions) {
+		this.editorFiles = options.editorFiles;
 		this.project = options.project;
 		this.checkpoints = new CheckpointArchive(options.project);
 		this.telemetry = options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT;

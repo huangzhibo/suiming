@@ -14,6 +14,7 @@ import {
 	taskSummarySchema,
 	thinkingLevelSchema,
 } from "./domain-schema.js";
+import type { EditorFileCall, EditorFileReply } from "./editor-files.js";
 import { ProductEventSchema, type SessionEvent, type SessionEventBody, SessionEventSchema } from "./run-event.js";
 import { USAGE_CHECKPOINT_TOKENS } from "./usage-checkpoint.js";
 
@@ -137,7 +138,10 @@ export const LOCAL_COMMANDS = {
 	 * 2026-10-02 之前另有只管作品文件的 workspace.read / save，与这一组大面积重叠，已删。
 	 */
 	"workspace.file.read": command(
-		Type.Object({ path: id, revisionId: Type.Optional(id) }, { additionalProperties: false }),
+		Type.Object(
+			{ path: id, revisionId: Type.Optional(id), expectedProjectId: Type.Optional(id) },
+			{ additionalProperties: false },
+		),
 		Type.Object(
 			{
 				path: id,
@@ -154,7 +158,12 @@ export const LOCAL_COMMANDS = {
 	),
 	"workspace.file.save": command(
 		Type.Object(
-			{ path: id, content: Type.String(), expectedSHA: Type.Union([Type.String(), Type.Null()]) },
+			{
+				path: id,
+				content: Type.String(),
+				expectedSHA: Type.Union([Type.String(), Type.Null()]),
+				expectedProjectId: Type.Optional(id),
+			},
 			{ additionalProperties: false },
 		),
 		file,
@@ -468,6 +477,7 @@ export interface DesktopCommandFailure {
 	diagnostics?: Static<typeof checkDiagnosticSchema>[];
 }
 export interface DesktopBridge extends LocalCommandClient {
+	onEditorFile(listener: (call: EditorFileCall) => Promise<EditorFileReply>): () => void;
 	/** 通过系统保存对话框导出文字副本，不写入作品 Artifact。 */
 	exportConversation(content: string): Promise<boolean>;
 	chooseProject(create: boolean): Promise<boolean>;

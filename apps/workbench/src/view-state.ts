@@ -293,14 +293,17 @@ export function editDocument(
 	return { ...state, documents };
 }
 /** 保存时仍可切换页面、继续输入；只清除这次写入对应的缓冲。 */
-export function savedDocument(
-	state: WorkbenchState,
+export function savedDocument<T extends Pick<WorkbenchState, "documents">>(
+	state: T,
 	path: string,
 	content: string,
 	sha256: string | null,
-): WorkbenchState {
+	base?: { baseContent: string; baseSHA: string | null },
+): T {
 	const documents = { ...state.documents };
 	const draft = documents[path];
+	// 较新的保存或合并已推进基线，旧回执不能清掉后来重新输入的同文草稿。
+	if (base && draft && (draft.baseSHA !== base.baseSHA || draft.baseContent !== base.baseContent)) return state;
 	if (!draft || draft.content === content) delete documents[path];
 	else documents[path] = { ...draft, baseContent: content, baseSHA: sha256 };
 	return { ...state, documents };

@@ -207,20 +207,130 @@ if (process.argv.includes("--concurrent-file-test")) {
 			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "迟到的旧结果" }));
 		},
 		async (context) => {
-			assert.match(JSON.stringify(context.messages.at(-1)), /file_write_conflict/);
-			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" }));
+			assert.match(JSON.stringify(context.messages.at(-1)), /editor_sync_failed/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md", editor: true }));
 		},
 		async (context) => {
-			assert.match(JSON.stringify(context.messages.at(-1)), /甲的草稿/);
-			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "甲的草稿，Agent 合并" }));
-		},
-		async () => {
-			await gate("agent-next-write");
-			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "甲的草稿，Agent 再改" }));
+			const message = context.messages.at(-1);
+			assert.ok(message?.role === "toolResult");
+			const part = message.content.find((part) => part.type === "text");
+			assert.ok(part?.type === "text");
+			const { draftSHA } = JSON.parse(part.text) as { draftSHA: string };
+			return fauxAssistantMessage(
+				fauxToolCall("write", { path: "甲.md", content: "甲的草稿，手动保存，作者继续写，Agent 合并", draftSHA }),
+			);
 		},
 		async () => {
 			await gate("agent-finish");
 			return fauxAssistantMessage("已保留作者保存的内容，修改尚未提交。");
+		},
+	]);
+}
+
+if (process.argv.includes("--editor-missing-test")) {
+	provider.setResponses([
+		fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" })),
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /editor_sync_failed/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md", editor: true }));
+		},
+		async (context) => {
+			const message = context.messages.at(-1);
+			assert.ok(message?.role === "toolResult");
+			const part = message.content.find((part) => part.type === "text");
+			assert.ok(part?.type === "text");
+			const snapshot = JSON.parse(part.text) as { draftSHA: string; file: unknown };
+			assert.equal(snapshot.file, null);
+			return fauxAssistantMessage(
+				fauxToolCall("write", {
+					path: "甲.md",
+					content: "甲的草稿",
+					draftSHA: snapshot.draftSHA,
+				}),
+			);
+		},
+		fauxAssistantMessage("已按要求恢复甲的草稿，尚未提交版本。"),
+	]);
+}
+if (process.argv.includes("--editor-sync-test")) {
+	provider.setResponses([
+		async () => {
+			await gate("editor-start");
+			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /甲的草稿/);
+			await gate("editor-after-read");
+			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "过期的 Agent 内容" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /file_write_conflict/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /继续输入/);
+			return fauxAssistantMessage(
+				fauxToolCall("write", { path: "甲.md", content: "甲的草稿，继续输入，Agent 合并" }),
+			);
+		},
+		fauxAssistantMessage(fauxToolCall("read", { path: "乙.md" })),
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /乙的草稿/);
+			return fauxAssistantMessage("按需同步已完成，尚未提交版本。");
+		},
+	]);
+}
+if (process.argv.includes("--editor-conflict-test")) {
+	let draftSHA = "";
+	const inspected: FauxResponseFactory = async (context) => {
+		const message = context.messages.at(-1);
+		assert.ok(message?.role === "toolResult");
+		const value = message.content.find((part) => part.type === "text");
+		assert.ok(value?.type === "text");
+		draftSHA = (JSON.parse(value.text) as { draftSHA: string }).draftSHA;
+		await gate("editor-merge");
+		return fauxAssistantMessage(
+			fauxToolCall("write", { path: "乙.md", content: "乙的外部改动，乙的草稿", draftSHA }),
+		);
+	};
+	provider.setResponses([
+		fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" })),
+		async () => {
+			await gate("editor-second");
+			return fauxAssistantMessage(fauxToolCall("read", { path: "乙.md" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /editor_sync_failed/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "乙.md", editor: true }));
+		},
+		inspected,
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /继续编辑/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "乙.md", editor: true }));
+		},
+		async (context) => {
+			const message = context.messages.at(-1);
+			assert.ok(message?.role === "toolResult");
+			const value = message.content.find((part) => part.type === "text");
+			assert.ok(value?.type === "text");
+			draftSHA = (JSON.parse(value.text) as { draftSHA: string }).draftSHA;
+			await gate("editor-merge-again");
+			return fauxAssistantMessage(
+				fauxToolCall("write", { path: "乙.md", content: "乙的外部改动，乙的草稿，继续输入", draftSHA }),
+			);
+		},
+		fauxAssistantMessage("已合并作者草稿和外部内容，尚未提交版本。"),
+	]);
+}
+if (process.argv.includes("--editor-lifecycle-test")) {
+	provider.setResponses([
+		async () => {
+			await gate("editor-start");
+			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /甲的草稿/);
+			return fauxAssistantMessage("编辑器重接后已读取作者草稿。");
 		},
 	]);
 }

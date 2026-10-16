@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { constants, type Dirent } from "node:fs";
 import { mkdir, open, readdir, realpath, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import type { EditorFileHandler, EditorFileRequest, EditorFileSnapshot } from "@suiming/sdk";
 import { sha256Buffer } from "@suiming/story";
 import { confinedPath } from "../files/confined-path.js";
 import { ToolRejection } from "./tool.js";
@@ -23,6 +24,7 @@ const pendingWrites = new Map<string, Promise<void>>();
 
 export interface ConfinedEnvOptions {
 	rootPath: string;
+	editorFiles?: EditorFileHandler;
 	policy: ConfinedEnvPolicy;
 	/** 缺省是给模型的环境，看不见 host 接入目录；作者的文件视图传 `"visible"`。 */
 	hostAdapters?: "hidden" | "visible";
@@ -116,9 +118,28 @@ export class ConfinedExecutionEnv {
 		return { absolute, logical };
 	}
 
+	/** 先验证角色权限，再让编辑器处理自己的缓冲；模型不能借此绕过路径边界。 */
+	async editorFile(request: EditorFileRequest, signal?: AbortSignal): Promise<EditorFileSnapshot | null> {
+		const { logical } = await this.#confine(request.path, request.operation === "resolve");
+		if (!this.#options.editorFiles) {
+			if (request.operation === "save") return null;
+			throw new ToolRejection("editor_unavailable", "当前入口没有活动编辑器草稿，请直接 read 文件");
+		}
+		try {
+			return await this.#options.editorFiles({ ...request, path: logical }, signal);
+		} catch (error) {
+			signal?.throwIfAborted();
+			throw new ToolRejection(
+				"editor_sync_failed",
+				`${error instanceof Error ? error.message : String(error)}；可用 read 的 editor: true 查看草稿、基线和磁盘，再用 write 的 draftSHA 合并；不要要求作者先点保存。`,
+			);
+		}
+	}
+
 	async readBinaryFile(path: string, signal?: AbortSignal): Promise<Uint8Array> {
 		signal?.throwIfAborted();
 		const { absolute } = await this.#confine(path);
+		await this.editorFile({ operation: "save", path }, signal);
 		try {
 			const file = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
 			try {
@@ -175,6 +196,7 @@ export class ConfinedExecutionEnv {
 
 	async prepareWrite(path: string, content: string | Uint8Array | null): Promise<FileMutation> {
 		const { absolute, logical } = await this.#confine(path, true);
+		await this.editorFile({ operation: "save", path });
 		const before = await this.#readExisting(absolute, logical);
 		const bytes = content === null ? null : typeof content === "string" ? Buffer.from(content, "utf8") : content;
 		return {
@@ -188,6 +210,7 @@ export class ConfinedExecutionEnv {
 	/** 落盘前一刻核对 before：准备写入之后有人改过同一个文件就报写冲突，已经是 after 的当作写过。 */
 	async applyMutation(mutation: FileMutation, signal?: AbortSignal): Promise<void> {
 		const { absolute } = await this.#confine(mutation.path, true);
+		await this.editorFile({ operation: "save", path: mutation.path }, signal);
 		// 默认 macOS / Windows 文件系统不分大小写；保守地把不同大小写的同一路径串起来。
 		const canonical = resolve(await realpath(this.rootPath), relative(this.rootPath, absolute));
 		const key = process.platform === "linux" ? canonical : canonical.toLowerCase();

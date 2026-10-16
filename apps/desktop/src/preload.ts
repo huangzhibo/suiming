@@ -3,6 +3,7 @@
 import type {
 	DesktopBridge,
 	DesktopCommandFailure,
+	EditorFileCall,
 	LocalCommandInput,
 	LocalCommandName,
 	LocalCommandOutput,
@@ -27,6 +28,25 @@ function unwrap<T>(reply: { ok: true; value: T } | { ok: false; error: { code: s
 	return reply.value;
 }
 const bridge: DesktopBridge = {
+	onEditorFile(listener) {
+		const handler = async (_event: Electron.IpcRendererEvent, call: EditorFileCall) => {
+			try {
+				ipcRenderer.send("suiming:editor-reply", await listener(call));
+			} catch (error) {
+				ipcRenderer.send("suiming:editor-reply", {
+					id: call.id,
+					ok: false,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		};
+		ipcRenderer.on("suiming:editor-file", handler);
+		ipcRenderer.send("suiming:editor-ready", true);
+		return () => {
+			ipcRenderer.removeListener("suiming:editor-file", handler);
+			ipcRenderer.send("suiming:editor-ready", false);
+		};
+	},
 	async invoke<K extends LocalCommandName>(command: K, input: LocalCommandInput<K>): Promise<LocalCommandOutput<K>> {
 		const reply: { ok: true; value: LocalCommandOutput<K> } | { ok: false; error: DesktopCommandFailure } =
 			await ipcRenderer.invoke("suiming:command", { command, input });

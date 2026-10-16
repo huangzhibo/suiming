@@ -38,6 +38,7 @@ export function readTool<T extends TSchema, D extends ToolDetails>(
 const ReadSchema = Type.Object(
 	{
 		path: Type.String({ minLength: 1 }),
+		editor: Type.Optional(Type.Boolean({ description: "自动保存冲突时查看编辑器草稿、原基线与磁盘内容，不写文件" })),
 		offset: Type.Optional(Type.Integer({ minimum: 1 })),
 		column: Type.Optional(Type.Integer({ minimum: 1, description: "首行从第几个 Unicode 码点续读，默认 1" })),
 		limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 4000 })),
@@ -52,7 +53,17 @@ const CheckAfterWrite = Type.Optional(
 	Type.Boolean({ description: "true 时写完立刻对整个候选跑一次确定性检查（同 check 工具），结论接在结果后面" }),
 );
 const WriteSchema = Type.Object(
-	{ path: Type.String({ minLength: 1 }), content: Type.String(), check: CheckAfterWrite },
+	{
+		path: Type.String({ minLength: 1 }),
+		content: Type.String(),
+		draftSHA: Type.Optional(
+			Type.String({
+				pattern: "^[a-f0-9]{64}$",
+				description: "合并编辑器冲突时填 read(editor: true) 返回的草稿 hash；会同时核对草稿和已读磁盘版本",
+			}),
+		),
+		check: CheckAfterWrite,
+	},
 	{ additionalProperties: false },
 );
 const EditSchema = Type.Object(
@@ -222,6 +233,29 @@ export function fileTools(
 		parameters: ReadSchema,
 		rereadable: true,
 		async execute(_id, params, signal) {
+			if (params.editor) {
+				const snapshot = await env.editorFile({ operation: "inspect", path: params.path }, signal);
+				if (!snapshot) throw new ToolRejection("editor_unavailable", "未能读取编辑器状态");
+				observed.set(key(params.path), snapshot.file?.sha256 ?? null);
+				const show = (content: string) => {
+					const part = readWindow(content, params);
+					return {
+						...part,
+						...(part.next ? { continue: { path: params.path, editor: true, ...part.next } } : {}),
+					};
+				};
+				return text(
+					JSON.stringify({
+						path: params.path,
+						draftSHA: snapshot.draft?.sha256 ?? null,
+						fileSHA: snapshot.file?.sha256 ?? null,
+						draft: snapshot.draft ? show(snapshot.draft.content) : null,
+						base: snapshot.draft ? show(snapshot.draft.baseContent) : null,
+						file: snapshot.file ? show(snapshot.file.content) : null,
+						next: "保留作者与磁盘两边的有效修改，用 write(path, content, draftSHA) 写入合并结果；文件缺失时可据任务决定恢复原路径。",
+					}),
+				);
+			}
 			let bytes: Uint8Array;
 			try {
 				bytes = await env.readBinaryFile(params.path, signal);
@@ -266,6 +300,17 @@ export function fileTools(
 			"创建或完整替换允许范围内的作品文件。替换已有文件须在本轮先 read；读取后被外部修改或删除会拒绝，须重读再调整。局部修改优先用 edit。结果给出写入后的字数（按码点计，含标点与换行，与正文检查同一口径）；汇报篇幅以它为准，不要估算。带 check: true 时一并返回对整个候选的确定性检查结论，省掉紧跟着的一次 check。",
 		parameters: WriteSchema,
 		async execute(_id, params, signal) {
+			if (params.draftSHA) {
+				const fileSHA = observed.get(key(params.path));
+				if (fileSHA === undefined)
+					throw new ToolRejection("file_read_required", "先 read(editor: true) 查看冲突两边，再合并");
+				await env.editorFile(
+					{ operation: "resolve", path: params.path, content: params.content, draftSHA: params.draftSHA, fileSHA },
+					signal,
+				);
+				observed.set(key(params.path), sha256Hex(params.content));
+				return written(`已合并并保存 ${params.path}；未提交 Canon`, params.check);
+			}
 			const mutation = await env.prepareWrite(params.path, params.content);
 			requireObserved(mutation);
 			await env.applyMutation(mutation, signal);

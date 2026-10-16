@@ -15,7 +15,7 @@
 
 ## 最近有效验收
 
-2026-10-17：[保存时机隔离实验](validation/2026-10-17-save-policy/README.md)比较手动保存、显式交付时同步所选文件和停顿保存，复用生产编辑器、保存 CAS、Agent 文件工具与真实 Git Canon。生产仍手动保存；实验确认语法合法的半句话能通过 Checker 并被提交，自动保存不替代版本保护，也不能单独保证立即交付时 Agent 读到最新编辑。原型使用受控动作，不新增真实模型或桌面整套验收结论。
+2026-10-17：按 [ADR-0036](adr/0036-agent-editor-sync.md) 将保存时机收敛为 Agent 按目标文件同步：普通消息直接发送，不增加保存范围或逐文件确认；读取 / 修改前复用原保存 CAS，其他草稿不落盘。冲突由 Agent 通过原 read / write 查看并合并两边，也可明确恢复被删除文件；草稿和磁盘双重核对、迟到回执及预期作品 ID 防止覆盖继续输入或串到另一作品。同步不提交 Canon，语法合法的半句话仍可能进入候选。完整证据与边界见[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)，[最初保存实验](validation/2026-10-17-save-policy/README.md)保留决策形成过程。
 
 2026-10-17：补齐 Agent 与作者共享 checkout 的双向覆盖保护：整篇写入、复制覆盖和删除核对本轮实际读取版本，局部 `edit` 保留作者其他段落；修复移动文件时源内容被替换后仍删除的竞态。桌面继续使用现有草稿、CAS 与冲突比较，迟到成功 / 失败回执不丢后续输入、不串页或抢焦点，合并期间再次修改须重新处理。机制、真实调用及边界见[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)与 [ADR-0035](adr/0035-shared-checkout-write-protection.md)。
 
@@ -48,9 +48,9 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 489 / 489、0 skip，工作台 77 / 77 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 492 / 492、0 skip，工作台 78 / 78 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 76 / 76 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)为最新完整复跑，新增持续 Agent 写入与多草稿组合、迟到保存失败验收；最终相关 4 / 4 复验通过；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 81 / 81 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)为最新完整复跑，新增自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 
@@ -81,6 +81,8 @@
 | 真实长篇 | 在不少于 3 卷 30 个 StoryBeat 的真实作品上跑通并有作者反馈 |
 
 ## 已知缺陷
+
+- **最新观测对账有缺口**：按需编辑同步真实验收的执行记录为 3 次模型调用 / 6 次工具，Langfuse 两种查询只返回 2 / 2；turn 已结束、来源与关闭内容采集正确。首批 observation 缺失的原因未确定，后续须收集导出诊断并复验，不影响本轮已核对的文件与 Canon 保全。见[测量记录](validation/2026-10-17-agent-editor-sync/langfuse-measurements.json)。
 
 - **持续使用的验收边界**：页面与短创作闭环已通过上述走查；已补齐 Agent 持续修改叠加多文件草稿、迟到保存成功 / 失败与重复冲突的受控组合，并有真实模型冲突后重读证据；跨作品、多轮修订与长对话叠加的多小时真实使用仍未系统验收。尚无完整无障碍验收。缺少这些证据不能靠要求作者反复排障来补，也不意味着已经验证的单项能力未实现。
 

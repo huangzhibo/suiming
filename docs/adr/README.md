@@ -39,5 +39,6 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0033](0033-continuous-use-and-data-preservation.md) | Accepted | 顶层需求纳入持续使用、数据保全和验证分工；操作规则与完成证据各归原文档维护 |
 | [0034](0034-local-architecture-consolidation.md) | Accepted | 草稿恢复失败保全原记录，移除测试专用版本实现，整理文档编辑与导航职责 |
 | [0035](0035-shared-checkout-write-protection.md) | Accepted | 共享 checkout 的整篇覆盖与删除核对本轮读取版本；保留局部编辑、手动合并和原有草稿机制 |
+| [0036](0036-agent-editor-sync.md) | Accepted | 默认手动保存，整篇引用显式选择保存范围；全部成功再发送，部分失败与继续输入沿用原有草稿和回执 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。

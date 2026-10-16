@@ -33,6 +33,7 @@ import { ProjectSwitcher } from "./project-switcher.js";
 import { BacklinksPane, EvidencePane } from "./right-pane.js";
 import { useAutoHideScrollbars } from "./scrollbars.js";
 import { ToolButton } from "./ui-bits.js";
+import { useAgentEditorFiles } from "./use-agent-editor-files.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
 import { useCurrentDocument } from "./use-current-document.js";
 import { useEditorHistory } from "./use-editor-history.js";
@@ -150,6 +151,7 @@ function WorkspaceShell() {
 		observe,
 		locate,
 	} = useWorkspaceGroup(undefined, { onOpen: () => setLibraryOpen(false) });
+	useAgentEditorFiles({ shown, queryClient, refresh });
 	const currentDocument = useCurrentDocument({ state, view, shown, book, setView });
 	const { page, kind, rawPath, file, isBeat, editPath, primary, anyChanged } = currentDocument;
 	const query = view.searchQuery;

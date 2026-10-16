@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
 import {
+	type EditorFileHandler,
 	LOCAL_COMMANDS,
 	type LocalCommandClient,
 	type LocalCommandInput,
@@ -176,6 +177,7 @@ export class LocalWorkspace implements LocalCommandClient {
 		settings = new LocalModelSettings(),
 		systemFile?: (absolute: string, action: "reveal" | "open") => Promise<void>,
 		private readonly telemetryContext?: TelemetryContext,
+		private readonly editorFiles?: EditorFileHandler,
 	) {
 		this.project = project;
 		this.#models = models;
@@ -210,6 +212,7 @@ export class LocalWorkspace implements LocalCommandClient {
 				this.#sessions = new LocalSessionController({
 					project: this.project,
 					models,
+					...(this.editorFiles ? { editorFiles: this.editorFiles } : {}),
 					...(this.telemetryContext === undefined ? {} : { telemetryContext: this.telemetryContext }),
 					usageCheckpoint: () => this.#settings.usageCheckpoint(),
 				});
@@ -244,6 +247,11 @@ export class LocalWorkspace implements LocalCommandClient {
 	}
 	async #execute(command: LocalCommandName, input: unknown): Promise<unknown> {
 		const project = this.project;
+		if (command === "workspace.file.read" || command === "workspace.file.save") {
+			const { expectedProjectId } = input as LocalCommandInput<"workspace.file.read">;
+			if (expectedProjectId !== undefined && expectedProjectId !== project.projectId)
+				throw new ArtifactError("workspace_project_mismatch", "作品已切换，原作品的文件操作没有执行");
+		}
 		// 桌面的每条作品命令先从 canon ref 重读 head：CLI 与 host 的 suim commit 在别的进程里推进它，
 		// 不重读的话已提交的文件会一直标成未提交，桌面里提交也会因基线过期被拒。模型设置不读作品。
 		if (!command.startsWith("models.")) await project.refreshHead();

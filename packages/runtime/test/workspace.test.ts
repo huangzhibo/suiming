@@ -101,6 +101,24 @@ test("工作台查询无需模型；读写只有 workspace.file.* 一组：编�
 		});
 		assert.match(await readFile(join(root, "text/beat-0002.md"), "utf8"), /焚毁/, "保存可以新建作品文件");
 		const file = await workspace.invoke("workspace.file.read", { path: "intent/计谋的代价.md" });
+		await assert.rejects(
+			workspace.invoke("workspace.file.read", { path: file.path, expectedProjectId: "other-project" }),
+			{ code: "workspace_project_mismatch" },
+		);
+		await assert.rejects(
+			workspace.invoke("workspace.file.save", {
+				path: file.path,
+				expectedProjectId: "other-project",
+				expectedSHA: file.sha256,
+				content: "另一作品的迟到草稿",
+			}),
+			{ code: "workspace_project_mismatch" },
+		);
+		assert.equal(
+			await readFile(join(root, file.path), "utf8"),
+			file.content,
+			"即使文件 hash 相同，跨作品操作也不能落盘",
+		);
 		await writeFile(join(root, file.path), "作者在外部明确了诈降的代价。\n");
 		await assert.rejects(
 			workspace.invoke("workspace.file.save", { path: file.path, expectedSHA: file.sha256, content: "过时 buffer" }),

@@ -69,9 +69,14 @@ export function useDocumentEditing(
 	async function savePath(path: string, restoreMissing = false) {
 		const draft = live.current.documents[path];
 		if (!draft) return;
-		const args = { path, content: draft.content, expectedSHA: restoreMissing ? null : draft.baseSHA };
+		const args = {
+			path,
+			content: draft.content,
+			expectedSHA: restoreMissing ? null : draft.baseSHA,
+			...(shown?.projectId ? { expectedProjectId: shown.projectId } : {}),
+		};
 		const result = await invoke("workspace.file.save", args);
-		setView((v) => savedDocument(v, path, result.content, result.sha256));
+		setView((v) => savedDocument(v, path, result.content, result.sha256, draft));
 		await queryClient.invalidateQueries({ queryKey: ["file", shown?.projectId, path] });
 		setError("");
 		setNotice("已保存");
