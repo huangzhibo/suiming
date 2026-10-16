@@ -760,7 +760,7 @@ export class HarnessSession {
 	 * 阶段提交，成功后继续原 Agent。它就是作者「提交」按钮与 host `suim commit` 的同一条路：
 	 * 扫 checkout diff → ChangeSet → Checker → 推进 canon ref，只多一个 commandId 回执，提交被打断时据此告诉模型
 	 * 提交成了没有（committedRevision）。没有合并步骤——作者与 Agent 改同一文件时冲突在动作发生的当下就解决了
-	 * （`edit` 的 `oldText`、保存的 `expectedSHA`）。
+	 * （整篇替换与删除的读取版本、`edit` 的 `oldText`、保存的 `expectedSHA`）。
 	 */
 	async commitStage(actionId: string): Promise<{ created: boolean; revision: ProjectRevision }> {
 		this.throwIfInterrupted();

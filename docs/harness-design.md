@@ -148,7 +148,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 
 | 能力 | 工具 | 可重读 | 说明 |
 | --- | --- | --- | --- |
-| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` | 是 | `read` 按行分页（默认 2000 行），超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
+| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` | 是 | `read` 对文本按行分页（默认 2000 行），非 UTF-8 文件只确认当前版本与大小；超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
 | 修改候选 | `write` `edit` `copy` `move` `delete` | 否 | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | 是 / 否 | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | 否 | 模型主动压缩；系统触发的压缩见第 7 节 |
@@ -159,8 +159,9 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 
 修改候选的几个工具各有来由：
 
-- `copy` 把一个文件或整个目录原样复制到新路径，内容不经过模型，每个目标文件照 `write` 先算好写前 hash 再落盘。没有它时，斗破抽取的「原样提升」要模型把 176 个文件逐个重打一遍，约 35 分钟。
-- `move` 与 `mv` 同义，挪完原处不留，目标已有不同内容时拒绝。换卷就是改 index 加 `move` 文件；没有它时，120 章整合给 153 节分卷只能逐个 `copy` 再 `delete`。
+- `write` 完整替换、`delete` 删除及 `copy` 覆盖不同内容时，核对本轮 `read` 观察的 hash；读后有变化就拒绝并让模型重读。读取版本只留工具闭包，换轮或恢复后重新读取。自己的完整写入可以继续修改；局部 `edit` 用唯一 `oldText` 匹配当前内容，保留作者在其他段落的修改，但不能因此放行旧全文覆盖。规则与限制见 [ADR-0035](adr/0035-shared-checkout-write-protection.md)。
+- `copy` 把一个文件或整个目录原样复制到新路径，内容不经过模型；新建或同内容不要求先读目标，覆盖已有不同内容须先读取目标。每个目标仍按写前 hash 核对后落盘。没有它时，斗破抽取的「原样提升」要模型把 176 个文件逐个重打一遍，约 35 分钟。
+- `move` 与 `mv` 同义，挪完原处不留，目标已有不同内容时拒绝。准备删除源文件时核对复制字节的 hash，防止搬走旧内容后删除作者的新保存。换卷就是改 index 加 `move` 文件；没有它时，120 章整合给 153 节分卷只能逐个 `copy` 再 `delete`。
 - `write` / `edit` 带可选的 `check: true`：改完立刻对候选跑 Checker，一次观察返回两者，省一个模型来回（SoL-Pi Action Fusion 的无 shell 版）。Writer 的交付句是「全文完成的那次 write 带 check」。结果也给写入后的字数，因为 Writer 曾把 6,745 码点报成「约一万字」。DeepSeek 写一万字要 write 四五次、每次后跟一个 check（实测见 [packages/runtime/AGENTS.md](../packages/runtime/AGENTS.md)），所以不在工具层禁止多次 write。
 
 **scope 去掉。**Design / Write / Review / Source 不是带权限预设的入口，只是桌面与 CLI 发出的消息模板（桌面「写这个 Beat」发的是「完成并提交 beat-0004 的正文」这句话）。曾经的 `run.design` / `run.write` / `run.review` / `run.source.*` 是「权限预设 + 交付检查」：前者在长会话第二轮就不成立——作者顺口一句「顺便改下大纲」；后者是在判「作者目标是否达成」。哪些路径是合法作品文件由 codec 与 Checker 在 `commit` 时判，工具层不设第二道。
@@ -414,7 +415,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 重复发送同一条作者消息 | command receipt 去重，返回原序号 | `workspace`「命令重发校验输入：并发 send 只有一个 controller，跑完后的重发返回原回执不再开 turn」；`execution-persistence`「inbox：idle 与 running 都排队，turn 非正常结束后照样收，相同命令返回原序号」 |
 | **turn 结束后作者再发消息** | 同一 session、同一消息列表续接；checkout 里的候选仍在 | `agent`「作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的 commit 一起进版本，没有合并步骤」（第二个 turn 提交的正是第一个 turn 留在 checkout 里的改动）、「说完就停；同一 session 的下一句接着消息列表，新 session 隔离；只讨论不产生作品版本」 |
 | turn 结束时候选未提交 | turn 正常结束；对账事件给出未提交数与这一轮改了哪些文件；下一 turn 可提交 | `agent-write`「未提交的模型候选不会因为停止输出而进入 Canon；候选留在 checkout 等下一轮」；对账：`agent`「turn 结束事件带对账：作者几条、意图 / Design / 正文各改了什么、提交了几个版本、还剩几个未提交」 |
-| **作者与 Agent 改同一文件** | Agent 的 `edit` 以当前内容为准，`oldText` 对不上即失败并让模型重读；作者保存时 `expectedSHA` 冲突、外部修改保留；提交没有合并步骤 | 编辑侧：`agent`「作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，对不上就失败让模型重读」；保存侧：`workspace`「工作台查询无需模型；读写只有 workspace.file.* 一组：编辑 CAS 保留外部修改，按版本读单个文件」；提交侧：`agent`「作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的 commit 一起进版本，没有合并步骤」 |
+| **作者与 Agent 改同一文件** | 整篇覆盖与删除核对本轮读取版本；Agent 的 `edit` 以当前内容为准，`oldText` 对不上即失败并让模型重读；作者保存时 `expectedSHA` 冲突、外部修改保留；提交没有合并步骤 | 整篇与移动：`file-tool-concurrency`；桌面叠加：`concurrent-file-editing`；编辑侧：`agent`「作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，对不上就失败让模型重读」；保存侧：`workspace`「工作台查询无需模型；读写只有 workspace.file.* 一组：编辑 CAS 保留外部修改，按版本读单个文件」；提交侧：`agent`「作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的 commit 一起进版本，没有合并步骤」 |
 | 两个 turn 之间升级了工具面或宪法；停在一批动作中间时工具面变了 | 下一次请求就用新的；被打断的动作补结果，不按旧声明重放 | `harness-recovery`「停在一批动作中间时工具面变了：照样续上，被打断的动作补结果，新请求用新的工具声明」 |
 | 退出后重开；换模型 | 重开同 session 从 checkpoint 续；换模型从这个 turn 起生效，半途停下的也照样续 | `agent`「进程重启：持有进程已死的 running session 收敛回 idle 记 process_restart，下一句从 checkpoint 续」「模型回复没收到进程就退出：…换了模型照样接着原对话」；`execution-state`「删除 session 带走它的子任务；turn 进行中不能删」；`conversation-model`「session 的模型独立于全局默认，思考参数真实传入；turn 边界换绑与设置保存都不打断当前回复」 |
 | 2026-10-06 之前落盘的 paused session | 打开作品时收敛成 idle，暂停原因转记为 `lastFailure`，作者一句话就能续 | `execution-state`「2026-10-06 之前落盘的 paused session：打开时收敛成 idle，暂停原因转记为 lastFailure，作者一句话就能续」 |

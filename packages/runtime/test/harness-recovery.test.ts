@@ -394,6 +394,7 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 		});
 		const original = project.project().headRevisionId;
 		provider.setResponses([
+			fauxAssistantMessage(fauxToolCall("read", { path: "intent/计谋的代价.md" })),
 			fauxAssistantMessage(
 				fauxToolCall("write", { path: "intent/计谋的代价.md", content: "主角必须为真相承担代价。" }),
 			),
@@ -401,13 +402,14 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 			async (context) => {
 				// 被打断的提交按回执说清已经提交成了哪个版本，模型不必再提交一次。
 				assert.match(JSON.stringify(context.messages), /这次提交其实已经完成：版本 r2/u);
-				return fauxAssistantMessage(
-					fauxToolCall("write", {
-						path: "world/characters/黄盖.md",
-						content: "黄盖相信证据，愿意为自己的选择承担后果。",
-					}),
-				);
+				return fauxAssistantMessage(fauxToolCall("read", { path: "world/characters/黄盖.md" }));
 			},
+			fauxAssistantMessage(
+				fauxToolCall("write", {
+					path: "world/characters/黄盖.md",
+					content: "黄盖相信证据，愿意为自己的选择承担后果。",
+				}),
+			),
 			fauxAssistantMessage(fauxToolCall("commit", { summary: "第二阶段" })),
 			fauxAssistantMessage("已完成两阶段修改"),
 		]);
@@ -441,7 +443,7 @@ test("同一 turn 两次阶段提交；第一次 revision 已确认但动作结�
 		assert.equal(state.tasks.length, 0);
 		assert.equal(state.sessions[0]?.baseRevisionId, project.project().headRevisionId);
 		assert.equal(state.sessions[0]?.status, "idle");
-		assert.equal(provider.state.callCount, 5);
+		assert.equal(provider.state.callCount, 7);
 	} finally {
 		project.close();
 		await rm(root, { recursive: true, force: true });
@@ -474,6 +476,7 @@ for (const [edit, content] of [
 			const authored = content ?? (await readFile(path, "utf8"));
 			const original = project.project().headRevisionId;
 			provider.setResponses([
+				fauxAssistantMessage(fauxToolCall("read", { path: "intent/计谋的代价.md" })),
 				fauxAssistantMessage(
 					fauxToolCall("write", { path: "intent/计谋的代价.md", content: "主角必须为真相承担代价。" }),
 				),
@@ -510,7 +513,7 @@ for (const [edit, content] of [
 			const outcome = await harness.turn(session.id, {}, (handle) => agentTurn(handle));
 			assert.equal(outcome.failure, undefined);
 			assert.equal(await readFile(path, "utf8"), authored, "作者在两轮之间的修改原样留着");
-			assert.equal(provider.state.callCount, 3);
+			assert.equal(provider.state.callCount, 4);
 		} finally {
 			project.close();
 			await rm(root, { recursive: true, force: true });

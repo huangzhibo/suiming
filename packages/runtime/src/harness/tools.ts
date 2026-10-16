@@ -1,6 +1,6 @@
-import { posix } from "node:path";
+import { posix, resolve } from "node:path";
 import { type Static, type TSchema, Type } from "@earendil-works/pi-ai";
-import { buildStateTimeline, formatDiagnostic, sha256Hex } from "@suiming/story";
+import { buildStateTimeline, formatDiagnostic, sha256Buffer, sha256Hex } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
 import {
 	checkFindings,
@@ -183,7 +183,7 @@ async function storyTextShape(mutation: FileMutation, scan?: CandidateScanner): 
 
 /**
  * 文件动作由 Suiming 执行：先算出要写的字节与写前的 hash（FileMutation），落盘前一刻再核对一次，
- * 作者或别的程序在这中间改过同一个文件就报写冲突，交给模型重读再改。
+ * 整篇替换与删除还核对本轮实际读过的版本，覆盖模型生成结果前的思考间隔；版本只留在内存，换轮重新读。
  */
 export function fileTools(
 	env: ConfinedExecutionEnv,
@@ -191,17 +191,51 @@ export function fileTools(
 	scan?: CandidateScanner,
 	sourceId?: string,
 ): HarnessTool[] {
+	// 不是 checkpoint / 重放日志；只证明这一轮模型读过哪个版本。局部 edit 仍以 oldText 为条件。
+	const observed = new Map<string, string | null>();
+	const key = (path: string) => {
+		const absolute = resolve(env.rootPath, path).normalize("NFC");
+		return process.platform === "linux" ? absolute : absolute.toLowerCase();
+	};
+	const requireObserved = (mutation: FileMutation) => {
+		const before = observed.get(key(mutation.path));
+		if (before === undefined) {
+			if (mutation.before === null) return; // 新文件没有旧内容可覆盖。
+			throw new ToolRejection(
+				"file_read_required",
+				`先用 read 读取 ${mutation.path} 的当前内容，再覆盖或删除；换轮或恢复后也需重新读取`,
+			);
+		}
+		if (before !== mutation.before)
+			throw new ToolRejection(
+				"file_write_conflict",
+				`${mutation.path} 在你读取后被修改或删除；先重新 read，在最新内容上调整，不要直接重试旧结果`,
+			);
+	};
 	/** 改动已经落盘之后再检查：检查不过也如实返回，模型据此接着改，不回滚写入。 */
 	const written = async (summary: string, check: boolean | undefined) =>
 		text(check && scan ? `${summary}\n\n检查：${formatCheck(await scan(), sourceId)}` : summary);
 	const read: HarnessTool<typeof ReadSchema> = {
 		name: "read",
 		description:
-			"读取作品中的 UTF-8 文件。offset 从 1 开始，默认最多 2000 行且正文不超过 50 KiB；截断时按返回的 offset、column 继续读取。",
+			"读取作品文件；非 UTF-8 文件只返回大小并确认当前版本，不展开内容。offset 从 1 开始，默认最多 2000 行且正文不超过 50 KiB；截断时按返回的 offset、column 继续读取。",
 		parameters: ReadSchema,
 		rereadable: true,
 		async execute(_id, params, signal) {
-			const content = await env.readTextFile(params.path, signal);
+			let bytes: Uint8Array;
+			try {
+				bytes = await env.readBinaryFile(params.path, signal);
+			} catch (error) {
+				if (error instanceof ToolRejection && error.code === "file_not_found") observed.set(key(params.path), null);
+				throw error;
+			}
+			observed.set(key(params.path), sha256Buffer(bytes));
+			let content: string;
+			try {
+				content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+			} catch {
+				return text(`${params.path} 是非 UTF-8 文件（${bytes.byteLength} 字节），已确认当前版本，未展开内容。`);
+			}
 			const result = readWindow(content, params);
 			return text(
 				result.text +
@@ -229,11 +263,13 @@ export function fileTools(
 	const write: HarnessTool<typeof WriteSchema> = {
 		name: "write",
 		description:
-			"创建或完整替换允许范围内的作品文件。结果给出写入后的字数（按码点计，含标点与换行，与正文检查同一口径）；汇报篇幅以它为准，不要估算。带 check: true 时一并返回对整个候选的确定性检查结论，省掉紧跟着的一次 check。",
+			"创建或完整替换允许范围内的作品文件。替换已有文件须在本轮先 read；读取后被外部修改或删除会拒绝，须重读再调整。局部修改优先用 edit。结果给出写入后的字数（按码点计，含标点与换行，与正文检查同一口径）；汇报篇幅以它为准，不要估算。带 check: true 时一并返回对整个候选的确定性检查结论，省掉紧跟着的一次 check。",
 		parameters: WriteSchema,
 		async execute(_id, params, signal) {
 			const mutation = await env.prepareWrite(params.path, params.content);
+			requireObserved(mutation);
 			await env.applyMutation(mutation, signal);
+			observed.set(key(mutation.path), mutation.after);
 			return written(
 				`已写入 ${mutation.path}${sizeAfter(mutation)}${await storyTextShape(mutation, scan)}`,
 				params.check,
@@ -257,6 +293,8 @@ export function fileTools(
 			if (mutation.before !== sha256Hex(original))
 				throw new ToolRejection("file_write_conflict", conflictMessage(params.path));
 			await env.applyMutation(mutation, signal);
+			if (observed.get(key(mutation.path)) === mutation.before) observed.set(key(mutation.path), mutation.after);
+			else observed.delete(key(mutation.path)); // 未见过的其他段落可能已由作者修改，不能授权整篇替换。
 			return written(
 				`已修改 ${mutation.path}${sizeAfter(mutation)}${await storyTextShape(mutation, scan)}`,
 				params.check,
@@ -265,13 +303,16 @@ export function fileTools(
 	};
 	const remove: HarnessTool<typeof DeleteSchema> = {
 		name: "delete",
-		description: "删除允许范围内的作品文件。删除只改当前候选；提交时 Checker 会检查是否有引用指向它。",
+		description:
+			"删除允许范围内的作品文件，须在本轮先 read；读取后有变化会拒绝，须重读再决定。删除只改当前候选；提交时 Checker 会检查是否有引用指向它。",
 		parameters: DeleteSchema,
 		async execute(_id, params, signal) {
 			const mutation = await env.prepareWrite(params.path, null);
 			// 删一个本来就不存在的文件不是「成功」，是模型记错了路径：如实拒绝，别让它以为删掉了。
 			if (mutation.before === null) throw new ToolRejection("file_not_found", params.path);
+			requireObserved(mutation);
 			await env.applyMutation(mutation, signal);
+			observed.set(key(mutation.path), null);
 			return text(`已删除 ${mutation.path}`);
 		},
 	};
@@ -279,7 +320,7 @@ export function fileTools(
 	const copy: HarnessTool<typeof CopySchema> = {
 		name: "copy",
 		description:
-			"把允许范围内的一个文件或整个目录原样复制到新路径：目录按相对路径整棵复制，同名文件覆盖。内容不经过你，比 read 再 write 快，也不会抄错；Source 原样提升为 Target 用它（如 source/<id>/world → world）。带 check: true 时一并返回确定性检查结论。",
+			"把允许范围内的一个文件或整个目录原样复制到新路径：目录按相对路径整棵复制。目标已有不同内容须在本轮先 read，读后有变化则拒绝；同内容不改。内容不经过你，比 read 再 write 快，也不会抄错；Source 原样提升为 Target 用它（如 source/<id>/world → world）。带 check: true 时一并返回确定性检查结论。",
 		parameters: CopySchema,
 		async execute(_id, params, signal) {
 			const from = logicalPath(params.from);
@@ -296,9 +337,15 @@ export function fileTools(
 							return [file, `${to}/${file.slice(from.length + 1)}`] as const;
 						});
 			const mutations: FileMutation[] = [];
-			for (const [source, target] of pairs)
-				mutations.push(await env.prepareWrite(target, await env.readBinaryFile(source, signal)));
-			for (const mutation of mutations) await env.applyMutation(mutation, signal);
+			for (const [source, target] of pairs) {
+				const mutation = await env.prepareWrite(target, await env.readBinaryFile(source, signal));
+				if (mutation.before !== mutation.after) requireObserved(mutation);
+				mutations.push(mutation);
+			}
+			for (const mutation of mutations) {
+				await env.applyMutation(mutation, signal);
+				if (mutation.before !== mutation.after) observed.delete(key(mutation.path));
+			}
 			const created = mutations.filter((mutation) => mutation.before === null).length;
 			const unchanged = mutations.filter((mutation) => mutation.before === mutation.after).length;
 			return written(
@@ -335,9 +382,15 @@ export function fileTools(
 						"move_target_exists",
 						`${target} 已经有别的内容，不覆盖；先看一眼它，确实不要了再删`,
 					);
-				mutations.push(write, await env.prepareWrite(source, null));
+				const remove = await env.prepareWrite(source, null);
+				if (remove.before !== sha256Buffer(bytes))
+					throw new ToolRejection("file_write_conflict", conflictMessage(source));
+				mutations.push(write, remove);
 			}
-			for (const mutation of mutations) await env.applyMutation(mutation, signal);
+			for (const mutation of mutations) {
+				await env.applyMutation(mutation, signal);
+				observed.delete(key(mutation.path));
+			}
 			return written(`已挪到 ${to}：${pairs.length} 个文件`, params.check);
 		},
 	};

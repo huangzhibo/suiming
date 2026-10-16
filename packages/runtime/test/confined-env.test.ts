@@ -245,6 +245,7 @@ test("copy：整个目录或单个文件原样复制，Source 提升为 Target �
 			return (first as { content: { text: string }[] }).content[0]?.text ?? "";
 		};
 
+		await tools.find((item) => item.name === "read")?.execute("read-target", { path: "world/core.md" });
 		assert.match(await run({ from: "source/访谈/world", to: "world" }), /2 个文件.*新建 1.*覆盖 1/u);
 		assert.equal(await readFile(join(root, "world/core.md"), "utf8"), files["source/访谈/world/core.md"]);
 		assert.equal(

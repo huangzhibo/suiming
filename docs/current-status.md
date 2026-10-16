@@ -15,6 +15,8 @@
 
 ## 最近有效验收
 
+2026-10-17：补齐 Agent 与作者共享 checkout 的双向覆盖保护：整篇写入、复制覆盖和删除核对本轮实际读取版本，局部 `edit` 保留作者其他段落；修复移动文件时源内容被替换后仍删除的竞态。桌面继续使用现有草稿、CAS 与冲突比较，迟到成功 / 失败回执不丢后续输入、不串页或抢焦点，合并期间再次修改须重新处理。机制、真实调用及边界见[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)与 [ADR-0035](adr/0035-shared-checkout-write-protection.md)。
+
 2026-10-17：按 [ADR-0034](adr/0034-local-architecture-consolidation.md) 修复工作区恢复失败覆盖草稿的风险：无记录才初始化，读取异常或内容损坏时保全原记录并停止编辑与自动保存，可重试或打开其他作品。布局损坏仍可归一化，但不能连带丢正文、消息和待确认提交；同时移除仅旧测试使用的内存 Artifact 版本库，格式与候选变更验收使用生产函数，版本与隔离验收使用真实 Git；执行对象 ID 不变。文档查询由调用方显式使用，编辑事务与反馈从渲染组件分离，关闭标签与导航共用草稿路径判断；沿用共享草稿、CAS 与原有焦点规则。隔离验证见[局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)。
 
 2026-10-16：[多文件草稿恢复](validation/2026-10-16-multi-draft-recovery/README.md)补齐两部同路径作品、各三份未保存文件与对话草稿的切换、退出进程再启动和关窗重开；逐字核对草稿、磁盘原文、光标与活动编辑器焦点。草稿存储失败时切换受阻、退出可取消，恢复存储后仍可重开。修正作品成功切换后选择弹层未收起的问题，复用原有持久化，不新增恢复机制。
@@ -44,9 +46,9 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 482 / 482、0 skip，工作台 77 / 77 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 489 / 489、0 skip，工作台 77 / 77 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 74 / 74 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)为最新完整复跑，新增草稿恢复读取失败与迟到保存回执验收；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 76 / 76 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)为最新完整复跑，新增持续 Agent 写入与多草稿组合、迟到保存失败验收；最终相关 4 / 4 复验通过；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 
@@ -78,10 +80,10 @@
 
 ## 已知缺陷
 
-- **持续使用的验收边界**：页面与短创作闭环已通过上述走查；单项测试已有多标签、外部修改冲突、迟到回包、重载和恢复覆盖，但跨作品、多轮修订与长对话叠加的持续使用场景还未系统验收。尚无完整无障碍验收。缺少这些证据不能靠要求作者反复排障来补，也不意味着已经验证的单项能力未实现。
+- **持续使用的验收边界**：页面与短创作闭环已通过上述走查；已补齐 Agent 持续修改叠加多文件草稿、迟到保存成功 / 失败与重复冲突的受控组合，并有真实模型冲突后重读证据；跨作品、多轮修订与长对话叠加的多小时真实使用仍未系统验收。尚无完整无障碍验收。缺少这些证据不能靠要求作者反复排障来补，也不意味着已经验证的单项能力未实现。
 
 - **长篇**：尚无 3 卷 30 Beat 的完整真实作品验收。最大的真实运行是 Agent 对《三国演义》前五十回的忠实抽取（231 节；隔离副本已继续补全与全 Source 复核）与斗破前 120 章的抽取和两组共 8 节的留出评测，都不是 Agent 自己写成的长篇。大型 checkpoint 的消息 / Context 对象去重、长列表和持续运行性能仍需规模数据测量；百万字符单文件已有合成编辑证据，不能代替真实长篇。[C 题库](c-question-bank.md) 17 道（目标不少于 20），2026-09-06 补硬状态后的回归是 13 / 17。
-- **作者体验**：v7 工作台已在 2 Beat 样例上验收。Library 有最近作品列表与打开 / 新建，打开任意 Open Story Directory 会就地初始化；旧仓格式不迁移，初始化失败时文件夹保持原样。上下文栏与右栏可以拖拽调宽（[调宽验收](validation/2026-09-09-pane-resize/README.md)）。邻域图只画 frontmatter 声明的引用，看二跳就再点一次，不推断隐含关系。finding 的 Runtime 锚点仍只到文件，段落定位是窗口用审稿引文在 mdast 上对出来的，Reviewer 没引原文时退回到只锚文件。同一个文件被编辑器 buffer 与外部改动（作者、host agent、Agent）同时修改时只做 CAS 比较，入口是「比较外部修改」，不自动解决，也不覆盖任何一方。
+- **作者体验**：v7 工作台已在 2 Beat 样例上验收。Library 有最近作品列表与打开 / 新建，打开任意 Open Story Directory 会就地初始化；旧仓格式不迁移，初始化失败时文件夹保持原样。上下文栏与右栏可以拖拽调宽（[调宽验收](validation/2026-09-09-pane-resize/README.md)）。邻域图只画 frontmatter 声明的引用，看二跳就再点一次，不推断隐含关系。finding 的 Runtime 锚点仍只到文件，段落定位是窗口用审稿引文在 mdast 上对出来的，Reviewer 没引原文时退回到只锚文件。同一个文件被编辑器 buffer 与外部改动（作者、host agent、Agent）同时修改时只做 CAS 比较，入口是「比较外部修改」，不自动解决或覆盖任一方。Agent 整篇覆盖与删除也核对本轮读取版本；这些保护不等于外部任意进程写文件的全局锁，最终 hash 检查与文件替换间仍有跨进程竞态边界。
 - **A / B 决策卡**（针对一段给两个改法让作者选）还没做，但不是做不了：零件都在，缺的只是 `validateProductEvent` 的 CUSTOM 白名单里的一个事件名，以及一次「作者读到一段不满意」的真实场景来定给几个改法、怎么呈现。它也是「作者否决」这类证据最干净的采集口。零件清单见[作者工作台设计](workbench-design.md) 4.4 节「A / B 决策卡」。
 - **发行与认证**：已有 macOS arm64 自含 `.app` / zip 预览与同格式手工替换、冷备份回退验收；签名 / 公证脚本、ad-hoc 演练和篡改拒绝已验证，真实 Developer ID、公证、独立机器下载首次打开尚未完成，现按作者要求暂缓；没有自动更新器，详见[安装验收](validation/2026-10-15-macos-install/README.md)。设置页的登录向导接通了 pi-ai 全部 provider 的 API key / OAuth 流程（浏览器回调、设备码、手动粘贴授权码都能转述）。到「真实调用」的：API key（另经桌面 E2E）；`openai` 的 Sign in with ChatGPT——2026-10-02 登录并真实调用，10-03 凭据文件在一次真实刷新中被重写，当天 CLI 连跑多个一到两小时的运行没有一次因凭据失败。隔离服务的失效恢复与并发刷新已通过真实桌面 / CLI 组合验收，凭据轮换仍复用 pi-ai 和原文件锁；实际服务商的 refresh token 撤销及重新登录尚未验证，`openai-codex`、Anthropic 等其余 provider 的 OAuth 也不能因此标为已支持。订阅额度与作者自己的 Codex 共用，界面上的花费是按 API 价的估算，不是扣费。本地执行库暂不做跨 schema 转换，遇到旧版会拒绝且不改表；提示先完整备份、用兼容版本读取旧对话，只续作品则另建完整副本处理。同为 v6 / 当前 Story Language 的两个开发构建已验证替换安装与回退；不等于跨 schema 或历史正式版本升级已解决。启动失败现在通过原有工作台显示原因并可打开其他作品；正式交付仍须保证旧作品与对话可取回，不能以执行数据可丢代替。
 - **命令边界**：CLI 与桌面 IPC 保留两份手写传输目录，共用领域 schema 和摘要投影，理由见[系统架构](architecture.md)。旧 Cloud API、存储 adapter、同步服务与专属协议已按 [ADR-0030](adr/0030-remove-frozen-cloud.md) 删除。未来 Cloud 不是当前能力或桌面验收缺口。

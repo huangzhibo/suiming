@@ -110,6 +110,7 @@ test("write / edit 带 check: true：写完一并返回 Checker 结论，省掉�
 			return part?.type === "text" ? (part.text ?? "") : "";
 		};
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", {
 				path: "intent/计谋的代价.md",
 				content: "揭示真相必须让选择者承担不可逆的后果。",
@@ -149,6 +150,7 @@ test("delete 从候选里真的移除 artifact；删掉仍被引用的文件由 
 	try {
 		// 删一份已经结晶进故事事实的 Intent——Story Language 明写这类 Intent 应当合并或删除。
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("delete", { path: "intent/计谋的代价.md" }),
 			call("commit", { summary: "这条 Intent 已经落进 Beat，删除" }),
 			reply("已删除并提交"),
@@ -168,6 +170,7 @@ test("delete 从候选里真的移除 artifact；删掉仍被引用的文件由 
 		const head = f.project.project().headRevisionId;
 		const liMu = await readFile(join(f.root, "world/characters/黄盖.md"), "utf8");
 		f.provider.setResponses([
+			call("read", { path: "world/characters/黄盖.md" }),
 			call("delete", { path: "world/characters/黄盖.md" }),
 			call("commit", { summary: "删掉黄盖" }),
 			async (context) => {
@@ -202,6 +205,7 @@ test("turn 结束事件带对账：作者几条、意图 / Design / 正文各改
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "真相公开必须当场付出不可逆的代价。" }),
 			call("commit", { summary: "写回意图" }),
 			call("write", { path: "text/beat-0001.md", content: "军杖落到第三十下。" }),
@@ -279,6 +283,7 @@ test("对账点名根 Agent 没取写作依据就整篇写入的正文；取过 
 		// 委派 writer 的那一节：子任务自己拿 Write Context，它的写入不算
 		f.provider.setResponses([
 			call("delegate", { profile: "writer", storyBeatId: "beat-0002", goal: "重写第二节" }),
+			call("read", { path: "text/beat-0002.md" }),
 			call("write", { path: "text/beat-0002.md", content: "他把火船折好，藏进袖中最深处。" }),
 			call("submit_task", { summary: "写好了" }),
 			reply("交给 Writer 重写了第二节。"),
@@ -295,6 +300,7 @@ test("作者消息后的状态附注在取走消息时现算；开场写明是�
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			async () => {
 				// turn 进行中作者又说了一句：它在 Agent 改过文件之后才进消息列表。
 				f.project.queueInbox(id, "补充：代价要当场兑现");
@@ -446,6 +452,7 @@ test("提交产生新版本之后，之前读的大文件在请求里折成头�
 		const read = () => call("read", { path: "notes/赤壁长注.md" });
 		f.provider.setResponses([
 			read(),
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "揭示真相必须让选择者承担不可逆的后果。" }),
 			call("commit", { summary: "记下计谋的代价" }),
 			async (context) => {
@@ -467,7 +474,7 @@ test("提交产生新版本之后，之前读的大文件在请求里折成头�
 		]);
 		const outcome = await f.say("读长注，记下代价并提交");
 		assert.equal(outcome.failure, undefined);
-		assert.equal(f.provider.state.callCount, 6);
+		assert.equal(f.provider.state.callCount, 7);
 	} finally {
 		await f.close();
 	}
@@ -820,6 +827,7 @@ test("作品状态来自版本真源，候选修改不会冒充已提交版本",
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			async (context) => {
 				assert.match(JSON.stringify(context.messages), /committedRevisionCount/);
 				assert.match(
@@ -859,6 +867,7 @@ test("Agent 直接修改与阶段提交，不强制 Review 或子任务；不属
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "揭示真相必须让选择者承担不可逆的后果。" }),
 			call("write", { path: "scripts/count.py", content: "print('统计用词频率')\n" }),
 			call("commit", { summary: "强化后果" }),
@@ -909,6 +918,7 @@ test("Agent 按模型决定调用独立 Review，结论随工具结果直接回�
 	const f = await fixture();
 	try {
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "真相必须来自主动选择，并有不可逆代价。" }),
 			call("review", { layer: "design", goal: "核对因果与代价" }),
 			call("submit_review", {
@@ -1177,6 +1187,7 @@ test("interrupt：打断的 turn 回 idle 不记故障；消息列表与候选�
 		const id = (await f.harness.createSession()).id;
 		const controller = new AbortController();
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "真相公开须承担不可逆代价。" }),
 			async () => {
 				controller.abort(new Error("作者停止了当前回复"));
@@ -1416,6 +1427,7 @@ test("作者与 Agent 共用一份候选：作者未提交的修改随 Agent 的
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "真相公开须承担不可逆代价。" }),
 			reply("改好了，还没提交"),
 		]);
@@ -1485,6 +1497,7 @@ test("作者与 Agent 改同一文件：edit 以 checkout 当前内容为准，�
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "Agent 候选：真相必须付出代价。\n" }),
 			reply("改好了"),
 		]);
@@ -1651,6 +1664,7 @@ test("续跑时读取权威状态失败也释放 lease，并保留 checkout 里�
 	try {
 		const id = (await f.harness.createSession()).id;
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "保留作者代价要求" }),
 			reply("改好了"),
 		]);
@@ -1706,6 +1720,7 @@ test("委派观测归属 turn；工具 / Checker 带同一 session 关联", asyn
 	const f = await fixture({ telemetryContext: telemetry.context });
 	try {
 		f.provider.setResponses([
+			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "每次选择都有不可逆的代价。" }),
 			call("review", { layer: "design", goal: "检查代价" }),
 			call("submit_review", { verdict: "pass", summary: "通过", findings: [], uncovered: [], uncertainties: [] }),

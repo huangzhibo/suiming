@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import {
 	createModels,
 	type FauxResponseFactory,
@@ -130,19 +131,25 @@ if (process.argv.includes("--composer-test")) {
 }
 // 人工释放回包，验证窗格关闭期间的共享输入；只存在于测试入口。
 if (process.argv.includes("--workspace-callback-test")) {
-	const callbacks: { command: string; release?: () => void } = { command: "" };
+	const callbacks: { command: string; before?: boolean; release?: () => void } = { command: "" };
 	Object.assign(globalThis, { workspaceTestCallbacks: callbacks });
+	const hold = async () => {
+		await new Promise<void>((resolve) => {
+			callbacks.release = resolve;
+		});
+		delete callbacks.release;
+	};
 	const handle = ipcMain.handle.bind(ipcMain);
 	ipcMain.handle = (channel, listener) =>
 		handle(channel, async (event, request, ...args) => {
+			if (channel !== "suiming:command" || request.command !== callbacks.command)
+				return listener(event, request, ...args);
+			callbacks.command = "";
+			const before = callbacks.before === true;
+			delete callbacks.before;
+			if (before) await hold();
 			const result = await listener(event, request, ...args);
-			if (channel === "suiming:command" && request.command === callbacks.command) {
-				callbacks.command = "";
-				await new Promise<void>((resolve) => {
-					callbacks.release = resolve;
-				});
-				delete callbacks.release;
-			}
+			if (!before) await hold();
 			return result;
 		});
 }
@@ -192,6 +199,32 @@ provider.setResponses([
 	fauxAssistantMessage(fauxToolCall("commit", { summary: "保留独立审稿意见，交作者裁决" })),
 	fauxAssistantMessage("首场正文与独立审稿已提交，取信动作的意见留给作者裁决。"),
 ]);
+if (process.argv.includes("--concurrent-file-test")) {
+	provider.setResponses([
+		fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" })),
+		async () => {
+			await gate("agent-stale-write");
+			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "迟到的旧结果" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /file_write_conflict/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "甲.md" }));
+		},
+		async (context) => {
+			assert.match(JSON.stringify(context.messages.at(-1)), /甲的草稿/);
+			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "甲的草稿，Agent 合并" }));
+		},
+		async () => {
+			await gate("agent-next-write");
+			return fauxAssistantMessage(fauxToolCall("write", { path: "甲.md", content: "甲的草稿，Agent 再改" }));
+		},
+		async () => {
+			await gate("agent-finish");
+			return fauxAssistantMessage("已保留作者保存的内容，修改尚未提交。");
+		},
+	]);
+}
+
 if (process.argv.includes("--recovery-test"))
 	provider.setResponses([
 		async () => {
