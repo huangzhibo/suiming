@@ -78,3 +78,34 @@ test("git Canon 建仓时写下正文不自动合并的策略，且它不进快�
 		await rm(root, { recursive: true, force: true });
 	}
 });
+
+test("两个真实作品仓库不读取或提交对方的独有版本，拒绝后本地 Canon 与历史保持不变", async () => {
+	const root = await mkdtemp(join(tmpdir(), "suiming-canon-isolation-"));
+	try {
+		const stores = await Promise.all(
+			["甲", "乙"].map(async (name) => {
+				const files = [
+					...sampleWorkFiles(),
+					{ path: "intent/隔离.md", mediaType: "text/markdown", bytes: new TextEncoder().encode(name) },
+				];
+				const dir = join(root, name);
+				await materializeOpenStoryDirectorySnapshot(dir, files);
+				const store = new GitCanonStore({ dir });
+				const revision = await store.init(files);
+				return { store, revision };
+			}),
+		);
+		const [first, second] = stores;
+		assert.ok(first && second);
+		assert.notEqual(first.revision.id, second.revision.id);
+		await assert.rejects(() => second.store.snapshotForProject("乙", first.revision.id));
+		await assert.rejects(() =>
+			second.store.commit("乙", { baseRevisionId: first.revision.id, operations: [] }, () => undefined),
+		);
+		assert.equal(await second.store.headRevisionId("乙"), second.revision.id);
+		assert.deepEqual(await second.store.history("乙"), [second.revision]);
+		assert.equal((await first.store.snapshotForProject("甲", first.revision.id)).baseRevisionId, first.revision.id);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});

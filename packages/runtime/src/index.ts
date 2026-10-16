@@ -51,9 +51,8 @@ export {
 	targetArtifactIdentity,
 	validateArtifactIdentity,
 } from "./artifact/identity.js";
-export { InMemoryArtifactStore } from "./artifact/memory-store.js";
 export type { ArtifactPathCodec, OpenPackageFile } from "./artifact/open-package.js";
-export { exportOpenPackage, importOpenPackage, validateOpenPackagePath } from "./artifact/open-package.js";
+export { validateOpenPackagePath } from "./artifact/open-package.js";
 export type {
 	OpenStoryDirectoryFileKind,
 	OpenStoryDirectoryIgnoredEntry,
@@ -109,7 +108,6 @@ export type {
 	ArtifactContent,
 	ArtifactIdentity,
 	ArtifactNamespace,
-	ArtifactVersion,
 	CandidateArtifact,
 	ChangeOperation,
 	ChangeSet,

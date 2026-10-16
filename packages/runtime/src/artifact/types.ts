@@ -11,10 +11,6 @@ export interface ArtifactContent {
 	bytes: Uint8Array;
 }
 
-export interface ArtifactVersion extends ArtifactContent {
-	id: string;
-}
-
 /**
  * 一个版本在 Canon 里的位置，仅此而已。
  *

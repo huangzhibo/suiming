@@ -64,7 +64,7 @@ Artifact 的标识不能混用：
 
 **换卷因此是两步：改 index、`mv` 文件。**顺序只有 index 能表达（eval-022 第一卷是 1 68 2 3 4 5 69 6 7），位置只有文件能表达；只做一半由 Checker 双向报出。同一 identity 换了路径在 ChangeSet 里是 `replace`（`artifact.test.ts`「StoryBeat 换卷是两步：改 index 加移动文件；只改一半由 Checker 拒绝」、`local-project-service.test.ts`「host 换卷是改 index 加 mv 两步，diff 里两个 artifact 都算改过」）。
 
-手上有 artifact 时直接读 `artifact.path`。`storyPackageCodec.pathForIdentity(identity, candidate)` 只是**在候选里查表**，留给解析 Story Language 的引用（手上只有 kind + localId）；引用可能指向不存在的 artifact，所以查不到就抛 `artifact_not_in_candidate`。手写 ChangeSet 的 create / replace 要自己填 `path`，`applyChangeOperations` 用 `identityForPath`（不看 index，所以不是自证）比对，拼错报 `path_identity_mismatch`。按 identity 存 artifact 的 store 必须自己存路径：`InMemoryArtifactStore` 存在内部记录里；git 不用，tree 天然带路径。
+手上有 artifact 时直接读 `artifact.path`。`storyPackageCodec.pathForIdentity(identity, candidate)` 只是**在候选里查表**，留给解析 Story Language 的引用（手上只有 kind + localId）；引用可能指向不存在的 artifact，所以查不到就抛 `artifact_not_in_candidate`。手写 ChangeSet 的 create / replace 要自己填 `path`，`applyChangeOperations` 用 `identityForPath`（不看 index，所以不是自证）比对，拼错报 `path_identity_mismatch`。候选保留实际路径，git tree 保存版本路径。开放文件与候选的转换使用 `candidateFromOpenStoryFiles` / `openStoryFilesFromCandidate`；格式转换不经过另一个版本库。旧测试专用内存版本库已按 [ADR-0034](adr/0034-local-architecture-consolidation.md) 删除，提交与历史验收使用真实 Git Canon。
 
 未修改 artifact 经导入再导出保持原始字节；修改只重新序列化被修改的 artifact。一个事实只由拥有它的 artifact 表达，人物轨迹、关系反向边、Contract 生命周期、时间线、影响图都从明确 revision 派生，不能独立编辑。
 

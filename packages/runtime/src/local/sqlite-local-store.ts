@@ -4,7 +4,6 @@ import { DatabaseSync } from "node:sqlite";
 import { EventType } from "@suiming/sdk";
 import { canonicalJson, sha256Buffer } from "@suiming/story";
 import { ArtifactError } from "../artifact/errors.js";
-import { artifactVersionId, shouldInlineArtifactVersion } from "../artifact/version-storage.js";
 import { InMemoryExecutionState } from "../execution/in-memory-execution-state.js";
 import type {
 	ExecutionCommandReceipt,
@@ -18,6 +17,7 @@ import type {
 import { openActivities, openTextMessages, type SessionEvent } from "../harness/events.js";
 import type { ConfirmedStateEvent } from "../harness/state-events.js";
 import { ContentAddressedObjectStore } from "./content-addressed-object-store.js";
+import { executionObjectId, shouldInlineExecutionObject } from "./execution-object-storage.js";
 import { leaseHolderAlive } from "./project-lock.js";
 
 export interface SqliteLocalStoreOptions {
@@ -719,15 +719,15 @@ export class SqliteLocalStore {
 	}
 
 	/**
-	 * 执行对象的 id 沿用内容寻址：`eo_` + sha256(mediaType‖contentHash)，与 `artifactVersionId` 同一
+	 * 执行对象的 id 沿用内容寻址：`eo_` + sha256(mediaType‖contentHash)，与旧版相同的
 	 * 算法（收敛方案 3.5 决定 5）。同样的字节反复保存得到同一个 id，`INSERT OR IGNORE` 因此天然幂等。
 	 */
 	async #preparePayload(mediaType: string, bytes: Uint8Array): Promise<PreparedPayload> {
 		const normalizedMediaType = nonempty(mediaType, "mediaType");
 		const contentHash = sha256Buffer(bytes);
-		const inline = shouldInlineArtifactVersion(normalizedMediaType, bytes.byteLength, this.#inlineThreshold);
+		const inline = shouldInlineExecutionObject(normalizedMediaType, bytes.byteLength, this.#inlineThreshold);
 		return {
-			id: `eo_${artifactVersionId(normalizedMediaType, contentHash).slice("av_".length)}`,
+			id: executionObjectId(normalizedMediaType, contentHash),
 			mediaType: normalizedMediaType,
 			contentHash,
 			byteLength: bytes.byteLength,

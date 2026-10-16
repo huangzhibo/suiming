@@ -8,18 +8,16 @@ import {
 	applyChangeOperations,
 	artifactIdentityKey,
 	type ChangeSet,
+	candidateFromOpenStoryFiles,
 	candidateFromStoryFiles,
-	exportOpenPackage,
-	InMemoryArtifactStore,
-	importOpenPackage,
 	inspectStoryDesignCandidate,
 	inspectStorySourcesCandidate,
 	materializeOpenStoryDirectorySnapshot,
 	type OpenPackageFile,
 	OpenStoryDirectoryCache,
+	openStoryFilesFromCandidate,
 	readOpenStoryDirectory,
 	sourceIngestChangeSet,
-	storyPackageCodec,
 	targetArtifactIdentity,
 	unrecognizedPaths,
 	validateStoryProjectCandidate,
@@ -132,14 +130,13 @@ async function createDirectoryFixture(kind: DirectoryFixtureKind): Promise<strin
 }
 
 test("开放作品包导入导出保持未修改 artifact 的路径、media type 与字节", () => {
-	const store = new InMemoryArtifactStore();
 	const input = designPackage();
-	const revision = importOpenPackage(store, "project-1", input, storyPackageCodec, validateStoryProjectCandidate);
-	const { check } = inspectStoryDesignCandidate(store.snapshot(revision.id));
+	const candidate = candidateFromOpenStoryFiles(input, "base");
+	const { check } = inspectStoryDesignCandidate(candidate);
 	assert.deepEqual(check.diagnostics, []);
 	assert.equal(check.passed, true);
 
-	const output = exportOpenPackage(store, "project-1", revision.id);
+	const output = openStoryFilesFromCandidate(candidate);
 	assert.deepEqual(bytesByPath(output), bytesByPath(input));
 	assert.deepEqual(
 		new Map(output.map((item) => [item.path, item.mediaType])),
@@ -163,15 +160,7 @@ test("repository-native、export directory 与本地 checkout 共用目录 codec
 				new Map(expected.map((item) => [item.path, item.mediaType])),
 			);
 
-			const store = new InMemoryArtifactStore();
-			const revision = importOpenPackage(
-				store,
-				`project-${kind}`,
-				scanned.files,
-				storyPackageCodec,
-				validateStoryProjectCandidate,
-			);
-			const exported = exportOpenPackage(store, `project-${kind}`, revision.id);
+			const exported = openStoryFilesFromCandidate(candidateFromOpenStoryFiles(scanned.files, "base"));
 			assert.deepEqual(bytesByPath(exported), bytesByPath(expected));
 
 			if (kind === "repository-native") {
@@ -252,16 +241,8 @@ test("视图用的目录缓存：文件状态不变就复用同一份字节，�
 });
 
 test("目录 codec 拒绝未知保留路径、路径穿越与保留路径中的 symlink", async () => {
-	const store = new InMemoryArtifactStore();
 	assert.throws(
-		() =>
-			importOpenPackage(
-				store,
-				"unsafe-project",
-				[file("../intent/escape.md", "escape\n")],
-				storyPackageCodec,
-				validateStoryProjectCandidate,
-			),
+		() => candidateFromOpenStoryFiles([file("../intent/escape.md", "escape\n")], "base"),
 		(error: unknown) => error instanceof ArtifactError && error.code === "invalid_logical_path",
 	);
 
@@ -304,19 +285,12 @@ test("目录 codec 拒绝未知保留路径、路径穿越与保留路径中的 
 	}
 });
 
-test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 ProjectRevision", () => {
-	const store = new InMemoryArtifactStore();
-	const base = importOpenPackage(
-		store,
-		"project-1",
-		designPackage(),
-		storyPackageCodec,
-		validateStoryProjectCandidate,
-	);
+test("ChangeSet 的应用是纯函数：不修改原候选，未修改 artifact 的字节不变", () => {
+	const base = candidateFromOpenStoryFiles(designPackage(), "base");
 	const currentIntent = designPackage().find((item) => item.path === "intent/计谋的代价.md");
 	assert.ok(currentIntent);
 	const changeSet: ChangeSet = {
-		baseRevisionId: base.id,
+		baseRevisionId: base.baseRevisionId,
 		operations: [
 			{
 				operation: "replace",
@@ -327,8 +301,7 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 			},
 		],
 	};
-	const applied = applyChangeOperations(store.snapshot(base.id).artifacts, changeSet.operations);
-	assert.equal(store.headRevisionId("project-1"), base.id, "应用候选不推进 head");
+	const applied = applyChangeOperations(base.artifacts, changeSet.operations);
 	const intent = applied.find((artifact) => artifact.identity.localId === "计谋的代价");
 	assert.ok(intent !== undefined, "被 replace 的 artifact 仍在候选里");
 	assert.equal(
@@ -337,7 +310,7 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 		"被 replace 的换了内容",
 	);
 	const untouched = new Map(
-		store.snapshot(base.id).artifacts.map((artifact) => [artifactIdentityKey(artifact.identity), artifact.bytes]),
+		base.artifacts.map((artifact) => [artifactIdentityKey(artifact.identity), artifact.bytes]),
 	);
 	assert.ok(
 		applied
@@ -351,26 +324,13 @@ test("ChangeSet 的应用是纯函数：不触碰 store，只有 commit 推进 P
 		(error: unknown) => error instanceof ArtifactError && error.code === "artifact_not_found",
 	);
 
-	const committed = store.commit("project-1", changeSet, validateStoryProjectCandidate);
-	assert.equal(committed.parentId, base.id);
-	assert.notEqual(committed.id, base.id);
-	assert.equal(store.headRevisionId("project-1"), committed.id);
-	assert.equal(
-		bytesByPath(exportOpenPackage(store, "project-1", base.id)).get("intent/计谋的代价.md"),
-		decoder.decode(currentIntent.bytes),
-	);
+	validateStoryProjectCandidate({ ...base, artifacts: applied });
+	assert.deepEqual(bytesByPath(openStoryFilesFromCandidate(base)), bytesByPath(designPackage()), "原候选未被修改");
 });
 
 test("StoryBeat 换卷是两步：改 index 加移动文件；只改一半由 Checker 拒绝", () => {
-	const store = new InMemoryArtifactStore();
-	const base = importOpenPackage(
-		store,
-		"project-1",
-		designPackage(),
-		storyPackageCodec,
-		validateStoryProjectCandidate,
-	);
-	const beat = store.snapshot(base.id).artifacts.find((artifact) => artifact.identity.localId === "beat-0002");
+	const base = candidateFromOpenStoryFiles(designPackage(), "base");
+	const beat = base.artifacts.find((artifact) => artifact.identity.localId === "beat-0002");
 	assert.ok(beat);
 	assert.equal(beat.path, "outline/story/vol-0001/beat-0002.md");
 	const movedIndex = {
@@ -385,12 +345,7 @@ test("StoryBeat 换卷是两步：改 index 加移动文件；只改一半由 Ch
 
 	// 只改 index、文件还留在 vol-0001：目录与 index 对不上，Checker 双向报出来并给出两条出路。
 	assert.throws(
-		() =>
-			store.commit(
-				"project-1",
-				{ baseRevisionId: base.id, operations: [movedIndex] },
-				validateStoryProjectCandidate,
-			),
+		() => validateStoryProjectCandidate({ ...base, artifacts: applyChangeOperations(base.artifacts, [movedIndex]) }),
 		(error: unknown) => {
 			const diagnostics =
 				(error as { diagnostics?: readonly { message: string; hint?: string }[] }).diagnostics ?? [];
@@ -405,41 +360,31 @@ test("StoryBeat 换卷是两步：改 index 加移动文件；只改一半由 Ch
 	);
 
 	// 改 index 加移动文件才是换卷。路径变了、内容一个字没改，也是一次 replace。
-	const revision = store.commit(
-		"project-1",
-		{
-			baseRevisionId: base.id,
-			operations: [
-				movedIndex,
-				{
-					operation: "replace",
-					identity: targetArtifactIdentity("story-beat", "beat-0002"),
-					path: "outline/story/vol-0002/beat-0002.md",
-					mediaType: beat.mediaType,
-					bytes: beat.bytes,
-				},
-			],
-		},
-		validateStoryProjectCandidate,
-	);
-	const paths = exportOpenPackage(store, "project-1", revision.id).map((item) => item.path);
+	const candidate = {
+		...base,
+		artifacts: applyChangeOperations(base.artifacts, [
+			movedIndex,
+			{
+				operation: "replace",
+				identity: targetArtifactIdentity("story-beat", "beat-0002"),
+				path: "outline/story/vol-0002/beat-0002.md",
+				mediaType: beat.mediaType,
+				bytes: beat.bytes,
+			},
+		]),
+	};
+	validateStoryProjectCandidate(candidate);
+	const paths = openStoryFilesFromCandidate(candidate).map((item) => item.path);
 	assert.equal(paths.includes("outline/story/vol-0002/beat-0002.md"), true);
 	assert.equal(paths.includes("outline/story/vol-0001/beat-0002.md"), false);
 });
 
 test("identity 改名表现为 delete 加 create；未同步确定性引用时不能提交", () => {
-	const store = new InMemoryArtifactStore();
-	const base = importOpenPackage(
-		store,
-		"project-1",
-		designPackage(),
-		storyPackageCodec,
-		validateStoryProjectCandidate,
-	);
+	const base = candidateFromOpenStoryFiles(designPackage(), "base");
 	const character = designPackage().find((item) => item.path === "world/characters/黄盖.md");
 	assert.ok(character);
 	const renamed: ChangeSet = {
-		baseRevisionId: base.id,
+		baseRevisionId: base.baseRevisionId,
 		operations: [
 			{ operation: "delete", identity: targetArtifactIdentity("character", "黄盖") },
 			{
@@ -451,33 +396,37 @@ test("identity 改名表现为 delete 加 create；未同步确定性引用时�
 			},
 		],
 	};
-	assert.throws(() => store.commit("project-1", renamed, validateStoryProjectCandidate));
-	assert.equal(store.headRevisionId("project-1"), base.id);
+	assert.throws(() =>
+		validateStoryProjectCandidate({ ...base, artifacts: applyChangeOperations(base.artifacts, renamed.operations) }),
+	);
+	assert.deepEqual(bytesByPath(openStoryFilesFromCandidate(base)), bytesByPath(designPackage()));
 });
 
 test("ProjectRevision 拒绝没有对应 StoryBeat 的 StoryText", () => {
 	const files = designPackage();
 	files.push(file("text/beat-9999.md", "没有对应细纲的正文。\n"));
-	const store = new InMemoryArtifactStore();
 	assert.throws(
-		() => importOpenPackage(store, "project-1", files, storyPackageCodec, validateStoryProjectCandidate),
+		() => candidateFromOpenStoryFiles(files, "base"),
 		(error: unknown) => error instanceof ArtifactError && error.code === "orphan_story_text",
 	);
 });
 
 test("Target 与多个 Source 使用独立 namespace，同名 StoryBeat 和 Character 不冲突", () => {
 	const files = [...designPackage(), ...sourcePackage("原作一"), ...sourcePackage("原作二")];
-	const store = new InMemoryArtifactStore();
-	const revision = importOpenPackage(store, "project-1", files, storyPackageCodec, validateStoryProjectCandidate);
-	const characters = store
-		.snapshot(revision.id)
-		.artifacts.filter((artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "黄盖");
+	const candidate = candidateFromOpenStoryFiles(files, "base");
+	const characters = candidate.artifacts.filter(
+		(artifact) => artifact.identity.kind === "character" && artifact.identity.localId === "黄盖",
+	);
 	assert.equal(characters.length, 3);
 	assert.deepEqual(
-		characters.map((artifact) => artifact.identity.namespace),
-		[{ kind: "source", sourceId: "原作一" }, { kind: "source", sourceId: "原作二" }, { kind: "target" }],
+		new Set(characters.map((artifact) => JSON.stringify(artifact.identity.namespace))),
+		new Set(
+			[{ kind: "source", sourceId: "原作一" }, { kind: "source", sourceId: "原作二" }, { kind: "target" }].map(
+				(namespace) => JSON.stringify(namespace),
+			),
+		),
 	);
-	const sources = inspectStorySourcesCandidate(store.snapshot(revision.id));
+	const sources = inspectStorySourcesCandidate(candidate);
 	assert.deepEqual(
 		sources.map((source) => [source.sourceId, source.state, source.check?.contracts.openContractIds]),
 		[
@@ -485,7 +434,7 @@ test("Target 与多个 Source 使用独立 namespace，同名 StoryBeat 和 Char
 			["原作二", "extracted", ["火船去向"]],
 		],
 	);
-	assert.deepEqual(bytesByPath(exportOpenPackage(store, "project-1", revision.id)), bytesByPath(files));
+	assert.deepEqual(bytesByPath(openStoryFilesFromCandidate(candidate)), bytesByPath(files));
 });
 
 test("Source 可以先只导入原始材料，再在后续 revision 建立 extraction", () => {
@@ -499,34 +448,23 @@ test("Source 可以先只导入原始材料，再在后续 revision 建立 extra
 		file("source/待抽取/original.bin", "尚未抽取的材料。", "application/octet-stream"),
 		file("source/待抽取/material.txt", "尚未抽取的材料。\n", "text/plain; charset=utf-8"),
 	];
-	const store = new InMemoryArtifactStore();
-	const revision = importOpenPackage(store, "project-1", files, storyPackageCodec, validateStoryProjectCandidate);
-	const source = inspectStorySourcesCandidate(store.snapshot(revision.id))[0];
+	const candidate = candidateFromOpenStoryFiles(files, "base");
+	const source = inspectStorySourcesCandidate(candidate)[0];
 	assert.equal(source?.state, "ingested");
 	assert.equal(source?.check, undefined);
 });
 
 test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖已有 Source", () => {
-	const store = new InMemoryArtifactStore();
-	const base = importOpenPackage(
-		store,
-		"project-1",
-		designPackage(),
-		storyPackageCodec,
-		validateStoryProjectCandidate,
-	);
+	const base = candidateFromOpenStoryFiles(designPackage(), "base");
 	const original = encoder.encode("访谈记录：黄盖先核对火船。\n");
-	const revision = store.commit(
-		"project-1",
-		sourceIngestChangeSet(store.snapshotForProject("project-1", base.id), {
-			sourceId: "访谈",
-			name: "访谈.txt",
-			original,
-			encoding: "utf-8",
-		}),
-		validateStoryProjectCandidate,
-	);
-	const candidate = store.snapshotForProject("project-1", revision.id);
+	const changeSet = sourceIngestChangeSet(base, {
+		sourceId: "访谈",
+		name: "访谈.txt",
+		original,
+		encoding: "utf-8",
+	});
+	const candidate = { ...base, artifacts: applyChangeOperations(base.artifacts, changeSet.operations) };
+	validateStoryProjectCandidate(candidate);
 	const source = inspectStorySourcesCandidate(candidate).find((item) => item.sourceId === "访谈");
 	assert.equal(source?.state, "ingested");
 	assert.equal(source?.materialCodePoints, [...decoder.decode(original)].length);
@@ -569,25 +507,29 @@ test("Source ingest 保留原始字节、生成 UTF-8 material，并拒绝覆盖
 			}),
 		(error: unknown) => error instanceof ArtifactError && error.code === "invalid_source_encoding",
 	);
-	assert.equal(store.headRevisionId("project-1"), revision.id);
+	assert.deepEqual(bytesByPath(openStoryFilesFromCandidate(base)), bytesByPath(designPackage()));
 });
 
-test("ProjectRevision 不能跨项目读取或提交", () => {
-	const store = new InMemoryArtifactStore();
-	const first = importOpenPackage(
-		store,
-		"project-1",
-		designPackage(),
-		storyPackageCodec,
-		validateStoryProjectCandidate,
-	);
-	importOpenPackage(store, "project-2", designPackage(), storyPackageCodec, validateStoryProjectCandidate);
+test("开放快照拒绝重复路径、重复身份与空 media type", () => {
+	const files = designPackage();
+	const first = files[0];
+	assert.ok(first);
 	assert.throws(
-		() => store.snapshotForProject("project-2", first.id),
-		(error: unknown) => error instanceof ArtifactError && error.code === "revision_project_mismatch",
+		() => candidateFromOpenStoryFiles([...files, first], "base"),
+		(error: unknown) => error instanceof ArtifactError && error.code === "duplicate_logical_path",
+	);
+	const beat = files.find((f) => f.path.endsWith("beat-0001.md"));
+	assert.ok(beat);
+	assert.throws(
+		() => candidateFromOpenStoryFiles([...files, { ...beat, path: "outline/story/vol-other/beat-0001.md" }], "base"),
+		(error: unknown) => error instanceof ArtifactError && error.code === "duplicate_artifact_identity",
 	);
 	assert.throws(
-		() => store.commit("project-2", { baseRevisionId: first.id, operations: [] }, validateStoryProjectCandidate),
-		(error: unknown) => error instanceof ArtifactError && error.code === "revision_conflict",
+		() =>
+			candidateFromOpenStoryFiles(
+				files.map((f, i) => (i === 0 ? { ...f, mediaType: " " } : f)),
+				"base",
+			),
+		(error: unknown) => error instanceof ArtifactError && error.code === "invalid_media_type",
 	);
 });
