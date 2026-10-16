@@ -36,5 +36,6 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0030](0030-remove-frozen-cloud.md) | Accepted | 删除冻结 Cloud 实现与专属协议，保留本地核心和数据，未来按届时核心重建 |
 | [0031](0031-external-file-draft-recovery.md) | Accepted | 草稿按原路径保留，外部删除后显式恢复复用空基线 CAS，重命名不自动搬移草稿 |
 | [0032](0032-document-shell-feedback.md) | Accepted | 文档外壳只保留导航与工具行，文件异常按需展开，操作反馈回归状态栏 |
+| [0033](0033-continuous-use-and-data-preservation.md) | Accepted | 顶层需求纳入持续使用、数据保全和验证分工；操作规则与完成证据各归原文档维护 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。

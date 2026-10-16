@@ -91,7 +91,7 @@ ChangeSet 只从 diff 构造：人类、host agent 与 Suiming Agent 改的是�
 
 判定逐条按路径进行，无关修改不让整批失效（`derived.test.ts`「审稿时效比的是审的时候主体文件的摘要，不是审稿进版本的时间」）。stale Release 只是不能发布，不阻塞作品继续提交（同文件「发布 Release 后 host 修改正文仍能提交」）。派生层只依赖 `RevisionHistoryReader`（`history` / `fileDigests` / `snapshot`），目前只有 git 实现（`derived.test.ts` 用一串快照冒充历史）。
 
-portable package 是导入导出格式，不是运行时持久化载体：Open Story Package 是没有历史的快照，导入即一次提交，此后时效从导入版本起算；导入必须重新解析、核对 hash、运行 Checker，不信任包内的成功声明。本地 Open Story Directory 本身是 git 仓；历史传递须显式携带 `refs/suiming/canon`，默认 clone 不会复制它。对话在 `.suiming`，完整恢复需停止写入后复制整个自含目录，操作与边界见[仓库迁移与恢复](repository-recovery.md)。
+portable package 是导入导出格式，不是运行时持久化载体：Open Story Package 是没有历史的快照，导入即一次提交，此后时效从导入版本起算；导入必须重新解析、核对 hash、运行 Checker，不信任包内的成功声明。本地 Open Story Directory 本身是 git 仓；历史传递须显式携带 `refs/suiming/canon`，默认 clone 不会复制它。已持久化对话在 `.suiming`，作品与对话的恢复需停止写入后复制整个自含目录；桌面应用草稿的范围与操作见[仓库迁移与恢复](repository-recovery.md)。
 
 ### 4.5 Open Story Directory
 

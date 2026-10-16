@@ -20,7 +20,7 @@ npm run package:mac
 
 - 作品目录：作品文件、未提交候选、`.git` 中的 Canon 历史、整个 `.suiming` 中的对话与执行对象。
 - 用户配置：默认 `~/.suiming/config.toml` 与 `auth.json`，或显式配置的 `SUIMING_CONFIG_PATH` / `SUIMING_AUTH_PATH`。不能随安装包分发。
-- 应用数据：Electron 的 `userData`（默认 macOS Application Support 下的 Suiming 目录），含最近作品、标签与尚未落到作品文件的编辑现场。安装包名称与 bundle ID 固定，升级不能借改名改变这些位置。
+- 应用数据：Electron 的 `userData`（默认 macOS Application Support 下的 Suiming 目录），含最近作品、标签、尚未落到作品文件的编辑现场与未发送消息草稿。安装包名称与 bundle ID 固定，升级不能借改名改变这些位置。
 
 当前只验证同为执行库 v6、相同 Story Language 的两个构建之间完整替换 `.app`。它们不是历史正式发行版本；不据此承诺任意旧版可升级。没有自动更新器，也不做执行库自动降级。Story Language、执行库、checkpoint 或事件解释有不兼容变更时，发布前须给出具体版本范围、保全与转换验证；不能靠版本号相同推断兼容。
 
