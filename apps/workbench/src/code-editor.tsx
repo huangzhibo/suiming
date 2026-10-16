@@ -86,6 +86,8 @@ const unifiedExtensions = (original: string, changesOnly: boolean) =>
 	});
 
 const externalChange = Annotation.define<boolean>();
+/** 定位也回传选区上下文，但不是作者发起的选段操作。 */
+const revealedSelection = Annotation.define<boolean>();
 
 /** Markdown 源码即真源：只做语法着色，不隐藏标记；标题、强调、链接用与阅读态相同的语义色。 */
 const highlight = HighlightStyle.define([
@@ -184,7 +186,7 @@ export default function CodeEditor({
 	/** 阅读与编辑共用内容行宽；源码与并排差异利用全部空间。只改排版，不重建编辑器。 */
 	measure?: "reading" | "document" | "full";
 	onChange?: (value: string) => void;
-	onSelection?: (value: string) => void;
+	onSelection?: (value: string, revealed: boolean) => void;
 	position?: EditorPosition | undefined;
 	onPosition?: (value: EditorPosition) => void;
 	reveal?: DocumentReveal | null;
@@ -432,7 +434,10 @@ export default function CodeEditor({
 			if (update.selectionSet) savePosition(update.view);
 			if (update.selectionSet) {
 				const range = update.state.selection.main;
-				callbacks.current.onSelection?.(update.state.sliceDoc(range.from, range.to));
+				callbacks.current.onSelection?.(
+					update.state.sliceDoc(range.from, range.to),
+					update.transactions.some((transaction) => transaction.annotation(revealedSelection)),
+				);
 			}
 		});
 		const editing = [
@@ -525,6 +530,7 @@ export default function CodeEditor({
 		const to = Math.min(reveal.to, view.state.doc.length);
 		view.dispatch({
 			selection: { anchor: from, head: to },
+			annotations: revealedSelection.of(true),
 			effects: EditorView.scrollIntoView(from, { y: "center" }),
 		});
 	}, [reveal, path]);

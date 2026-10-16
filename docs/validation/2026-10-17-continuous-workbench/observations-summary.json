@@ -1,0 +1,451 @@
+{
+  "complete": true,
+  "sessions": [
+    {
+      "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28",
+      "complete": true,
+      "sent": 41,
+      "received": 41,
+      "modelCalls": 16,
+      "localCalls": 16,
+      "toolCalls": 21,
+      "localTools": 21,
+      "turns": 3,
+      "missing": [],
+      "unexpected": [],
+      "usage": {
+        "input": 21815,
+        "output": 2669,
+        "cacheRead": 235264,
+        "totalTokens": 259748
+      },
+      "localUsage": {
+        "calls": 16,
+        "confirmedCalls": 16,
+        "input": 21815,
+        "output": 2669,
+        "cacheRead": 235264,
+        "cacheWrite": 0,
+        "reasoning": 621,
+        "totalTokens": 259748,
+        "costUsd": 0.09384640000000001
+      },
+      "parentsMatch": true,
+      "observations": [
+        {
+          "id": "ac37dda7c6c7dc6e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "f7bae259304100cb",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool workbench",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "0c9d7895641f36cb",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "45b6b8f6d3221159",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool workbench",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "495ed61d74e082f8",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "db2042be841abf9e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.checker.commit",
+          "type": "GUARDRAIL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "2540f94d39673aba",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool commit",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "8bea408ac32a8d0e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "a6d14f76f1f98c4d",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool write",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "ad632d4a7baf9be4",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "0965454b88e65c32",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool story_guide",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "50daa32dcfbbdb9e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool story_guide",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "48f7a86257178993",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "015d7485850464de",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "301b2042e5296ee5",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": "273391accb1a1097",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "273391accb1a1097",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "parentId": null,
+          "name": "suiming.turn agent",
+          "type": "SPAN",
+          "level": "DEFAULT",
+          "outcome": "completed"
+        },
+        {
+          "id": "fd89bf6930f434ad",
+          "traceId": "9ffb3ba39dbc6a14ac3ad56804817274",
+          "parentId": null,
+          "name": "suiming.turn agent",
+          "type": "SPAN",
+          "level": "WARNING",
+          "outcome": "stopped"
+        },
+        {
+          "id": "2aa50dec273ec5a3",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "9db25b4426853a36",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool workbench",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "875cdd396c180b4b",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "efa001abb0e0bf36",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool edit",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "0bf02beac45e8df0",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "6c5cd6dd08e3386d",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "1bd6c02f62beea01",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool workbench",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "eecbb145f710033e",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "d795052a612bb369",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool write",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "8d99e18ed2172d46",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "befbb47e7974ec84",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool write_context",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "601b1de26a20a0a8",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "c96c139cf84479fb",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "8d2fc1853ec0d358",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "9496c4e8a5f29e8a",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool write",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "27187883016ba9a7",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "54067d37576d009c",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool write_context",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "c752013db5dbc07d",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "726ca2b85e04f709",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "6dfb1fbc39cfa5bc",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool story_guide",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "9439072eb03a4eca",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "4e996fe6f7400a2a",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.tool story_guide",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "e6a9b8d0560bb5a8",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": "df768950b9ee903b",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "df768950b9ee903b",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "parentId": null,
+          "name": "suiming.turn agent",
+          "type": "SPAN",
+          "level": "DEFAULT",
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86",
+      "complete": true,
+      "sent": 6,
+      "received": 6,
+      "modelCalls": 3,
+      "localCalls": 3,
+      "toolCalls": 2,
+      "localTools": 2,
+      "turns": 1,
+      "missing": [],
+      "unexpected": [],
+      "usage": {
+        "input": 13419,
+        "output": 85,
+        "cacheRead": 6144,
+        "totalTokens": 19648
+      },
+      "localUsage": {
+        "calls": 3,
+        "confirmedCalls": 3,
+        "input": 13419,
+        "output": 85,
+        "cacheRead": 6144,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 19648,
+        "costUsd": 0.0283024
+      },
+      "parentsMatch": true,
+      "observations": [
+        {
+          "id": "751856b98b0ca571",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "parentId": "8416220331d283cd",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "d57f0fb827475979",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "parentId": "8416220331d283cd",
+          "name": "suiming.tool read",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "cc1084ab8fa2ea47",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "parentId": "8416220331d283cd",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "395661275113aec7",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "parentId": "8416220331d283cd",
+          "name": "suiming.tool workbench",
+          "type": "TOOL",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "a84b6a73760d2f91",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "parentId": "8416220331d283cd",
+          "name": "suiming.model.call",
+          "type": "GENERATION",
+          "level": "DEFAULT"
+        },
+        {
+          "id": "8416220331d283cd",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "parentId": null,
+          "name": "suiming.turn agent",
+          "type": "SPAN",
+          "level": "DEFAULT",
+          "outcome": "completed"
+        }
+      ]
+    }
+  ]
+}

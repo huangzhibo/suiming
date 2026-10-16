@@ -1,0 +1,521 @@
+{
+  "passed": true,
+  "probeResumed": false,
+  "elapsedMs": 125934,
+  "steps": [
+    {
+      "name": "两份正文修订与差异展示",
+      "ms": 71485
+    },
+    {
+      "name": "真实流输出停止",
+      "ms": 138
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28",
+      "turn": 3,
+      "usage": {
+        "calls": 16,
+        "confirmedCalls": 16,
+        "input": 21815,
+        "output": 2669,
+        "cacheRead": 235264,
+        "cacheWrite": 0,
+        "reasoning": 621,
+        "totalTokens": 259748,
+        "costUsd": 0.09384640000000001
+      },
+      "actions": [
+        {
+          "name": "story_guide",
+          "action": null
+        },
+        {
+          "name": "story_guide",
+          "action": null
+        },
+        {
+          "name": "read",
+          "action": null
+        },
+        {
+          "name": "read",
+          "action": null
+        },
+        {
+          "name": "write_context",
+          "action": null
+        },
+        {
+          "name": "write",
+          "action": null
+        },
+        {
+          "name": "read",
+          "action": null
+        },
+        {
+          "name": "write_context",
+          "action": null
+        },
+        {
+          "name": "write",
+          "action": null
+        },
+        {
+          "name": "workbench",
+          "action": "context"
+        },
+        {
+          "name": "read",
+          "action": null
+        },
+        {
+          "name": "edit",
+          "action": null
+        },
+        {
+          "name": "workbench",
+          "action": "diff"
+        },
+        {
+          "name": "read",
+          "action": null
+        },
+        {
+          "name": "read",
+          "action": null
+        },
+        {
+          "name": "story_guide",
+          "action": null
+        },
+        {
+          "name": "story_guide",
+          "action": null
+        },
+        {
+          "name": "write",
+          "action": null
+        },
+        {
+          "name": "commit",
+          "action": null
+        },
+        {
+          "name": "workbench",
+          "action": "context"
+        },
+        {
+          "name": "workbench",
+          "action": "open"
+        }
+      ]
+    },
+    {
+      "id": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86",
+      "turn": 1,
+      "usage": {
+        "calls": 3,
+        "confirmedCalls": 3,
+        "input": 13419,
+        "output": 85,
+        "cacheRead": 6144,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 19648,
+        "costUsd": 0.0283024
+      },
+      "actions": [
+        {
+          "name": "workbench",
+          "action": "context"
+        },
+        {
+          "name": "read",
+          "action": null
+        }
+      ]
+    }
+  ],
+  "batches": [
+    {
+      "status": 200,
+      "durationMs": 2116,
+      "spans": [
+        {
+          "id": "e6a9b8d0560bb5a8",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "4e996fe6f7400a2a",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool story_guide",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 88,
+      "spans": [
+        {
+          "id": "9439072eb03a4eca",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "6dfb1fbc39cfa5bc",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool story_guide",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "726ca2b85e04f709",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool read",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "c752013db5dbc07d",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool read",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "54067d37576d009c",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool write_context",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 79,
+      "spans": [
+        {
+          "id": "27187883016ba9a7",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "9496c4e8a5f29e8a",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool write",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "8d2fc1853ec0d358",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "c96c139cf84479fb",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool read",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 135,
+      "spans": [
+        {
+          "id": "601b1de26a20a0a8",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "befbb47e7974ec84",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool write_context",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 102,
+      "spans": [
+        {
+          "id": "8d99e18ed2172d46",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "d795052a612bb369",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool write",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 248,
+      "spans": [
+        {
+          "id": "eecbb145f710033e",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "1bd6c02f62beea01",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool workbench",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "6c5cd6dd08e3386d",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool read",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 115,
+      "spans": [
+        {
+          "id": "0bf02beac45e8df0",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "efa001abb0e0bf36",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool edit",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 122,
+      "spans": [
+        {
+          "id": "875cdd396c180b4b",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "9db25b4426853a36",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.tool workbench",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 86,
+      "spans": [
+        {
+          "id": "2aa50dec273ec5a3",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "df768950b9ee903b",
+          "traceId": "421b97656613f9e76149b98006b7792b",
+          "name": "suiming.turn agent",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28",
+          "outcome": "completed"
+        },
+        {
+          "id": "fd89bf6930f434ad",
+          "traceId": "9ffb3ba39dbc6a14ac3ad56804817274",
+          "name": "suiming.turn agent",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28",
+          "outcome": "stopped"
+        },
+        {
+          "id": "a84b6a73760d2f91",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "name": "suiming.model.call",
+          "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86"
+        },
+        {
+          "id": "395661275113aec7",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "name": "suiming.tool workbench",
+          "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 141,
+      "spans": [
+        {
+          "id": "cc1084ab8fa2ea47",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "name": "suiming.model.call",
+          "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86"
+        },
+        {
+          "id": "d57f0fb827475979",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "name": "suiming.tool read",
+          "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86"
+        },
+        {
+          "id": "751856b98b0ca571",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "name": "suiming.model.call",
+          "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86"
+        },
+        {
+          "id": "8416220331d283cd",
+          "traceId": "abdcc82f4add5e48a76bb532f83cdb73",
+          "name": "suiming.turn agent",
+          "sessionId": "session_e7f49f56824642671f96c8abd4ebc065d2098d0f2fae0d37e7efb00bf38aee86",
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 88,
+      "spans": [
+        {
+          "id": "301b2042e5296ee5",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "015d7485850464de",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool read",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "48f7a86257178993",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool read",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "50daa32dcfbbdb9e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool story_guide",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "0965454b88e65c32",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool story_guide",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 556,
+      "spans": [
+        {
+          "id": "ad632d4a7baf9be4",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "a6d14f76f1f98c4d",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool write",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 71,
+      "spans": [
+        {
+          "id": "8bea408ac32a8d0e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "db2042be841abf9e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.checker.commit",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "2540f94d39673aba",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool commit",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "495ed61d74e082f8",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "45b6b8f6d3221159",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool workbench",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        }
+      ]
+    },
+    {
+      "status": 200,
+      "durationMs": 146,
+      "spans": [
+        {
+          "id": "0c9d7895641f36cb",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "f7bae259304100cb",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.tool workbench",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "ac37dda7c6c7dc6e",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.model.call",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28"
+        },
+        {
+          "id": "273391accb1a1097",
+          "traceId": "fc439353dc9a46886e3eabb1550d20ab",
+          "name": "suiming.turn agent",
+          "sessionId": "session_f733e108638879edf602364f2f907a8573134321561c903183d888c5539e7e28",
+          "outcome": "completed"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "errors": [],
+  "multiFilePreserved": true,
+  "crossProjectIsolated": true,
+  "restartPreserved": true,
+  "canonAdvancedOnce": true
+}

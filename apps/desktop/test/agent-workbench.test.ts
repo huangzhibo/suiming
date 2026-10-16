@@ -13,18 +13,26 @@ type TestGlobal = typeof globalThis & {
 	testGateReached(name: string): boolean;
 	workspaceTestCallbacks: { command: string; release?: () => void };
 };
-async function fixture(race = false) {
+async function fixture(race = false, story = false) {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-ui-agent-"));
 	const root = join(directory, "work");
 	await mkdir(root);
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	await writeFile(join(root, "甲.md"), "甲的原文");
 	await writeFile(join(root, "乙.md"), "乙的第一行\n乙的第二行\n乙的第三行");
+	if (story) {
+		await mkdir(join(root, "text"));
+		await writeFile(join(root, "text/beat-0001.md"), "乙的第一行\n乙的第二行\n乙的第三行");
+	}
 	(await LocalProjectService.init({ checkoutPath: root })).close();
 	const app = await launchDesktop({
 		directory,
 		project: root,
-		flags: ["--workspace-callback-test", race ? "--workbench-race-test" : "--workbench-test"],
+		flags: [
+			"--workspace-callback-test",
+			race ? "--workbench-race-test" : "--workbench-test",
+			...(story ? ["--workbench-story-test"] : []),
+		],
 	});
 	const page = await app.firstWindow();
 	page.setDefaultTimeout(10000);
@@ -139,3 +147,25 @@ for (const change of ["navigate", "reload", "stop"] as const)
 			await f.close();
 		}
 	});
+
+test("Agent 自动定位正文只高亮，作者重新选段后才出现就地修改操作", { timeout: 60000 }, async () => {
+	const f = await fixture(false, true);
+	try {
+		await f.send();
+		await f.input.fill("继续在对话框输入");
+		await openGate(f.app, "ui-open");
+		await f.reached("ui-diff");
+		await f.page.locator(".cm-selectionBackground").first().waitFor();
+		assert.equal(await f.page.getByRole("textbox", { name: "说明要怎么改", exact: true }).count(), 0);
+		assert.equal(await f.input.evaluate((e) => e === e.ownerDocument.activeElement), true);
+		await f.editor.focus();
+		await f.editor.press("Meta+a");
+		await f.page.getByRole("textbox", { name: "说明要怎么改", exact: true }).waitFor();
+		assert.equal(await f.input.inputValue(), "继续在对话框输入");
+		await openGate(f.app, "ui-diff");
+		await f.page.getByText("已定位第二行并展示草稿与磁盘差异，文件未修改。", { exact: true }).waitFor();
+		assert.deepEqual(f.errors, []);
+	} finally {
+		await f.close();
+	}
+});

@@ -209,6 +209,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 			patch({
 				selectedText: selection.toString().slice(0, 12000),
 				proseSelection: captureReadingSelection(bodyRef.current, selection),
+				reveal: null,
 			});
 			setSelPara(Number(element?.closest("p[data-index]")?.getAttribute("data-index") ?? -1));
 		};
@@ -496,7 +497,9 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 								patch({ editors: { ...view.editors, [`${editPath}:${view.edit}`]: position } })
 							}
 							onChange={updateBuffer}
-							onSelection={(value) => setSelectedText(value.slice(0, 12000))}
+							onSelection={(value, revealed) =>
+								patch({ selectedText: value.slice(0, 12000), ...(!revealed ? { reveal: null } : {}) })
+							}
 						/>
 					</Suspense>
 				</div>
@@ -783,7 +786,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				</div>
 			)}
 			<SelectionBar
-				visible={kind === "artifact"}
+				visible={kind === "artifact" && !view.reveal}
 				selectedText={selectedText}
 				selPara={selPara}
 				source={`${book.title(file)} · ${book.headLabel}`}

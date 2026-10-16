@@ -266,6 +266,7 @@ if (process.argv.includes("--workbench-test") || process.argv.includes("--workbe
 		};
 	};
 	const race = process.argv.includes("--workbench-race-test");
+	const target = process.argv.includes("--workbench-story-test") ? "text/beat-0001.md" : "乙.md";
 	provider.setResponses([
 		async (context) => {
 			assert.match(JSON.stringify(context.messages), /界面上下文：/);
@@ -279,7 +280,7 @@ if (process.argv.includes("--workbench-test") || process.argv.includes("--workbe
 			return fauxAssistantMessage(
 				fauxToolCall("workbench", {
 					action: "open",
-					path: "乙.md",
+					path: target,
 					line: 2,
 					quote: "乙的第二行",
 					expectedLocation: location,
@@ -292,13 +293,13 @@ if (process.argv.includes("--workbench-test") || process.argv.includes("--workbe
 				return fauxAssistantMessage("作者现场已变化，未执行迟到导航。");
 			}
 			const result = snapshot(context);
-			assert.equal(result.active.path, "乙.md");
+			assert.equal(result.active.path, target);
 			assert.equal(result.active.view, "edit");
 			location = result.location;
 			return fauxAssistantMessage(
 				fauxToolCall("workbench", {
 					action: "open",
-					path: "乙.md",
+					path: target,
 					line: 2,
 					quote: "乙的第二行",
 					expectedLocation: location,
