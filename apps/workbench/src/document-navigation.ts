@@ -72,3 +72,25 @@ export function resolveDocumentPage(book: Book, location: PageState): PageState 
 		targetPath: location.edit === "edit" ? target.path : "",
 	};
 }
+
+/** 一个标签可能同时持有设计与正文；缺失对象仍认保存下来的编辑目标。 */
+export function documentPaths(book: Book | undefined, location: PageState): string[] {
+	const path = ["file", "diff"].includes(pageKind(location.page)) ? pageTarget(location.page) : location.page;
+	const object = book?.byPath.get(path);
+	return [
+		...new Set([
+			path,
+			location.targetPath,
+			...(pageKind(location.page) === "artifact" && object?.kind === "story-beat" && object.namespace === "target"
+				? [textPathFor(object.localId)]
+				: []),
+		]),
+	].filter(Boolean);
+}
+export function hasDocumentDraft(
+	book: Book | undefined,
+	location: PageState | undefined,
+	state: WorkbenchState,
+): boolean {
+	return !!location && documentPaths(book, location).some((path) => !!state.documents[path]);
+}

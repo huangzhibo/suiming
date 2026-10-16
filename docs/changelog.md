@@ -1,5 +1,7 @@
 # 变更记录
 
+- **2026-10-17** 整理文档编辑与导航职责：`useWorkspaceGroup` 不再转发当前文档查询，保存、冲突与处理弹层焦点集中在每个窗格的 `useDocumentEditing`，标签关联路径与关闭确认复用原导航和布局模块。保留现有 CAS、共享草稿、查询与视觉，新增迟到保存回执和最后持有者验收；完整隔离 Electron 74 / 74 通过，0 skip。设计见 [ADR-0034](adr/0034-local-architecture-consolidation.md)，验证见[架构收敛验收](validation/2026-10-17-architecture-consolidation/README.md)。
+
 - **2026-10-17** 移除仅旧测试使用的 `InMemoryArtifactStore` 及其包导入导出入口，格式与候选测试转到生产转换函数，版本与跨作品隔离使用真实 Git Canon；原模拟版本推进断言由已有 Canon 契约承接，不新增测试版本库。执行对象哈希与内联判断归回本地存储，旧 ID 与对话可读性不变。全仓检查、481 / 481 测试通过，0 skip；范围和证据见[架构收敛验收](validation/2026-10-17-architecture-consolidation/README.md)。
 
 - **2026-10-17** 修复草稿恢复读取失败被当作空工作区、随后覆盖原记录的问题。布局与草稿分别校验，无法完整恢复的正文、消息及待确认提交保留原始记录；恢复失败界面提供重试与打开其他作品，恢复成功前不挂载编辑工作面。隔离故障复现、窄窗与真实桌面恢复见[验收记录](validation/2026-10-17-architecture-consolidation/README.md)，边界见 [ADR-0034](adr/0034-local-architecture-consolidation.md)。

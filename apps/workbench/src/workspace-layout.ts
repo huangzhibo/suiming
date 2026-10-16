@@ -1,5 +1,5 @@
 import { restoreComposerDrafts } from "./composer-state.js";
-import { documentTarget, resolveDocumentPage } from "./document-navigation.js";
+import { documentPaths, documentTarget, resolveDocumentPage } from "./document-navigation.js";
 import { type Book, diffPage } from "./model.js";
 import {
 	type BeatView,
@@ -390,4 +390,16 @@ export function workspaceScreen(state: { show: QueryStatus; files: QueryStatus }
 	if (state.show === "success") return "workspace";
 	if (state.show === "pending" || state.files === "pending") return "loading";
 	return state.files === "success" ? "workspace" : "welcome";
+}
+
+/** 关闭最后一个持有草稿的标签才确认；原文、比较页与分屏共用相同路径语义。 */
+export function closingDraftPaths(layout: WorkspaceLayout, book: Book | undefined, tabId: string): string[] {
+	const tabs = layout.groups.flatMap((group) => group.tabs);
+	const closing = tabs.find((tab) => tab.id === tabId);
+	if (!closing) return [];
+	return documentPaths(book, closing.location).filter(
+		(path) =>
+			layout.documents[path] &&
+			!tabs.some((other) => other.id !== tabId && documentPaths(book, other.location).includes(path)),
+	);
 }

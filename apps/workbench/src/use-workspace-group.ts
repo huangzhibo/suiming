@@ -1,16 +1,13 @@
 import { type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "./bridge.js";
 import { type ComposerAttachment, contentFingerprint, emptyComposer } from "./composer-state.js";
-import { openDocument } from "./document-navigation.js";
-import { pageKind, pageTarget, textPathFor } from "./model.js";
+import { hasDocumentDraft, openDocument } from "./document-navigation.js";
 import { paneLayout } from "./pane-layout.js";
-import { useCurrentDocument } from "./use-current-document.js";
 import { useWorkspaceData } from "./use-workspace-data.js";
 import {
 	activeView,
 	type ObservationSelection,
 	type OpenOptions,
-	type PageState,
 	patchView,
 	type ViewState,
 	type WorkbenchState,
@@ -19,7 +16,8 @@ import { useWorkspace } from "./workspace-context.js";
 import { groupView, updateGroup } from "./workspace-layout.js";
 
 /**
- * 一个文档窗格的状态与动作：窗格自己的标签页、当前文档、引用与打开页面。
+ * 一个文档窗格的工作区投影与动作：标签页、布局、引用与打开页面。
+ * 当前文件查询由调用方直接使用 useCurrentDocument，保存与冲突处理只在文档窗格调用 useDocumentEditing。
  * 外壳（标题栏、左右栏）取当前活动的窗格（不传 `groupId`），分屏的每个文档窗格取自己那一格；
  * 草稿、侧栏与输入框是各窗格共享的，见 `updateGroup`。
  */
@@ -103,35 +101,7 @@ export function useWorkspaceGroup(groupId: string | undefined, { onOpen }: { onO
 		view,
 		panePriority,
 	);
-	const {
-		tab,
-		page,
-		kind,
-		rawPath,
-		file,
-		isBeat,
-		textPath,
-		editPath,
-		primary,
-		secondary,
-		committed,
-		comparisonLoading,
-		comparisonError,
-		comparisonOriginal,
-		editFile,
-		saved,
-		buffer,
-		changed,
-		anyChanged,
-		conflict,
-		missingFile,
-		rawFile,
-		fileDiagnostic,
-		editable,
-		setBuffer,
-		contentFor,
-		discard,
-	} = useCurrentDocument({ state, view, shown, book, setView });
+
 	async function act(body: () => Promise<unknown>) {
 		setBusy(true);
 		setError("");
@@ -144,21 +114,6 @@ export function useWorkspaceGroup(groupId: string | undefined, { onOpen }: { onO
 			setBusy(false);
 		}
 	}
-	const pathsOf = (location: PageState): string[] => {
-		const path = ["file", "diff"].includes(pageKind(location.page)) ? pageTarget(location.page) : location.page;
-		const object = book?.byPath.get(path);
-		return [
-			...new Set([
-				path,
-				location.targetPath,
-				...(pageKind(location.page) === "artifact" && object?.kind === "story-beat" && object.namespace === "target"
-					? [textPathFor(object.localId)]
-					: []),
-			]),
-		].filter(Boolean);
-	};
-	const protectedLocation = (location: PageState | undefined, v: WorkbenchState) =>
-		!!location && pathsOf(location).some((path) => !!v.documents[path]);
 	const open = (next: string, extra: Partial<ViewState> = {}, options?: OpenOptions) => {
 		setView((v) =>
 			openDocument(
@@ -167,7 +122,7 @@ export function useWorkspaceGroup(groupId: string | undefined, { onOpen }: { onO
 				next,
 				extra,
 				options ?? gesture.current,
-				protectedLocation(v.tabs[v.active]?.location, v),
+				hasDocumentDraft(book, v.tabs[v.active]?.location, v),
 			),
 		);
 		setError("");
@@ -256,36 +211,7 @@ export function useWorkspaceGroup(groupId: string | undefined, { onOpen }: { onO
 		rightWidth,
 		leftMax,
 		rightMax,
-		tab,
-		page,
-		kind,
-		rawPath,
-		file,
-		isBeat,
-		textPath,
-		editPath,
-		primary,
-		secondary,
-		committed,
-		comparisonLoading,
-		comparisonError,
-		comparisonOriginal,
-		editFile,
-		saved,
-		buffer,
-		changed,
-		anyChanged,
-		conflict,
-		missingFile,
-		rawFile,
-		fileDiagnostic,
-		editable,
-		setBuffer,
-		contentFor,
-		discard,
 		act,
-		pathsOf,
-		protectedLocation,
 		open,
 		showAgent,
 		observe,

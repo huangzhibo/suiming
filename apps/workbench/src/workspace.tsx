@@ -34,6 +34,7 @@ import { BacklinksPane, EvidencePane } from "./right-pane.js";
 import { useAutoHideScrollbars } from "./scrollbars.js";
 import { ToolButton } from "./ui-bits.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
+import { useCurrentDocument } from "./use-current-document.js";
 import { useEditorHistory } from "./use-editor-history.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
 import { createTab, EMPTY_PAGE, navigate, type ObservationSelection, pageState, type RightMode } from "./view-state.js";
@@ -115,6 +116,8 @@ function WorkspaceShell() {
 	const [libraryOpen, setLibraryOpen] = useState(false);
 	const [recovery, setRecovery] = useState<{ projectId: string; message: string } | null>(null);
 	const {
+		state,
+		setView,
 		layoutLive,
 		live,
 		view,
@@ -141,20 +144,14 @@ function WorkspaceShell() {
 		rightWidth,
 		leftMax,
 		rightMax,
-		page,
-		kind,
-		rawPath,
-		file,
-		isBeat,
-		editPath,
-		primary,
-		anyChanged,
 		act,
 		open,
 		showAgent,
 		observe,
 		locate,
 	} = useWorkspaceGroup(undefined, { onOpen: () => setLibraryOpen(false) });
+	const currentDocument = useCurrentDocument({ state, view, shown, book, setView });
+	const { page, kind, rawPath, file, isBeat, editPath, primary, anyChanged } = currentDocument;
 	const query = view.searchQuery;
 	const setQuery = (searchQuery: string) => patch({ searchQuery });
 	useEffect(() => {

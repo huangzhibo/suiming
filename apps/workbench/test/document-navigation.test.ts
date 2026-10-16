@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { documentTarget, openDocument } from "../src/document-navigation.js";
+import { documentTarget, hasDocumentDraft, openDocument } from "../src/document-navigation.js";
 import { Book, type FileEntry, filePage, type WorkspaceData } from "../src/model.js";
 import { activeView, createTab, DEFAULT_VIEW, editDocument, pageState, patchView } from "../src/view-state.js";
-import { groupView, resolveWorkspaceDocuments, splitGroup, workspaceLayout } from "../src/workspace-layout.js";
+import {
+	closeWorkspaceTab,
+	closingDraftPaths,
+	groupView,
+	openComparison,
+	resolveWorkspaceDocuments,
+	splitGroup,
+	workspaceLayout,
+} from "../src/workspace-layout.js";
 
 const design = "outline/story/vol-0001/beat-0001.md";
 const prose = "text/beat-0001.md";
@@ -121,4 +129,25 @@ test("显示名依次取 frontmatter 的 title、name、正文一级标题，都
 	assert.equal(named.title(entry("c2", { frontmatter: { name: "白墨" }, heading: "白墨（同窗）" })), "白墨");
 	assert.equal(named.title(entry("contract-chibi", { heading: "赤壁之战的胜负" })), "赤壁之战的胜负");
 	assert.equal(named.title(entry("c4", {})), "c4");
+});
+
+test("关闭标签按真实草稿路径确认：设计与正文、比较页及缺失对象共享保护", () => {
+	let state = editDocument(initial(), design, "设计草稿", { content: "设计", sha256: "d" });
+	state = editDocument(state, prose, "正文草稿", { content: "正文", sha256: "p" });
+	let layout = workspaceLayout(state);
+	const group = layout.activeGroup;
+	const original = groupView(layout).tabs[0];
+	assert.ok(original);
+	assert.equal(hasDocumentDraft(book, original.location, state), true);
+	layout = openComparison(layout, group, prose, "r1");
+	const comparison = groupView(layout).tabs[1];
+	assert.ok(comparison);
+	assert.deepEqual(closingDraftPaths(layout, book, original.id), [design], "比较页仍持有正文草稿");
+	assert.deepEqual(closingDraftPaths(layout, book, comparison.id), [], "原页面仍持有两份草稿");
+	layout = closeWorkspaceTab(layout, group, original.id);
+	assert.deepEqual(closingDraftPaths(layout, book, comparison.id), [prose]);
+	assert.equal(layout.documents[design]?.content, "设计草稿", "计算和导航不丢弃草稿");
+	const missing = { ...pageState(design), targetPath: prose };
+	assert.equal(hasDocumentDraft(undefined, missing, state), true, "对象已删除仍认原编辑目标");
+	assert.equal(hasDocumentDraft(book, pageState(source), state), false, "Source 的同名情节不持有 Target 草稿");
 });

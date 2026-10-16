@@ -15,7 +15,7 @@
 
 ## 最近有效验收
 
-2026-10-17：按 [ADR-0034](adr/0034-local-architecture-consolidation.md) 修复工作区恢复失败覆盖草稿的风险：无记录才初始化，读取异常或内容损坏时保全原记录并停止编辑与自动保存，可重试或打开其他作品。布局损坏仍可归一化，但不能连带丢正文、消息和待确认提交；同时移除仅旧测试使用的内存 Artifact 版本库，格式与候选变更验收使用生产函数，版本与隔离验收使用真实 Git；执行对象 ID 不变。隔离验证见[局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)。
+2026-10-17：按 [ADR-0034](adr/0034-local-architecture-consolidation.md) 修复工作区恢复失败覆盖草稿的风险：无记录才初始化，读取异常或内容损坏时保全原记录并停止编辑与自动保存，可重试或打开其他作品。布局损坏仍可归一化，但不能连带丢正文、消息和待确认提交；同时移除仅旧测试使用的内存 Artifact 版本库，格式与候选变更验收使用生产函数，版本与隔离验收使用真实 Git；执行对象 ID 不变。文档查询由调用方显式使用，编辑事务与反馈从渲染组件分离，关闭标签与导航共用草稿路径判断；沿用共享草稿、CAS 与原有焦点规则。隔离验证见[局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)。
 
 2026-10-16：[多文件草稿恢复](validation/2026-10-16-multi-draft-recovery/README.md)补齐两部同路径作品、各三份未保存文件与对话草稿的切换、退出进程再启动和关窗重开；逐字核对草稿、磁盘原文、光标与活动编辑器焦点。草稿存储失败时切换受阻、退出可取消，恢复存储后仍可重开。修正作品成功切换后选择弹层未收起的问题，复用原有持久化，不新增恢复机制。
 
@@ -44,9 +44,9 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 481 / 481、0 skip，工作台 76 / 76 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 482 / 482、0 skip，工作台 77 / 77 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 72 / 72 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)为最新完整复跑；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 74 / 74 通过、0 skip，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [局部架构收敛](validation/2026-10-17-architecture-consolidation/README.md)为最新完整复跑，新增草稿恢复读取失败与迟到保存回执验收；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 

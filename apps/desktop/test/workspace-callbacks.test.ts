@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
 import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
-import { collectPageErrors, launchDesktop } from "./launch.js";
+import { collectPageErrors, eventually, launchDesktop } from "./launch.js";
 
 type CallbackFixture = typeof globalThis & { workspaceTestCallbacks: { command: string; release?: () => void } };
 
@@ -69,6 +69,65 @@ test("关闭发起窗格后，附件与委托回包仍更新共享草稿", { tim
 		await input.waitFor();
 		assert.equal(await input.inputValue(), "回包前新增的草稿");
 		assert.equal(await page.locator("[data-pane-id]").count(), 1);
+		assert.deepEqual(errors, []);
+	} finally {
+		await app.close();
+		await rm(directory, { recursive: true, force: true });
+	}
+});
+
+test("迟到保存回执：保留提交后的继续输入，切页后不抢焦点或覆盖另一文件草稿", { timeout: 45000 }, async () => {
+	const directory = await mkdtemp(join(tmpdir(), "suiming-save-callback-"));
+	const root = join(directory, "work");
+	await mkdir(root);
+	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
+	await writeFile(join(root, "甲.md"), "甲的原文");
+	await writeFile(join(root, "乙.md"), "乙的原文");
+	(await LocalProjectService.init({ checkoutPath: root })).close();
+	const app = await launchDesktop({ directory, project: root, flags: ["--workspace-callback-test"] });
+	try {
+		const page = await app.firstWindow();
+		page.setDefaultTimeout(8000);
+		const errors = collectPageErrors(page);
+		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
+		const editor = page.getByLabel("编辑文件内容", { exact: true });
+		const tabIds: string[] = [];
+		for (const name of ["甲", "乙"]) {
+			await page.keyboard.press("Meta+t");
+			await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).fill(`${name}.md`);
+			await page.keyboard.press("Enter");
+			await page.getByRole("button", { name: "切换到编辑视图", exact: true }).click();
+			await editor.fill(`${name}的草稿`);
+			tabIds.push((await page.locator('.tab-btn[data-active="true"]').getAttribute("data-tab-id")) ?? "");
+		}
+		const activate = (index: number) => page.locator(`[data-tab-id="${tabIds[index]}"]`).click();
+		await activate(0);
+		await app.evaluate(() => {
+			(globalThis as CallbackFixture).workspaceTestCallbacks.command = "workspace.file.save";
+		});
+		await page.keyboard.press("Meta+s");
+		await eventually(
+			() => app.evaluate(() => !!(globalThis as CallbackFixture).workspaceTestCallbacks.release),
+			"保存已经完成，回执待释放",
+		);
+		await editor.fill("甲的草稿，保存后继续写");
+		await activate(1);
+		await editor.focus();
+		await app.evaluate(() => (globalThis as CallbackFixture).workspaceTestCallbacks.release?.());
+		await eventually(() => page.getByRole("button", { name: "保存 ⌘S", exact: true }).isEnabled(), "保存回执已处理");
+		await eventually(
+			() => editor.evaluate((element) => element === element.ownerDocument.activeElement),
+			"回执不抢另一文档焦点",
+		);
+		assert.equal(await editor.innerText(), "乙的草稿");
+		assert.equal(await readFile(join(root, "甲.md"), "utf8"), "甲的草稿");
+		await activate(0);
+		assert.equal(await editor.innerText(), "甲的草稿，保存后继续写");
+		await page.reload();
+		await editor.waitFor();
+		assert.equal(await editor.innerText(), "甲的草稿，保存后继续写");
+		await activate(1);
+		assert.equal(await editor.innerText(), "乙的草稿");
 		assert.deepEqual(errors, []);
 	} finally {
 		await app.close();

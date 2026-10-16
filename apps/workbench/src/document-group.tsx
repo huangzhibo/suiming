@@ -6,8 +6,8 @@ import { StoryAxis } from "./axis/StoryAxis.js";
 import { invoke } from "./bridge.js";
 import { CheckPage } from "./check-page.js";
 import type { ComparisonController, ComparisonStatus } from "./code-editor.js";
-import { CommandError } from "./command-error.js";
 import { ComparisonActions, ComparisonBaseline, ComparisonOptions } from "./comparison-controls.js";
+import { hasDocumentDraft } from "./document-navigation.js";
 import { DocumentToolbar } from "./document-toolbar.js";
 import { EmptyPage } from "./empty-page.js";
 import { Markdown } from "./markdown.js";
@@ -19,6 +19,8 @@ import { SelectionBar } from "./selection-bar.js";
 import { TabStrip } from "./tab-strip.js";
 import { Hint, ToolButton } from "./ui-bits.js";
 import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
+import { useCurrentDocument } from "./use-current-document.js";
+import { useDocumentEditing } from "./use-document-editing.js";
 import { useWorkspaceGroup } from "./use-workspace-group.js";
 import {
 	EMPTY_PAGE,
@@ -28,11 +30,11 @@ import {
 	patchView,
 	resolveComparisonLayout,
 	resolveOpening,
-	savedDocument,
 } from "./view-state.js";
 import { useWorkspace } from "./workspace-context.js";
 import {
 	closeWorkspaceTab,
+	closingDraftPaths,
 	groupView,
 	mergeGroup,
 	openComparison,
@@ -57,8 +59,8 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		notice,
 		setNotice,
 		busy,
-		setBusy,
 	} = useWorkspace();
+	const workspace = useWorkspaceGroup(groupId);
 	const {
 		group,
 		state,
@@ -76,7 +78,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		draftKey,
 		composer,
 		addReference,
-		queryClient,
 		projection,
 		directory,
 		shown,
@@ -86,6 +87,14 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		refresh,
 		showLeft,
 		showRight,
+		act,
+		open,
+		showAgent,
+		observe,
+		locate,
+	} = workspace;
+	const currentDocument = useCurrentDocument({ state, view, shown, book, setView });
+	const {
 		tab,
 		page,
 		kind,
@@ -100,7 +109,6 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		comparisonLoading,
 		comparisonError,
 		comparisonOriginal,
-		editFile,
 		saved,
 		buffer,
 		changed,
@@ -110,40 +118,27 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		rawFile,
 		fileDiagnostic,
 		editable,
-		setBuffer,
 		contentFor,
 		discard,
-		act,
-		pathsOf,
-		protectedLocation,
-		open,
-		showAgent,
-		observe,
-		locate,
-	} = useWorkspaceGroup(groupId);
+	} = currentDocument;
 	const [closeRequest, setCloseRequest] = useState<{ tabId?: string; paths: string[] } | null>(null);
 	const bodyRef = useRef<HTMLDivElement>(null);
 	const mainRef = useRef<HTMLElement>(null);
-	const [statusOpen, setStatusOpen] = useState(false);
-	const [saveError, setSaveError] = useState("");
-	const statusRef = useRef<HTMLDivElement>(null);
-	const returnFocus = useRef<HTMLElement | null>(null);
-	const documentKey = `${tab?.id}:${editPath}`;
-	const latestDocumentKey = useRef(documentKey);
-	latestDocumentKey.current = documentKey;
-	// biome-ignore lint/correctness/useExhaustiveDependencies: 换文档时关闭上一个文档的临时处理入口
-	useEffect(() => {
-		setStatusOpen(false);
-		setSaveError("");
-	}, [tab?.id, editPath]);
-	const focusEditor = () =>
-		mainRef.current?.querySelector<HTMLElement>(
-			'.cm-merge-b [contenteditable="true"], .cm-editor [contenteditable="true"]',
-		) ?? null;
-	const showStatus = () => {
-		returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-		setStatusOpen(true);
-	};
+	const {
+		statusOpen,
+		saveError,
+		setSaveError,
+		statusRef,
+		changeStatusOpen,
+		statusFinalFocus,
+		rebase,
+		savePath,
+		save,
+		updateBuffer,
+		beginEdit,
+		finishTask,
+		documentProblem,
+	} = useDocumentEditing(workspace, currentDocument, mainRef);
 
 	const comparisonController = useRef<ComparisonController | null>(null);
 	const [comparisonStatus, setComparisonStatus] = useState<ComparisonStatus | null>(null);
@@ -170,20 +165,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		textPath,
 		setView,
 	]);
-	const rebase = () => {
-		if (!editFile) return;
-		setView((v) => ({
-			...v,
-			documents: {
-				...v.documents,
-				[editPath]: { content: buffer, baseContent: editFile.content, baseSHA: editFile.sha256 },
-			},
-		}));
-		setSaveError("");
-		setStatusOpen(false);
-		setError("");
-		setNotice("外部版本已设为基线；编辑内容仍保留，请完成合并后保存。");
-	};
+
 	const restoredFor = useRef("");
 	const restoreKey = `${tab?.id}:${page}:${view.beatView}:${view.edit}`;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: live / layoutLive 是 useWorkspaceGroup 给的 ref，读的是事件发生那一刻的值，不该让 effect 随它重跑
@@ -233,65 +215,18 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		document.addEventListener("selectionchange", onSelect);
 		return () => document.removeEventListener("selectionchange", onSelect);
 	}, [view.edit, setSelectedText, setSelPara, patch]);
-	async function savePath(path: string, restoreMissing = false) {
-		const draft = live.current.documents[path];
-		if (!draft) return;
-		const args = { path, content: draft.content, expectedSHA: restoreMissing ? null : draft.baseSHA };
-		const result = await invoke("workspace.file.save", args);
-		setView((v) => savedDocument(v, path, result.content, result.sha256));
-		await queryClient.invalidateQueries({ queryKey: ["file", shown?.projectId, path] });
-		setError("");
-		setNotice("已保存");
-	}
-	// 文档保存错误由本文件的处理入口负责，不再写入全局提示造成重复。
-	const save = async (restoreMissing = false) => {
-		if (busy) return;
-		if (!restoreMissing && (missingFile || conflict !== undefined)) {
-			showStatus();
-			return;
-		}
-		const savingDocument = documentKey;
-		const origin = document.activeElement;
-		setBusy(true);
-		setSaveError("");
-		try {
-			await savePath(editPath, restoreMissing);
-			refresh();
-			if (latestDocumentKey.current !== savingDocument) return;
-			setStatusOpen(false);
-			if (
-				layoutLive.current.activeGroup === group &&
-				(document.activeElement === origin ||
-					document.activeElement === document.body ||
-					statusRef.current?.contains(document.activeElement))
-			) {
-				focusEditor()?.focus();
-			}
-		} catch (failure) {
-			await queryClient.invalidateQueries({ queryKey: ["file", shown?.projectId, editPath] });
-			if (latestDocumentKey.current !== savingDocument) return;
-			if (!(failure instanceof CommandError && failure.code === "checkout_edit_conflict"))
-				setSaveError(failure instanceof Error ? failure.message : String(failure));
-			showStatus();
-		} finally {
-			setBusy(false);
-		}
-	};
+
 	const go = (direction: "back" | "forward") =>
-		setView((v) => historyMove(v, direction, !!v.tabs[v.active] && protectedLocation(v.tabs[v.active]?.location, v)));
+		setView((v) =>
+			historyMove(v, direction, !!v.tabs[v.active] && hasDocumentDraft(book, v.tabs[v.active]?.location, v)),
+		);
 	const activate = (index: number) => setView((v) => ({ ...v, active: index }));
 	const remove = (id: string) => setLayout((current) => closeWorkspaceTab(current, group, id));
 	const closeTab = (index: number) => {
 		const v = live.current;
 		const closing = v.tabs[index];
 		if (!closing) return;
-		const paths = pathsOf(closing.location).filter(
-			(path) =>
-				v.documents[path] &&
-				!layoutLive.current.groups
-					.flatMap((group) => group.tabs)
-					.some((other) => other.id !== closing.id && pathsOf(other.location).includes(path)),
-		);
+		const paths = closingDraftPaths(layoutLive.current, book, closing.id);
 		if (paths.length) setCloseRequest({ tabId: closing.id, paths });
 		else remove(closing.id);
 	};
@@ -351,37 +286,11 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 		window.addEventListener("keydown", key);
 		return () => window.removeEventListener("keydown", key);
 	});
-	const updateBuffer = (content: string) => {
-		setBuffer(content);
-		if (notice === "已保存") setNotice("");
-	};
-	const beginEdit = (path: string) =>
-		patch({
-			targetPath: path,
-			edit: "edit",
-		});
+
 	const beginDiff = (path: string, external = false) =>
 		setLayout((current) =>
 			openComparison(current, group, path, external ? null : (shown?.revisionId ?? null), external),
 		);
-	// 页面对象消失时，原编辑目标（可能是正文）仍由草稿持有；切阅读不能把它换成缺失的设计路径。
-	const finishTask = () => patch({ edit: "read", targetPath: !file && changed ? editPath : "" });
-
-	const documentProblem =
-		missingFile && changed
-			? "文件已移除"
-			: conflict !== undefined
-				? "外部修改冲突"
-				: saveError
-					? "保存失败"
-					: kind === "artifact" && fileDiagnostic
-						? "文件格式有误"
-						: kind === "artifact" && primary.error && file
-							? "文件读取失败"
-							: "";
-	useEffect(() => {
-		if (!documentProblem) setStatusOpen(false);
-	}, [documentProblem]);
 
 	// 外壳只在作品读到之后才画出各窗格，这里只是让类型收窄。
 	if (!shown || !book) return null;
@@ -402,18 +311,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	const documentActions = (
 		<>
 			{documentProblem && (
-				<Popover
-					open={statusOpen}
-					onOpenChange={(on, details) => {
-						if (!on && (details.reason === "outside-press" || details.reason === "focus-out"))
-							returnFocus.current = null;
-						if (on)
-							returnFocus.current =
-								focusEditor() ??
-								(document.activeElement instanceof HTMLElement ? document.activeElement : null);
-						setStatusOpen(on);
-					}}
-				>
+				<Popover open={statusOpen} onOpenChange={(on, details) => changeStatusOpen(on, details.reason)}>
 					<Hint content={`${documentProblem} · 查看处理方式`}>
 						<PopoverTrigger render={<Button variant="ghost" size="xs" aria-label={documentProblem} />}>
 							<CircleAlert className="size-4 text-amber" />
@@ -425,20 +323,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 						initialFocus={(interaction) => interaction === "keyboard" || interaction === ""}
 						align="end"
 						className="w-80 max-w-[calc(100vw-24px)] max-h-[70vh] overflow-auto"
-						finalFocus={() => {
-							if (layoutLive.current.activeGroup !== group || latestDocumentKey.current !== documentKey)
-								return false;
-							const active = document.activeElement;
-							if (
-								active instanceof HTMLElement &&
-								active !== document.body &&
-								active !== returnFocus.current &&
-								!statusRef.current?.contains(active) &&
-								active.getAttribute("aria-label") !== documentProblem
-							)
-								return false;
-							return returnFocus.current?.isConnected ? returnFocus.current : false;
-						}}
+						finalFocus={statusFinalFocus}
 					>
 						<PopoverTitle>{documentProblem}</PopoverTitle>
 						<PopoverDescription>
@@ -464,7 +349,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 									<Button
 										size="sm"
 										onClick={() => {
-											setStatusOpen(false);
+											changeStatusOpen(false, "none");
 											beginDiff(editPath, true);
 										}}
 									>
@@ -995,7 +880,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					reviews={reviews}
 					insetLeft={first && !showLeft}
 					insetRight={last && !showRight}
-					unsaved={(location) => protectedLocation(location, state)}
+					unsaved={(location) => hasDocumentDraft(book, location, state)}
 					onActivate={activate}
 					onClose={closeTab}
 					onTogglePin={(id) =>
