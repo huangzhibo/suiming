@@ -1,0 +1,263 @@
+"""斗破留出评测的全流程：搭作品 → Agent 续写、审稿、提交 → 确定性指标 → 读者口径评委，一条命令跑完。
+
+用法（在仓库根目录）：
+  python3 -I docs/validation/2026-10-17-doupo-holdout-pipeline/holdout.py <抽取作品> <Agent 回复.md> <输出目录> \
+      --holdout-from 107
+
+输出目录不在仓库里（作品是《斗破苍穹》的原文，不进 MIT 仓库）：
+- work/       评测作品：留出的节没有正文，Agent 在这里写
+- ref/        参照作品：留出的节放回原作，评委从这里取前文（Agent 那一版若接在自己的上一节后面，评委看到的前文就偏向它）
+- reference/  留出各节的原作原文
+- logs/       每一步的原始 JSON 输出与 stderr
+- results.json、results.md
+
+能续跑：已经有输出的步骤跳过；turn 没写完就发「继续」，最多两次，发过几次照实记下。
+这一轮只验证流程能无人工干预地跑完，不调写法：评委与指标照常出，但不据此改任何东西。
+
+搭作品用 2026-10-03 的 build_eval_work.py；指标用 2026-10-02 的 compare.py。suim 用本仓的
+apps/cli/dist/bin.js，跑之前先构建；跑的过程中不要重建 dist（每一步核对一次指纹，变了就停）。
+"""
+
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[3]
+CLI = REPO / "apps/cli/dist/bin.js"
+BUILDER = REPO / "docs/validation/2026-10-03-doupo-agent-gpt/build_eval_work.py"
+COMPARE = REPO / "docs/validation/2026-10-02-doupo-holdout/compare.py"
+MAX_CONTINUES = 2
+
+# 评测搭法对意图的两处改动（2026-10-03 留出时手改过同样两处）：留出点之后的正文不是原作；
+# 续写篇幅那句去掉——篇幅交给 Agent 按前文判断，留着它会让 24 节各写一万字。
+STYLE_INTENT = "intent/story-text-style.md"
+STYLE_EDITS = [
+    (r"前[一二三四五六七八九十百零]+章的正文就是原作章节，续写正文延续原作的笔法：", "第 {n} 章之前的正文就是原作章节，之后的正文延续原作的笔法："),
+    (r"续写每个 StoryBeat 写一万字左右[^\n]*", "章题沿用前文的格式「## 第N章 标题」，章号接着前文往下编。"),
+]
+
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def environment() -> dict[str, str]:
+    """本仓 .env 里的模型与观测配置（judge profile 在这里）；shell 里已有的同名变量优先。"""
+    env = dict(os.environ)
+    dotenv = REPO / ".env"
+    if dotenv.exists():
+        for line in dotenv.read_text(encoding="utf8").splitlines():
+            match = re.match(r"^([A-Z][A-Z0-9_]*)=(.*)$", line.strip())
+            if match:
+                # 与 node --env-file 一样去掉成对的引号（LANGFUSE_BASE_URL="http://…" 带着引号会让 OTLP 导出器拒绝启动）
+                value = re.sub(r"^([\"'])(.*)\1$", r"\2", match.group(2))
+                env.setdefault(match.group(1), value)
+    return env
+
+
+def dist_fingerprint() -> str:
+    digest = hashlib.sha256()
+    for root in ("packages/story/dist", "packages/sdk/dist", "packages/runtime/dist", "apps/cli/dist"):
+        for path in sorted((REPO / root).rglob("*")):
+            if path.is_file():
+                info = path.stat()
+                digest.update(f"{path}\0{info.st_size}\0{info.st_mtime_ns}\n".encode())
+    return digest.hexdigest()[:16]
+
+
+class Pipeline:
+    def __init__(self, out: Path):
+        self.out = out
+        self.work = out / "work"
+        self.ref = out / "ref"
+        self.reference = out / "reference"
+        self.logs = out / "logs"
+        self.env = environment()
+        self.fingerprint = dist_fingerprint()
+
+    def guard(self) -> None:
+        if dist_fingerprint() != self.fingerprint:
+            raise SystemExit("dist 在运行中变了，之后的结果与前面不可比，停止。")
+
+    def suim(self, cwd: Path, args: list[str], log: str) -> dict:
+        """跑一次 suim --json，原样存下 stdout / stderr；返回解析后的信封。"""
+        self.guard()
+        started = time.time()
+        done = subprocess.run(
+            ["node", str(CLI), "--json", *args], cwd=cwd, env=self.env, capture_output=True, text=True, check=False
+        )
+        (self.logs / f"{log}.json").write_text(done.stdout, encoding="utf8")
+        if done.stderr:
+            (self.logs / f"{log}.err").write_text(done.stderr, encoding="utf8")
+        try:
+            envelope = json.loads(done.stdout)
+        except json.JSONDecodeError:
+            envelope = {"ok": False, "error": {"message": f"非 JSON 输出（exit {done.returncode}）"}}
+        envelope["_seconds"] = round(time.time() - started, 1)
+        envelope["_exit"] = done.returncode
+        return envelope
+
+    def git(self, cwd: Path, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+
+    # ① 搭作品
+    def build(self, extraction: Path, reply: Path, holdout_from: int) -> list[str]:
+        if not self.work.exists():
+            subprocess.run(
+                [sys.executable, "-I", str(BUILDER), str(extraction), str(reply), str(self.work), str(self.reference),
+                 "--holdout-from", str(holdout_from)],
+                check=True,
+            )
+            style = self.work / STYLE_INTENT
+            text = style.read_text(encoding="utf8")
+            for pattern, replacement in STYLE_EDITS:
+                text, count = re.subn(pattern, replacement.format(n=holdout_from), text)
+                if count != 1:
+                    raise SystemExit(f"风格意图里没找到要改的那句（{pattern[:20]}…），这份抽取作品的意图写法不同，先看一眼再改脚本")
+            style.write_text(text, encoding="utf8")
+            shutil.copytree(self.work, self.ref)
+            for path in sorted(self.reference.glob("beat-*.md")):
+                shutil.copy(path, self.ref / "text" / path.name)
+            self.logs.mkdir(parents=True, exist_ok=True)
+            for name, path in (("init-work", self.work), ("init-ref", self.ref)):
+                result = self.suim(path, ["init"], name)
+                if not result.get("ok"):
+                    raise SystemExit(f"suim init 失败：{path}")
+        self.logs.mkdir(parents=True, exist_ok=True)
+        return sorted(path.stem for path in self.reference.glob("beat-*.md"))
+
+    def committed(self, beats: list[str]) -> list[str]:
+        return [beat for beat in beats if self.git(self.work, "cat-file", "-e", f"refs/suiming/canon:text/{beat}.md").returncode == 0]
+
+    # ② 续写、审稿、提交：一句作者消息，没写完就说「继续」
+    def write(self, beats: list[str]) -> list[dict]:
+        turns: list[dict] = []
+        for path in sorted(self.logs.glob("turn-*.json")):
+            turns.append(json.loads(path.read_text(encoding="utf8") or "{}"))
+        message = (
+            f"按设计写 {beats[0]} 到 {beats[-1]} 共 {len(beats)} 节的正文，接着前面的原作往下写，"
+            "语气、节奏和人物说话方式与前文一致。写完独立审稿，按意见修，检查并提交。"
+        )
+        while len(self.committed(beats)) < len(beats) and len(turns) <= MAX_CONTINUES:
+            session = next((turn.get("data", {}).get("session", {}).get("id") for turn in reversed(turns) if turn.get("ok")), None)
+            args = ["session", "send", message] if session is None else ["session", "send", "--session", session, "继续"]
+            turn = self.suim(self.work, args, f"turn-{len(turns) + 1}")
+            # 存档里补上耗时与退出码，续跑时读得回来
+            (self.logs / f"turn-{len(turns) + 1}.json").write_text(json.dumps(turn, ensure_ascii=False), encoding="utf8")
+            turns.append(turn)
+            if not turn.get("ok") and session is None:
+                break
+        return turns
+
+    # ③ 指标与评委
+    def score(self, beats: list[str]) -> tuple[dict, dict]:
+        compare = load_module("compare", COMPARE)
+        metrics: dict[str, dict] = {}
+        ranks: dict[str, dict] = {}
+        for beat in self.committed(beats):
+            candidate = self.git(self.work, "show", f"refs/suiming/canon:text/{beat}.md").stdout
+            original = (self.reference / f"{beat}.md").read_text(encoding="utf8")
+            metrics[beat] = compare.measure(candidate, original)
+            log = self.logs / f"rank-{beat}.json"
+            if not log.exists():
+                folder = self.logs / "rank" / beat
+                folder.mkdir(parents=True, exist_ok=True)
+                # 去掉章标题（章号与标题会泄露哪份是原作）和原作章末残留的按语括号
+                strip = lambda text: re.sub(r"[（(]\s*$", "", "\n".join(  # noqa: E731
+                    line for line in text.split("\n") if not line.lstrip().startswith("#")
+                ).strip()) + "\n"
+                (folder / "agent.md").write_text(strip(candidate), encoding="utf8")
+                (folder / "original.md").write_text(strip(original), encoding="utf8")
+                self.suim(
+                    self.ref,
+                    ["rank", beat, "--candidate", str(folder / "agent.md"), str(folder / "original.md"),
+                     "--rubric", "reader", "--rounds", "2"],
+                    f"rank-{beat}",
+                )
+            ranks[beat] = json.loads(log.read_text(encoding="utf8") or "{}")
+        return metrics, ranks
+
+    def summarize(self, beats: list[str], turns: list[dict], metrics: dict, ranks: dict) -> None:
+        check = self.suim(self.work, ["check"], "check")
+        revisions = self.git(self.work, "rev-list", "--count", "refs/suiming/canon").stdout.strip()
+        changed = self.git(self.work, "diff", "--name-only", "refs/suiming/canon~" + str(max(int(revisions or 1) - 1, 0)),
+                           "refs/suiming/canon").stdout.split()
+        dirty = self.git(self.work, "status", "--porcelain", "--untracked-files=all").stdout.split("\n")
+        committed = self.committed(beats)
+        results = {
+            "repo": self.git(REPO, "rev-parse", "--short", "HEAD").stdout.strip(),
+            "dist": self.fingerprint,
+            "heldOut": beats,
+            "committed": committed,
+            "canonRevisions": int(revisions or 0),
+            "changedSinceGenesis": changed,
+            "uncommitted": [line for line in dirty if line.strip()],
+            "turns": [
+                {
+                    "ok": turn.get("ok"),
+                    "seconds": turn.get("_seconds"),
+                    "status": turn.get("data", {}).get("session", {}).get("status"),
+                    "usage": turn.get("data", {}).get("session", {}).get("usage"),
+                    "lastFailure": turn.get("data", {}).get("session", {}).get("lastFailure"),
+                    "error": turn.get("error"),
+                    "reply": turn.get("data", {}).get("reply", "")[:2000],
+                }
+                for turn in turns
+            ],
+            "check": check.get("data") if check.get("ok") else check.get("error"),
+            "metrics": metrics,
+            "ranks": {
+                beat: (
+                    {item["label"]: item["averageRank"] for item in rank["data"]["ranking"]} | {"judge": rank["data"]["judge"]["model"]}
+                    if rank.get("ok")
+                    else {"error": rank.get("error")}
+                )
+                for beat, rank in ranks.items()
+            },
+        }
+        (self.out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf8")
+        wins = sum(1 for value in results["ranks"].values() if value.get("agent", 9) < value.get("original", 9))
+        losses = sum(1 for value in results["ranks"].values() if value.get("agent", 0) > value.get("original", 0))
+        lines = [
+            f"# 留出全流程结果（构建 {results['repo']} · dist {results['dist']}）",
+            "",
+            f"- 留出 {len(beats)} 节，提交了 {len(committed)} 节；Canon 共 {results['canonRevisions']} 个版本；未提交 {len(results['uncommitted'])} 个文件",
+            f"- turn {len(turns)} 次（其中「继续」{max(len(turns) - 1, 0)} 次）：" + "；".join(
+                f"{'ok' if turn['ok'] else 'fail'} {turn['seconds']}s {turn['status']} 调用 {(turn['usage'] or {}).get('calls')} 估算 ${(turn['usage'] or {}).get('costUsd', 0):.2f}"
+                for turn in results["turns"]
+            ),
+            f"- check：{'passed' if (results['check'] or {}).get('passed') else results['check']}",
+            f"- 读者口径评委（2 轮）：Agent 平均名次更好 {wins} 节，原作更好 {losses} 节，持平 {len(ranks) - wins - losses} 节",
+        ]
+        (self.out / "results.md").write_text("\n".join(lines) + "\n", encoding="utf8")
+        print("\n".join(lines))
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    if "--holdout-from" not in args:
+        raise SystemExit(__doc__)
+    at = args.index("--holdout-from")
+    holdout_from = int(args[at + 1])
+    del args[at : at + 2]
+    extraction, reply, out = (Path(arg).expanduser().resolve() for arg in args)
+    pipeline = Pipeline(out)
+    beats = pipeline.build(extraction, reply, holdout_from)
+    turns = pipeline.write(beats)
+    metrics, ranks = pipeline.score(beats)
+    pipeline.summarize(beats, turns, metrics, ranks)
+
+
+if __name__ == "__main__":
+    main()

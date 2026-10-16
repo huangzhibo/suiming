@@ -64,25 +64,31 @@ def clean(text: str) -> str:
 def parse_reply(reply: str, titles: list[str]) -> tuple[list[tuple[str, int]], dict[str, str]]:
     """表里每行：(标题, 起始章)；章内分界 → 下一节开头的那句原文，按《标题》对上。
 
-    Agent 每次的表格式不一样（有时多一列「第几节」，章内分界有时用 ①② 标号、有时写「第2章 → 第3节《标题》」），
-    这里只认两样东西：哪一格是 index 里的 Beat 标题、哪一格写着「第N章」；开头句按引号上方那行里的《标题》对应。
+    Agent 每次的表格式不一样（有时多一列「第几节」，章内分界有时用 ①② 标号、有时写「第2章 → 第3节《标题》」，
+    2026-10-03 的 120 章那次把开头句放在章号后面的一列，没有就写「—」），这里只认三样东西：哪一格是 index 里的
+    Beat 标题、哪一格写着「第N章」、章号后面那格里的开头句；或者按引号上方那行里的《标题》对应开头句。
     """
     known = set(titles)
     rows: list[tuple[str, int]] = []
+    openings: dict[str, str] = {}
     for line in reply.split("\n"):
         if not line.strip().startswith("|"):
             continue
-        cells = [cell.strip().strip("*《》") for cell in line.strip().strip("|").split("|")]
+        raw = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        cells = [cell.strip("*《》") for cell in raw]
         title = next((cell for cell in cells if cell in known), None)
         # 「第3—4章」这种范围只在末尾写一次「章」；「第18节」那一列不是章号
-        chapter = next((match for cell in cells if (match := re.search(r"第(\d+)(?:[—–\-~至到]\d+)?章", cell))), None)
-        if title is None or chapter is None:
+        at = next((i for i, cell in enumerate(cells) if re.search(r"第(\d+)(?:[—–\-~至到]\d+)?章", cell)), None)
+        if title is None or at is None:
             continue
+        chapter = re.search(r"第(\d+)(?:[—–\-~至到]\d+)?章", cells[at])
+        assert chapter is not None
         rows.append((title, int(chapter.group(1))))
-    openings = {
-        match.group(1): match.group(2).strip()
-        for match in re.finditer(r"《([^》]+)》[^\n]*\n\s*>\s*(.+)", reply)
-    }
+        opening = next((cell for cell in raw[at + 1 :] if cell and cell not in ("—", "-", "–")), None)
+        if opening is not None:
+            openings[title] = opening
+    for match in re.finditer(r"《([^》]+)》[^\n]*\n\s*>\s*(.+)", reply):
+        openings.setdefault(match.group(1), match.group(2).strip())
     return rows, openings
 
 
@@ -151,6 +157,13 @@ def main() -> None:
             starts.append(heads[chapter])
             continue
         at = material.find(sentence, heads[chapter])
+        if at < 0:
+            # 有时这一格写成说明（「场景标签：“加列家族。”随后是：“……”」）：取引号里在本章恰好出现一次的那段
+            chapter_end = min([position for position in heads.values() if position > heads[chapter]] + [len(material)])
+            chapter_text = material[heads[chapter] : chapter_end]
+            quoted = [part for part in re.findall(r"“([^”]+)”", sentence) if chapter_text.count(part) == 1]
+            if quoted:
+                at = heads[chapter] + chapter_text.find(quoted[0])
         if at < 0:
             raise SystemExit(f"《{title}》的开头句在第 {chapter} 章之后找不到：{sentence[:30]}")
         starts.append(at)
