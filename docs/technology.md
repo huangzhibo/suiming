@@ -91,7 +91,7 @@ Suiming 直接使用 OpenTelemetry 埋点，现有 pi-telemetry 显式 Telemetry
 
 Langfuse 是可选的 OpenTelemetry 后端，用于查看调用树、经数据策略允许的 Prompt 与响应、延迟、token、缓存、成本、错误和辅助 score。它帮助我们避免自建通用 trace UI，但可关闭、替换或自托管，故障不能影响创作和任务恢复。CLI 退出时调用有界 shutdown，由 SDK 导出已结束的 span 并关闭 provider，不再叠加两次等待；桌面主进程在 5 秒的退出窗口内为保存和观测收尾分配时间。执行存储保留恢复所需消息、准确调用绑定与 Context 引用、动作结果、权威用量和 trace 关联；数据归属见 Harness 设计。trace 可丢失，不能作为这些数据的唯一保存位置。
 
-桌面主进程 → Workspace → Controller → Harness → Gateway 全程接了观测。开发时从仓库根目录运行 `npm run dev:desktop`，启动脚本加载根 `.env`，已有进程环境优先；直接运行 Electron 需由启动环境提供配置。Langfuse keys 只留在主进程。OTLP 发送 v4 header，并向子 observation 传播 session、turn / Task 与 project 的可筛选关联字段。Review 归属父 Task；模型、工具与阶段提交 Checker 分别记录。缓存 token 按互斥分类上报，费用使用实际消息用量中的金额。默认不采集 prompt / 正文，通用异常仅记录类型；导出失败或超时用脱敏诊断码报告，不影响领域结果。验收见[Langfuse 检查与修复](validation/2026-09-11-langfuse-audit.md)。
+桌面主进程 → Workspace → Controller → Harness → Gateway 全程接了观测。开发时从仓库根目录运行 `npm run dev:desktop`，启动脚本加载根 `.env`，已有进程环境优先；直接运行 Electron 需由启动环境提供配置。Langfuse keys 只留在主进程。OTLP 发送 v4 header，并向子 observation 传播 session、turn / Task 与 project 的可筛选关联字段。Review 归属父 Task；模型、工具与阶段提交 Checker 分别记录。缓存 token 按互斥分类上报，费用使用实际消息用量中的金额。默认不采集 prompt / 正文，通用异常仅记录类型；导出沿用 OTLP 默认超时与重试，退出等待单独有界；失败批次用脱敏原因、数量、耗时和 span / trace ID 定位，不记录异常原文或响应正文，不影响领域结果。验收见[Langfuse 检查与修复](validation/2026-09-11-langfuse-audit.md)。
 
 Langfuse 的 Prompt、Dataset、Experiment 和 Score 不作为 Suiming 真源。故事专属 Eval 需要绑定完整 ProjectRevision、Context、候选、随机重复、paired blind result、作者修改和发布反馈，由 Suiming 保存；需要观察时可以把其 score 副本发送给 Langfuse。完整 Prompt、provider payload 和 stream event 不默认长期复制进 Local SQLite。
 

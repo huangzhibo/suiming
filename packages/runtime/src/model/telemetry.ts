@@ -192,6 +192,17 @@ class OpenTelemetryContext implements TelemetryContext {
 	}
 }
 
+export interface TelemetryExportDiagnostic {
+	reason: "timeout" | "http" | "network" | "unknown";
+	statusCode?: number;
+	spanCount: number;
+	spanIds: string[];
+	traceIds: string[];
+	durationMs: number;
+}
+
+type DiagnosticListener = (code: string, details?: TelemetryExportDiagnostic) => void;
+
 export interface CreateOpenTelemetryOptions extends TelemetryContentPolicy {
 	entrypoint?: string;
 	environment?: string;
@@ -199,7 +210,7 @@ export interface CreateOpenTelemetryOptions extends TelemetryContentPolicy {
 	spanProcessors: SpanProcessor[];
 	serviceName?: string;
 	tracerName?: string;
-	onDiagnostic?: (code: string) => void;
+	onDiagnostic?: DiagnosticListener;
 }
 
 /** 用给定的 span processor 建一个独立的 provider；不注册为全局。 */
@@ -230,7 +241,7 @@ export function createOpenTelemetry(options: CreateOpenTelemetryOptions): Suimin
 async function bounded(
 	operation: () => Promise<void>,
 	timeoutMs: number,
-	onDiagnostic?: (code: string) => void,
+	onDiagnostic?: DiagnosticListener,
 ): Promise<void> {
 	let timer: NodeJS.Timeout | undefined;
 	const timeout = new Promise<void>((resolve) => {
@@ -251,9 +262,9 @@ async function bounded(
 	}
 }
 
-function diagnose(listener: ((code: string) => void) | undefined, code: string): void {
+function diagnose(listener: DiagnosticListener | undefined, code: string, details?: TelemetryExportDiagnostic): void {
 	try {
-		listener?.(code);
+		listener?.(code, details);
 	} catch {
 		/* 诊断不得影响执行 */
 	}
@@ -262,7 +273,7 @@ function diagnose(listener: ((code: string) => void) | undefined, code: string):
 const RUNTIME_VERSION = (createRequire(import.meta.url)("../../package.json") as { version: string }).version;
 
 export interface LangfuseTelemetryOptions extends Omit<CreateOpenTelemetryOptions, "spanProcessors"> {
-	onDiagnostic?: (code: string) => void;
+	onDiagnostic?: DiagnosticListener;
 	baseUrl: string;
 	publicKey: string;
 	secretKey: string;
@@ -285,13 +296,34 @@ export function langfuseExportOptions(options: LangfuseTelemetryOptions): {
 }
 
 export function createLangfuseTelemetry(options: LangfuseTelemetryOptions): SuimingTelemetry {
-	const target = new OTLPTraceExporter({ ...langfuseExportOptions(options), timeoutMillis: 1500 });
-	const onDiagnostic = options.onDiagnostic ?? ((code: string) => console.error(`[Suiming telemetry] ${code}`));
+	// 沿用 OTLP 的导出超时与重试；进程退出的等待上限由 bounded 单独约束。
+	const target = new OTLPTraceExporter(langfuseExportOptions(options));
+	const onDiagnostic: DiagnosticListener =
+		options.onDiagnostic ??
+		((code, details) => console.error(`[Suiming telemetry] ${code}${details ? ` ${JSON.stringify(details)}` : ""}`));
 	let failed = false;
 	const exporter: SpanExporter = {
 		export(spans, done) {
+			const started = performance.now();
 			target.export(spans, (result) => {
-				if (result.code !== 0 && !failed) diagnose(onDiagnostic, "langfuse_export_failed");
+				if (result.code !== 0) {
+					const error = result.error as (Error & { code?: unknown }) | undefined;
+					const statusCode = typeof error?.code === "number" ? error.code : undefined;
+					diagnose(onDiagnostic, "langfuse_export_failed", {
+						reason: /timed? ?out|timeout/iu.test(error?.message ?? "")
+							? "timeout"
+							: statusCode !== undefined
+								? "http"
+								: typeof error?.code === "string"
+									? "network"
+									: "unknown",
+						...(statusCode !== undefined ? { statusCode } : {}),
+						spanCount: spans.length,
+						spanIds: spans.map((span) => span.spanContext().spanId),
+						traceIds: [...new Set(spans.map((span) => span.spanContext().traceId))],
+						durationMs: Math.round(performance.now() - started),
+					});
+				}
 				if (result.code === 0 && failed) diagnose(onDiagnostic, "langfuse_export_recovered");
 				failed = result.code !== 0;
 				done(result);
@@ -301,7 +333,7 @@ export function createLangfuseTelemetry(options: LangfuseTelemetryOptions): Suim
 	};
 	return createOpenTelemetry({
 		...options,
-		spanProcessors: [new BatchSpanProcessor({ exporter, exportTimeoutMillis: 2000 })],
+		spanProcessors: [new BatchSpanProcessor({ exporter })],
 		onDiagnostic,
 		...(options.serviceName === undefined ? {} : { serviceName: options.serviceName }),
 	});
