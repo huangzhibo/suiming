@@ -315,7 +315,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				closeRequest ||
 				settingsOpen ||
 				helpOpen ||
-				document.querySelector('[role="dialog"], [role="menu"]')
+				document.querySelector('[role="dialog"]:not([data-closed]), [role="menu"]:not([data-closed])')
 			)
 				return;
 			if ((event.metaKey || event.ctrlKey) && event.key === "t") {

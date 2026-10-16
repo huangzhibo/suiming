@@ -65,6 +65,7 @@ Object.assign(globalThis, {
 });
 
 const modelTest = process.argv.includes("--model-picker-test");
+const streamingTest = process.argv.includes("--streaming-test");
 if (process.argv.includes("--version-page-test")) {
 	let failedList = false;
 	let failedFile = false;
@@ -95,7 +96,11 @@ const provider = fauxProvider(
 					{ id: "second", name: "测试模型 B", reasoning: true },
 				],
 			}
-		: { provider: "desktop-test", api: "desktop-test-api" },
+		: {
+				provider: "desktop-test",
+				api: "desktop-test-api",
+				...(streamingTest ? { tokensPerSecond: 120, tokenSize: { min: 32, max: 32 } } : {}),
+			},
 );
 if (process.argv.includes("--composer-test")) {
 	const commands: { command: string; input: Record<string, unknown> }[] = [];
@@ -247,6 +252,29 @@ if (process.argv.includes("--conversation-test")) {
 		},
 		stopThenContinue,
 		stopThenContinue,
+	]);
+}
+if (streamingTest) {
+	// 只让只读 attach 断线，模型继续输出；不会接触开发者的提供商、凭据或作品。
+	const control = { disconnected: false, failedAttaches: 0, calls: () => provider.state.callCount };
+	Object.assign(globalThis, { streamingTest: control });
+	const handle = ipcMain.handle.bind(ipcMain);
+	ipcMain.handle = (channel, listener) =>
+		handle(channel, async (event, request, ...args) => {
+			if (channel === "suiming:command" && request.command === "session.attach" && control.disconnected) {
+				control.failedAttaches += 1;
+				return { ok: false, error: { code: "test_disconnected", message: "测试：连接中断" } };
+			}
+			return listener(event, request, ...args);
+		});
+	provider.setResponses([
+		fauxAssistantMessage(
+			fauxToolCall("read", { path: "outline/story/vol-0001/beat-0001.md" }, { id: "streaming-read" }),
+		),
+		fauxAssistantMessage(
+			Array.from({ length: 20000 }, (_, i) => `流式片段 ${i}：黄盖此时还没有说出自己的打算。\n\n`).join(""),
+		),
+		fauxAssistantMessage("停止之后可以继续，仍然是同一个对话。"),
 	]);
 }
 if (process.argv.includes("--subtask-resume-test")) {

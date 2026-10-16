@@ -1,7 +1,7 @@
 import type { SessionEvent, SuimingTurnSummary } from "@suiming/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronRight, Copy, Quote } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "./bridge.js";
 import { Markdown } from "./markdown.js";
@@ -176,7 +176,7 @@ const TASK_STATUS_TEXT: Record<string, string> = { running: "进行中", failed:
  * 点开一个动作看到的完整输入与输出，从跑它的 loop 的执行记录里按需读（`session.action`）：事件里只有一句摘要，
  * 不为它在事件流里再存一份。revision 变了就重读——子任务那一行里的委派，子任务做完之前还没有交回的结果。
  */
-function ActionDetail({
+const ActionDetail = memo(function ActionDetail({
 	sessionId,
 	taskId,
 	actionId,
@@ -221,7 +221,7 @@ function ActionDetail({
 			</div>
 		</div>
 	);
-}
+});
 
 const DETAIL_BLOCK = "max-h-60 overflow-auto rounded-md bg-muted px-2 py-1.5 font-sans whitespace-pre-wrap break-words";
 
@@ -463,6 +463,43 @@ type Row =
 	| { kind: "activity"; id: string; sequence: number; activity: Activity }
 	| { kind: "summary"; id: string; sequence: number; text: string };
 
+/** AG-UI 会复制消息对象；按实际显示的标量比较，让历史消息不随新片段或输入重新渲染。 */
+const MessageRow = memo(function MessageRow({
+	id,
+	role,
+	text,
+	latest,
+	streaming,
+	titles,
+	links,
+	onReference,
+}: {
+	id: string;
+	role: string;
+	text: string;
+	latest: boolean;
+	streaming: boolean;
+	titles: ReadonlyMap<string, string>;
+	links: ReadonlyMap<string, () => void>;
+	onReference(id: string, text: string): void;
+}) {
+	return (
+		<article
+			data-message-id={id}
+			data-latest={latest}
+			className={`message ${role} ${role === "user" ? "max-w-[90%] self-end" : "min-w-0"}`}
+		>
+			<div className="sr-only">{role === "user" ? "你" : "燧明"}</div>
+			{role === "user" ? (
+				<UserMessage text={text} titles={titles} links={links} />
+			) : (
+				<Markdown className="msg-text" content={text} streaming={streaming} links={links} />
+			)}
+			<MessageActions text={text} onReference={() => onReference(id, text)} />
+		</article>
+	);
+});
+
 export function Transcript({
 	sessionId,
 	history = false,
@@ -481,10 +518,18 @@ export function Transcript({
 	/** 当前作品的全部文件路径与显示标题；Agent 提到其中之一时才渲染成可打开的链接。 */
 	titles: ReadonlyMap<string, string>;
 	open(path: string): void;
-	onExport(sessionId: string, text: string): void;
+	onExport(sessionId: string, read: () => string): void;
 	onReference(id: string, text: string): void;
 }) {
-	const links = useMemo(() => new Map([...titles.keys()].map((path) => [path, () => open(path)])), [titles, open]);
+	// 父窗格的事件回调会随草稿等状态更新；行的显示不依赖这些函数的身份，但点击必须用最新回调。
+	const callbacks = useRef({ open, onReference });
+	callbacks.current = { open, onReference };
+	const openFile = useCallback((path: string) => callbacks.current.open(path), []);
+	const referenceMessage = useCallback((id: string, text: string) => callbacks.current.onReference(id, text), []);
+	const links = useMemo(
+		() => new Map([...titles.keys()].map((path) => [path, () => openFile(path)])),
+		[titles, openFile],
+	);
 	// 事件只改这份记录，同一帧里到的合成一次重渲染。原来每个动作快照都 setState 复制整份记录：长对话 attach 时
 	// 一次重放两千多个动作，复制是平方级的，加上逐个重渲染，主线程卡住四秒多（2026-10-06，斗破 120 章那次对话）。
 	const store = useRef({
@@ -501,16 +546,19 @@ export function Transcript({
 		const event = record.event;
 		const { activities, summaries, order } = store.current;
 		if (event.type === "TEXT_MESSAGE_START") order.set(event.messageId, record.sequence);
-		if (event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn")
+		// 文字由 useConversation 按帧更新；这里仅刷新本组件持有的动作 / 对账，避免每个文字片段再更新一遍。
+		if (
+			event.type !== "ACTIVITY_SNAPSHOT" ||
+			!["suiming.turn", "suiming.action", "suiming.progress"].includes(event.activityType)
+		)
+			return;
+		if (event.activityType === "suiming.turn")
 			summaries.set(event.messageId, {
 				sequence:
 					summaries.get(event.messageId)?.sequence ?? Number(event.metadata?.suiming?.sequence ?? record.sequence),
 				summary: event.content as SuimingTurnSummary,
 			});
-		if (
-			event.type === "ACTIVITY_SNAPSHOT" &&
-			(event.activityType === "suiming.action" || event.activityType === "suiming.progress")
-		) {
+		else {
 			const body = event.content as {
 				/** 2026-10-05 之前落盘的事件：执行者写在内容里（根 Agent 是 sessionId），现在是事件上的 subagentRunId。 */
 				taskId?: string;
@@ -544,12 +592,20 @@ export function Transcript({
 		text: message.text,
 	}));
 	const latest = rows.at(-1)?.id;
-	const exported = rows
-		.map((row) => (row.kind === "message" ? `## ${row.role === "user" ? "作者" : "Suiming"}\n\n${row.text}` : ""))
-		.join("\n\n");
+	// 导出只在作者点击时拼全文；逐片段把全文送回父窗格会让输入器和整段历史跟着重绘。
+	const exportMessages = useRef(messages);
+	exportMessages.current = messages;
+	const readExport = useCallback(
+		() =>
+			exportMessages.current
+				.map((message) => `## ${message.role === "user" ? "作者" : "Suiming"}\n\n${message.text}`)
+				.join("\n\n"),
+		[],
+	);
+	const hasMessages = messages.length > 0;
 	useEffect(() => {
-		if (connectionState === "ready" && messages.length) onExport(sessionId, exported);
-	}, [sessionId, exported, onExport, connectionState, messages.length]);
+		if (connectionState === "ready" && hasMessages) onExport(sessionId, readExport);
+	}, [sessionId, readExport, onExport, connectionState, hasMessages]);
 	rows.push(
 		...[...store.current.activities.values()].map((activity) => ({
 			kind: "activity" as const,
@@ -599,28 +655,18 @@ export function Transcript({
 							{group.text}
 						</p>
 					) : group.kind === "message" ? (
-						<article
+						<MessageRow
 							key={group.id}
-							data-message-id={group.id}
-							data-latest={!history && group.id === latest}
-							className={`message ${group.role} ${group.role === "user" ? "max-w-[90%] self-end" : "min-w-0"}`}
-						>
-							<div className="sr-only">{group.role === "user" ? "你" : "燧明"}</div>
-							{group.role === "user" ? (
-								<UserMessage text={group.text} titles={titles} links={links} />
-							) : (
-								<Markdown
-									className="msg-text"
-									content={group.text}
-									// 打开或切到一个已结束的会话要重放历史事件，重放到一半 generating 也是真的：
-									// 最后一条消息因此按流式挂载、逐词淡入，长回复要三秒多才显示全（2026-10-05 走查，706 个词）。
-									// 是否在生成以执行库的 session 状态为准，事件流只决定流到哪里。
-									streaming={running && generating && group.id === latest}
-									links={links}
-								/>
-							)}
-							<MessageActions text={group.text} onReference={() => onReference(group.id, group.text)} />
-						</article>
+							id={group.id}
+							role={group.role}
+							text={group.text}
+							latest={!history && group.id === latest}
+							// 重放历史也会令 generating 为真；执行库的 running 防止已结束的长回复再次逐词淡入。
+							streaming={running && generating && group.id === latest}
+							titles={titles}
+							links={links}
+							onReference={referenceMessage}
+						/>
 					) : group.taskId === undefined ? (
 						// 根 Agent 的动作直接排在对话里，同类连着的并成一行；点开任何一行看完整输入与输出。
 						group.rows.some((row) => !delegating.has(row.id)) && (
@@ -633,7 +679,7 @@ export function Transcript({
 									taskId={undefined}
 									rows={group.rows.filter((row) => !delegating.has(row.id))}
 									titles={titles}
-									open={open}
+									open={openFile}
 								/>
 							</div>
 						)
@@ -650,7 +696,7 @@ export function Transcript({
 							rows={group.rows}
 							showLog={showLog}
 							titles={titles}
-							open={open}
+							open={openFile}
 						/>
 					),
 				)}

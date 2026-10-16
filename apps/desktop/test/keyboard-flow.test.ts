@@ -170,6 +170,21 @@ test("键盘：未保存关闭取消恢复光标，弹窗不穿透快捷键", { 
 		await page.getByRole("dialog", { name: "设置", exact: true }).waitFor();
 		await page.keyboard.press("Escape");
 		await eventually(() => focused(settings), "设置关闭后返回触发按钮");
+		// 放慢真实弹层的退场动画，稳定复现“已经关闭，但 DOM 还在”时吞掉快捷键。
+		// 不等动画结束，也不靠按键恰好抢在默认的 100ms 内。
+		await page.addStyleTag({
+			content: '[data-slot="popover-content"][data-closed] { animation-duration: 60s !important; }',
+		});
+		await page.getByRole("button", { name: "切换作品", exact: true }).click();
+		const popup = page.locator('[data-slot="popover-content"]');
+		await popup.waitFor();
+		await page.keyboard.press("Meta+t");
+		assert.equal(await page.locator(".tab-btn").count(), before, "打开的弹层仍阻止快捷键穿透");
+		await page.keyboard.press("Escape");
+		await page.locator('[data-slot="popover-content"][data-closed]').waitFor({ state: "attached" });
+		await page.keyboard.press("Meta+t");
+		await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).waitFor();
+		assert.equal(await page.locator(".tab-btn").count(), before + 1, "已关闭的弹层不再吞掉快捷键");
 		assert.deepEqual(errors, []);
 	} finally {
 		await close();

@@ -35,7 +35,8 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 		await page.getByRole("option", { name: "高", exact: true }).click();
 		await page.reload();
 		await picker.waitFor();
-		assert.match(await picker.innerText(), /测试模型 B/);
+		// 本地选择先恢复为模型 ID，显示名称要等异步模型目录；按钮可见不代表目录已返回。
+		await eventually(async () => /测试模型 B.*高/u.test(await picker.innerText()), "恢复模型 B 与高思考强度");
 		const input = page.getByRole("textbox", { name: "输入消息", exact: true });
 		await input.fill("讨论一下人物的选择");
 		await input.press("Meta+Enter");

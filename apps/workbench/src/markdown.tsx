@@ -1,5 +1,5 @@
 import { cjk } from "@streamdown/cjk";
-import { Children, createElement, type HTMLAttributes, type ReactNode, useLayoutEffect, useRef } from "react";
+import { Children, createElement, type HTMLAttributes, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { type Components, type ExtraProps, Streamdown } from "streamdown";
 import { Hint } from "./ui-bits.js";
 
@@ -55,6 +55,37 @@ export function Markdown({
 	links?: ReadonlyMap<string, () => void>;
 	"data-prose"?: boolean;
 }) {
+	// Streamdown 按组件函数的身份复用已完成的段落；逐片段新建链接渲染器会让整条长回复重新解析。
+	const components = useMemo(
+		() =>
+			links
+				? {
+						...COMPONENTS,
+						a: ({ href, children }: ExtraProps & { href?: string | undefined; children?: ReactNode }) => {
+							let target = href ?? "";
+							try {
+								target = decodeURIComponent(target).replace(/^(?:\.\/|\/)/u, "");
+							} catch {
+								/* 非法 URL 不成为作品链接 */
+							}
+							const onClick = links.get(target);
+							return onClick ? (
+								<button
+									type="button"
+									className="cursor-pointer text-primary underline underline-offset-2"
+									data-page={target}
+									onClick={onClick}
+								>
+									{children}
+								</button>
+							) : (
+								<span>{children}</span>
+							);
+						},
+					}
+				: COMPONENTS,
+		[links],
+	);
 	const ref = useRef<HTMLDivElement>(null);
 	// 段号来自渲染结果而不是解析器：Streamdown 按块缓存，块内位置不是全文位置。
 	useLayoutEffect(() => {
@@ -79,34 +110,7 @@ export function Markdown({
 				isAnimating={streaming}
 				animated={streaming}
 				parseIncompleteMarkdown={streaming}
-				components={
-					links
-						? {
-								...COMPONENTS,
-								a: ({ href, children }: ExtraProps & { href?: string | undefined; children?: ReactNode }) => {
-									let target = href ?? "";
-									try {
-										target = decodeURIComponent(target).replace(/^(?:\.\/|\/)/u, "");
-									} catch {
-										/* 非法 URL 不成为作品链接 */
-									}
-									const onClick = links.get(target);
-									return onClick ? (
-										<button
-											type="button"
-											className="cursor-pointer text-primary underline underline-offset-2"
-											data-page={target}
-											onClick={onClick}
-										>
-											{children}
-										</button>
-									) : (
-										<span>{children}</span>
-									);
-								},
-							}
-						: COMPONENTS
-				}
+				components={components}
 				plugins={PLUGINS}
 				controls={false}
 				lineNumbers={false}

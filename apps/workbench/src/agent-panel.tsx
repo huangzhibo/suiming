@@ -106,14 +106,14 @@ export function AgentPanel({
 	const [picker, setPicker] = useState(false);
 	const [showLog, setShowLog] = useState(false);
 	const [confirmDelete, setConfirmDelete] = useState(false);
-	const [exports, setExports] = useState<Record<string, string>>({});
-	const receiveExport = useCallback((id: string, text: string) => {
-		setExports((previous) => (previous[id] === text ? previous : { ...previous, [id]: text }));
+	const [exportSource, setExportSource] = useState<{ id: string; read: () => string }>();
+	const receiveExport = useCallback((id: string, read: () => string) => {
+		setExportSource((previous) => (previous?.id === id && previous.read === read ? previous : { id, read }));
 	}, []);
 	const [exportNotice, setExportNotice] = useState("");
 	const setGoal = (goal: string) => binding.updateComposer(binding.draftKey, (draft) => ({ ...draft, goal }));
 	const session = sessions.find((item) => item.id === selected);
-	const exported = session ? (exports[session.id] ?? "") : "";
+	const exported = session && exportSource?.id === session.id ? exportSource.read : undefined;
 	const active = isActive(session);
 	// 开始对话前先看 Agent 有没有可用模型；主进程的预检会拦住，但提前说明比失败后再解释省一次来回。
 	const agent = useModelSettings().data?.profiles.find((profile) => profile.id === "main");
@@ -176,7 +176,7 @@ export function AgentPanel({
 								onClick={() =>
 									action(async () => {
 										setExportNotice("");
-										if (await bridge().exportConversation(exported)) setExportNotice("对话已导出");
+										if (await bridge().exportConversation(exported?.() ?? "")) setExportNotice("对话已导出");
 									})
 								}
 							>
