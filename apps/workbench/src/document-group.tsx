@@ -487,7 +487,8 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 										: "document"
 									: "full"
 							}
-							autoFocus={groupId === layout.activeGroup}
+							autoFocus={groupId === layout.activeGroup && !view.reveal}
+							reveal={view.reveal}
 							key={`${tab?.id}:${editPath}:${view.edit}`}
 							editHistory={editorHistory(tab?.id ?? "", editPath)}
 							position={view.editors[`${editPath}:${view.edit}`]}

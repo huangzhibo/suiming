@@ -64,6 +64,7 @@ function MessageActions({ text, onReference }: { text: string; onReference(): vo
 const actionLabels: Record<string, string> = {
 	read: "读取文件",
 	project_status: "核对作品状态",
+	workbench: "查看与定位界面",
 	write: "修改文件",
 	edit: "修改文件",
 	list: "浏览目录",

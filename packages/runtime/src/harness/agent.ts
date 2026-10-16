@@ -14,6 +14,7 @@ import { sourceTools } from "./source-tools.js";
 import type { HarnessSession, RootLoopOutcome, TaskHandle, TaskSpec } from "./suiming-harness.js";
 import { type HarnessTool, ToolRejection } from "./tool.js";
 import { checkTool, compactContextTool, fileTools, frameTool, impactTool, searchTool, submitTool } from "./tools.js";
+import { workbenchTools } from "./workbench-tool.js";
 import { compileWriteContext } from "./write-context.js";
 import {
 	SOURCE_COMPLETION_METHOD,
@@ -152,6 +153,7 @@ function subagentTools(
 ): HarnessTool[] {
 	return [
 		projectStatusTool(session, handle),
+		...workbenchTools(session.workbench, handle.env),
 		...fileTools(handle.env, policy, handle.scan, sourceId),
 		searchTool(handle.scan),
 		impactTool(handle.scan),
@@ -500,6 +502,7 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 			const reviewTool = review(session, handle);
 			return [
 				projectStatusTool(session, handle),
+				...workbenchTools(session.workbench, handle.env),
 				...fileTools(handle.env, "write", handle.scan),
 				searchTool(handle.scan),
 				impactTool(handle.scan),

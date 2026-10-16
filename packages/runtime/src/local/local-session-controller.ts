@@ -1,5 +1,5 @@
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
-import type { EditorFileHandler, ModelChoice } from "@suiming/sdk";
+import type { EditorFileHandler, ModelChoice, WorkbenchHandler } from "@suiming/sdk";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ExecutionStateEvent, SessionRecord } from "../execution/types.js";
 import { agentTurn } from "../harness/agent.js";
@@ -10,6 +10,7 @@ import type { LocalProjectService } from "./local-project-service.js";
 
 export interface LocalSessionControllerOptions {
 	editorFiles?: EditorFileHandler;
+	workbench?: WorkbenchHandler;
 	project: LocalProjectService;
 	models: ModelGateway;
 	telemetryContext?: TelemetryContext;
@@ -58,6 +59,7 @@ export interface SendInput {
 export class LocalSessionController {
 	readonly #project: LocalProjectService;
 	readonly #models: ModelGateway;
+	readonly #workbench: WorkbenchHandler | undefined;
 	readonly #editorFiles: EditorFileHandler | undefined;
 	readonly #telemetryContext: TelemetryContext | undefined;
 	readonly #now: (() => Date) | undefined;
@@ -68,6 +70,7 @@ export class LocalSessionController {
 		this.#project = options.project;
 		this.#models = options.models;
 		this.#editorFiles = options.editorFiles;
+		this.#workbench = options.workbench;
 		this.#telemetryContext = options.telemetryContext;
 		this.#now = options.now;
 		this.#usageCheckpoint = options.usageCheckpoint;
@@ -112,6 +115,7 @@ export class LocalSessionController {
 			project: this.#project,
 			models: this.#models,
 			...(this.#editorFiles ? { editorFiles: this.#editorFiles } : {}),
+			...(this.#workbench ? { workbench: this.#workbench } : {}),
 			...(this.#telemetryContext === undefined ? {} : { telemetryContext: this.#telemetryContext }),
 			...(this.#now === undefined ? {} : { now: this.#now }),
 			...(this.#usageCheckpoint === undefined ? {} : { turnUsageCheckpointTokens: this.#usageCheckpoint }),

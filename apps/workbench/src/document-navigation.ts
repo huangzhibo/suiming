@@ -94,3 +94,31 @@ export function hasDocumentDraft(
 ): boolean {
 	return !!location && documentPaths(book, location).some((path) => !!state.documents[path]);
 }
+
+/** 页面指向的物理文件；阅读、编辑、界面上下文共用，正文不能误指回设计。 */
+export function documentLocation(view: ViewState, book: Book | undefined) {
+	const page = view.page;
+	const kind = pageKind(page);
+	const rawPath = kind === "file" || kind === "diff" ? pageTarget(page) : page;
+	const file = kind === "artifact" || kind === "file" || kind === "diff" ? book?.byPath.get(rawPath) : undefined;
+	const isBeat = kind === "artifact" && file?.kind === "story-beat" && file.namespace === "target";
+	const textPath = isBeat && file ? textPathFor(file.localId) : "";
+	const editPath =
+		view.targetPath && (view.edit !== "read" || (!file && !!view.documents[view.targetPath]))
+			? view.targetPath
+			: isBeat
+				? view.beatView === "design"
+					? rawPath
+					: textPath
+				: kind === "artifact" || kind === "file" || kind === "diff"
+					? rawPath
+					: "";
+	return { page, kind, rawPath, file, isBeat, textPath, editPath };
+}
+
+/** macOS / Windows 上界面入口与文件同步认同一份草稿，不因模型改变路径大小写开出第二份。 */
+export function matchingDocumentPath(requested: string, paths: Iterable<string>, caseInsensitive: boolean): string {
+	for (const path of paths)
+		if (path === requested || (caseInsensitive && path.toLowerCase() === requested.toLowerCase())) return path;
+	return requested;
+}

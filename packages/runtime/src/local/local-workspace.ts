@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
+import type { WorkbenchHandler } from "@suiming/sdk";
 import {
 	type EditorFileHandler,
 	LOCAL_COMMANDS,
@@ -178,6 +179,7 @@ export class LocalWorkspace implements LocalCommandClient {
 		systemFile?: (absolute: string, action: "reveal" | "open") => Promise<void>,
 		private readonly telemetryContext?: TelemetryContext,
 		private readonly editorFiles?: EditorFileHandler,
+		private readonly workbench?: WorkbenchHandler,
 	) {
 		this.project = project;
 		this.#models = models;
@@ -213,6 +215,7 @@ export class LocalWorkspace implements LocalCommandClient {
 					project: this.project,
 					models,
 					...(this.editorFiles ? { editorFiles: this.editorFiles } : {}),
+					...(this.workbench ? { workbench: this.workbench } : {}),
 					...(this.telemetryContext === undefined ? {} : { telemetryContext: this.telemetryContext }),
 					usageCheckpoint: () => this.#settings.usageCheckpoint(),
 				});

@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { type SetStateAction, useRef } from "react";
 import { invoke } from "./bridge.js";
 import { CommandError } from "./command-error.js";
-import { type Book, pageKind, pageTarget, textPathFor, type WorkspaceData } from "./model.js";
+import { documentLocation } from "./document-navigation.js";
+import type { Book, WorkspaceData } from "./model.js";
 import { editDocument, type ViewState, type WorkbenchState } from "./view-state.js";
 
 const EMPTY_FILE = { path: "", content: "", sha256: null as string | null };
@@ -25,22 +26,7 @@ export function useCurrentDocument({
 	setView: (update: SetStateAction<WorkbenchState>) => void;
 }) {
 	const tab = state.tabs[state.active];
-	const page = view.page;
-	const kind = pageKind(page);
-	const rawPath = kind === "file" || kind === "diff" ? pageTarget(page) : page;
-	const file = kind === "artifact" || kind === "file" || kind === "diff" ? book?.byPath.get(rawPath) : undefined;
-	const isBeat = kind === "artifact" && file?.kind === "story-beat" && file.namespace === "target";
-	const textPath = isBeat && file ? textPathFor(file.localId) : "";
-	const editPath =
-		view.targetPath && (view.edit !== "read" || (!file && !!state.documents[view.targetPath]))
-			? view.targetPath
-			: isBeat
-				? view.beatView === "design"
-					? rawPath
-					: textPath
-				: kind === "artifact" || kind === "file" || kind === "diff"
-					? rawPath
-					: "";
+	const { page, kind, rawPath, file, isBeat, textPath, editPath } = documentLocation(view, book);
 	const readRaw =
 		kind === "file" || (kind === "artifact" && !!file) || (kind === "diff" && view.diffExternal && !file);
 	const primary = useQuery({

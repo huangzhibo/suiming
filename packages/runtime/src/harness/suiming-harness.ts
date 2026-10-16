@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
-import type { EditorFileHandler } from "@suiming/sdk";
+import type { EditorFileHandler, WorkbenchHandler } from "@suiming/sdk";
 import {
 	EventType,
 	type ModelChoice,
@@ -45,6 +45,7 @@ import { textWrittenWithoutContext, turnSummary } from "./turn-summary.js";
 
 export interface SuimingHarnessOptions {
 	editorFiles?: EditorFileHandler;
+	workbench?: WorkbenchHandler;
 	project: HarnessProjectPort;
 	models: ModelGateway;
 	/** turn / Task span 的根；模型调用 span 挂在它们下面。缺省 NOOP。 */
@@ -328,6 +329,11 @@ export class HarnessSession {
 	pendingInbox(): { sequence: number; text: string }[] {
 		const consumed = this.record.inboxSequence ?? 0;
 		return this.#engine.project.readInbox(this.sessionId).filter((item) => item.sequence > consumed);
+	}
+
+	get workbench(): WorkbenchHandler | undefined {
+		const handler = this.#engine.workbench;
+		return handler ? (request, signal) => handler(request, signal ?? this.#signal) : undefined;
 	}
 
 	#editorOptions(): { editorFiles?: EditorFileHandler } {
@@ -828,6 +834,7 @@ async function turnStart(session: HarnessSession): Promise<TurnStart | undefined
  */
 export class SuimingHarness {
 	readonly editorFiles: EditorFileHandler | undefined;
+	readonly workbench: WorkbenchHandler | undefined;
 	readonly project: HarnessProjectPort;
 	readonly checkpoints: CheckpointArchive;
 	readonly telemetry: TelemetryContext;
@@ -837,6 +844,7 @@ export class SuimingHarness {
 
 	constructor(options: SuimingHarnessOptions) {
 		this.editorFiles = options.editorFiles;
+		this.workbench = options.workbench;
 		this.project = options.project;
 		this.checkpoints = new CheckpointArchive(options.project);
 		this.telemetry = options.telemetryContext ?? NOOP_TELEMETRY_CONTEXT;

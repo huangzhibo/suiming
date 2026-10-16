@@ -11,7 +11,7 @@ import {
 	unifiedMergeView,
 } from "@codemirror/merge";
 import { Annotation, ChangeSet, Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { drawSelection, EditorView, keymap } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
 	type CSSProperties,
@@ -26,7 +26,7 @@ import {
 import { createPortal } from "react-dom";
 import { ComparisonResizer } from "./comparison-resizer.js";
 import type { EditorHistory, EditorScroll } from "./use-editor-history.js";
-import type { ComparisonLayout, EditorPosition } from "./view-state.js";
+import type { ComparisonLayout, DocumentReveal, EditorPosition } from "./view-state.js";
 
 export interface ComparisonStatus {
 	count: number;
@@ -130,6 +130,7 @@ const mergeTheme = EditorView.baseTheme({
 const language = (path: string): Extension =>
 	path.endsWith(".yaml") ? yaml() : yamlFrontmatter({ content: markdown() });
 const base = (path: string): Extension[] => [
+	drawSelection(),
 	language(path),
 	syntaxHighlighting(highlight),
 	theme,
@@ -172,6 +173,7 @@ export default function CodeEditor({
 	onPosition,
 	comparison,
 	editHistory,
+	reveal,
 }: {
 	content: string;
 	editHistory?: EditorHistory;
@@ -185,7 +187,9 @@ export default function CodeEditor({
 	onSelection?: (value: string) => void;
 	position?: EditorPosition | undefined;
 	onPosition?: (value: EditorPosition) => void;
+	reveal?: DocumentReveal | null;
 }) {
+	const revealed = useRef<string | null>(null);
 	const container = useRef<HTMLDivElement>(null);
 	const activeSide = useRef<"a" | "b">("b");
 	const views = useRef<{ current: EditorView; before?: EditorView; merge?: MergeView } | null>(null);
@@ -513,6 +517,17 @@ export default function CodeEditor({
 			views.current = null;
 		};
 	}, [path, diff, editable, dedicated, unified, editHistory]);
+	useEffect(() => {
+		const view = views.current?.current;
+		if (!view || !reveal || reveal.path !== path || revealed.current === reveal.id) return;
+		revealed.current = reveal.id;
+		const from = Math.min(reveal.from, view.state.doc.length);
+		const to = Math.min(reveal.to, view.state.doc.length);
+		view.dispatch({
+			selection: { anchor: from, head: to },
+			effects: EditorView.scrollIntoView(from, { y: "center" }),
+		});
+	}, [reveal, path]);
 	// 外部改了内容（保存后回读、外部修改）时同步进视图；自己敲出的变化已经等于 content，不会重复 dispatch。
 	useEffect(() => replace(views.current?.current, content), [content]);
 	useEffect(() => {

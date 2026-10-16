@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AgentPanel } from "./agent-panel.js";
+import { captureWorkbenchContext } from "./agent-workbench.js";
 import { bridge, invoke } from "./bridge.js";
 import { checkQuery } from "./check-page.js";
 import { checkNotice } from "./check-result.js";
@@ -34,6 +35,7 @@ import { BacklinksPane, EvidencePane } from "./right-pane.js";
 import { useAutoHideScrollbars } from "./scrollbars.js";
 import { ToolButton } from "./ui-bits.js";
 import { useAgentEditorFiles } from "./use-agent-editor-files.js";
+import { useAgentWorkbench } from "./use-agent-workbench.js";
 import { useComposerWorkspace } from "./use-composer-workspace.js";
 import { useCurrentDocument } from "./use-current-document.js";
 import { useEditorHistory } from "./use-editor-history.js";
@@ -152,6 +154,7 @@ function WorkspaceShell() {
 		locate,
 	} = useWorkspaceGroup(undefined, { onOpen: () => setLibraryOpen(false) });
 	useAgentEditorFiles({ shown, queryClient, refresh });
+	useAgentWorkbench(book, shown);
 	const currentDocument = useCurrentDocument({ state, view, shown, book, setView });
 	const { page, kind, rawPath, file, isBeat, editPath, primary, anyChanged } = currentDocument;
 	const query = view.searchQuery;
@@ -625,6 +628,7 @@ function WorkspaceShell() {
 								completeAttachment={completeAttachment}
 								currentPath={["artifact", "file"].includes(kind) && primary.data ? editPath : ""}
 								currentSelection={selectedText}
+								uiContext={captureWorkbenchContext(layout, book).active}
 								isCurrentProject={isCurrentProject}
 								position={view.conversationPositions[draftKey]}
 								onPosition={(position) => savePosition(draftKey, position)}

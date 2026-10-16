@@ -118,6 +118,11 @@ export class ConfinedExecutionEnv {
 		return { absolute, logical };
 	}
 
+	/** 界面导航也必须经过同一条路径校验，但不触发保存或读取全文。 */
+	async readablePath(path: string): Promise<string> {
+		return (await this.#confine(path)).logical;
+	}
+
 	/** 先验证角色权限，再让编辑器处理自己的缓冲；模型不能借此绕过路径边界。 */
 	async editorFile(request: EditorFileRequest, signal?: AbortSignal): Promise<EditorFileSnapshot | null> {
 		const { logical } = await this.#confine(request.path, request.operation === "resolve");

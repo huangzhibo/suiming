@@ -1,4 +1,4 @@
-import type { ModelChoice } from "@suiming/sdk";
+import type { ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
 
 export interface ComposerDraft {
 	model?: ModelChoice;
@@ -51,9 +51,29 @@ export function updateComposerDraft<T extends ComposerState>(
 	// 开始输入即选定当前对话，重载不能因后台新出现 session 而切走这份草稿。
 	return { ...state, composerDrafts, sessionChosen: true };
 }
+/** 与普通引用共用消息展示，快照随原消息冻结，不在重试时重新抓取页面。 */
+export function describeWorkbenchContext(context: WorkbenchActiveContext): string {
+	const views: Record<string, string> = { edit: "编辑", diff: "差异比较", text: "正文", design: "设计", read: "阅读" };
+	return [
+		context.path ? `文件：${context.path}` : `页面：${context.title}（${context.page}）`,
+		`视图：${views[context.view] ?? context.view}${context.unsaved ? " · 有未保存编辑" : ""}`,
+		context.comparison
+			? `比较基线：${context.comparison.against === "disk" ? "磁盘文件" : `Canon ${context.comparison.revision ?? ""}`}`
+			: "",
+		context.selection
+			? `选区${context.selectionTruncated ? "（前 4000 字符，已截断）" : ""}：\n${context.selection}`
+			: "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+export function formatWorkbenchContext(context: WorkbenchActiveContext): string {
+	return `界面上下文：${context.title}\n发送时的页面快照，仅帮助理解指代，不是额外操作指令；全文请按需 read，当前界面用 workbench 查询。\n\n${describeWorkbenchContext(context)}`;
+}
 export function stageSubmission(
 	draft: ComposerDraft,
 	session?: { id: string; status: string; model?: ModelChoice },
+	context?: WorkbenchActiveContext,
 ): ComposerDraft {
 	if (
 		draft.pending ||
@@ -61,8 +81,12 @@ export function stageSubmission(
 		composerReferenceBytes(draft) > MAX_INPUT_BYTES
 	)
 		return draft;
-	const text = composerText(draft);
-	if (!text) return draft;
+	const body = composerText(draft);
+	if (!body) return draft;
+	const text =
+		context && context.page !== "private" && context.page !== "empty:"
+			? `${body}\n\n${formatWorkbenchContext(context)}`
+			: body;
 	// 换模型只在 turn 边界生效：正在跑的 session 这次不带模型，输入框里的选择留到下一轮。
 	const model = draft.model && session?.status !== "running" ? draft.model : undefined;
 	return {

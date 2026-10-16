@@ -17,9 +17,11 @@ import {
 	telemetryFromEnvironment,
 	useEnvironmentProxy,
 } from "@suiming/runtime";
+import type { WorkbenchContext, WorkbenchRequest } from "@suiming/sdk";
 import { type DesktopCommandFailure, LOCAL_COMMANDS, type LocalCommandName, type WorkspaceChange } from "@suiming/sdk";
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import { editorFilesBridge } from "./editor-files.js";
+import { rendererRequests } from "./renderer-requests.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const renderer = resolve(here, "../../workbench/dist/index.html");
@@ -90,6 +92,12 @@ export function startDesktop(
 		if (!window) throw new Error("编辑器无法启动");
 		return window;
 	}, trusted);
+	const workbench = rendererRequests<WorkbenchRequest, WorkbenchContext>(
+		"suiming:workbench",
+		() => (window?.isVisible() ? window : undefined),
+		trusted,
+		() => false,
+	);
 	function changed(change: WorkspaceChange = "workspace") {
 		pendingChanges.add(change);
 		if (notifying) return;
@@ -169,6 +177,7 @@ export function startDesktop(
 			},
 			telemetry.context,
 			editorFiles.forProject(project.project().id),
+			workbench.forProject(project.project().id),
 		);
 		startupFailure = undefined;
 		const { watch } = await import("node:fs");
@@ -246,7 +255,10 @@ export function startDesktop(
 		window.on("enter-full-screen", syncWindowChrome);
 		window.on("leave-full-screen", syncWindowChrome);
 		window.webContents.on("dom-ready", syncWindowChrome);
-		window.webContents.on("did-start-loading", () => editorFiles.disconnected());
+		window.webContents.on("did-start-loading", () => {
+			editorFiles.disconnected();
+			workbench.disconnected();
+		});
 		window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 		window.webContents.on("will-navigate", (event, url) => {
 			if (!trusted(url)) event.preventDefault();
@@ -267,6 +279,7 @@ export function startDesktop(
 		});
 		window.on("closed", () => {
 			editorFiles.disconnected();
+			workbench.disconnected();
 			window = undefined;
 			if (quitRequested) finishQuit();
 		});

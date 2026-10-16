@@ -1,0 +1,177 @@
+{
+  "sessionId": "session_d1485901083e75d85df73d9d10a399c1ee3c4dafe3cf43f16802097a1a852ca0",
+  "environment": "validation-workbench-context",
+  "contentCapture": false,
+  "turns": 2,
+  "modelCalls": 6,
+  "workbenchCalls": 4,
+  "usage": {
+    "input": 15534,
+    "output": 407,
+    "cacheRead": 26496,
+    "totalTokens": 42437
+  },
+  "usageMatchesSession": true,
+  "parentLinksVerified": true,
+  "status": 200,
+  "count": 12,
+  "meta": {},
+  "observations": [
+    {
+      "id": "db0df850ce58a174",
+      "parentObservationId": "78008185ef215c8b",
+      "traceId": "b1d6bbe0f8ef04c558a053233bd793b9",
+      "name": "suiming.model.call",
+      "type": "GENERATION",
+      "level": "DEFAULT",
+      "model": "gpt-6.1-sol",
+      "usageDetails": {
+        "input": 7659,
+        "output": 37,
+        "input_cache_read": 0,
+        "input_cache_write": 0,
+        "total": 7696
+      }
+    },
+    {
+      "id": "7d1f29ceb50a504e",
+      "parentObservationId": "78008185ef215c8b",
+      "traceId": "b1d6bbe0f8ef04c558a053233bd793b9",
+      "name": "suiming.tool workbench",
+      "type": "TOOL",
+      "level": "DEFAULT",
+      "model": "",
+      "usageDetails": {}
+    },
+    {
+      "id": "5e30f42176ce19d3",
+      "parentObservationId": "78008185ef215c8b",
+      "traceId": "b1d6bbe0f8ef04c558a053233bd793b9",
+      "name": "suiming.model.call",
+      "type": "GENERATION",
+      "level": "DEFAULT",
+      "model": "gpt-6.1-sol",
+      "usageDetails": {
+        "input": 327,
+        "output": 97,
+        "input_cache_read": 7040,
+        "input_cache_write": 0,
+        "total": 7464
+      }
+    },
+    {
+      "id": "250967110c15562d",
+      "parentObservationId": "78008185ef215c8b",
+      "traceId": "b1d6bbe0f8ef04c558a053233bd793b9",
+      "name": "suiming.tool workbench",
+      "type": "TOOL",
+      "level": "DEFAULT",
+      "model": "",
+      "usageDetails": {}
+    },
+    {
+      "id": "512f5361b413f0ad",
+      "parentObservationId": "78008185ef215c8b",
+      "traceId": "b1d6bbe0f8ef04c558a053233bd793b9",
+      "name": "suiming.model.call",
+      "type": "GENERATION",
+      "level": "DEFAULT",
+      "model": "gpt-6.1-sol",
+      "usageDetails": {
+        "input": 365,
+        "output": 18,
+        "input_cache_read": 6784,
+        "input_cache_write": 0,
+        "total": 7167
+      }
+    },
+    {
+      "id": "78008185ef215c8b",
+      "parentObservationId": null,
+      "traceId": "b1d6bbe0f8ef04c558a053233bd793b9",
+      "name": "suiming.turn agent",
+      "type": "SPAN",
+      "level": "DEFAULT",
+      "model": "",
+      "usageDetails": {}
+    },
+    {
+      "id": "f808f4de84602b64",
+      "parentObservationId": "3934f0dce910af5d",
+      "traceId": "8138d741eb0a5245cafe52b5015e93cd",
+      "name": "suiming.model.call",
+      "type": "GENERATION",
+      "level": "DEFAULT",
+      "model": "gpt-6.1-sol",
+      "usageDetails": {
+        "input": 528,
+        "output": 63,
+        "input_cache_read": 6400,
+        "input_cache_write": 0,
+        "total": 6991
+      }
+    },
+    {
+      "id": "ee616b8526d5ce79",
+      "parentObservationId": "3934f0dce910af5d",
+      "traceId": "8138d741eb0a5245cafe52b5015e93cd",
+      "name": "suiming.tool workbench",
+      "type": "TOOL",
+      "level": "DEFAULT",
+      "model": "",
+      "usageDetails": {}
+    },
+    {
+      "id": "314b46d815ae6848",
+      "parentObservationId": "3934f0dce910af5d",
+      "traceId": "8138d741eb0a5245cafe52b5015e93cd",
+      "name": "suiming.model.call",
+      "type": "GENERATION",
+      "level": "DEFAULT",
+      "model": "gpt-6.1-sol",
+      "usageDetails": {
+        "input": 298,
+        "output": 174,
+        "input_cache_read": 6272,
+        "input_cache_write": 0,
+        "total": 6744
+      }
+    },
+    {
+      "id": "41013e167d90fd44",
+      "parentObservationId": "3934f0dce910af5d",
+      "traceId": "8138d741eb0a5245cafe52b5015e93cd",
+      "name": "suiming.tool workbench",
+      "type": "TOOL",
+      "level": "DEFAULT",
+      "model": "",
+      "usageDetails": {}
+    },
+    {
+      "id": "e0fefb44bea1ca80",
+      "parentObservationId": "3934f0dce910af5d",
+      "traceId": "8138d741eb0a5245cafe52b5015e93cd",
+      "name": "suiming.model.call",
+      "type": "GENERATION",
+      "level": "DEFAULT",
+      "model": "gpt-6.1-sol",
+      "usageDetails": {
+        "input": 6357,
+        "output": 18,
+        "input_cache_read": 0,
+        "input_cache_write": 0,
+        "total": 6375
+      }
+    },
+    {
+      "id": "3934f0dce910af5d",
+      "parentObservationId": null,
+      "traceId": "8138d741eb0a5245cafe52b5015e93cd",
+      "name": "suiming.turn agent",
+      "type": "SPAN",
+      "level": "DEFAULT",
+      "model": "",
+      "usageDetails": {}
+    }
+  ]
+}

@@ -249,7 +249,7 @@ export const taskRoleLabel = (kind: string | undefined) =>
 		: ((TASK_ROLE_LABELS as Record<string, string>)[kind] ?? LEGACY_TASK_KINDS[kind] ?? kind);
 
 /** 作者消息里接在原话后面的引用与附件（composerText 拼的），开头是这几种固定前缀之一。 */
-const REFERENCE_PREFIXES = ["作品引用：", "对话引用：", "外部文本附件："];
+const REFERENCE_PREFIXES = ["作品引用：", "对话引用：", "外部文本附件：", "界面上下文："];
 
 export interface MessageReference {
 	/** 给作者看的一行：作品引用用标题与选段位置，附件用文件名。 */
@@ -293,7 +293,7 @@ export function messageReferences(
 		// 对话引用与外部附件：头一段是来源说明，空行之后才是内容。
 		const gap = content.indexOf("\n\n");
 		return {
-			label: prefix === "对话引用：" ? "对话引用" : target,
+			label: prefix === "对话引用：" ? "对话引用" : prefix === "界面上下文：" ? `当前页面 · ${target}` : target,
 			content,
 			quote: gap < 0 ? content : content.slice(gap + 2),
 		};

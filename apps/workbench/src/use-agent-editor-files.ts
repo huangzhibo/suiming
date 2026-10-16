@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { bridge, invoke } from "./bridge.js";
 import { contentFingerprint } from "./composer-state.js";
+import { matchingDocumentPath } from "./document-navigation.js";
 import type { useWorkspaceData } from "./use-workspace-data.js";
 import { savedDocument } from "./view-state.js";
 import { useWorkspace } from "./workspace-context.js";
@@ -27,12 +28,11 @@ export function useAgentEditorFiles({
 		const { id, request } = call;
 		try {
 			if (call.projectId !== projectId || !composerActions.isCurrentProject()) throw new Error("作品已切换，请重试");
-			const path =
-				Object.keys(latest.current.documents).find(
-					(path) =>
-						path === request.path ||
-						(/Mac|Win/.test(navigator.platform) && path.toLowerCase() === request.path.toLowerCase()),
-				) ?? request.path;
+			const path = matchingDocumentPath(
+				request.path,
+				Object.keys(latest.current.documents),
+				/Mac|Win/.test(navigator.platform),
+			);
 			const draft = latest.current.documents[path];
 			if (request.operation === "inspect") {
 				const file = await invoke("workspace.file.read", { path, expectedProjectId: call.projectId }).catch(

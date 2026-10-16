@@ -1,3 +1,5 @@
+import type { RendererCall, RendererReply } from "./workbench.js";
+
 /** 活动编辑器与文件工具之间的临时协作；不保存第二份草稿，不参与 Canon 提交。 */
 export type EditorFileRequest =
 	| { operation: "save"; path: string }
@@ -11,11 +13,5 @@ export type EditorFileHandler = (
 	request: EditorFileRequest,
 	signal?: AbortSignal,
 ) => Promise<EditorFileSnapshot | null>;
-export interface EditorFileCall {
-	id: string;
-	projectId: string;
-	request: EditorFileRequest;
-}
-export type EditorFileReply =
-	| { id: string; ok: true; value: EditorFileSnapshot | null }
-	| { id: string; ok: false; error: string };
+export type EditorFileCall = RendererCall<EditorFileRequest>;
+export type EditorFileReply = RendererReply<EditorFileSnapshot | null>;

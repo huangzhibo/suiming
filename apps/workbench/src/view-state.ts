@@ -102,7 +102,14 @@ export interface EditorPosition {
 	top: number;
 	beforeTop?: number;
 }
+export interface DocumentReveal {
+	id: string;
+	path: string;
+	from: number;
+	to: number;
+}
 export interface PageState {
+	reveal: DocumentReveal | null;
 	page: string;
 	beatView: BeatView;
 	/** 中性导航待实际正文读取后确定一次；历史恢复不重新判断。 */
@@ -149,6 +156,7 @@ export const EMPTY_PAGE = "empty:";
 export function pageState(page = EMPTY_PAGE): PageState {
 	return {
 		page,
+		reveal: null,
 		beatView: "design",
 		resolveContent: false,
 		edit: "read",

@@ -1,4 +1,4 @@
-import type { ModelChoice } from "@suiming/sdk";
+import type { ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "./bridge.js";
@@ -6,6 +6,7 @@ import { CommandError } from "./command-error.js";
 import { type ComposerDraft, type ComposerSubmission, rejectSubmission, stageSubmission } from "./composer-state.js";
 
 export interface ComposerSubmitBinding {
+	uiContext?: WorkbenchActiveContext;
 	composer: ComposerDraft;
 	draftKey: string;
 	session: { id: string; status: string; model?: ModelChoice } | undefined;
@@ -23,6 +24,7 @@ export interface ComposerSubmitBinding {
  */
 export function useComposerSubmit({
 	composer,
+	uiContext,
 	draftKey,
 	session,
 	updateComposer,
@@ -41,7 +43,7 @@ export function useComposerSubmit({
 	async function send(retry?: ComposerSubmission, draft?: ComposerDraft) {
 		if (inFlight.current || !isCurrentProject()) return;
 		const original = draft ?? latest.current;
-		const staged = retry ? latest.current : stageSubmission(original, session);
+		const staged = retry ? latest.current : stageSubmission(original, session, uiContext);
 		const pending = retry ?? staged.pending;
 		if (!pending || (!retry && latest.current.pending)) return;
 		inFlight.current = true;

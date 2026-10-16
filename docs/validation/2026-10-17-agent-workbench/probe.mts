@@ -1,0 +1,87 @@
+/** 真实模型 + 隔离 Electron，沿用加锁凭据存储，作品与应用数据完全隔离。 */
+import assert from "node:assert/strict";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { LocalProjectService, materializeOpenStoryDirectorySnapshot } from "@suiming/runtime";
+import { CheckpointArchive } from "../../../packages/runtime/dist/harness/checkpoint-archive.js";
+import type { DesktopBridge } from "@suiming/sdk";
+import { sampleWorkFiles } from "../../../packages/runtime/test/sample-work.js";
+import { collectPageErrors, eventually, launchDesktop, waitForSessionIdle } from "../../../apps/desktop/test/launch.js";
+
+declare const window: { suiming: DesktopBridge };
+const output=resolve("docs/validation/2026-10-17-agent-workbench");
+const directory=await mkdtemp(join(tmpdir(),"suiming-workbench-real-"));
+const root=join(directory,"work");await mkdir(root);
+await materializeOpenStoryDirectorySnapshot(root,sampleWorkFiles());
+await writeFile(join(root,"讨论备忘.md"),"渡口原文。\n夜里封锁渡口。\n等待下一步。\n");
+await writeFile(join(root,"未定稿.md"),"保留磁盘原文。\n");
+(await LocalProjectService.init({checkoutPath:root})).close();
+await copyFile(process.env.SUIMING_CONFIG_PATH??join(homedir(),".suiming/config.toml"),join(directory,"config.toml"));
+const telemetry=Object.fromEntries(Object.entries(process.env).filter(([key,value])=>key.startsWith("LANGFUSE_")&&value!==undefined)) as Record<string,string>;
+const app=await launchDesktop({directory,project:root,flags:["--unconfigured-model-test"],env:{...telemetry,SUIMING_AUTH_PATH:process.env.SUIMING_AUTH_PATH??join(homedir(),".suiming/auth.json"),SUIMING_TELEMETRY_CONTENT:"false",SUIMING_TELEMETRY_ENVIRONMENT:"validation-workbench-context"}});
+const page=await app.firstWindow();page.setDefaultTimeout(15000);
+const errors=collectPageErrors(page);
+let completed=false;
+try{
+ await page.getByRole("heading",{name:"beat-0001",exact:true}).waitFor();
+ await page.keyboard.press("Meta+t");
+ await page.getByRole("textbox",{name:"搜索对象或文件",exact:true}).fill("未定稿.md");
+ await page.keyboard.press("Enter");
+ await page.getByRole("button",{name:"切换到编辑视图",exact:true}).click();
+ const editor=page.getByLabel("编辑文件内容",{exact:true});
+ await editor.fill("作者仍在推敲的草稿。\n这句话尚未定稿。");
+ await editor.press("Meta+a");
+ const draftTab=await page.locator('.tab-btn[data-active="true"]').getAttribute("data-tab-id");
+ const input=page.getByRole("textbox",{name:"输入消息",exact:true});
+ const before=await page.evaluate(()=>window.suiming.invoke("workspace.show",{}));
+ const started=Date.now();
+ await input.fill("先告诉我当前看的文件是什么，以及我选中的内容。然后请在工作台打开讨论备忘.md，定位到‘夜里封锁渡口。’。只做界面展示，不保存或修改任何文件，不提交版本，不委派。");
+ await page.getByRole("button",{name:"发送",exact:true}).click();
+ let sessionId="";
+ await eventually(async()=>{sessionId=(await page.evaluate(()=>window.suiming.invoke("session.list",{}))).sessions[0]?.id??"";return !!sessionId},"真实对话创建");
+ await input.fill("后续想法尚未发送");
+ await waitForSessionIdle(page,sessionId,1,180000);
+ assert.match(await editor.innerText(),/夜里封锁渡口/);
+ assert.equal(await input.inputValue(),"后续想法尚未发送");
+ assert.equal(await input.evaluate(e=>e===e.ownerDocument.activeElement),true);
+ await input.fill("现在把未定稿.md的作者草稿与磁盘内容的差异展示给我。不要保存、改写、丢弃或提交任何内容，只展示差异。");
+ await page.getByRole("button",{name:"发送",exact:true}).click();
+ await input.fill("继续保留这句未发送的话");
+ await waitForSessionIdle(page,sessionId,2,180000);
+ await page.locator(".cm-mergeView").waitFor();
+ assert.equal(await readFile(join(root,"未定稿.md"),"utf8"),"保留磁盘原文。\n");
+ assert.equal((await page.evaluate(()=>window.suiming.invoke("workspace.show",{}))).revisionId,before.revisionId);
+ await page.screenshot({path:join(output,"desktop.png")});
+ await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0]?.setSize(960,640));
+ await page.waitForFunction(()=>(globalThis as unknown as {innerWidth:number}).innerWidth===960);
+ await page.evaluate(()=>new Promise<void>(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>done()))));
+ await page.getByRole("button",{name:"查看自动附带的界面上下文"}).click();
+ await page.getByText("发送时附带当前页面和选区，全文由 Agent 按需读取。",{exact:true}).waitFor();
+ await page.locator('[data-slot="popover-content"]').evaluate(async node=>{await Promise.all(node.getAnimations().map((animation: {finished:Promise<unknown>})=>animation.finished))});
+ await page.screenshot({path:join(output,"narrow-context.png")});
+ await page.keyboard.press("Escape");
+ await page.locator(`[data-tab-id="${draftTab}"]`).click();
+ assert.match(await editor.innerText(),/作者仍在推敲的草稿/);
+ await page.reload();await editor.waitFor();
+ assert.match(await editor.innerText(),/这句话尚未定稿/);
+ assert.equal(await input.inputValue(),"继续保留这句未发送的话");
+ assert.deepEqual(errors,[]);
+ const sessions=await page.evaluate(()=>window.suiming.invoke("session.list",{}));
+ const project=await LocalProjectService.open(root);
+ let actions:{call:{name:string;arguments:Record<string,unknown>}}[]=[];
+ try{
+  const ref=project.createExecutionState().session(sessionId).checkpointRef??assert.fail("缺少 checkpoint");
+  const state=await new CheckpointArchive(project).read((await project.readExecutionObject(ref.id)).bytes) as {loop:{actions:typeof actions}};
+  actions=state.loop.actions;
+  assert.ok(actions.some(a=>a.call.name==="workbench"&&a.call.arguments.action==="open"));
+  assert.ok(actions.some(a=>a.call.name==="workbench"&&a.call.arguments.action==="diff"));
+ }finally{project.close()}
+ await writeFile(join(output,"real-measurements.json"),JSON.stringify({passed:true,sessionId,elapsedMs:Date.now()-started,tools:actions.map(a=>({name:a.call.name,action:a.call.arguments.action??null})),sessions,errors,canonUnchanged:true,draftPreserved:true,focusPreserved:true},null,2));
+ console.log(JSON.stringify({passed:true,sessionId}));completed=true;
+}finally{
+ if(!completed)await page.screenshot({path:join(directory,"failure.png")}).catch(()=>undefined);
+ await app.close();
+ if(completed)await rm(directory,{recursive:true,force:true});
+ else console.error(`验收副本保留：${directory}`);
+}

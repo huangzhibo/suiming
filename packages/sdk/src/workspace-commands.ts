@@ -17,6 +17,7 @@ import {
 import type { EditorFileCall, EditorFileReply } from "./editor-files.js";
 import { ProductEventSchema, type SessionEvent, type SessionEventBody, SessionEventSchema } from "./run-event.js";
 import { USAGE_CHECKPOINT_TOKENS } from "./usage-checkpoint.js";
+import type { WorkbenchCall, WorkbenchReply } from "./workbench.js";
 
 const id = Type.String({ minLength: 1 });
 
@@ -477,6 +478,7 @@ export interface DesktopCommandFailure {
 	diagnostics?: Static<typeof checkDiagnosticSchema>[];
 }
 export interface DesktopBridge extends LocalCommandClient {
+	onWorkbench(listener: (call: WorkbenchCall, cancelled: () => boolean) => Promise<WorkbenchReply>): () => void;
 	onEditorFile(listener: (call: EditorFileCall) => Promise<EditorFileReply>): () => void;
 	/** 通过系统保存对话框导出文字副本，不写入作品 Artifact。 */
 	exportConversation(content: string): Promise<boolean>;

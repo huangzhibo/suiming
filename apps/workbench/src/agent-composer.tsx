@@ -1,3 +1,4 @@
+import type { WorkbenchActiveContext } from "@suiming/sdk";
 import { ArrowUp, FileText, Loader2, Plus, RotateCcw, Square, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
 	type ComposerDraft,
 	composerReferenceBytes,
 	composerText,
+	describeWorkbenchContext,
 	MAX_INPUT_BYTES,
 	textFileAttachment,
 } from "./composer-state.js";
@@ -28,6 +30,7 @@ import { Hint } from "./ui-bits.js";
 import { useComposerSubmit } from "./use-composer-submit.js";
 
 export interface ComposerBinding {
+	uiContext?: WorkbenchActiveContext;
 	composer: ComposerDraft;
 	draftKey: string;
 	updateComposer(key: string, update: (draft: ComposerDraft) => ComposerDraft, persist?: boolean): void;
@@ -54,6 +57,7 @@ export function AgentComposer({
 }) {
 	const {
 		composer,
+		uiContext,
 		draftKey,
 		updateComposer,
 		onSubmitted,
@@ -64,6 +68,7 @@ export function AgentComposer({
 		isCurrentProject,
 	} = binding;
 	const { busy, setBusy, error, setError, submit } = useComposerSubmit({
+		...(uiContext ? { uiContext } : {}),
 		composer,
 		draftKey,
 		session,
@@ -211,6 +216,30 @@ export function AgentComposer({
 						</Button>
 					)}
 				</div>
+			)}
+			{uiContext && uiContext.page !== "private" && uiContext.page !== "empty:" && (
+				<Popover>
+					<PopoverTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="xs"
+								className="mb-1 max-w-full"
+								aria-label="查看自动附带的界面上下文"
+							/>
+						}
+					>
+						<FileText />
+						<span className="truncate">
+							{uiContext.title}
+							{uiContext.selection ? " · 选区" : ""}
+						</span>
+					</PopoverTrigger>
+					<PopoverContent align="start" className="max-h-64 overflow-auto text-xs">
+						<p className="mb-2 text-muted-foreground">发送时附带当前页面和选区，全文由 Agent 按需读取。</p>
+						<pre className="whitespace-pre-wrap break-words font-sans">{describeWorkbenchContext(uiContext)}</pre>
+					</PopoverContent>
+				</Popover>
 			)}
 			{attachments.length > 0 && (
 				<div className="composer-attachments mb-2 flex max-h-40 flex-col gap-1.5 overflow-auto">

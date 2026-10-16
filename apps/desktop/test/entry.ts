@@ -252,6 +252,73 @@ if (process.argv.includes("--editor-missing-test")) {
 		fauxAssistantMessage("已按要求恢复甲的草稿，尚未提交版本。"),
 	]);
 }
+if (process.argv.includes("--workbench-test") || process.argv.includes("--workbench-race-test")) {
+	let location = "";
+	const snapshot = (context: Parameters<FauxResponseFactory>[0]) => {
+		const message = context.messages.at(-1);
+		assert.equal(message?.role, "toolResult");
+		if (message?.role !== "toolResult") throw new Error("Missing tool result");
+		const text = message.content.find((part) => part.type === "text");
+		assert.ok(text?.type === "text");
+		return JSON.parse(text.text) as {
+			location: string;
+			active: { path: string; view: string; comparison?: { against: string } };
+		};
+	};
+	const race = process.argv.includes("--workbench-race-test");
+	provider.setResponses([
+		async (context) => {
+			assert.match(JSON.stringify(context.messages), /界面上下文：/);
+			return fauxAssistantMessage(fauxToolCall("workbench", { action: "context" }));
+		},
+		async (context) => {
+			const result = snapshot(context);
+			assert.equal(result.active.path, "甲.md");
+			location = result.location;
+			await gate("ui-open");
+			return fauxAssistantMessage(
+				fauxToolCall("workbench", {
+					action: "open",
+					path: "乙.md",
+					line: 2,
+					quote: "乙的第二行",
+					expectedLocation: location,
+				}),
+			);
+		},
+		async (context) => {
+			if (race) {
+				assert.match(JSON.stringify(context.messages.at(-1)), /切换页面|重载|关闭/);
+				return fauxAssistantMessage("作者现场已变化，未执行迟到导航。");
+			}
+			const result = snapshot(context);
+			assert.equal(result.active.path, "乙.md");
+			assert.equal(result.active.view, "edit");
+			location = result.location;
+			return fauxAssistantMessage(
+				fauxToolCall("workbench", {
+					action: "open",
+					path: "乙.md",
+					line: 2,
+					quote: "乙的第二行",
+					expectedLocation: location,
+				}),
+			);
+		},
+		async (context) => {
+			location = snapshot(context).location;
+			await gate("ui-diff");
+			return fauxAssistantMessage(
+				fauxToolCall("workbench", { action: "diff", path: "甲.md", against: "disk", expectedLocation: location }),
+			);
+		},
+		async (context) => {
+			const result = snapshot(context);
+			assert.equal(result.active.comparison?.against, "disk");
+			return fauxAssistantMessage("已定位第二行并展示草稿与磁盘差异，文件未修改。");
+		},
+	]);
+}
 if (process.argv.includes("--editor-sync-test")) {
 	provider.setResponses([
 		async () => {

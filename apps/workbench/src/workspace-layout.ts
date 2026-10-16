@@ -237,6 +237,7 @@ export function normalizePage(value: PageState): PageState {
 	return {
 		...defaults,
 		...Object.fromEntries(Object.entries(value).filter(([key]) => key in defaults)),
+		reveal: null,
 		scrolls: { ...(value.scrolls ?? {}) },
 		beatView: value.beatView === "text" ? "text" : "design",
 		edit: value.edit === "edit" ? "edit" : "read",
