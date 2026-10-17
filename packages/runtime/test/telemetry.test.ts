@@ -118,6 +118,23 @@ test("Langfuse 导出参数：OTLP HTTP traces 端点与 Basic auth；没有 key
 	await langfuse.shutdown(200);
 });
 
+test("Langfuse 地址写错只关掉观测，不挡住模型调用", (t) => {
+	// 2026-10-17 留出评测：.env 里带引号的地址原样进了环境变量，OTLP 导出器构造时抛错，session send 整轮报 internal_error。
+	const printed: string[] = [];
+	t.mock.method(console, "error", (line: string) => printed.push(line));
+	const telemetry = telemetryFromEnvironment({
+		LANGFUSE_PUBLIC_KEY: "pk",
+		LANGFUSE_SECRET_KEY: "sk",
+		LANGFUSE_BASE_URL: '"http://localhost:3000"',
+	});
+	assert.equal(telemetry, NOOP_TELEMETRY);
+	assert.ok(printed.some((line) => line.includes("langfuse_base_url_invalid")));
+	assert.ok(
+		printed.every((line) => !line.includes("sk")),
+		"诊断不带密钥",
+	);
+});
+
 test("关联维度传给子 observation，Task 覆盖父值，用量与错误不继承", async () => {
 	const { exporter, telemetry } = harness();
 	await telemetry.context.startSpan(

@@ -362,12 +362,17 @@ export function telemetryFromEnvironment(
 		if (publicKey || secretKey) console.error("[Suiming telemetry] langfuse_credentials_incomplete");
 		return NOOP_TELEMETRY;
 	}
+	const baseUrl = environment.LANGFUSE_BASE_URL?.trim() || LANGFUSE_DEFAULT_BASE_URL;
+	// 地址写错（比如带着引号）只关掉观测：导出器构造时会抛错，原来整轮 session send 跟着报 internal_error。
+	if (!/^https?:$/u.test(URL.parse(baseUrl)?.protocol ?? "")) {
+		console.error("[Suiming telemetry] langfuse_base_url_invalid");
+		return NOOP_TELEMETRY;
+	}
 	if (environment.SUIMING_TELEMETRY_CONTENT && !["true", "false"].includes(environment.SUIMING_TELEMETRY_CONTENT))
 		console.error("[Suiming telemetry] telemetry_content_invalid_disabled");
 	console.error(
 		`[Suiming telemetry] langfuse_enabled content=${environment.SUIMING_TELEMETRY_CONTENT === "true" ? "on" : "off"}`,
 	);
-	const baseUrl = environment.LANGFUSE_BASE_URL?.trim();
 	return createLangfuseTelemetry({
 		...source,
 		environment: environment.SUIMING_TELEMETRY_ENVIRONMENT?.trim() || "local",
@@ -376,7 +381,7 @@ export function telemetryFromEnvironment(
 		redactValues: Object.entries(environment)
 			.filter(([key]) => /KEY|TOKEN|SECRET|PASSWORD/iu.test(key))
 			.flatMap(([, value]) => (value ? [value] : [])),
-		baseUrl: baseUrl === undefined || baseUrl.length === 0 ? LANGFUSE_DEFAULT_BASE_URL : baseUrl,
+		baseUrl,
 		publicKey,
 		secretKey,
 	});
