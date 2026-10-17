@@ -127,6 +127,11 @@ export interface TaskLoopOptions {
 	onSteer?(text: string, sequence: number): void;
 	/** 作者消息进消息列表前的确定性附注（head、候选状态）；只改进模型看到的文本，事件里仍是原话。 */
 	decorateSteering?(text: string, sequence: number): string | Promise<string>;
+	/**
+	 * 目标的自动续跑（ADR-0038）：模型上一轮停下、没有作者新消息时，把这条系统写的 user 消息接进消息列表，
+	 * 再开一次请求。它不是作者说的，不进 inbox，也不推进 steeringSequence。
+	 */
+	continuation?: string;
 }
 export interface TaskLoopOutcome {
 	stop: "terminated" | "model_stopped" | "budget_exhausted";
@@ -477,6 +482,14 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 			const result = await finishTerminated();
 			if (result) return result;
 		}
+	}
+	if (options.continuation !== undefined && state.phase === "ready" && state.messages.at(-1)?.role === "assistant") {
+		// 和作者在模型停下之后说话一样是一个边界：上一轮读过的大结果可以折
+		state.boundary = state.messages.length;
+		state.messages.push({ role: "user", content: options.continuation, timestamp: Date.now() });
+		delete state.repeated;
+		delete state.rejectedStreak;
+		await save();
 	}
 	check();
 	// 没有拿到可用回复的调用（打断、provider 报错、输出被截断）不能把下一次续跑也钉死在同一个错误上：

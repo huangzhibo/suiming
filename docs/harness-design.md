@@ -70,6 +70,8 @@ Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两�
 
 调研来源与落盘数（第 8 节）随切片 E 加进来。「作者目标是否达成」由作者看作品定，系统不判。
 
+**目标（goal）：作者主动开的自动续跑**（[ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md)）。作者用 `session.send` 带 `goal: true`（CLI `suim session goal set`）把一句话设为对话的目标，记在 Session 记录的 `goal` 上，是执行数据不是作品事实。turn 结束时目标仍 active、inbox 也没有作者新消息，`LocalSessionController` 就开下一轮：`harness.turn` 带 `continueGoal`，loop 把一条系统写的「按作者设定的目标继续」接进消息列表（不进 inbox，不算作者消息，对账里 `authorMessages` 是 0），并发一条 `suiming.progress`。完成与「需要作者拍板」由模型用 `update_goal` 标 complete / blocked，标完成时工具结果附上检查结论、未提交、未写正文与过时审稿这几项事实，系统不据此否决。续跑在这几处停下：模型标了 complete / blocked；turn 非正常结束（`lastFailure`，包括用量检查点，目标仍 active，作者说「继续」就接着跑）；自动续的一轮作品文件与版本都没变（目标标 blocked，写明原因）；作者停止或应用退出（目标转 paused，`resume` 才续）。作者回一句话就把 blocked 的目标改回 active；作者只在对话停着时改目标，跑着时 Session 记录只归持有 turn 的进程写。它不是第 16 节删掉的 `finish` 与交付协议：那是每一轮都必须声明交付、由系统判断是否达成；goal 是作者开的、不开时一切照旧、完成由模型判断，Codex 的 `/goal` 与 Claude Code 的 `/goal` 是同类。
+
 **未提交候选就是脏的 checkout。**候选就在 checkout 里，`project.diff` 看得见（作者、host agent 与 Agent 的改动是同一份 diff），下一个 turn 可以继续或提交。候选不能静默丢失，这一点由 checkout 本身加 turn 结束的对账保证，不靠交付协议。
 
 **`interrupt`** 是唯一的停止命令：中止当前模型调用（checkpoint 记 `interrupted`，下次续接时弹掉半截响应）和正在跑的子任务，消息列表原样，回 `idle`；被打断的动作下次续接时补「被打断」的结果（第 5 节）。取消不回滚已提交作品。
@@ -322,7 +324,7 @@ checkpoint 的写入为此排队：快照在调用时同步取，后取的一定
 
 **没有预算，有每轮用量检查点。**创作路径不设调用次数、token 或花费上限：曾经的 `RunBudget`（maxModelCalls / maxTotalTokens / maxCostUsd）默认就是空对象，没有一个真实 Run 设过它，按次或按量的上限还会误砍正常产出。根 Agent 与子任务的 `maxTurns` 都是 `Number.MAX_SAFE_INTEGER`，唯一的上限是 `rank-experiment.ts` 里评委的 `JUDGE_MAX_TURNS = 3`。留下的是**用量**：session 累计的已知 usage 与未确认调用数照常显示（作废的请求可能已计费，作者看的就是它），在途调用可能超出估计，缺失用量不能当作已确认的零。
 
-**每轮用量检查点**（2026-10-04 加）：一个 turn 里根 Agent 与全部子任务的折算用量合计到 `TURN_USAGE_CHECKPOINT_TOKENS`（600 万），下一次请求之前停下，turn 回 `idle`，`lastFailure` 记 `turn_usage_checkpoint` 并说明用了多少、按目录价估算花了多少。折算用量（`weightedUsage`）是未缓存输入与缓存写按一、缓存读按一成、输出按五倍，取主流模型目录价的大致比例，不随单价变。子任务不算失败（算失败的话父模型会重派一个、从头再花一遍），turn 收口时标 interrupted；作者说一句「继续」，根 Agent 看到被打断的委派，用 `resume_task` 让子任务从自己的 checkpoint 接着跑。它与预算的区别：不砍任何产出，不替作者判断值不值，只保证没人看着时一轮最多用掉这么多。起因是 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92（[验证记录](validation/2026-10-04-sanguo-example/README.md)）——那个循环当天修了，但循环长什么样事先列不全，兜底必须与形状无关。
+**每轮用量检查点**（2026-10-04 加）：一个 turn 里根 Agent 与全部子任务的折算用量合计到 `TURN_USAGE_CHECKPOINT_TOKENS`（600 万），下一次请求之前停下，turn 回 `idle`，`lastFailure` 记 `turn_usage_checkpoint` 并说明用了多少、按目录价估算花了多少。折算用量（`weightedUsage`）是未缓存输入与缓存写按一、缓存读按一成、输出按五倍，取主流模型目录价的大致比例，不随单价变。子任务不算失败（算失败的话父模型会重派一个、从头再花一遍），turn 收口时标 interrupted；作者说一句「继续」，根 Agent 看到被打断的委派，用 `resume_task` 让子任务从自己的 checkpoint 接着跑。它与预算的区别：不砍任何产出，不替作者判断值不值，只保证没人看着时一轮最多用掉这么多。**目标自动续的轮次与作者开的那一轮共用一个窗口**（`TurnOptions.usageCarried`）：作者说一句话才重新计，所以有了目标，没人看着时的上限也不变（`goal.test.ts` 守着）。起因是 2026-10-04 抽三国时 5 个补全子任务在压缩里空转了 19 分钟、估算 $92（[验证记录](validation/2026-10-04-sanguo-example/README.md)）——那个循环当天修了，但循环长什么样事先列不全，兜底必须与形状无关。
 
 单位为什么是折算用量。当天先做的是按美元（$10）停，作者指出不同模型成本不一样：同样一次斗破整本抽取，按目录价在 GPT-6.1 Sol 上约 $15、DeepSeek Flash 上约 $1、Claude Opus 5.5 上约 $30。一个美元数对便宜模型等于放任空转（DeepSeek 上空转要烧掉十倍于最重正常任务的量才停），对贵模型又频繁打断正常工作；一轮里根、writer、reviewer 也可能是不同模型，只有与单价无关的量能相加。原始 token 总数也不行：三国空转 4,844 万、斗破整本抽取 3,949 万，分不开——空转几乎全是未缓存请求（缓存命中 6%），正常的长任务大多命中缓存。折算之后空转 4,620 万、斗破整本抽取 880 万、三国分段加整合 485 万，差得开。600 万的依据就是这三个数：最重的正常单轮撞线一次，三国那种一轮做完，空转在七分之一处停。换成钱，在 GPT-6.1 Sol 上约 $12、DeepSeek Flash 约 $1.7、Claude Opus 约 $24，对应的是同样的工作量。在途的请求照常收完，超出的只有它们（并行的同组子任务各多一次）。阈值作者自己调：桌面在设置页「模型配置」的默认模型下面（200 万 / 600 万 / 2,000 万 / 6,000 万几档，按默认模型的目录输入单价标出约合多少钱），`suim` 读 config.toml 的 `session.usage_checkpoint`（同一份文件，范围见 `USAGE_CHECKPOINT_TOKENS`）；每个 turn 开始读一次，改了下一轮生效。不设「关闭」：停下不丢任何进度，要整夜跑就调大。为什么开放调整而形状规则写死：别人的形状规则都写死（Gemini CLI 只给一个整体关闭的开关，OpenHands 不开放），有上限的都让作者调（Roo Code 设置页的 Max Requests / Max Cost、OpenHands 的 `max_budget_per_task`、Gemini CLI 的 `maxSessionTurns`）；默认开着又不能调的只有 Cursor 早年的 25 次工具调用，论坛上抱怨最多，后来付费版取消。我们的检查点默认开着，就得能调。
 
@@ -464,7 +466,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 **拆**（都已从代码里删掉，不要重建；为什么在括号里的节）
 
 - 执行模型：Conversation / Run / Attempt 与 Run 的七态状态机、per-session worktree（`worktree.ts`、三方合并、`run_merge_conflict`、`run.diff`）、`plan` / `execute_task`（第 2 节）；对应的 SQLite 表与 eval-022 的旧 Run 和事件（第 12 节）。
-- 交付与交互：`finish` 与交付协议、`ask_author`、`read_conversation`、历史文本注入（`conversation-context.ts`）、steering 序号核对（第 3、4 节）。
+- 交付与交互：`finish` 与交付协议、`ask_author`、`read_conversation`、历史文本注入（`conversation-context.ts`）、steering 序号核对（第 3、4 节）。2026-10-17 的目标（goal）不是它们回来了：作者主动开、不开时照旧，完成由模型用 `update_goal` 标（第 3 节）。
 - 权限预设：scope 与 `run.design` / `run.write` 等入口、`writable()` 与 `writableRoots`、`delegate` 的 `writablePaths`、`review_scope_mismatch`（第 6、9 节）。
 - 预算与暂停：`RunBudget` 及其预留记账、`budget_exceeded`、CLI 的 `--max-*`、桌面的预算展示；`paused` 的另外五种原因（第 10 节）。2026-10-04 加的每轮用量检查点不是它们回来了：不砍产出、不停下等作者，作者一句话就续。
 - 半途核对（2026-10-06）：剩下的三种 `paused` 与 `session.resume`、CLI 的 `session resume --retry-unknown` 与 `session interrupt`、桌面的「继续 / 确认重新请求模型 / 放弃这次核对」；checkpoint 的 `binding` hash 与 `binding_mismatch`；工具的 `replay` / `prepare` / `reconcile` 与持久 journal；`task_stopped_by_author` 与 `AuthorStop`（第 5 节，[方案](history/recovery-simplification.md)）。

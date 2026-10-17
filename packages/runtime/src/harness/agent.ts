@@ -1,4 +1,5 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
+import type { SessionGoal } from "@suiming/sdk";
 import { sha256Hex } from "@suiming/story";
 import { Value } from "typebox/value";
 import { sourceCoverage } from "../artifact/derived.js";
@@ -13,7 +14,16 @@ import { renderSourceRange } from "./source-context.js";
 import { sourceTools } from "./source-tools.js";
 import type { HarnessSession, RootLoopOutcome, TaskHandle, TaskSpec } from "./suiming-harness.js";
 import { type HarnessTool, ToolRejection } from "./tool.js";
-import { checkTool, compactContextTool, fileTools, frameTool, impactTool, searchTool, submitTool } from "./tools.js";
+import {
+	checkTool,
+	compactContextTool,
+	fileTools,
+	formatCheck,
+	frameTool,
+	impactTool,
+	searchTool,
+	submitTool,
+} from "./tools.js";
 import { workbenchTools } from "./workbench-tool.js";
 import { compileWriteContext } from "./write-context.js";
 import {
@@ -493,9 +503,10 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 		systemPrompt: withConstitution(AGENT_PROMPT),
 		prompt: await workSnapshot(session, "会话开始"),
 		refreshOpening: () => workSnapshot(session, "压缩上下文"),
+		...(session.continuingGoal && session.goal !== undefined ? { continuation: goalContinuation(session.goal) } : {}),
 		decorateInbox: async (text) => {
 			const current = await readProjectStatus(project, await session.scan(), { stale: false });
-			return `${text}\n\n[系统附注：收到这条消息时，版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个；${COLLABORATION_NOTE[session.collaboration]}。此后修改不更新本附注，最新状态用 project_status 查询]`;
+			return `${text}\n\n[系统附注：收到这条消息时，版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个；${COLLABORATION_NOTE[session.collaboration]}${goalNote(session.goal)}。此后修改不更新本附注，最新状态用 project_status 查询]`;
 		},
 		tools: (handle) => {
 			// 协作模式由工具面保证（ADR-0038）：讨论只给读的，协作不给 commit；整个 turn 用同一个模式。
@@ -516,6 +527,7 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 					extractionPlan: SOURCE_EXTRACTION_PLAN,
 				}),
 				...(mode === "discuss" ? [] : [delegate, reviewTool, resumeTask(session, [delegate, reviewTool])]),
+				...(session.goal?.status === "active" ? [updateGoalTool(session, handle)] : []),
 				{
 					name: "write_context",
 					description:
@@ -559,6 +571,60 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 			return mode === "autonomous" ? tools : tools.filter((tool) => tool.name !== "commit");
 		},
 	});
+}
+
+/** 作者消息的附注里点明进行中的目标（ADR-0038）；目标原文太长时截断，全文在续跑消息里。 */
+function goalNote(goal: SessionGoal | undefined): string {
+	if (goal?.status !== "active") return "";
+	const objective =
+		[...goal.objective].length > 200 ? `${[...goal.objective].slice(0, 200).join("")}…` : goal.objective;
+	return `；当前目标（作者设定）：${objective}——全部做到或需要作者拍板时用 update_goal 标记`;
+}
+
+/**
+ * 目标自动续跑那一轮接进消息列表的系统消息（ADR-0038）。措辞参照 Codex 的 goal 续跑：目标跨轮保留、
+ * 不缩小目标、有证据才标完成；我们多一条「需要作者拍板就标 blocked 并问清楚」，因为创作里的取舍常常不归 Agent 定。
+ */
+function goalContinuation(goal: SessionGoal): string {
+	return [
+		`[系统：按作者设定的目标继续（自动续跑第 ${goal.autoTurns} 轮）。这条不是作者的新消息。]`,
+		`目标：${goal.objective}`,
+		"- 目标跨轮保留：这一轮做不完就做出实在的进展，不要把目标缩小成这一轮做得完的部分。",
+		"- 以作品现状为准，需要时先看 project_status 与相关文件，再决定下一步。",
+		"- 全部要求都做到、有证据时，用 update_goal 标 complete 并写明依据；还差什么就接着做，不要提前标完成。",
+		"- 意图与 Design 都定不下来、需要作者拍板的取舍，用 update_goal 标 blocked，在回复里把问题问清楚，然后停下。",
+	].join("\n");
+}
+
+const UpdateGoalSchema = Type.Object(
+	{
+		status: Type.Union([Type.Literal("complete"), Type.Literal("blocked")], {
+			description: "complete：全部要求都做到；blocked：需要作者拍板或做不下去",
+		}),
+		reason: Type.String({ minLength: 1, description: "complete 写依据，blocked 写要作者决定的事" }),
+	},
+	{ additionalProperties: false },
+);
+
+/** 只在有进行中的目标时声明。标完成时附上系统核对的事实（检查结论、未提交、未写正文、过时审稿），不替模型判断。 */
+function updateGoalTool(session: HarnessSession, handle: TaskHandle): HarnessTool<typeof UpdateGoalSchema> {
+	return {
+		name: "update_goal",
+		description:
+			"作者给这段对话设了目标时才有。目标的全部要求都做到、有证据时标 complete，reason 写依据；意图与 Design 都定不下来、需要作者拍板的取舍标 blocked，reason 写要作者决定什么，并在回复里问清楚。标完照常写回复，然后停下。",
+		parameters: UpdateGoalSchema,
+		async execute(id, params: Static<typeof UpdateGoalSchema>) {
+			session.markGoal(`${session.sessionId}:goal:${id}`, params.status, params.reason);
+			if (params.status === "blocked")
+				return text("续跑已停下，等作者答复。在回复里把要作者决定的事问清楚，然后停下。");
+			const candidate = await handle.scan();
+			const status = await readProjectStatus(session.projectPort, candidate);
+			const verdict = formatCheck(candidate).split("\n")[0] ?? "";
+			return text(
+				`目标已标为完成。系统核对（只陈述事实）：检查 ${verdict}；未提交的文件 ${status.candidate.uncommittedChanges} 个；还没有正文的 Beat ${status.candidate.unwrittenBeats} 个；过时的审稿 ${status.stale?.reviews.count ?? 0} 份。回复里如实告诉作者这些。`,
+			);
+		},
+	};
 }
 
 /** 收到作者消息时附注里的协作模式说明（ADR-0038）：工具面已经保证了边界，这句让模型知道为什么、该怎么交代。 */

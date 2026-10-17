@@ -495,6 +495,7 @@ export class LocalWorkspace implements LocalCommandClient {
 						...(args.model === undefined ? {} : { model: args.model }),
 						...(binding === undefined ? {} : { binding }),
 						...(args.mode === undefined ? {} : { mode: args.mode }),
+						...(args.goal === true ? { goal: true } : {}),
 						onEvent: () => this.#changed("stream"),
 					});
 					this.#changed();
@@ -502,6 +503,20 @@ export class LocalWorkspace implements LocalCommandClient {
 						.completion(result.sessionId)
 						.catch(() => undefined)
 						.finally(() => this.#changed());
+					return result;
+				});
+			}
+			case "session.goal": {
+				const args = input as LocalCommandInput<"session.goal">;
+				return this.#once(args.commandId, { command, args }, async () => {
+					const controller = await this.#controller();
+					const result = await controller.updateGoal(args);
+					this.#changed();
+					if (args.action === "resume")
+						void controller
+							.completion(args.sessionId)
+							.catch(() => undefined)
+							.finally(() => this.#changed());
 					return result;
 				});
 			}

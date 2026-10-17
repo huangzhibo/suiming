@@ -490,6 +490,48 @@ test("session send --mode 设协作模式并随对话保留；取值写错报用
 	}
 });
 
+test("session goal set 一直跑到 Agent 标完成才返回；动作或参数写错报用法错误", async () => {
+	const checkoutPath = await fixture();
+	try {
+		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
+		const providerId = "suiming-cli-goal-faux";
+		const provider = fauxProvider({ provider: providerId, models: [{ id: "agent-model" }] });
+		provider.setResponses([
+			fauxAssistantMessage(
+				fauxToolCall("edit", {
+					path: "outline/story/vol-0001/beat-0001.md",
+					oldText: "杖责五十",
+					newText: "杖责六十",
+				}),
+			),
+			fauxAssistantMessage("先改了一处。"),
+			fauxAssistantMessage(fauxToolCall("update_goal", { status: "complete", reason: "改好了" })),
+			fauxAssistantMessage("目标完成。"),
+		]);
+		const models = createModels();
+		models.setProvider(provider.provider);
+		const profile = { provider: providerId, model: "agent-model" };
+		const gateway = new ModelGateway(models, { profiles: { main: profile, reviewer: profile } });
+		const set = await jsonCommand(checkoutPath, ["session", "goal", "set", "把杖数改成六十"], gateway);
+		assert.equal(set.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(set.value));
+		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, set.value.data));
+		const data = set.value.data as {
+			session: { turn: number; goal?: { status: string; autoTurns: number } };
+			reply: string;
+		};
+		assert.equal(data.session.goal?.status, "complete");
+		assert.equal(data.session.goal?.autoTurns, 1);
+		assert.equal(data.session.turn, 2);
+		assert.equal(data.reply, "目标完成。");
+		const missing = await jsonCommand(checkoutPath, ["session", "goal", "pause"]);
+		assert.equal(missing.exitCode, SUIM_CLI_EXIT.usage);
+		const wrong = await jsonCommand(checkoutPath, ["session", "goal", "stop", "--session", "x"]);
+		assert.equal(wrong.exitCode, SUIM_CLI_EXIT.usage);
+	} finally {
+		await rm(checkoutPath, { recursive: true, force: true });
+	}
+});
+
 test("suim 退出时统一由 shutdown 导出并关闭观测实例，成功与失败路径都执行", async () => {
 	const checkoutPath = await fixture();
 	try {

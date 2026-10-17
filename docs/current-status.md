@@ -15,6 +15,8 @@
 
 ## 最近有效验收
 
+2026-10-17：按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 接通目标（goal）。作者用 `session.send` 带 `goal`（CLI `suim session goal set`）设目标，turn 结束后由 Runtime 自动续下一轮：续跑消息由系统写、不进 inbox、不算作者消息；完成与「需要作者拍板」由模型用 `update_goal` 标，标完成时附检查结论、未提交、未写正文与过时审稿的事实；自动续的一轮什么都没改就停下；作者停止转暂停，`resume` 才续。用量检查点按作者开的那一轮计，续跑轮次累计进去，变异核对确认拿掉这一处用例就失败。验收：机制 5 项、CLI 1 项、AG-UI 协议校验，真实模型回归 `goal-text` 1 / 1（样例两节正文写完、检查通过、模型自己标完成）。桌面入口随 `/` 命令一起做，尚未实现。
+
 2026-10-17：按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 接通协作模式。讨论模式只读，Agent 只出方案；协作模式由作者提交；自主模式维持现状，也是默认。模式由根 Agent 的工具面与只读文件环境保证，讨论模式下读文件不替作者存草稿；与换模型一样从下一轮起生效，对正在跑的对话换模式会被明确拒绝。验收：机制用例 3 项、CLI 1 项、工作台单测、桌面 E2E 1 项（讨论下 faux 模型硬要写被挡、协作下由作者点「提交版本」），真实模型回归 `mode` 组 2 / 2。目标与 `/` 命令尚未实现。
 
 2026-10-17：[斗破留出续写全流程](validation/2026-10-17-doupo-holdout-pipeline/README.md)：120 章抽取作品的第二卷 24 节整卷留出，一条命令独立跑了两次，中间都没有人插手。每次一个 turn 写完、审稿、修订、检查并一次提交（53 / 60 分钟，117 / 149 次调用），Langfuse 用量逐项对账。整卷审稿被开场预检拒绝后，Agent 自己拆小重审；第二次 Agent 改了一节抽自原作的 Design，改动可见，但破坏了留出的前提。顺带修掉 Langfuse 地址无效时整轮报错的缺陷。这些结果不说明文学质量。
@@ -74,6 +76,7 @@
 | 正文 / 审稿时效、Source 覆盖率 | `artifact/derived.ts` | 真实调用：审稿时效在桌面手动修订后再次验证；Source 覆盖率有抽取记录 |
 | AG-UI 事件、只读 attach、桌面 typed IPC | `sdk/run-event.ts`、`apps/desktop` | 机制、Electron E2E 与真实模型中断 / 重连 |
 | 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/workbench` | Electron E2E、真实模型创作闭环与 231 情节隔离副本走查 |
+| 目标（goal）：作者设定后自动续跑 | `local-session-controller.ts`、`harness/agent.ts` 的 `update_goal` | 真实调用：回归 `goal-text` 1 / 1；续跑、完成 / 拍板、空转即停、检查点跨轮次、停止即暂停由机制用例覆盖；桌面入口未做 |
 | 协作模式（讨论 / 协作 / 自主） | `harness/agent.ts`、`conversation-mode-picker.tsx` | 真实调用：回归 `mode` 组 2 / 2；faux 越界写入由工具面挡住，桌面 E2E 覆盖选择、草稿不落盘与作者提交 |
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |

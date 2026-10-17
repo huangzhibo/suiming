@@ -2,7 +2,10 @@
 
 用法（在仓库根目录）：
   python3 -I docs/validation/2026-10-17-doupo-holdout-pipeline/holdout.py <抽取作品> <Agent 回复.md> <输出目录> \
-      --holdout-from 107
+      --holdout-from 107 [--goal]
+
+`--goal`：作者消息改用 `suim session goal set` 发（ADR-0038），turn 结束后由 Runtime 自动续跑，直到 Agent 标完成
+或需要作者拍板；停在用量检查点时照旧替作者说「继续」。
 
 输出目录不在仓库里（作品是《斗破苍穹》的原文，不进 MIT 仓库）：
 - work/       评测作品：留出的节没有正文，Agent 在这里写
@@ -77,8 +80,9 @@ def dist_fingerprint() -> str:
 
 
 class Pipeline:
-    def __init__(self, out: Path):
+    def __init__(self, out: Path, goal: bool = False):
         self.out = out
+        self.goal = goal
         self.work = out / "work"
         self.ref = out / "ref"
         self.reference = out / "reference"
@@ -161,7 +165,8 @@ class Pipeline:
         )
         while len(self.committed(beats)) < len(beats) and len(turns) <= MAX_CONTINUES:
             session = next((turn.get("data", {}).get("session", {}).get("id") for turn in reversed(turns) if turn.get("ok")), None)
-            args = ["session", "send", message] if session is None else ["session", "send", "--session", session, "继续"]
+            first = ["session", "goal", "set", message] if self.goal else ["session", "send", message]
+            args = first if session is None else ["session", "send", "--session", session, "继续"]
             turn = self.suim(self.work, args, f"turn-{len(turns) + 1}")
             # 存档里补上耗时与退出码，续跑时读得回来
             (self.logs / f"turn-{len(turns) + 1}.json").write_text(json.dumps(turn, ensure_ascii=False), encoding="utf8")
@@ -211,6 +216,7 @@ class Pipeline:
             "repo": self.build_identity()["commit"],
             "dist": self.build_identity()["dist"],
             "heldOut": beats,
+            "goal": self.goal,
             "committed": committed,
             "canonRevisions": int(revisions or 0),
             "changedSinceGenesis": changed,
@@ -221,6 +227,8 @@ class Pipeline:
                     "ok": turn.get("ok"),
                     "seconds": turn.get("_seconds"),
                     "status": turn.get("data", {}).get("session", {}).get("status"),
+                    "goal": turn.get("data", {}).get("session", {}).get("goal"),
+                    "turns": turn.get("data", {}).get("session", {}).get("turn"),
                     "usage": turn.get("data", {}).get("session", {}).get("usage"),
                     "lastFailure": turn.get("data", {}).get("session", {}).get("lastFailure"),
                     "error": turn.get("error"),
@@ -253,6 +261,18 @@ class Pipeline:
                 for turn in results["turns"]
             ),
             f"- check：{'passed' if (results['check'] or {}).get('passed') else results['check']}",
+            *(
+                [
+                    "- 目标："
+                    + (
+                        f"{goal['status']}，自动续跑 {goal['autoTurns']} 轮；{goal.get('reason', '')}"
+                        if (goal := (results["turns"][-1] if results["turns"] else {}).get("goal"))
+                        else "没有"
+                    )
+                ]
+                if self.goal
+                else []
+            ),
             # 留出评测的前提是两边按同一份 Design 写；Agent 改了 Design 或别的作品文件，在这里点名，评分时心里有数
             "- 正文与审稿之外的改动：" + ("、".join(other) if (other := [
                 path for path in changed if not path.startswith(("text/", "review/"))
@@ -267,11 +287,14 @@ def main() -> None:
     args = sys.argv[1:]
     if "--holdout-from" not in args:
         raise SystemExit(__doc__)
+    goal = "--goal" in args
+    if goal:
+        args.remove("--goal")
     at = args.index("--holdout-from")
     holdout_from = int(args[at + 1])
     del args[at : at + 2]
     extraction, reply, out = (Path(arg).expanduser().resolve() for arg in args)
-    pipeline = Pipeline(out)
+    pipeline = Pipeline(out, goal)
     beats = pipeline.build(extraction, reply, holdout_from)
     turns = pipeline.write(beats)
     metrics, ranks = pipeline.score(beats)

@@ -1,5 +1,7 @@
 # 变更记录
 
+- **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 实现目标（goal）：`session.send` 带 `goal: true` 设目标，新增 `session.goal`（clear / pause / resume）与 CLI `suim session goal`。turn 结束后 `LocalSessionController` 自动开下一轮，loop 接进一条系统写的续跑消息（不进 inbox），模型用 `update_goal` 标完成或需要作者拍板。用量检查点窗口改为「作者开的那一轮加它自动续的轮次」：`harness.turn` 带 `usageCarried`，没人看着时的上限不变；拿掉这一处，「检查点跨轮次」那条用例就失败。自动续的一轮作品与版本都没变就停下；作者停止转暂停。Skill 补上 `--mode` 与 `session goal`。检查与 510 项单测通过，真实回归 `goal-text` 1 / 1；桌面入口还没做。
+
 - **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 实现协作模式：Session 记录加 `collaboration`，`session.send` 带 `mode`，CLI 有 `--mode`，输入框在模型入口左边加了模式选择。讨论模式下根 Agent 只有读的工具，文件环境只读，读文件也不同步作者草稿；协作模式去掉 `commit`。实现时发现两处：工具面每个 turn 只组装一次，所以模式与模型一样按 turn 生效，对正在跑的对话换模式明确拒绝，不排进去悄悄失效；输入框草稿只选了模式时原来会被当成空草稿删掉，恢复函数也会丢字段，都补了。检查与全部单测通过，桌面 E2E 1 项与真实回归 2 / 2 通过；完整桌面套件没有重跑。
 
 - **2026-10-17** 作者问留出流程是不是固定模式、能不能人与 AI 交互着完成，并指出 Codex、Claude Code 都有多种模式、goal 和 `/` 命令。本机核对两家的发行包后写 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md)：讨论 / 协作 / 自主三种协作模式，由工具面结构性保证；作者设定的目标在 turn 结束后自动续跑，完成与「需要作者拍板」由模型标，系统附确定性对账，用量检查点按作者开的那一轮计；`/` 命令只做现有能力的入口与作者自存的常用话。不做按次批准写入与按路径限定写入范围，后者就是 2026-09 删掉的 scope 预设。排进路线图第 6 节第 2 项，还没有实现。

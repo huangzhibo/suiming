@@ -6,6 +6,8 @@ import {
 	checkSummarySchema,
 	collaborationModeSchema,
 	commitResultSchema,
+	GOAL_ACTIONS,
+	type GoalAction,
 	type ModelChoice,
 	modelChoiceSchema,
 	modelProfileIdSchema,
@@ -13,6 +15,8 @@ import {
 	reviewSummarySchema,
 	revisionSummarySchema,
 	rollbackResultSchema,
+	type SessionGoal,
+	sessionGoalSchema,
 	sessionSummarySchema,
 	taskSummarySchema,
 	thinkingLevelSchema,
@@ -28,13 +32,18 @@ export {
 	COLLABORATION_MODES,
 	type CollaborationMode,
 	collaborationModeSchema,
+	GOAL_ACTIONS,
+	type GoalAction,
 	type ModelChoice,
 	modelChoiceSchema,
 	modelThinkingSchema,
+	type SessionGoal,
+	sessionGoalSchema,
 	thinkingLevelSchema,
 };
 
 const empty = Type.Object({}, { additionalProperties: false });
+
 const file = Type.Object(
 	{ path: id, content: Type.String(), sha256: Type.Union([Type.String(), Type.Null()]) },
 	{ additionalProperties: false },
@@ -427,10 +436,24 @@ export const LOCAL_COMMANDS = {
 				sessionId: Type.Optional(id),
 				model: Type.Optional(modelChoiceSchema),
 				mode: Type.Optional(collaborationModeSchema),
+				/** 把这句话设为对话的目标（ADR-0038）：turn 结束后自动续跑，直到模型标完成或需要作者拍板。 */
+				goal: Type.Optional(Type.Literal(true)),
 			},
 			{ additionalProperties: false },
 		),
 		Type.Object({ sessionId: id, sequence: Type.Integer({ minimum: 1 }) }, { additionalProperties: false }),
+	),
+	/** 清除、暂停或继续对话的目标；对正在跑的对话会被拒绝（先停止）。resume 立刻开一轮续跑。 */
+	"session.goal": command(
+		Type.Object(
+			{
+				commandId: id,
+				sessionId: id,
+				action: Type.Union([Type.Literal("clear"), Type.Literal("pause"), Type.Literal("resume")]),
+			},
+			{ additionalProperties: false },
+		),
+		Type.Object({ sessionId: id }, { additionalProperties: false }),
 	),
 	/** 中止当前 turn：消息列表原样，回 idle，下一句接着跑。 */
 	"session.interrupt": command(

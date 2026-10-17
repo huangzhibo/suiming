@@ -291,6 +291,21 @@ const TASKS = [
 		],
 	},
 	{
+		// 目标（ADR-0038）：用 session goal set 设目标，turn 结束后自动续跑，看模型会不会用 update_goal 收口，
+		// 续跑是否有界。样例小，一轮多半就写完，续跑那一轮核对后标完成。
+		id: "goal-text",
+		goal: true,
+		prompt: "写 beat-0001 和 beat-0002 的正文，写完检查并提交。",
+		grade: (r) => [
+			expect("目标标为完成", r.session?.goal?.status === "complete"),
+			expect("续跑有界（不超过 3 轮）", (r.session?.goal?.autoTurns ?? 99) <= 3),
+			expect("两节都有正文", r.texts.includes("beat-0001.md") && r.texts.includes("beat-0002.md")),
+			expect("当前版本过 Checker", r.check.data?.passed === true),
+			expect("没有遗留未提交", r.summary.uncommitted === 0),
+			expect("没有停在故障上", r.session?.lastFailure === undefined),
+		],
+	},
+	{
 		id: "review",
 		async setup(dir, service) {
 			await mkdir(join(dir, "text"), { recursive: true });
@@ -324,7 +339,12 @@ async function runTask(task, root, trial) {
 	const installed = await suim(dir, ["update", "--agent", "codex", "--agent", "claude-code", "--agent", "grok"]);
 	if (!installed.ok) throw new Error(`装 host 接入文件失败：${installed.error?.message}`);
 	const started = Date.now();
-	const sent = await suim(dir, ["session", "send", ...(task.mode ? ["--mode", task.mode] : []), task.prompt]);
+	const sent = await suim(dir, [
+		"session",
+		...(task.goal ? ["goal", "set"] : ["send"]),
+		...(task.mode ? ["--mode", task.mode] : []),
+		task.prompt,
+	]);
 	const durationMs = Date.now() - started;
 	const session = sent.data?.session;
 	if (!sent.ok || session === undefined) {
@@ -372,6 +392,8 @@ async function runTask(task, root, trial) {
 	);
 	const result = {
 		reply: sent.data.reply ?? "",
+		session,
+		texts: await readdir(join(dir, "text")).catch(() => []),
 		summary,
 		actions,
 		changedFiles,
@@ -406,7 +428,8 @@ async function runTask(task, root, trial) {
 /**
  * `--only` 可以写任务名，也可以写分组：改了哪类 prompt 就跑哪组，不必每次凭判断挑任务。
  * writer：写正文、委派 writer、审稿（Writer / Reviewer 契约、Write Context、写作方法）；design：改设计与写回；
- * check：只读检查与带着 ISSUES 写正文（check 输出、阶段提交的说明）；smoke：一次调用的冒烟；mode：协作模式的讨论与协作。
+ * check：只读检查与带着 ISSUES 写正文（check 输出、阶段提交的说明）；smoke：一次调用的冒烟；mode：协作模式的讨论与协作；
+ * goal：目标的自动续跑与收口。
  */
 const GROUPS = {
 	writer: ["write-text", "delegate-writer-issues", "review"],
@@ -414,6 +437,7 @@ const GROUPS = {
 	check: ["check-issues", "delegate-writer-issues"],
 	smoke: ["discuss"],
 	mode: ["mode-discuss", "mode-collaborate"],
+	goal: ["goal-text"],
 };
 
 const option = (name) => {

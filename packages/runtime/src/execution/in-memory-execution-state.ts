@@ -1,4 +1,4 @@
-import type { CollaborationMode } from "@suiming/sdk";
+import type { CollaborationMode, SessionGoal } from "@suiming/sdk";
 import { canonicalJson, sha256Hex } from "@suiming/story";
 import type { ModelBindingSnapshot } from "../model/model-gateway.js";
 import { ExecutionStateError } from "./errors.js";
@@ -54,6 +54,8 @@ export interface StartTurnInput {
 	model?: ModelBindingSnapshot;
 	/** 从这个 turn 起换用的协作模式。 */
 	collaboration?: CollaborationMode;
+	/** 这一轮是目标的自动续跑：autoTurns 加一。 */
+	goalTurn?: boolean;
 }
 
 export interface EndTurnInput {
@@ -255,6 +257,8 @@ export class InMemoryExecutionState {
 			session.turnId = nonempty(input.turnId ?? input.lease.ownerId ?? "", "turn.id");
 			if (input.model !== undefined) session.model = clone(input.model);
 			if (input.collaboration !== undefined) session.collaboration = input.collaboration;
+			if (input.goalTurn === true && session.goal?.status === "active")
+				session.goal = { ...session.goal, autoTurns: session.goal.autoTurns + 1, updatedAt: timestamp };
 			delete session.lastFailure;
 			touch(session, timestamp);
 			return clone(session);
@@ -303,6 +307,20 @@ export class InMemoryExecutionState {
 				return clone(session);
 			},
 		);
+	}
+
+	/**
+	 * 设定、改状态或清除目标（ADR-0038）。不查 session 状态：作者只在 idle 时改，跑着时只有持有 turn 的进程改
+	 * （update_goal 工具），由调用方保证；跨进程靠写入时的版本核对挡住。
+	 */
+	setSessionGoal(commandId: string, sessionId: string, goal: SessionGoal | undefined): SessionRecord {
+		return this.#execute(commandId, { commandId, sessionId, goal: goal ?? null }, () => {
+			const session = this.#requireSession(sessionId);
+			if (goal === undefined) delete session.goal;
+			else session.goal = { ...goal, objective: nonempty(goal.objective, "goal.objective") };
+			touch(session, this.#timestamp());
+			return clone(session);
+		});
 	}
 
 	/** 阶段提交后推进 session 的已提交基线。 */

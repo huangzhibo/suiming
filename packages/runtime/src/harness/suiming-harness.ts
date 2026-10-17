@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
-import type { CollaborationMode, EditorFileHandler, WorkbenchHandler } from "@suiming/sdk";
+import type { CollaborationMode, EditorFileHandler, SessionGoal, WorkbenchHandler } from "@suiming/sdk";
 import {
 	EventType,
 	type ModelChoice,
@@ -39,7 +39,7 @@ import { type SessionEvent, type SessionEventListener, SessionEventStream } from
 import { type LoopCheckpoint, runTaskLoop, TASK_OPENING_AT, type TaskLoopOutcome } from "./loop.js";
 import type { HarnessProjectPort } from "./project-port.js";
 import { readProjectStatus } from "./project-status.js";
-import type { HarnessTool } from "./tool.js";
+import { type HarnessTool, ToolRejection } from "./tool.js";
 import type { CandidateScanner } from "./tools.js";
 import { textWrittenWithoutContext, turnSummary } from "./turn-summary.js";
 
@@ -138,6 +138,8 @@ export interface RootLoopSpec {
 	tools(handle: TaskHandle): HarnessTool[];
 	/** 作者消息进消息列表前附的确定性状态行（head、候选状态）；在取走消息的那一刻算。 */
 	decorateInbox?(text: string, sequence: number): string | Promise<string>;
+	/** 目标自动续跑那一轮接进消息列表的系统消息（ADR-0038）；只有 `continuingGoal` 时用。 */
+	continuation?: string;
 }
 
 export interface RootLoopOutcome {
@@ -185,6 +187,13 @@ export interface TurnOptions {
 	model?: ModelBindingSnapshot;
 	/** 从这个 turn 起换用的协作模式（ADR-0038）。 */
 	collaboration?: CollaborationMode;
+	/** 这一轮是目标的自动续跑（ADR-0038）：没有作者新消息也接着请求。 */
+	continueGoal?: boolean;
+	/**
+	 * 用量检查点窗口里此前已用掉的折算用量与估算花费：目标自动续的轮次与作者开的那一轮共用一个窗口，
+	 * 没人看着时的上限不因续跑改变。
+	 */
+	usageCarried?: UsageWindow;
 	onStarted?(value: { sessionId: string; turnId: string }): Promise<void> | void;
 }
 
@@ -193,6 +202,16 @@ export interface TurnOutcome<T> {
 	/** body 正常返回的值；turn 被打断或失败时没有。 */
 	value?: T;
 	failure?: ExecutionFailure;
+	/** turn 结束的对账；checkout 读不出来时没有。目标续跑据此判断这一轮有没有改东西。 */
+	summary?: SuimingTurnSummary;
+	/** 到这一轮结束时，用量检查点窗口里的累计（含 usageCarried）。 */
+	usageWindow?: UsageWindow;
+}
+
+/** 用量检查点窗口：折算用量（见 weightedUsage）与按目录价估算的花费。 */
+export interface UsageWindow {
+	tokens: number;
+	usd: number;
 }
 
 /**
@@ -221,6 +240,8 @@ export class HarnessSession {
 	#usageTokens = 0;
 	#spentUsd = 0;
 	readonly #usageCheckpoint: number;
+	/** 这一轮是目标的自动续跑（ADR-0038）。 */
+	readonly continuingGoal: boolean;
 	constructor(
 		engine: SuimingHarness,
 		input: {
@@ -232,10 +253,15 @@ export class HarnessSession {
 			signal: AbortSignal | undefined;
 			telemetry: TelemetryContext;
 			usageCheckpoint: number;
+			continueGoal?: boolean;
+			usageCarried?: UsageWindow;
 		},
 	) {
 		this.#engine = engine;
 		this.#usageCheckpoint = input.usageCheckpoint;
+		this.continuingGoal = input.continueGoal === true;
+		this.#usageTokens = input.usageCarried?.tokens ?? 0;
+		this.#spentUsd = input.usageCarried?.usd ?? 0;
 		this.sessionId = input.sessionId;
 		this.checkoutPath = engine.project.paths.checkoutPath;
 		this.#base = input.base;
@@ -282,6 +308,26 @@ export class HarnessSession {
 	/** 这一轮的协作模式（ADR-0038）；旧记录没有这个字段就是自主。 */
 	get collaboration(): CollaborationMode {
 		return this.record.collaboration ?? "autonomous";
+	}
+
+	/** 作者设定的目标（ADR-0038）。 */
+	get goal(): SessionGoal | undefined {
+		return this.record.goal;
+	}
+
+	/** 模型用 update_goal 标完成或需要作者拍板：持有 turn 的进程自己写，跨进程靠版本核对。 */
+	markGoal(commandId: string, status: "complete" | "blocked", reason: string): SessionGoal {
+		const goal = this.record.goal;
+		if (goal === undefined || goal.status !== "active")
+			throw new ToolRejection("goal_not_active", "这段对话现在没有进行中的目标");
+		const next: SessionGoal = { ...goal, status, reason, updatedAt: this.#engine.now().toISOString() };
+		this.#execution.setSessionGoal(commandId, this.sessionId, next);
+		return next;
+	}
+
+	/** 用量检查点窗口里到现在的累计（含上一轮带进来的）。 */
+	get usageWindow(): UsageWindow {
+		return { tokens: this.#usageTokens, usd: this.#spentUsd };
 	}
 
 	/** 已提交基线，即 turn 开始时的 head、或最近一次阶段提交之后的版本。 */
@@ -374,9 +420,28 @@ export class HarnessSession {
 			...this.#editorOptions({ save: !discuss }),
 		});
 		const restored = await this.#restore(record.checkpointRef);
-		// 模型已经停下、inbox 也没有新消息：不该开新的模型调用。
-		if (restored !== undefined && restored.loop.phase === "settled" && this.pendingInbox().length === 0)
+		// 模型已经停下、inbox 也没有新消息：不该开新的模型调用。目标的自动续跑例外，它带着自己的系统消息。
+		const continuation = this.continuingGoal ? spec.continuation : undefined;
+		if (
+			continuation === undefined &&
+			restored !== undefined &&
+			restored.loop.phase === "settled" &&
+			this.pendingInbox().length === 0
+		)
 			return { stop: restored.loop.stop ?? "model_stopped", reply: "", turns: restored.loop.turns };
+		if (continuation !== undefined) {
+			const round = this.record.goal?.autoTurns ?? 0;
+			this.events.emit(
+				{
+					type: EventType.ACTIVITY_SNAPSHOT,
+					messageId: `goal_${this.record.turnId ?? this.sessionId}`,
+					activityType: "suiming.progress",
+					replace: true,
+					content: { label: "按目标继续", status: "completed", summary: `自动续跑第 ${round} 轮` },
+				},
+				`goal_${this.record.turnId ?? this.sessionId}`,
+			);
+		}
 		const outcome = await this.#drive({
 			loopId: this.sessionId,
 			model,
@@ -390,6 +455,7 @@ export class HarnessSession {
 			telemetry: this.#telemetry,
 			steering: true,
 			...(spec.decorateInbox === undefined ? {} : { decorateInbox: spec.decorateInbox }),
+			...(continuation === undefined ? {} : { continuation }),
 			saveCheckpoint: async (checkpoint, loop) => {
 				const object = await this.#engine.checkpoints.write(checkpoint);
 				this.#execution.recordSessionCheckpoint(
@@ -624,6 +690,7 @@ export class HarnessSession {
 		steering: boolean;
 		refreshOpening?(): Promise<string>;
 		decorateInbox?(text: string, sequence: number): string | Promise<string>;
+		continuation?: string;
 		captureSubmission?(): unknown;
 		saveCheckpoint(checkpoint: HarnessCheckpoint, loop: LoopCheckpoint): Promise<void>;
 		recordRequest(callId: string): void;
@@ -710,6 +777,7 @@ export class HarnessSession {
 						...(input.decorateInbox === undefined ? {} : { decorateSteering: input.decorateInbox }),
 					}
 				: {}),
+			...(input.continuation === undefined ? {} : { continuation: input.continuation }),
 			onTextDelta: (delta, callId) => this.events.appendText(callId, delta, metadata, subagentRunId),
 			onMessage: (callId, message) => {
 				const content = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
@@ -950,8 +1018,8 @@ export class SuimingHarness {
 		start: TurnStart | undefined,
 		turnId: string,
 		stopped = false,
-	): Promise<void> {
-		if (start === undefined) return;
+	): Promise<SuimingTurnSummary | undefined> {
+		if (start === undefined) return undefined;
 		let content: SuimingTurnSummary;
 		try {
 			const end = await session.scan();
@@ -974,7 +1042,7 @@ export class SuimingHarness {
 			if (stopped) content.stopped = true;
 		} catch {
 			// checkout 读不出来时这一轮本来就会失败，原因在 lastFailure 里，不再叠一层。
-			return;
+			return undefined;
 		}
 		session.events.emit(
 			{
@@ -986,6 +1054,7 @@ export class SuimingHarness {
 			},
 			`${turnId}:summary`,
 		);
+		return content;
 	}
 
 	/**
@@ -1019,6 +1088,7 @@ export class SuimingHarness {
 			turnId: ownerId,
 			...(options.model === undefined ? {} : { model: options.model }),
 			...(options.collaboration === undefined ? {} : { collaboration: options.collaboration }),
+			...(options.continueGoal === true ? { goalTurn: true } : {}),
 		});
 		execution.bindOwner(sessionId, ownerId);
 		// 上一个 turn 结束到这里之间可能回收过执行对象（只在没有 turn 跑时删），存过哪些节点要重新核对。
@@ -1068,6 +1138,8 @@ export class SuimingHarness {
 						signal: options.signal,
 						telemetry: span,
 						usageCheckpoint: await this.#usageCheckpoint(),
+						...(options.continueGoal === true ? { continueGoal: true } : {}),
+						...(options.usageCarried === undefined ? {} : { usageCarried: options.usageCarried }),
 					});
 					events.refresh();
 					captureTelemetryContent(span, "input", () =>
@@ -1075,12 +1147,17 @@ export class SuimingHarness {
 					);
 					start = await turnStart(session);
 					const value = await body(session);
-					await this.#emitTurnSummary(session, start, ownerId);
+					const summary = await this.#emitTurnSummary(session, start, ownerId);
 					const ended = endTurn();
 					events.refresh();
 					span.setAttributes({ "langfuse.observation.metadata.outcome": "completed" });
 					span.setStatus({ status: "ok" });
-					return { session: ended, value };
+					return {
+						session: ended,
+						value,
+						...(summary === undefined ? {} : { summary }),
+						usageWindow: session.usageWindow,
+					};
 				} catch (error) {
 					const failure = executionFailure(error);
 					const interrupted = failure.code === "run_interrupted" || options.signal?.aborted === true;
@@ -1100,11 +1177,18 @@ export class SuimingHarness {
 					events.assertWritable();
 					// 失败或被打断的 turn 也报这一轮改了什么；对账本身出错不能盖住原来的失败。停下的 turn 标出来：
 					// 没有它，对话里只剩一串操作、后面没有回复，作者看不出是自己停的还是出了什么事。
-					if (session !== undefined)
-						await this.#emitTurnSummary(session, start, ownerId, interrupted).catch(() => undefined);
+					const summary =
+						session === undefined
+							? undefined
+							: await this.#emitTurnSummary(session, start, ownerId, interrupted).catch(() => undefined);
 					const ended = interrupted ? endTurn() : endTurn(failure);
 					events.refresh();
-					return { session: ended, ...(interrupted ? {} : { failure }) };
+					return {
+						session: ended,
+						...(interrupted ? {} : { failure }),
+						...(summary === undefined ? {} : { summary }),
+						...(session === undefined ? {} : { usageWindow: session.usageWindow }),
+					};
 				} finally {
 					const latest = execution.session(sessionId);
 					if ((latest.inboxSequence ?? 0) > (record.inboxSequence ?? 0))

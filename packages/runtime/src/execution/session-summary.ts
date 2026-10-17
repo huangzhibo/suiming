@@ -1,4 +1,4 @@
-import type { CollaborationMode, ModelChoice } from "@suiming/sdk";
+import type { CollaborationMode, ModelChoice, SessionGoal } from "@suiming/sdk";
 import type { ModelProfileId } from "../model/config.js";
 import type {
 	ExecutionEntities,
@@ -20,6 +20,7 @@ export interface SessionSummary {
 	usage?: ModelUsage;
 	model?: ModelChoice;
 	collaboration?: CollaborationMode;
+	goal?: SessionGoal;
 	lastFailure?: NonNullable<SessionRecord["lastFailure"]>;
 	result?: NonNullable<SessionRecord["result"]>;
 	createdAt: string;
@@ -48,6 +49,7 @@ export function sessionSummary(session: SessionRecord, title = ""): SessionSumma
 		...(session.usage === undefined ? {} : { usage: session.usage }),
 		...(model === undefined ? {} : { model }),
 		...(session.collaboration === undefined ? {} : { collaboration: session.collaboration }),
+		...(session.goal === undefined ? {} : { goal: session.goal }),
 		...(session.lastFailure === undefined ? {} : { lastFailure: session.lastFailure }),
 		...(session.result === undefined ? {} : { result: session.result }),
 		createdAt: session.createdAt,

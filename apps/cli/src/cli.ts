@@ -51,6 +51,8 @@ import {
 	COLLABORATION_MODES,
 	type CollaborationMode,
 	errorCategory,
+	GOAL_ACTIONS,
+	type GoalAction,
 	retryableErrorCode,
 	SUIM_CLI_COMMAND_DATA,
 	SUIM_CLI_PROTOCOL_VERSION,
@@ -1087,6 +1089,89 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 								throw new ArtifactError("run_interrupted", "当前 turn 已被中断；再发一条消息即可接着跑");
 						});
 						return sessionTurnData(service, sent.sessionId);
+					}),
+				);
+			},
+		);
+
+	session
+		.command("goal")
+		.description(
+			"给对话设目标（ADR-0038）：set 把目标当作者消息发出，turn 结束后自动续跑，直到 Agent 标完成或需要你拍板，等续跑停下才返回；clear / pause / resume 改已有的目标",
+		)
+		.argument("<action>", "set、clear、pause 或 resume")
+		.argument("[objective...]", "set 时的目标原文")
+		.option("--session <id>", "已有的对话；set 不带就新开一个")
+		.option(
+			"--mode <mode>",
+			"set 时同时设协作模式：discuss 只读讨论，collaborate 能改候选但由作者提交，autonomous 能改也能提交",
+		)
+		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
+		.option("--auth <path>", "覆盖 ~/.suiming/auth.json")
+		.option("--events", "在最终响应之前逐行流式输出 SessionEvent NDJSON")
+		.action(
+			async (
+				action: string,
+				words: string[],
+				options: { session?: string; mode?: string; config?: string; auth?: string; events?: boolean },
+			) => {
+				await execute("session.goal", () =>
+					withProject(projectPath(program), async (service) => {
+						if (!["set", ...GOAL_ACTIONS].includes(action))
+							throw new ArtifactError("invalid_cli_usage", `动作只能是 set、${GOAL_ACTIONS.join("、")}`);
+						if (action === "set" && words.length === 0)
+							throw new ArtifactError("invalid_cli_usage", "set 要写上目标原文");
+						if (action !== "set" && options.session === undefined)
+							throw new ArtifactError("invalid_cli_usage", `${action} 要用 --session 指明对话`);
+						if (options.mode !== undefined && !COLLABORATION_MODES.includes(options.mode as CollaborationMode))
+							throw new ArtifactError("invalid_cli_usage", `--mode 只能是 ${COLLABORATION_MODES.join("、")}`);
+						const models = await modelGateway(io, options);
+						const controller = new LocalSessionController({
+							project: service,
+							models,
+							telemetryContext: cliTelemetry(io).context,
+							usageCheckpoint: usageCheckpoint(options),
+						});
+						const onEvent = eventWriter(io, "session.goal", options.events === true);
+						const sessionId =
+							action === "set"
+								? (
+										await controller.send({
+											commandId: randomUUID(),
+											text: words.join(" "),
+											goal: true,
+											...(options.session === undefined ? {} : { sessionId: options.session }),
+											...(options.mode === undefined ? {} : { mode: options.mode as CollaborationMode }),
+											...(onEvent === undefined ? {} : { onEvent }),
+										})
+									).sessionId
+								: (
+										await controller.updateGoal({
+											commandId: randomUUID(),
+											sessionId: options.session as string,
+											action: action as GoalAction,
+										})
+									).sessionId;
+						await withInterrupt(io, async (signal) => {
+							signal.addEventListener(
+								"abort",
+								() => {
+									try {
+										controller.interrupt(sessionId, new Error("Interrupted by signal"));
+									} catch {
+										// 不由本进程持有时无事可停。
+									}
+								},
+								{ once: true },
+							);
+							await controller.completion(sessionId);
+							if (signal.aborted)
+								throw new ArtifactError(
+									"run_interrupted",
+									"已中断，目标转为暂停；用 session goal resume 接着跑",
+								);
+						});
+						return sessionTurnData(service, sessionId);
 					}),
 				);
 			},

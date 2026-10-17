@@ -40,6 +40,7 @@ export const SUIM_CLI_COMMANDS = [
 	"release.status",
 	"release.publish",
 	"session.send",
+	"session.goal",
 	"session.list",
 	"session.show",
 	"session.events",
@@ -682,6 +683,8 @@ export const SUIM_CLI_COMMAND_DATA = {
 	"release.status": SuimCliReleaseStatusDataSchema,
 	"release.publish": SuimCliReleasePublishDataSchema,
 	"session.send": SuimCliSessionTurnDataSchema,
+	/** `session goal`：set / resume 等续跑停下才返回，clear / pause 立刻返回；都给出对话现在的摘要。 */
+	"session.goal": SuimCliSessionTurnDataSchema,
 	"session.list": SuimCliSessionListDataSchema,
 	"session.show": SuimCliSessionShowDataSchema,
 	"session.events": SuimCliSessionEventsDataSchema,

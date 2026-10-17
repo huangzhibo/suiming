@@ -21,6 +21,33 @@ export const collaborationModeSchema = Type.Union([
 	Type.Literal("autonomous"),
 ]);
 export type CollaborationMode = Static<typeof collaborationModeSchema>;
+/**
+ * 作者设定的目标（ADR-0038）：active 时 turn 结束自动续下一轮；complete / blocked 由模型用 update_goal 标，
+ * 或由系统在续跑空转时标 blocked；paused 是作者停止或 `pause` 的结果。它是执行数据，不是作品事实。
+ */
+export const sessionGoalStatusSchema = Type.Union([
+	Type.Literal("active"),
+	Type.Literal("paused"),
+	Type.Literal("complete"),
+	Type.Literal("blocked"),
+]);
+export const sessionGoalSchema = Type.Object(
+	{
+		objective: id,
+		status: sessionGoalStatusSchema,
+		/** complete 的依据、blocked 要作者决定的事，或系统停下续跑的原因。 */
+		reason: Type.Optional(Type.String()),
+		/** 自动续了几轮（不含作者开的那一轮）。 */
+		autoTurns: Type.Integer({ minimum: 0 }),
+		setAt: id,
+		updatedAt: id,
+	},
+	{ additionalProperties: false },
+);
+export type SessionGoal = Static<typeof sessionGoalSchema>;
+export const GOAL_ACTIONS = ["clear", "pause", "resume"] as const;
+export type GoalAction = (typeof GOAL_ACTIONS)[number];
+
 /** 与 collaborationModeSchema 同一组取值，给 CLI 校验参数与列出可选值。 */
 export const COLLABORATION_MODES: readonly CollaborationMode[] = ["discuss", "collaborate", "autonomous"];
 
@@ -161,6 +188,7 @@ export const sessionSummarySchema = Type.Object(
 		usage: Type.Optional(modelUsageSchema),
 		model: Type.Optional(modelChoiceSchema),
 		collaboration: Type.Optional(collaborationModeSchema),
+		goal: Type.Optional(sessionGoalSchema),
 		lastFailure: Type.Optional(executionFailureSchema),
 		result: Type.Optional(resultReferenceSchema),
 		createdAt: id,

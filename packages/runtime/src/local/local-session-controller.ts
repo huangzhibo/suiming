@@ -1,10 +1,17 @@
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
-import type { CollaborationMode, EditorFileHandler, ModelChoice, WorkbenchHandler } from "@suiming/sdk";
+import type {
+	CollaborationMode,
+	EditorFileHandler,
+	GoalAction,
+	ModelChoice,
+	SessionGoal,
+	WorkbenchHandler,
+} from "@suiming/sdk";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ExecutionStateEvent, SessionRecord } from "../execution/types.js";
 import { agentTurn } from "../harness/agent.js";
 import type { SessionEventListener } from "../harness/events.js";
-import { SuimingHarness, type TurnOutcome } from "../harness/suiming-harness.js";
+import { SuimingHarness, type TurnOutcome, type UsageWindow } from "../harness/suiming-harness.js";
 import type { ModelBindingSnapshot, ModelGateway } from "../model/model-gateway.js";
 import type { LocalProjectService } from "./local-project-service.js";
 
@@ -51,6 +58,8 @@ export interface SendInput {
 	binding?: ModelBindingSnapshot;
 	/** 协作模式（ADR-0038）：新 session 的初始模式，或从这一轮起换用；对正在跑的对话换模式会被拒绝。 */
 	mode?: CollaborationMode;
+	/** 把这句话设为对话的目标（ADR-0038）；对正在跑的对话会被拒绝。 */
+	goal?: boolean;
 	onEvent?: SessionEventListener;
 }
 
@@ -139,14 +148,37 @@ export class LocalSessionController {
 				...(input.mode === undefined ? {} : { collaboration: input.mode }),
 			});
 			sessionId = created.id;
-		} else if (input.mode !== undefined) {
-			// 模式与模型一样只在 turn 边界换：排进正在跑的对话就会悄悄失效，所以明确拒绝（本进程和别的进程在跑都算）。
+		} else {
 			const current = harness.session(sessionId);
-			if (current.status === "running" && (current.collaboration ?? "autonomous") !== input.mode)
+			// 模式与模型一样只在 turn 边界换：排进正在跑的对话就会悄悄失效，所以明确拒绝（本进程和别的进程在跑都算）。
+			if (
+				input.mode !== undefined &&
+				current.status === "running" &&
+				(current.collaboration ?? "autonomous") !== input.mode
+			)
 				throw new ArtifactError(
 					"session_running",
 					"对话正在进行，换模式要从下一轮起生效：等它停下或先停止，再发这句话",
 				);
+			if (input.goal === true && current.status === "running")
+				throw new ArtifactError("session_running", "对话正在进行：先停止当前回复，再设目标");
+			// 目标停在「需要作者拍板」时，作者回的这句话就是答复：目标回到进行中，这一轮之后照常续跑。
+			if (input.goal !== true && current.status === "idle" && current.goal?.status === "blocked")
+				this.#writeGoal(`${input.commandId}:goal:answer`, sessionId, {
+					...current.goal,
+					status: "active",
+					updatedAt: this.#timestamp(),
+				});
+		}
+		if (input.goal === true) {
+			const now = this.#timestamp();
+			this.#writeGoal(`${input.commandId}:goal`, sessionId, {
+				objective: input.text,
+				status: "active",
+				autoTurns: 0,
+				setAt: now,
+				updatedAt: now,
+			});
 		}
 		const queued = this.#project.queueInbox(sessionId, input.text, `${input.commandId}:send`, {
 			model: input.model ?? null,
@@ -162,6 +194,45 @@ export class LocalSessionController {
 			});
 		}
 		return { sessionId, sequence: queued.sequence };
+	}
+
+	/**
+	 * 清除、暂停或继续目标（ADR-0038）。只在对话停着时改：跑着的时候 Session 记录只归持有 turn 的进程写。
+	 * resume 立刻开一轮续跑，不冒充作者说话。
+	 */
+	async updateGoal(input: {
+		commandId: string;
+		sessionId: string;
+		action: GoalAction;
+	}): Promise<{ sessionId: string }> {
+		const harness = this.harness();
+		const current = harness.session(input.sessionId);
+		if (current.status === "running" || this.#active.has(input.sessionId))
+			throw new ArtifactError("session_running", "对话正在进行：先停止当前回复，再改目标");
+		const goal = current.goal;
+		if (goal === undefined) throw new ArtifactError("goal_not_found", "这段对话没有目标");
+		if (input.action === "resume") this.#requireFree(input.sessionId);
+		if (input.action === "clear") this.#writeGoal(`${input.commandId}:goal`, input.sessionId, undefined);
+		else {
+			const { reason: _reason, ...rest } = goal;
+			this.#writeGoal(`${input.commandId}:goal`, input.sessionId, {
+				...(input.action === "pause" ? goal : rest),
+				status: input.action === "pause" ? "paused" : "active",
+				updatedAt: this.#timestamp(),
+			});
+		}
+		if (input.action === "resume") this.#drive(harness, input.sessionId, { continueGoal: true });
+		return { sessionId: input.sessionId };
+	}
+
+	#timestamp(): string {
+		return (this.#now?.() ?? new Date()).toISOString();
+	}
+
+	#writeGoal(commandId: string, sessionId: string, goal: SessionGoal | undefined): void {
+		this.#project
+			.createExecutionState(this.#now ? { now: this.#now } : {})
+			.setSessionGoal(commandId, sessionId, goal);
 	}
 
 	/**
@@ -187,6 +258,15 @@ export class LocalSessionController {
 		return this.#active.get(sessionId)?.completion ?? Promise.resolve();
 	}
 
+	#pauseGoal(sessionId: string, session: SessionRecord): void {
+		if (session.status !== "idle" || session.goal?.status !== "active") return;
+		this.#writeGoal(`${sessionId}:goal:pause:${session.turn}`, sessionId, {
+			...session.goal,
+			status: "paused",
+			updatedAt: this.#timestamp(),
+		});
+	}
+
 	#requireFree(sessionId: string): void {
 		const other = this.activeSessionIds().find((id) => id !== sessionId);
 		if (other !== undefined)
@@ -200,25 +280,56 @@ export class LocalSessionController {
 			model?: ModelBindingSnapshot;
 			collaboration?: CollaborationMode;
 			onEvent?: SessionEventListener;
+			/** 第一轮就是目标的续跑（作者 resume）。 */
+			continueGoal?: boolean;
 		},
 	): void {
 		const controller = new AbortController();
 		const completion = (async () => {
 			try {
 				let first = true;
+				// 目标续跑（ADR-0038）：作者开的那一轮与它自动续的轮次共用一个用量检查点窗口。
+				let continuing = options.continueGoal === true;
+				let carried: UsageWindow | undefined;
 				while (!controller.signal.aborted) {
 					const outcome: TurnOutcome<unknown> = await harness.turn(
 						sessionId,
 						{
 							signal: controller.signal,
-							...(first ? options : {}),
+							...(first && options.model !== undefined ? { model: options.model } : {}),
+							...(first && options.collaboration !== undefined ? { collaboration: options.collaboration } : {}),
 							...(options.onEvent === undefined ? {} : { onEvent: options.onEvent }),
+							...(continuing ? { continueGoal: true } : {}),
+							...(carried === undefined ? {} : { usageCarried: carried }),
 						},
 						(session) => agentTurn(session),
 					);
 					first = false;
+					if (controller.signal.aborted) {
+						// 作者停止（或应用退出）：目标暂停，等作者 resume，不在下一次打开时自己续跑。
+						this.#pauseGoal(sessionId, outcome.session);
+						return;
+					}
 					if (outcome.session.status !== "idle" || outcome.failure !== undefined) return;
-					if (harness.pendingInbox(sessionId) === 0) return;
+					if (harness.pendingInbox(sessionId) > 0) {
+						// 作者又说话了：下一轮由作者开，窗口重新计。
+						continuing = false;
+						carried = undefined;
+						continue;
+					}
+					const goal = outcome.session.goal;
+					if (goal?.status !== "active") return;
+					if (continuing && madeNoProgress(outcome)) {
+						this.#writeGoal(`${sessionId}:goal:no-progress:${outcome.session.turn}`, sessionId, {
+							...goal,
+							status: "blocked",
+							reason: "自动续的一轮没有改动任何作品文件，也没有提交或更新目标，续跑停下",
+							updatedAt: this.#timestamp(),
+						});
+						return;
+					}
+					continuing = true;
+					carried = outcome.usageWindow;
 				}
 			} finally {
 				// 在 completion 兑现之前摘掉：等 completion 的调用方看到的 activeSessionIds 必须已经不含它。
@@ -241,4 +352,12 @@ export class LocalSessionController {
 		this.#active.set(sessionId, { controller, completion });
 		void completion.catch(() => undefined);
 	}
+}
+
+/** 续跑的一轮有没有做事：作品文件改了、或提交了版本。对账读不出来时当作没做，宁可停下。 */
+function madeNoProgress(outcome: TurnOutcome<unknown>): boolean {
+	const summary = outcome.summary;
+	if (summary === undefined) return true;
+	const changed = Object.values(summary.changed).reduce((sum, group) => sum + group.count, 0);
+	return changed === 0 && summary.revisions === 0;
 }
