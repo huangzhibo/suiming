@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AgentComposer, type ComposerBinding } from "./agent-composer.js";
 import { Transcript } from "./agent-transcript.js";
 import { bridge, invoke } from "./bridge.js";
+import { ConversationGoalBar } from "./conversation-goal-bar.js";
 import { type ConversationPosition, ConversationViewport } from "./conversation-viewport.js";
 import type { Book, SessionSummary } from "./model.js";
 import { useModelSettings } from "./model-settings.js";
@@ -74,6 +75,8 @@ export interface AgentPanelProps extends ComposerBinding {
 	openSettings(): void;
 	expanded: boolean;
 	toggleExpand(): void;
+	/** 与「提交版本」按钮同一个动作，给 `/提交` 用（ADR-0038）。 */
+	commit: { run(): void; blocked?: string | undefined };
 }
 /**
  * 待确认的调用数由存储形状派生：`confirmedCalls` 缺省表示历史记录全部已确认。
@@ -98,6 +101,7 @@ export function AgentPanel({
 	openSettings,
 	expanded,
 	toggleExpand,
+	commit,
 	...binding
 }: AgentPanelProps) {
 	const titles = useMemo(() => new Map([...book.byPath].map(([path, file]) => [path, book.title(file)])), [book]);
@@ -356,6 +360,22 @@ export function AgentPanel({
 					</div>
 				)}
 			</ConversationViewport>
+			{session?.goal && (
+				<ConversationGoalBar
+					goal={session.goal}
+					running={active}
+					busy={busy}
+					onAction={(goalAction) =>
+						void action(() =>
+							invoke("session.goal", {
+								commandId: crypto.randomUUID(),
+								sessionId: session.id,
+								action: goalAction,
+							}),
+						)
+					}
+				/>
+			)}
 			<AgentComposer
 				{...binding}
 				book={book}
@@ -363,6 +383,8 @@ export function AgentPanel({
 				expanded={expanded}
 				refresh={refresh}
 				openSettings={openSettings}
+				newConversation={() => onSelect("")}
+				commit={commit}
 			/>
 			{exportNotice && (
 				<p role="status" className="text-xs text-muted-foreground">

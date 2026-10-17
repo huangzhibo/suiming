@@ -291,6 +291,34 @@ function WorkspaceShell() {
 	const backlinks = file ? backlinksFor(book, file.path) : [];
 	const textCount = book.order.filter((id) => book.text(id)).length;
 	const workName = data.checkoutPath.split("/").at(-1) ?? "作品";
+	// 「提交版本」按钮与输入框的 `/提交` 是同一个动作（ADR-0038）；不可用时两处给同一句原因。
+	const commitBlocked = busy
+		? "正在处理，请稍候"
+		: anyChanged
+			? "请先保存未保存的修改"
+			: !data.dirty
+				? "没有可提交的修改"
+				: undefined;
+	const commitVersion = () =>
+		act(async () => {
+			const originGroup = layoutLive.current.activeGroup;
+			const origin = groupView(layoutLive.current, originGroup);
+			const originTab = origin.tabs[origin.active]?.id;
+			const result = await invoke("project.commit", {});
+			if (result.created && isCurrentProject())
+				setLayout((current) =>
+					current.activeGroup !== originGroup
+						? current
+						: updateGroup(current, originGroup, (state) => {
+								const tab = state.tabs[state.active];
+								// 只续接作者正在核对的候选页；回包期间换页或关窗格不抢导航。
+								return tab && tab.id === originTab && tab.location.page === CANDIDATE_VERSION
+									? navigate(state, { ...tab.location, page: versionPage(result.revision.id) })
+									: state;
+							}),
+				);
+			setNotice(result.created ? "已提交一个新版本" : "作品没有新的变更");
+		});
 	const rightButton = (mode: RightMode, label: string, icon: React.ReactNode) => (
 		<ToolButton
 			label={label}
@@ -443,31 +471,11 @@ function WorkspaceShell() {
 					<ToolButton
 						label="提交版本"
 						description="将已保存的修改提交为新的作品版本"
-						disabledReason={busy ? "正在处理，请稍候" : anyChanged ? "请先保存未保存的修改" : "没有可提交的修改"}
+						disabledReason={commitBlocked ?? ""}
 						side="right"
 						className="size-8 rounded-[7px]"
-						disabled={busy || anyChanged || !data.dirty}
-						onClick={() =>
-							act(async () => {
-								const originGroup = layoutLive.current.activeGroup;
-								const origin = groupView(layoutLive.current, originGroup);
-								const originTab = origin.tabs[origin.active]?.id;
-								const result = await invoke("project.commit", {});
-								if (result.created && isCurrentProject())
-									setLayout((current) =>
-										current.activeGroup !== originGroup
-											? current
-											: updateGroup(current, originGroup, (state) => {
-													const tab = state.tabs[state.active];
-													// 只续接作者正在核对的候选页；回包期间换页或关窗格不抢导航。
-													return tab && tab.id === originTab && tab.location.page === CANDIDATE_VERSION
-														? navigate(state, { ...tab.location, page: versionPage(result.revision.id) })
-														: state;
-												}),
-									);
-								setNotice(result.created ? "已提交一个新版本" : "作品没有新的变更");
-							})
-						}
+						disabled={commitBlocked !== undefined}
+						onClick={commitVersion}
 					>
 						<GitCommitHorizontal className="size-[17px]" />
 					</ToolButton>
@@ -637,6 +645,7 @@ function WorkspaceShell() {
 								openSettings={() => setSettingsOpen(true)}
 								expanded={view.expanded}
 								toggleExpand={() => patch({ expanded: !view.expanded })}
+								commit={{ run: () => void commitVersion(), blocked: commitBlocked }}
 							/>
 						)}
 					</aside>

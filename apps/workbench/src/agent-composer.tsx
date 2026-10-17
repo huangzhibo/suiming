@@ -1,4 +1,5 @@
-import type { WorkbenchActiveContext } from "@suiming/sdk";
+import type { GoalAction, WorkbenchActiveContext } from "@suiming/sdk";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowUp, FileText, Loader2, Plus, RotateCcw, Square, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,14 @@ import { ConversationModePicker } from "./conversation-mode-picker.js";
 import { ConversationModelPicker } from "./conversation-model-picker.js";
 import type { Book } from "./model.js";
 import { isSessionActive } from "./run-presentation.js";
+import {
+	commandMenu,
+	expandCustom,
+	goalIntent,
+	parseSlash,
+	type SlashCommand,
+	slashCommands,
+} from "./slash-commands.js";
 import { Hint } from "./ui-bits.js";
 import { useComposerSubmit } from "./use-composer-submit.js";
 
@@ -48,6 +57,8 @@ export function AgentComposer({
 	expanded,
 	refresh,
 	openSettings,
+	newConversation,
+	commit,
 	...binding
 }: ComposerBinding & {
 	book: Book;
@@ -62,6 +73,10 @@ export function AgentComposer({
 	expanded: boolean;
 	refresh(): void;
 	openSettings(): void;
+	/** `/新对话`：与对话栏的「新对话」按钮同一个动作。 */
+	newConversation(): void;
+	/** `/提交`：与「提交版本」按钮同一个动作；`blocked` 是按钮不可用时的原因。 */
+	commit: { run(): void; blocked?: string | undefined };
 }) {
 	const {
 		composer,
@@ -75,7 +90,7 @@ export function AgentComposer({
 		currentSelection,
 		isCurrentProject,
 	} = binding;
-	const { busy, setBusy, error, setError, submit } = useComposerSubmit({
+	const { busy, setBusy, error, setError, submit, submitDraft, submitGoal } = useComposerSubmit({
 		...(uiContext ? { uiContext } : {}),
 		composer,
 		draftKey,
@@ -87,6 +102,18 @@ export function AgentComposer({
 	});
 	const [picker, setPicker] = useState(false);
 	const [query, setQuery] = useState("");
+	// `/` 命令（ADR-0038）：只是现有能力的入口。dismissed 是按 Esc 收起菜单的记号，输入一变就清掉。
+	const authorCommands = useQuery({
+		queryKey: ["author-commands"],
+		queryFn: () => invoke("commands.list", {}),
+		staleTime: 15000,
+	});
+	const commands = slashCommands(authorCommands.data ?? []);
+	const [dismissed, setDismissed] = useState<string | undefined>();
+	const [highlight, setHighlight] = useState(0);
+	const [modelOpen, setModelOpen] = useState(false);
+	const menu = dismissed === composer.goal ? [] : commandMenu(commands, composer.goal);
+	const highlighted = Math.min(highlight, Math.max(menu.length - 1, 0));
 	const input = useRef<HTMLInputElement>(null);
 	const textarea = useRef<HTMLTextAreaElement>(null);
 	const attachmentFiles = useRef(new Map<string, File>());
@@ -166,12 +193,71 @@ export function AgentComposer({
 		setQuery("");
 		setPicker(true);
 	};
+	const clearInput = () => update((draft) => ({ ...draft, goal: "" }), true);
+	async function goalAction(action: GoalAction) {
+		if (!session) {
+			setError("还没有对话：先用 /goal 写上目标");
+			return;
+		}
+		setBusy(true);
+		setError("");
+		try {
+			await invoke("session.goal", { commandId: crypto.randomUUID(), sessionId: session.id, action });
+			clearInput();
+			refresh();
+		} catch (reason) {
+			setError(reason instanceof Error ? reason.message : String(reason));
+		} finally {
+			setBusy(false);
+		}
+	}
+	/** 选中菜单里的一项：要参数的补成 `/名字 `，其余立刻执行，与对应按钮做同一件事。 */
+	function pick(command: SlashCommand) {
+		setError("");
+		if (command.kind === "goal" || command.kind === "custom") {
+			update((draft) => ({ ...draft, goal: `/${command.name} ` }), true);
+			textarea.current?.focus();
+			return;
+		}
+		update((draft) => ({ ...draft, goal: "", ...(command.kind === "mode" ? { mode: command.mode } : {}) }), true);
+		if (command.kind === "model") setModelOpen(true);
+		else if (command.kind === "new") newConversation();
+		else if (command.kind === "commit") {
+			if (commit.blocked) setError(commit.blocked);
+			else commit.run();
+		}
+	}
+	/** 发送前先看是不是命令；是命令就由这里处理，返回 true。 */
+	async function runSlash(): Promise<boolean> {
+		const parsed = parseSlash(composer.goal);
+		if (!parsed) return false;
+		const command = commands.find((item) => item.name === parsed.name);
+		if (!command) {
+			setError(`没有这个命令：/${parsed.name}`);
+			return true;
+		}
+		if (command.kind === "goal") {
+			const intent = goalIntent(parsed.argument);
+			if (!intent) setError("在 /goal 后面写上目标，或者 clear、pause、resume");
+			else if ("action" in intent) await goalAction(intent.action);
+			else await submitGoal({ ...composer, goal: intent.objective });
+			return true;
+		}
+		if (command.kind === "custom") {
+			await submitDraft({ ...composer, goal: expandCustom(command.text, parsed.argument) });
+			return true;
+		}
+		pick(command);
+		return true;
+	}
 	return (
 		<form
 			className={`agent-composer mx-auto w-full shrink-0 ${expanded ? "max-w-[720px]" : ""}`}
 			onSubmit={(event) => {
 				event.preventDefault();
-				void submit();
+				void (async () => {
+					if (!(await runSlash())) await submit();
+				})();
 			}}
 			onDragOver={(event) => {
 				if (event.dataTransfer.types.includes("Files")) event.preventDefault();
@@ -338,6 +424,31 @@ export function AgentComposer({
 					引用总量超过 256 KB，请移除部分内容或改为引用选段。
 				</p>
 			)}
+			{menu.length > 0 && (
+				<div
+					role="listbox"
+					aria-label="命令"
+					className="mb-1 max-h-56 overflow-auto rounded-lg border bg-popover p-1 text-sm shadow-sm"
+				>
+					{menu.map((command, index) => (
+						<div
+							key={command.name}
+							role="option"
+							tabIndex={-1}
+							aria-selected={index === highlighted}
+							data-highlighted={index === highlighted ? "" : undefined}
+							className="flex cursor-default items-baseline gap-2 rounded-md px-2 py-1 data-[highlighted]:bg-accent"
+							onMouseDown={(event) => {
+								event.preventDefault();
+								pick(command);
+							}}
+						>
+							<span className="shrink-0 font-medium">/{command.name}</span>
+							<span className="min-w-0 truncate text-xs text-muted-foreground">{command.detail}</span>
+						</div>
+					))}
+				</div>
+			)}
 			<InputGroup data-variant="composer">
 				<InputGroupTextarea
 					ref={textarea}
@@ -347,6 +458,8 @@ export function AgentComposer({
 					placeholder="输入消息…"
 					onChange={(event) => {
 						const goal = event.target.value;
+						setHighlight(0);
+						setDismissed(undefined);
 						update((draft) => ({ ...draft, goal }));
 					}}
 					onPaste={(event) => {
@@ -357,6 +470,25 @@ export function AgentComposer({
 					}}
 					onKeyDown={(event) => {
 						if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+						if (menu.length > 0 && !event.metaKey && !event.ctrlKey) {
+							if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+								event.preventDefault();
+								const step = event.key === "ArrowDown" ? 1 : -1;
+								setHighlight((highlighted + step + menu.length) % menu.length);
+								return;
+							}
+							if (event.key === "Enter" || event.key === "Tab") {
+								event.preventDefault();
+								const command = menu[highlighted];
+								if (command) pick(command);
+								return;
+							}
+							if (event.key === "Escape") {
+								event.preventDefault();
+								setDismissed(composer.goal);
+								return;
+							}
+						}
 						const cursor = event.currentTarget.selectionStart;
 						if (event.key === "@" && (cursor === 0 || /\s/u.test(event.currentTarget.value[cursor - 1] ?? ""))) {
 							event.preventDefault();
@@ -418,6 +550,8 @@ export function AgentComposer({
 						onChange={(mode) => update((draft) => ({ ...draft, mode }), true)}
 					/>
 					<ConversationModelPicker
+						open={modelOpen}
+						onOpenChange={setModelOpen}
 						choice={composer.model}
 						current={session?.model}
 						active={active}

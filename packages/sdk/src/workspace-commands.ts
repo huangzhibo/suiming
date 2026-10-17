@@ -44,6 +44,12 @@ export {
 
 const empty = Type.Object({}, { additionalProperties: false });
 
+/**
+ * 作者存的常用话（ADR-0038 决定三）：应用配置目录 `commands/<名字>.md`，与 config.toml 同处。工作流习惯不是作品事实，
+ * 不放进作品目录；输入框里用 `/名字` 调出，发出去的就是展开后的原文。
+ */
+export const authorCommandSchema = Type.Object({ name: id, text: id }, { additionalProperties: false });
+export type AuthorCommand = Static<typeof authorCommandSchema>;
 const file = Type.Object(
 	{ path: id, content: Type.String(), sha256: Type.Union([Type.String(), Type.Null()]) },
 	{ additionalProperties: false },
@@ -443,6 +449,8 @@ export const LOCAL_COMMANDS = {
 		),
 		Type.Object({ sessionId: id, sequence: Type.Integer({ minimum: 1 }) }, { additionalProperties: false }),
 	),
+	/** 作者存的常用话；目录不存在就是空表。 */
+	"commands.list": command(empty, Type.Array(authorCommandSchema)),
 	/** 清除、暂停或继续对话的目标；对正在跑的对话会被拒绝（先停止）。resume 立刻开一轮续跑。 */
 	"session.goal": command(
 		Type.Object(

@@ -34,6 +34,8 @@ export interface ComposerAttachment {
 export interface ComposerSubmission {
 	model?: ModelChoice;
 	mode?: CollaborationMode;
+	/** 这句话设为对话的目标（`/goal`，ADR-0038）。 */
+	goal?: true;
 	id: string;
 	text: string;
 	/** 缺省表示新建 session。 */
@@ -83,6 +85,7 @@ export function stageSubmission(
 	draft: ComposerDraft,
 	session?: { id: string; status: string; model?: ModelChoice; collaboration?: CollaborationMode },
 	context?: WorkbenchActiveContext,
+	options: { goal?: boolean } = {},
 ): ComposerDraft {
 	if (
 		draft.pending ||
@@ -92,8 +95,9 @@ export function stageSubmission(
 		return draft;
 	const body = composerText(draft);
 	if (!body) return draft;
+	// 设目标时只发目标原文：它会存成目标、在每一轮续跑里重复，不该带上发送那一刻的界面快照
 	const text =
-		context && context.page !== "private" && context.page !== "empty:"
+		!options.goal && context && context.page !== "private" && context.page !== "empty:"
 			? `${body}\n\n${formatWorkbenchContext(context)}`
 			: body;
 	// 换模型只在 turn 边界生效：正在跑的 session 这次不带模型，输入框里的选择留到下一轮。
@@ -112,6 +116,7 @@ export function stageSubmission(
 			text,
 			...(model ? { model } : {}),
 			...(mode ? { mode } : {}),
+			...(options.goal ? { goal: true as const } : {}),
 			...(session ? { sessionId: session.id } : {}),
 		},
 	};
@@ -236,7 +241,8 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 						typeof pending.text !== "string" ||
 						(pending.sessionId !== undefined && typeof pending.sessionId !== "string") ||
 						(pending.model !== undefined && !validModelChoice(pending.model)) ||
-						(pending.mode !== undefined && !validMode(pending.mode))))
+						(pending.mode !== undefined && !validMode(pending.mode)) ||
+						(pending.goal !== undefined && pending.goal !== true)))
 			)
 				throw new Error("本机对话草稿不完整");
 			return [
@@ -255,6 +261,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 										...(typeof pending.sessionId === "string" ? { sessionId: pending.sessionId } : {}),
 										...(validModelChoice(pending.model) ? { model: pending.model } : {}),
 										...(validMode(pending.mode) ? { mode: pending.mode } : {}),
+										...(pending.goal === true ? { goal: true as const } : {}),
 									},
 								}
 							: {}),

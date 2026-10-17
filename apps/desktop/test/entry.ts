@@ -320,6 +320,35 @@ if (process.argv.includes("--workbench-test") || process.argv.includes("--workbe
 		},
 	]);
 }
+if (process.argv.includes("--slash-command-test")) {
+	// ADR-0038：`/goal` 设目标后续跑到模型标「需要作者拍板」；自定义命令按参数展开后就是作者的消息。
+	const last = (context: { messages: unknown[] }) => JSON.stringify(context.messages.at(-1));
+	provider.setResponses([
+		async (context) => {
+			assert.match(last(context), /当前目标/);
+			assert.doesNotMatch(last(context), /\/goal/, "发出去的是目标原文，不带命令名");
+			return fauxAssistantMessage(
+				fauxToolCall("edit", {
+					path: "outline/story/vol-0001/beat-0001.md",
+					oldText: "杖责五十",
+					newText: "杖责六十",
+				}),
+			);
+		},
+		fauxAssistantMessage("先改了第一节的杖数。"),
+		async (context) => {
+			assert.match(last(context), /按作者设定的目标继续/);
+			return fauxAssistantMessage(
+				fauxToolCall("update_goal", { status: "blocked", reason: "要不要连人物档一起改，需要你定" }),
+			);
+		},
+		fauxAssistantMessage("要不要连人物档一起改？"),
+		async (context) => {
+			assert.match(last(context), /独立审一下 第一节/);
+			return fauxAssistantMessage("收到常用话。");
+		},
+	]);
+}
 if (process.argv.includes("--collaboration-mode-test")) {
 	// ADR-0038：讨论模式只读，协作模式改候选但不提交；faux 模型故意越界，看工具面挡不挡得住。
 	const last = (context: { messages: unknown[] }) => JSON.stringify(context.messages.at(-1));

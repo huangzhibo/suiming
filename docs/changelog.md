@@ -1,5 +1,7 @@
 # 变更记录
 
+- **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 做输入框的 `/` 命令与目标状态条：内置命令与对应按钮走同一个处理函数（「提交版本」的处理与不可用原因抽成一处给两边用，模型面板改成可由输入框打开），`/goal` 设目标时不附界面快照，作者的常用话从配置目录 `commands/*.md` 读（新增 `commands.list`）。走查发现按 Esc 收起菜单后、输入回到同一个值时菜单不再出现，已修。单测 3 项与桌面 E2E 1 项通过，完整桌面套件 87 / 88：原生全屏因宿主锁屏进不了全屏，待解锁后补跑。
+
 - **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 实现目标（goal）：`session.send` 带 `goal: true` 设目标，新增 `session.goal`（clear / pause / resume）与 CLI `suim session goal`。turn 结束后 `LocalSessionController` 自动开下一轮，loop 接进一条系统写的续跑消息（不进 inbox），模型用 `update_goal` 标完成或需要作者拍板。用量检查点窗口改为「作者开的那一轮加它自动续的轮次」：`harness.turn` 带 `usageCarried`，没人看着时的上限不变；拿掉这一处，「检查点跨轮次」那条用例就失败。自动续的一轮作品与版本都没变就停下；作者停止转暂停。Skill 补上 `--mode` 与 `session goal`。检查与 510 项单测通过，真实回归 `goal-text` 1 / 1；桌面入口还没做。
 
 - **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 实现协作模式：Session 记录加 `collaboration`，`session.send` 带 `mode`，CLI 有 `--mode`，输入框在模型入口左边加了模式选择。讨论模式下根 Agent 只有读的工具，文件环境只读，读文件也不同步作者草稿；协作模式去掉 `commit`。实现时发现两处：工具面每个 turn 只组装一次，所以模式与模型一样按 turn 生效，对正在跑的对话换模式明确拒绝，不排进去悄悄失效；输入框草稿只选了模式时原来会被当成空草稿删掉，恢复函数也会丢字段，都补了。检查与全部单测通过，桌面 E2E 1 项与真实回归 2 / 2 通过；完整桌面套件没有重跑。

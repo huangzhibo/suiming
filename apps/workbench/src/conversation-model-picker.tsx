@@ -14,6 +14,8 @@ export function ConversationModelPicker({
 	disabled,
 	onChange,
 	openSettings,
+	open: controlledOpen,
+	onOpenChange,
 }: {
 	choice?: ModelChoice | undefined;
 	current?: ModelChoice | undefined;
@@ -21,9 +23,17 @@ export function ConversationModelPicker({
 	disabled: boolean;
 	onChange(model: ModelChoice): void;
 	openSettings(): void;
+	/** 给 `/模型` 用：由输入框打开同一个面板，不另做一个入口。 */
+	open?: boolean;
+	onOpenChange?(open: boolean): void;
 }) {
 	const settings = useModelSettings();
-	const [open, setOpen] = useState(false);
+	const [ownOpen, setOwnOpen] = useState(false);
+	const open = controlledOpen ?? ownOpen;
+	const setOpen = (next: boolean) => {
+		setOwnOpen(next);
+		onOpenChange?.(next);
+	};
 	const profile = settings.data?.profiles.find((profile) => profile.id === "main");
 	const fallback = profile?.model
 		? {

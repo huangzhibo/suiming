@@ -40,10 +40,10 @@ export function useComposerSubmit({
 	const update = (change: (draft: ComposerDraft) => ComposerDraft, persist = false) =>
 		updateComposer(draftKey, change, persist);
 
-	async function send(retry?: ComposerSubmission, draft?: ComposerDraft) {
+	async function send(retry?: ComposerSubmission, draft?: ComposerDraft, options: { goal?: boolean } = {}) {
 		if (inFlight.current || !isCurrentProject()) return;
 		const original = draft ?? latest.current;
-		const staged = retry ? latest.current : stageSubmission(original, session, uiContext);
+		const staged = retry ? latest.current : stageSubmission(original, session, uiContext, options);
 		const pending = retry ?? staged.pending;
 		if (!pending || (!retry && latest.current.pending)) return;
 		inFlight.current = true;
@@ -67,6 +67,7 @@ export function useComposerSubmit({
 				...(pending.sessionId ? { sessionId: pending.sessionId } : {}),
 				...(pending.model ? { model: pending.model } : {}),
 				...(pending.mode ? { mode: pending.mode } : {}),
+				...(pending.goal ? { goal: true } : {}),
 			});
 			onSubmitted(draftKey, pending.id, receipt.sessionId);
 			refresh();
@@ -109,5 +110,7 @@ export function useComposerSubmit({
 		setError,
 		submit: (retry?: ComposerSubmission) => send(retry),
 		submitDraft: (draft: ComposerDraft) => send(undefined, draft),
+		/** `/goal <目标>`：把草稿里的目标原文作为目标发出（ADR-0038）。 */
+		submitGoal: (draft: ComposerDraft) => send(undefined, draft, { goal: true }),
 	};
 }
