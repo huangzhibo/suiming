@@ -1227,7 +1227,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 		.description("用隔离的评委盲评同一个 StoryBeat 的多份候选（judge profile，候选打乱且匿名，每种顺序跑一轮）")
 		.argument("<beat-id>")
 		.requiredOption("--candidate <file...>", "候选 StoryText 文件；去掉扩展名的文件名就是它的标签")
-		.option("--rounds <count>", "让评委看几种候选顺序（1-4）", "2")
+		.option("--rounds <count>", "评委跑几轮，每轮换一种候选顺序（1-4）", "4")
 		.option("--goal <text>", "这次想比较什么")
 		.option(
 			"--rubric <rubric>",

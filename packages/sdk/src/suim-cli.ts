@@ -604,6 +604,8 @@ export const SuimCliRankDataSchema = Type.Object(
 			{
 				provider: Type.String({ minLength: 1 }),
 				model: Type.String({ minLength: 1 }),
+				/** 评委实际用的思考档位，default 为模型自己的缺省。2026-10-17 斗破留出：不开思考时先出场的候选赢 79%，结论多半由顺序决定。 */
+				thinking: Type.String({ minLength: 1 }),
 				/** 评委与 Writer 同一个模型时自评倾向不可忽略，结果只能当参考。 */
 				sameModelAsWriter: Type.Boolean(),
 			},

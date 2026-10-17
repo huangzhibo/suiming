@@ -52,7 +52,6 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 							reason: `第 ${index + 1} 名的理由`,
 							flaws: index === 0 ? [] : ["旁白替人物作证"],
 						})),
-						summary: "两版都能读，先出现的更紧。",
 					}),
 				);
 			},
@@ -67,7 +66,6 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 							reason: `第二轮第 ${index + 1} 名`,
 							flaws: [],
 						})),
-						summary: "第二轮。",
 					}),
 				);
 			},
@@ -76,6 +74,8 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 			storyBeatId: "beat-0001",
 			candidates,
 			goal: "看谁更像人在现场",
+			// 默认 4 轮由 CLI 那条测试守；这里看两种顺序怎么排、怎么合并
+			rounds: 2,
 		});
 		assert.equal(result.rounds, 2);
 		// 默认按本作宪法与写作准则评，结果标明口径（读者口径另有一条测试）。
@@ -83,7 +83,12 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 		assert.match(system, /旁白替人物作证/u);
 		// 作者想比的点原样交给评委（原来只断言它存进了 session 记录的 input，那个字段没人读，已删）。
 		assert.deepEqual(goals, [true]);
-		assert.deepEqual(result.judge, { provider: "suiming-rank-faux", model: "judge-model", sameModelAsWriter: false });
+		assert.deepEqual(result.judge, {
+			provider: "suiming-rank-faux",
+			model: "judge-model",
+			thinking: "default",
+			sameModelAsWriter: false,
+		});
 		assert.equal(orders.length, 2);
 		assert.deepEqual(orders[0], ["甲", "乙"], "评委每轮看到的盲标固定，变的是盲标背后的候选");
 		assert.deepEqual(result.ranking.map((item) => item.label).sort(), ["flash", "pro"]);
@@ -136,7 +141,6 @@ test("盲读评委：漏排、并列或未知盲标被工具拒绝并让评委�
 				return fauxAssistantMessage(
 					fauxToolCall("submit_ranking", {
 						ranking: [{ candidate: labels[0] as string, rank: 1, reason: "只排了一版", flaws: [] }],
-						summary: "漏排",
 					}),
 				);
 			},
@@ -146,7 +150,6 @@ test("盲读评委：漏排、并列或未知盲标被工具拒绝并让评委�
 				return fauxAssistantMessage(
 					fauxToolCall("submit_ranking", {
 						ranking: labels.map((label) => ({ candidate: label, rank: 1, reason: "并列", flaws: [] })),
-						summary: "并列",
 					}),
 				);
 			},
@@ -161,7 +164,6 @@ test("盲读评委：漏排、并列或未知盲标被工具拒绝并让评委�
 							reason: "好了",
 							flaws: [],
 						})),
-						summary: "第三次才对",
 					}),
 				);
 			},
@@ -196,11 +198,12 @@ test("盲读评委：漏排、并列或未知盲标被工具拒绝并让评委�
 	});
 });
 
-test("盲读评委把总评写进了名次条目：拒绝信息点明顶层缺 summary、条目里只认哪些字段，评委照着改对后完成", async () => {
+test("盲读评委在名次条目里多写字段、漏掉必填字段：拒绝信息点明是哪一层、这一层认哪些字段，评委照着改对后完成", async () => {
 	// AGENTS.md 测试纪律：真实 provider 暴露的 malformed output 要有等价回归。2026-10-17 斗破留出，deepseek-v4-pro
-	// 在同一节两次把 summary 放进 ranking 的条目里，三次调用都没改对：原来的报错是 TypeBox 原文，
-	// 「: must have required properties summary; /ranking/0/summary: schema is false; /ranking/0: must not have
-	// additional properties」，既没说缺的是顶层，也没说多出的是哪个字段。
+	// 几次把当时必填的整批总评 summary 写进 ranking 的条目里，三次调用都没改对，那一节评委没有结果。原来的报错是
+	// TypeBox 原文「: must have required properties summary; /ranking/0/summary: schema is false; /ranking/0: must not
+	// have additional properties」，既没说缺的在顶层，也没说多出的是哪个字段。summary 没人读，已经删掉；
+	// 这里守的是拒绝信息：多出的字段点名、列出这一层认的字段，顶层写成 (top level)。
 	await withProject(async (project) => {
 		const feedback: string[] = [];
 		const responses: Responses = [
@@ -213,10 +216,14 @@ test("盲读评委把总评写进了名次条目：拒绝信息点明顶层缺 s
 							rank: index + 1,
 							reason: "理由",
 							flaws: [],
-							...(index === labels.length - 1 ? { summary: "总评放错了地方" } : {}),
+							...(index === labels.length - 1 ? { summary: "总评写进了条目" } : {}),
 						})),
 					}),
 				);
+			},
+			(context: Context) => {
+				feedback.push(JSON.stringify(context.messages.at(-1)?.content));
+				return fauxAssistantMessage(fauxToolCall("submit_ranking", { summary: "只交了总评" }));
 			},
 			(context: Context) => {
 				feedback.push(JSON.stringify(context.messages.at(-1)?.content));
@@ -229,7 +236,6 @@ test("盲读评委把总评写进了名次条目：拒绝信息点明顶层缺 s
 							reason: "理由",
 							flaws: [],
 						})),
-						summary: "改到顶层",
 					}),
 				);
 			},
@@ -240,14 +246,14 @@ test("盲读评委把总评写进了名次条目：拒绝信息点明顶层缺 s
 			rounds: 1,
 		});
 		assert.equal(result.ranking.length, 2);
-		const [message] = feedback;
-		assert.match(message ?? "", /invalid_tool_arguments/u);
-		assert.match(message ?? "", /\(top level\): must have required properties summary/u);
+		const [nested, topLevel] = feedback;
 		assert.match(
-			message ?? "",
-			/\/ranking\/1: unexpected property summary \(allowed here: candidate, rank, reason, flaws\)/u,
+			nested ?? "",
+			/invalid_tool_arguments: \/ranking\/1: unexpected property summary \(allowed here: candidate, rank, reason, flaws\)/u,
 		);
-		assert.doesNotMatch(message ?? "", /schema is false/u, "additionalProperties 的子错误是噪声，不重复报");
+		assert.doesNotMatch(nested ?? "", /schema is false/u, "additionalProperties 的子错误是噪声，不重复报");
+		assert.match(topLevel ?? "", /\(top level\): must have required properties ranking/u);
+		assert.match(topLevel ?? "", /\(top level\): unexpected property summary \(allowed here: ranking\)/u);
 	});
 });
 
@@ -272,7 +278,6 @@ test("读者口径的评委：不带宪法与写作准则、不看 Design，只�
 								reason: "口气接得上前文",
 								flaws: [],
 							})),
-							summary: "读者口径。",
 						}),
 					);
 				},

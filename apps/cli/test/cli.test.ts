@@ -1319,7 +1319,7 @@ function rankRunGateway(): ModelGateway {
 		models: [{ id: "agent-model" }, { id: "reviewer-model" }, { id: "judge-model" }],
 	});
 	provider.setResponses(
-		Array.from({ length: 2 }, () => (context: Context) => {
+		Array.from({ length: 4 }, () => (context: Context) => {
 			const prompt = context.messages
 				.filter((message) => message.role === "user")
 				.map((message) => (typeof message.content === "string" ? message.content : JSON.stringify(message.content)))
@@ -1333,7 +1333,6 @@ function rankRunGateway(): ModelGateway {
 						reason: "先出现的更紧",
 						flaws: [],
 					})),
-					summary: "两版都能读。",
 				}),
 			);
 		}),
@@ -1378,22 +1377,20 @@ test("suim run rank：多版候选文件匿名交给评委，输出合并名次�
 			judge: { model: string; sameModelAsWriter: boolean };
 			ranking: { label: string; ranks: number[] }[];
 		};
-		assert.equal(data.rounds, 2);
+		assert.equal(data.rounds, 4, "默认 4 轮：只跑 2 轮时两轮一致的结论在复测里被推翻 5%–13%");
 		assert.equal(data.rubric, "constitution", "默认按本作宪法与写作准则评");
 		assert.equal(data.judge.model, "judge-model");
 		// 只有 ChatGPT 订阅、没配评委时评委落回写正文的模型，结果里只有一个布尔值；host 要知道这时名次只能当参考
 		const skill = await readFile(new URL("../../../integrations/shared/suiming/SKILL.md", import.meta.url), "utf8");
 		assert.match(skill, /`judge\.sameModelAsWriter` 为 true 时评委就是写正文的模型/u);
+		assert.match(skill, /`judge\.thinking` 是 `off` 时评委没开思考/u);
 		assert.deepEqual(data.ranking.map((item) => item.label).sort(), ["flash", "pro"]);
 		const shown = await jsonCommand(checkoutPath, ["session", "show", data.sessionId]);
 		const rank = shown.value.data as { session: { kind: string }; tasks: { kind: string; status: string }[] };
 		assert.equal(rank.session.kind, "rank");
 		assert.deepEqual(
 			rank.tasks.map((task) => [task.kind, task.status]),
-			[
-				["judge", "completed"],
-				["judge", "completed"],
-			],
+			Array.from({ length: 4 }, () => ["judge", "completed"]),
 		);
 
 		// 对照原作或参照稿：读者口径的评委不带本作准则，只看前文

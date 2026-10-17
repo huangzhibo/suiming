@@ -16,7 +16,9 @@ import { compileWriteContext, precedingStoryText, styleEvidenceFor } from "./wri
  * 盲读评委（路线图 R 节，2026-09-06 作者提出）：同一个 StoryBeat 的多版正文匿名打乱后交给隔离的评委，
  * 按作者盲读记录里的口径排序。它只做预筛与回归，不是作品裁决，也不是 Reward：
  * - 评委用 `judge` profile，应与 Writer 不同的模型；结果记下是否与 Writer 同模型；
- * - 同一批候选跑多个顺序（默认两个：一正一反）取平均名次，压位置偏差；
+ * - 同一批候选跑多个顺序取平均名次，压位置偏差：默认 4 轮，两个候选时正反顺序各两轮。2026-10-17 斗破留出复测
+ *   （docs/validation/2026-10-17-judge-position）：只跑 2 轮时「两轮一致」的结论在独立复测里被推翻 5%–13%，
+ *   4 轮全一致的被推翻约 3%；位置偏向在正反平衡时变成平局，不变成错判；
  * - 每轮是一个只读 Task，结果作为 Task 结果持久化，不新增任何记录类型；
  * - 与作者盲读的一致率由作者记录对照，不在这里计算。
  */
@@ -28,7 +30,7 @@ export interface RankCandidate {
 export type StartRankRunInput = Pick<TurnOptions, "signal" | "onEvent"> & {
 	storyBeatId: string;
 	candidates: readonly RankCandidate[];
-	/** 评委轮数（每轮一个不同的候选顺序），1 到 4，默认 2。 */
+	/** 评委轮数（每轮一个候选顺序，轮流换），1 到 4，默认 4。 */
 	rounds?: number;
 	/** 作者这次特别想比的点，原样交给评委。 */
 	goal?: string;
@@ -59,7 +61,6 @@ export interface RankRoundResult {
 	/** 本轮的候选顺序：按盲标顺序排列的原始 label。 */
 	order: string[];
 	ranking: { label: string; rank: number; reason: string; flaws: string[] }[];
-	summary: string;
 }
 
 export interface RankRunResult {
@@ -67,7 +68,8 @@ export interface RankRunResult {
 	session: SessionRecord;
 	rounds: number;
 	rubric: RankRubric;
-	judge: { provider: string; model: string; sameModelAsWriter: boolean };
+	/** thinking 是评委实际用的思考档位（default 为模型自己的缺省），记下来是因为它决定评委能不能用，见 SubmitRankingSchema 上方。 */
+	judge: { provider: string; model: string; thinking: string; sameModelAsWriter: boolean };
 	ranking: RankedCandidate[];
 	roundResultObjectIds: string[];
 }
@@ -86,6 +88,8 @@ export const JUDGE_SYSTEM_PROMPT =
 export const READER_JUDGE_SYSTEM_PROMPT =
 	"你是读过这部中文网络小说前文的老读者，隔离盲读同一节接下来的几种写法。只按读者的感受排：哪一版读起来最像这部书接着往下写——人物说话的样子、叙述的口气、节奏、段落与对白的疏密、这部书惯常交代事情的方式；哪一版更让你想接着读。作者选定了样章时，文风以样章为准，前文只用来判断接不接得上；没有样章时，前文自己的写法就是标准。不要拿任何写作规范或你自己的审美去纠正这个标准，不要因为一版更规范、更干净、更克制就偏好它，也不要因为它更像原作就默认它好——像不像、想不想读，按读到的感受判断。候选顺序随机且没有来源信息：不要猜来源，不要偏好长的或先出现的。给每一版一个 1 到 n 的名次（不并列）、一句理由和它的主要缺陷（哪里不像前文、哪里读着出戏或想跳过），只调用 submit_ranking 提交。";
 
+// 原来还有一个必填的整批总评 summary，没有任何地方读它。2026-10-17 斗破留出里 deepseek-v4-pro（不开思考）几次把它
+// 写进 ranking 的条目，三次调用改不对，那一节评委就没有结果；每版的理由与缺陷已经够用，删掉。
 const SubmitRankingSchema = Type.Object(
 	{
 		ranking: Type.Array(
@@ -100,7 +104,6 @@ const SubmitRankingSchema = Type.Object(
 			),
 			{ minItems: 1 },
 		),
-		summary: Type.String({ minLength: 1, description: "整批候选的一句总评" }),
 	},
 	{ additionalProperties: false },
 );
@@ -167,7 +170,6 @@ function roundResultOf(value: unknown): RankRoundResult {
 			reason: String(item.reason),
 			flaws: Array.isArray(item.flaws) ? item.flaws.map(String) : [],
 		})),
-		summary: typeof record.summary === "string" ? record.summary : "",
 	};
 }
 
@@ -177,7 +179,7 @@ export async function runRankExperiment(engine: SuimingHarness, input: StartRank
 	if (storyBeatId.length === 0) throw new SuimingHarnessError("invalid_goal", "storyBeatId must not be empty");
 	const candidates = input.candidates.map((item) => ({ label: item.label.trim(), text: item.text }));
 	validateCandidates(candidates);
-	const rounds = Math.min(MAX_ROUNDS, Math.max(1, Math.trunc(input.rounds ?? 2)));
+	const rounds = Math.min(MAX_ROUNDS, Math.max(1, Math.trunc(input.rounds ?? MAX_ROUNDS)));
 	const goal = input.goal?.trim();
 	const rubric = input.rubric ?? "constitution";
 	if (!RANK_RUBRICS.includes(rubric)) throw new SuimingHarnessError("invalid_goal", `unknown rank rubric: ${rubric}`);
@@ -301,7 +303,6 @@ export async function runRankExperiment(engine: SuimingHarness, input: StartRank
 								submitted = {
 									order: order.map((index) => candidates[index]?.label as string),
 									ranking: ranking.sort((left, right) => left.rank - right.rank),
-									summary: params.summary.trim(),
 								};
 								return "已记录本轮名次。";
 							},
@@ -340,7 +341,12 @@ export async function runRankExperiment(engine: SuimingHarness, input: StartRank
 				storyBeatId,
 				rounds,
 				rubric,
-				judge: { provider: judge.snapshot.provider, model: judge.snapshot.model, sameModelAsWriter },
+				judge: {
+					provider: judge.snapshot.provider,
+					model: judge.snapshot.model,
+					thinking: judge.snapshot.thinking ?? "default",
+					sameModelAsWriter,
+				},
 				ranking,
 				roundResultObjectIds,
 			};
