@@ -306,6 +306,21 @@ const TASKS = [
 		],
 	},
 	{
+		// 真实模型多半在作者开的那一轮就做完并标完成（2026-10-17 两次斗破长运行都是），续跑消息碰不到。
+		// 这里让它每写完一节先停下汇报：第一轮停在一节，看它读到系统的续跑消息后会不会接着写完、再标完成。
+		id: "goal-continue",
+		goal: true,
+		prompt: "写 beat-0001 和 beat-0002 的正文并提交。每写完一节先停下来跟我说一声。",
+		grade: (r) => [
+			expect("目标标为完成", r.session?.goal?.status === "complete"),
+			expect("真的续跑过", (r.session?.goal?.autoTurns ?? 0) >= 1),
+			expect("续跑有界（不超过 3 轮）", (r.session?.goal?.autoTurns ?? 99) <= 3),
+			expect("两节都有正文", r.texts.includes("beat-0001.md") && r.texts.includes("beat-0002.md")),
+			expect("当前版本过 Checker", r.check.data?.passed === true),
+			expect("没有停在故障上", r.session?.lastFailure === undefined),
+		],
+	},
+	{
 		id: "review",
 		async setup(dir, service) {
 			await mkdir(join(dir, "text"), { recursive: true });
@@ -437,7 +452,7 @@ const GROUPS = {
 	check: ["check-issues", "delegate-writer-issues"],
 	smoke: ["discuss"],
 	mode: ["mode-discuss", "mode-collaborate"],
-	goal: ["goal-text"],
+	goal: ["goal-text", "goal-continue"],
 };
 
 const option = (name) => {

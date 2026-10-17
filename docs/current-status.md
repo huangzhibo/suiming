@@ -78,7 +78,7 @@
 | 正文 / 审稿时效、Source 覆盖率 | `artifact/derived.ts` | 真实调用：审稿时效在桌面手动修订后再次验证；Source 覆盖率有抽取记录 |
 | AG-UI 事件、只读 attach、桌面 typed IPC | `sdk/run-event.ts`、`apps/desktop` | 机制、Electron E2E 与真实模型中断 / 重连 |
 | 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/workbench` | Electron E2E、真实模型创作闭环与 231 情节隔离副本走查 |
-| 目标（goal）：作者设定后自动续跑 | `local-session-controller.ts`、`harness/agent.ts` 的 `update_goal`、`conversation-goal-bar.tsx` | 真实调用：回归 `goal-text` 1 / 1；续跑、完成 / 拍板、空转即停、检查点跨轮次、停止即暂停由机制用例覆盖；桌面 `/goal` 与状态条经 E2E |
+| 目标（goal）：作者设定后自动续跑 | `local-session-controller.ts`、`harness/agent.ts` 的 `update_goal`、`conversation-goal-bar.tsx` | 真实调用：回归 `goal-text`、`goal-continue`（真实续跑一轮后收口）各 1 / 1；斗破 24 节留出带目标跑两次，Agent 自己标完成，检查点 100 万时撞线即停、目标不跑出窗口（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）；空转即停、检查点跨轮次、停止即暂停由机制用例覆盖；桌面 `/goal` 与状态条经 E2E |
 | 输入框 `/` 命令 | `slash-commands.ts`、`agent-composer.tsx`、`local/author-commands.ts` | Electron E2E；只是现有能力的入口 |
 | 协作模式（讨论 / 协作 / 自主） | `harness/agent.ts`、`conversation-mode-picker.tsx` | 真实调用：回归 `mode` 组 2 / 2；faux 越界写入由工具面挡住，桌面 E2E 覆盖选择、草稿不落盘与作者提交 |
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |

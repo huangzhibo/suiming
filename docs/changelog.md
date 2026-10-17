@@ -1,5 +1,7 @@
 # 变更记录
 
+- **2026-10-17** 目标的真实运行验收：斗破 24 节留出加 `--goal` 跑两次，Agent 都在作者开的那一轮里写完、审完、提交并自己标完成，完成理由如实交代审稿已过时；检查点调到 100 万时前两轮各在约 100 万处撞线停下，目标保持进行中、没有自动续跑，作者说「继续」才接着做。长运行碰不到续跑消息，另加回归 `goal-continue`（每写完一节先停下汇报），真实续跑一轮后写完并收口，1 / 1。见[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)。
+
 - **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 做输入框的 `/` 命令与目标状态条：内置命令与对应按钮走同一个处理函数（「提交版本」的处理与不可用原因抽成一处给两边用，模型面板改成可由输入框打开），`/goal` 设目标时不附界面快照，作者的常用话从配置目录 `commands/*.md` 读（新增 `commands.list`）。走查发现按 Esc 收起菜单后、输入回到同一个值时菜单不再出现，已修。单测 3 项与桌面 E2E 1 项通过，完整桌面套件 87 / 88：原生全屏因宿主锁屏进不了全屏，待解锁后补跑。
 
 - **2026-10-17** 按 [ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md) 实现目标（goal）：`session.send` 带 `goal: true` 设目标，新增 `session.goal`（clear / pause / resume）与 CLI `suim session goal`。turn 结束后 `LocalSessionController` 自动开下一轮，loop 接进一条系统写的续跑消息（不进 inbox），模型用 `update_goal` 标完成或需要作者拍板。用量检查点窗口改为「作者开的那一轮加它自动续的轮次」：`harness.turn` 带 `usageCarried`，没人看着时的上限不变；拿掉这一处，「检查点跨轮次」那条用例就失败。自动续的一轮作品与版本都没变就停下；作者停止转暂停。Skill 补上 `--mode` 与 `session goal`。检查与 510 项单测通过，真实回归 `goal-text` 1 / 1；桌面入口还没做。
