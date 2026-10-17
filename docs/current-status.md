@@ -15,6 +15,8 @@
 
 ## 最近有效验收
 
+2026-10-17：[斗破留出续写全流程](validation/2026-10-17-doupo-holdout-pipeline/README.md)：120 章抽取作品的第二卷 24 节整卷留出，一条命令独立跑了两次，中间都没有人插手。每次一个 turn 写完、审稿、修订、检查并一次提交（53 / 60 分钟，117 / 149 次调用），Langfuse 用量逐项对账。整卷审稿被开场预检拒绝后，Agent 自己拆小重审；第二次 Agent 改了一节抽自原作的 Design，改动可见，但破坏了留出的前提。顺带修掉 Langfuse 地址无效时整轮报错的缺陷。这些结果不说明文学质量。
+
 2026-10-17：完成[对话驱动连续创作组合验收](validation/2026-10-17-continuous-workbench/README.md)：两部隔离作品、4 个 turn、19 次真实模型调用，串起两文件按需同步、差异展示、流式停止、跨作品往返、退出重开和原会话继续提交。未触及草稿与继续输入保留，Canon 仅推进一次；自动定位不再弹出作者选段修改栏。首批 OTLP 受控延迟后，导出与 Langfuse 的 47 条观测逐项对账通过；旧缺失仍保留归因边界。
 
 2026-10-17：按 [ADR-0037](adr/0037-agent-workbench-context.md) 接通发送时界面快照与根 Agent 的展示能力：当前文件 / 视图 / 选区随消息冻结，可查询现场、定位原文和展示差异；复用原导航、比较与草稿，切页、停止和重载后不执行迟到导航，不为展示自动唤起窗口。验证过程、迭代发现与证据边界见[界面能力验收](validation/2026-10-17-agent-workbench/README.md)。
@@ -52,7 +54,7 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 498 / 498、0 skip，工作台 82 / 82 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 499 / 499、0 skip（2026-10-17 `3b46f45`），工作台 82 / 82 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
 | 桌面与窗口 | 完整桌面 86 / 86 通过、0 skip（2026-10-17 在 `a79c5b4` 上复跑），含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
@@ -73,7 +75,7 @@
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |
-| 盲评 `suim rank` | `harness/rank-experiment.ts` | 机制；与作者判断的一致率还没量过。两种口径见[路线图](roadmap.md)第 5 节 |
+| 盲评 `suim rank` | `harness/rank-experiment.ts` | 真实调用；与作者判断的一致率还没量过。读者口径在两次 24 节留出上每节 2 轮，两轮名次互换的节数是 12 / 24 与 20 / 24，位置偏差压过了判断（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）。两种口径见[路线图](roadmap.md)第 5 节 |
 | 长篇 | — | 无 |
 
 ## 证据等级
@@ -97,6 +99,7 @@
 - **命令边界**：CLI 与桌面 IPC 保留两份手写传输目录，共用领域 schema 和摘要投影，理由见[系统架构](architecture.md)。旧 Cloud API、存储 adapter、同步服务与专属协议已按 [ADR-0030](adr/0030-remove-frozen-cloud.md) 删除。未来 Cloud 不是当前能力或桌面验收缺口。
 - **模型预检范围**：启动只预检这次对话用的模型。没单独配置的角色从 2026-10-05 起跟随对话的模型，预检查过的就是它们要用的；单独配置过的 writer / reviewer / source-extractor 不在预检里，凭据或模型有问题时失败发生在 turn 中途、token 已经花掉。可续做的调用失败现会给父模型真实 Task ID 和已有 `resume_task` 入口，独立模型失败、重载与原任务续做已定向验证；这不等于所有角色都做过提前预检。按实际会用到的 profile 预检需要先知道 Agent 会不会委派，未实现。
 - **无人值守没有方向闸**：创作路径没有预算，兜底有 `run_no_progress`、每轮用量检查点与作者打断。检查点保证没人看着时一轮最多用掉约一次整本抽取的量（GPT-6.1 Sol 上约 $12），但它只封住用量、不判断方向，**停不住「持续产出但方向错了」的 turn**，只能靠作者发现（完整说明见 [Harness 设计](harness-design.md)第 10 节）。检查点的阈值作者在设置页或 config.toml 的 `session.usage_checkpoint` 调。带交付工具的子任务另有 `unsubmittedStops >= 3` 的收口，那不是方向闸。真正的结构性改善是让作者补充的意图能沉淀回作品，见 [AGENTS.md](../AGENTS.md) 不变量 5。
+- **Agent 会为了自洽改动作者定下的 Design**：斗破留出第二次运行，审稿指出四星到五星没有交代，根 Agent 把一节抽自原作的 Design 改成与原作相反的星级，而意图写明前 120 章照原作建模、不改设定。回复与 turn 结束对账都列出了 Design 改动，作者看得见；但「先查原作或保留幕后突破」这样的判断仍靠模型，没有闸，也不该加闸（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）。
 - **长期意图已验证短场景的持续维护，尚非全面覆盖**：六节三轮真实创作已验证首次写回、后续改口替换同一意图文件、保留未撤销偏好和新对话仅读复用，见[组合验收](validation/2026-10-14-continuous-recovery/README.md)。写回仍由 prompt 指导；每轮确定性对账只显示哪些文件改变，不判断全部要求是否正确保存。脚本偏好不冒充作者判断，多来源矛盾消解、长期组织和大上下文压缩后保持仍无充分证据。
 - **大材料补全已覆盖全部分段，审稿仍受窗口与语义判断限制**：三国隔离副本五段 231 节均实际回读；76 份延后情节全部读取，Source Checker 与覆盖对账通过。真实摘要后继续整合、正常停止后原任务恢复已有证据。全 Source 审稿约 656 KB，默认模型的开场预检拒绝；此次单独选用更大窗口的 Reviewer，不裁剪范围。首份正式 pass 漏掉辅助核查的四条问题，根 Agent 回读后修正；不能将完整输入、覆盖率或 pass 当作无语义遗漏的保证。跨卷整合与摘要成本仍高，见[验收](validation/2026-10-15-large-source/README.md)。
 - **`refs.beat` 的新写法尚未全量复核旧抽取**：抽取方法原来要「每节依赖的更早那一节写进 refs.beat」，与 Story Language 不一致，Agent 抽出的作品大量连上一节：示例三国 231 节 403 条、一半只跨一节；斗破前 120 章 153 节 449 条、28% 只跨一节。依赖闭包沿这条链传下去，`impact` 改前半本任何一节都召回后文的近九成。2026-10-04 两处措辞对齐为「紧挨着的上一节不用连」，闭包对上一节的依赖只算一跳、改 Beat 时总带上下一节（示例三国的召回降到后文的 3%）。同日斗破前 24 章重抽：只连上一节的从 22 条（33%）降到 0，跨节的依赖 44 → 42（[第七圈](validation/2026-10-03-doupo-mini/README.md)）；2026-10-15 又在三国隔离副本全部五段 231 节上验证跨卷补全，修正遗漏的早期依据并去除相邻冗余引用；120 章与公开三国样例仍没有全量重抽，旧数据里的相邻连线由闭包与故事轴兜住。
