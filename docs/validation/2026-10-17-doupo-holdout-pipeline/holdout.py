@@ -250,6 +250,8 @@ class Pipeline:
         (self.out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf8")
         wins = sum(1 for value in results["ranks"].values() if value.get("agent", 9) < value.get("original", 9))
         losses = sum(1 for value in results["ranks"].values() if value.get("agent", 0) > value.get("original", 0))
+        # 评委没交出结果的节单列，不算持平
+        failed = [beat for beat, value in results["ranks"].items() if "error" in value]
         lines = [
             f"# 留出全流程结果（构建 {results['repo']} · dist {results['dist']}）",
             "",
@@ -277,7 +279,8 @@ class Pipeline:
             "- 正文与审稿之外的改动：" + ("、".join(other) if (other := [
                 path for path in changed if not path.startswith(("text/", "review/"))
             ]) else "无"),
-            f"- 读者口径评委（2 轮）：Agent 平均名次更好 {wins} 节，原作更好 {losses} 节，持平 {len(ranks) - wins - losses} 节",
+            f"- 读者口径评委（2 轮）：Agent 平均名次更好 {wins} 节，原作更好 {losses} 节，持平 {len(ranks) - wins - losses - len(failed)} 节"
+            + (f"，评委没交出结果 {len(failed)} 节（{'、'.join(failed)}）" if failed else ""),
         ]
         (self.out / "results.md").write_text("\n".join(lines) + "\n", encoding="utf8")
         print("\n".join(lines))

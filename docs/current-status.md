@@ -84,7 +84,7 @@
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |
-| 盲评 `suim rank` | `harness/rank-experiment.ts` | 真实调用；与作者判断的一致率还没量过。读者口径在两次 24 节留出上每节 2 轮，两轮名次互换的节数是 12 / 24 与 20 / 24，位置偏差压过了判断（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）。两种口径见[路线图](roadmap.md)第 5 节 |
+| 盲评 `suim rank` | `harness/rank-experiment.ts` | 真实调用；与作者判断的一致率还没量过。读者口径在两次 24 节留出上每节 2 轮，两轮名次互换的节数是 12 / 24 与 19 / 23；连同带目标的两次，188 轮里先出场的候选赢 141 轮（75%），位置偏差压过了判断；评委没开思考，同一节有两次三轮调用都交不出合法排序（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）。两种口径见[路线图](roadmap.md)第 5 节 |
 | 长篇 | — | 无 |
 
 ## 证据等级
