@@ -1,5 +1,6 @@
 import type { JsonValue, Static, Tool, ToolResultMessage, TSchema } from "@earendil-works/pi-ai";
 import { formatDiagnostic, SuimError } from "@suiming/story";
+import { Value } from "typebox/value";
 
 /** 工具结果的 details 随 ToolResultMessage 进 checkpoint 与 pi-ai，必须是 JSON 值（pi-ai 0.99 起类型上要求）。 */
 export type ToolDetails = JsonValue | undefined;
@@ -64,4 +65,37 @@ export function rejectionForToolError(error: unknown): unknown {
 	return new ToolRejection(error.code, detail.length === 0 ? error.message : `${error.message}\n${detail}`, {
 		cause: error,
 	});
+}
+
+/**
+ * 工具参数不合 schema 时回给模型的说明。TypeBox 的原文保持英文（AGENTS.md「错误信息与退出码」），只补它不说的两样：
+ * 顶层写成 `(top level)`；多出的字段点名，并列出这一层认的字段。additionalProperties 每多一个字段还会附一条
+ * 「schema is false」，与点名那条重复，不报。2026-10-17 斗破留出，deepseek-v4-pro 两次把评委的 summary 写进
+ * ranking 的条目里，原文只说「: must have required properties summary」「/ranking/0: must not have additional
+ * properties」，三次调用都没改对。
+ */
+export function describeArgumentErrors(schema: TSchema, value: unknown): string {
+	return [...Value.Errors(schema, value)]
+		.flatMap((error) => {
+			const path = error.instancePath || "(top level)";
+			if (error.keyword === "boolean" && error.schemaPath.endsWith("/additionalProperties")) return [];
+			if (error.keyword !== "additionalProperties") return [`${path}: ${error.message}`];
+			const extra = (error.params as { additionalProperties?: unknown }).additionalProperties;
+			const allowed = Object.keys(schemaAt(schema, error.schemaPath)?.properties ?? {});
+			return (Array.isArray(extra) ? extra.map(String) : []).map(
+				(name) =>
+					`${path}: unexpected property ${name}${allowed.length > 0 ? ` (allowed here: ${allowed.join(", ")})` : ""}`,
+			);
+		})
+		.join("; ");
+}
+
+/** 按 Value.Errors 给的 schemaPath（`#/properties/ranking/items` 这种 JSON Pointer）找到那一层 schema。 */
+function schemaAt(schema: TSchema, pointer: string): { properties?: Record<string, unknown> } | undefined {
+	let node: unknown = schema;
+	for (const segment of pointer.replace(/^#\/?/u, "").split("/").filter(Boolean)) {
+		if (node === null || typeof node !== "object") return undefined;
+		node = (node as Record<string, unknown>)[segment.replaceAll("~1", "/").replaceAll("~0", "~")];
+	}
+	return node !== null && typeof node === "object" ? (node as { properties?: Record<string, unknown> }) : undefined;
 }

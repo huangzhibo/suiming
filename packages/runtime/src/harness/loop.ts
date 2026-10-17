@@ -18,7 +18,13 @@ import type { BoundModelProfile } from "../model/model-gateway.js";
 import { captureTelemetryContent } from "../model/telemetry-content.js";
 import { compactionContext, compactionCut } from "./context-compaction.js";
 import { SuimingHarnessError } from "./errors.js";
-import { type HarnessTool, type HarnessToolResult, rejectionForToolError, ToolRejection } from "./tool.js";
+import {
+	describeArgumentErrors,
+	type HarnessTool,
+	type HarnessToolResult,
+	rejectionForToolError,
+	ToolRejection,
+} from "./tool.js";
 
 export interface TaskLoopBudget {
 	maxTurns: number;
@@ -568,9 +574,7 @@ export async function runTaskLoop(options: TaskLoopOptions): Promise<TaskLoopOut
 					if (!Value.Check(tool.parameters, action.call.arguments))
 						throw new ToolRejection(
 							"invalid_tool_arguments",
-							[...Value.Errors(tool.parameters, action.call.arguments)]
-								.map((error) => `${error.instancePath}: ${error.message}`)
-								.join("; "),
+							describeArgumentErrors(tool.parameters, action.call.arguments),
 						);
 					// 先记下「已开始」：恢复时据此区分「执行时被打断」与「没有执行」。
 					action.state = "effect_pending";

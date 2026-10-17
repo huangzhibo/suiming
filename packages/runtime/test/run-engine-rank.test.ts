@@ -196,6 +196,61 @@ test("盲读评委：漏排、并列或未知盲标被工具拒绝并让评委�
 	});
 });
 
+test("盲读评委把总评写进了名次条目：拒绝信息点明顶层缺 summary、条目里只认哪些字段，评委照着改对后完成", async () => {
+	// AGENTS.md 测试纪律：真实 provider 暴露的 malformed output 要有等价回归。2026-10-17 斗破留出，deepseek-v4-pro
+	// 在同一节两次把 summary 放进 ranking 的条目里，三次调用都没改对：原来的报错是 TypeBox 原文，
+	// 「: must have required properties summary; /ranking/0/summary: schema is false; /ranking/0: must not have
+	// additional properties」，既没说缺的是顶层，也没说多出的是哪个字段。
+	await withProject(async (project) => {
+		const feedback: string[] = [];
+		const responses: Responses = [
+			(context: Context) => {
+				const labels = blindLabelsIn(context);
+				return fauxAssistantMessage(
+					fauxToolCall("submit_ranking", {
+						ranking: labels.map((label, index) => ({
+							candidate: label,
+							rank: index + 1,
+							reason: "理由",
+							flaws: [],
+							...(index === labels.length - 1 ? { summary: "总评放错了地方" } : {}),
+						})),
+					}),
+				);
+			},
+			(context: Context) => {
+				feedback.push(JSON.stringify(context.messages.at(-1)?.content));
+				const labels = blindLabelsIn(context);
+				return fauxAssistantMessage(
+					fauxToolCall("submit_ranking", {
+						ranking: labels.map((label, index) => ({
+							candidate: label,
+							rank: index + 1,
+							reason: "理由",
+							flaws: [],
+						})),
+						summary: "改到顶层",
+					}),
+				);
+			},
+		];
+		const result = await runRankExperiment(new SuimingHarness({ project, models: gateway(responses) }), {
+			storyBeatId: "beat-0001",
+			candidates,
+			rounds: 1,
+		});
+		assert.equal(result.ranking.length, 2);
+		const [message] = feedback;
+		assert.match(message ?? "", /invalid_tool_arguments/u);
+		assert.match(message ?? "", /\(top level\): must have required properties summary/u);
+		assert.match(
+			message ?? "",
+			/\/ranking\/1: unexpected property summary \(allowed here: candidate, rank, reason, flaws\)/u,
+		);
+		assert.doesNotMatch(message ?? "", /schema is false/u, "additionalProperties 的子错误是噪声，不重复报");
+	});
+});
+
 test("读者口径的评委：不带宪法与写作准则、不看 Design，只拿紧挨着的前文，问哪一版更像这部书接着往下写", async () => {
 	// 2026-10-03 斗破留出评测：默认评委与 Writer 用同一份 AI 味清单、还带宪法，对照原作时 36 轮 35 轮判 Agent 胜，
 	// 扣原作的理由正是那些条目——等于用 Writer 的考纲给原作阅卷。作者定：另加不带本作准则的评委专门对照原作。

@@ -60,7 +60,7 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 499 / 499、0 skip（2026-10-17 `3b46f45`），工作台 82 / 82 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 514 / 514、0 skip（2026-10-17，评委拒绝信息修复之后），工作台 82 / 82 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
 | 桌面与窗口 | 完整桌面 86 / 86 通过、0 skip（2026-10-17 在 `a79c5b4` 上复跑）；加入协作模式与 `/` 命令后 87 / 88，原生全屏一项因宿主锁屏未验，待补跑，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
@@ -84,7 +84,7 @@
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |
-| 盲评 `suim rank` | `harness/rank-experiment.ts` | 真实调用；与作者判断的一致率还没量过。读者口径在两次 24 节留出上每节 2 轮，两轮名次互换的节数是 12 / 24 与 19 / 23；连同带目标的两次，188 轮里先出场的候选赢 141 轮（75%），位置偏差压过了判断；评委没开思考，同一节有两次三轮调用都交不出合法排序（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）。两种口径见[路线图](roadmap.md)第 5 节 |
+| 盲评 `suim rank` | `harness/rank-experiment.ts` | 真实调用；与作者判断的一致率还没量过。读者口径在两次 24 节留出上每节 2 轮，两轮名次互换的节数是 12 / 24 与 19 / 23；连同带目标的两次，188 轮里先出场的候选赢 141 轮（75%），位置偏差压过了判断；评委没开思考，同一节有两次三轮调用都交不出合法排序（`summary` 写进了名次条目；已补等价回归，工具参数的拒绝信息现在点明顶层与这一层认的字段；[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）。两种口径见[路线图](roadmap.md)第 5 节 |
 | 长篇 | — | 无 |
 
 ## 证据等级
