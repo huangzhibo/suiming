@@ -1,5 +1,5 @@
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
-import type { EditorFileHandler, ModelChoice, WorkbenchHandler } from "@suiming/sdk";
+import type { CollaborationMode, EditorFileHandler, ModelChoice, WorkbenchHandler } from "@suiming/sdk";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ExecutionStateEvent, SessionRecord } from "../execution/types.js";
 import { agentTurn } from "../harness/agent.js";
@@ -49,6 +49,8 @@ export interface SendInput {
 	/** 新 session 的模型，或在 turn 边界换绑。 */
 	model?: ModelChoice;
 	binding?: ModelBindingSnapshot;
+	/** 协作模式（ADR-0038）：新 session 的初始模式，或从这一轮起换用；对正在跑的对话换模式会被拒绝。 */
+	mode?: CollaborationMode;
 	onEvent?: SessionEventListener;
 }
 
@@ -134,8 +136,17 @@ export class LocalSessionController {
 				commandId: input.commandId,
 				...(input.model === undefined ? {} : { model: input.model }),
 				...(input.binding === undefined ? {} : { binding: input.binding }),
+				...(input.mode === undefined ? {} : { collaboration: input.mode }),
 			});
 			sessionId = created.id;
+		} else if (input.mode !== undefined) {
+			// 模式与模型一样只在 turn 边界换：排进正在跑的对话就会悄悄失效，所以明确拒绝（本进程和别的进程在跑都算）。
+			const current = harness.session(sessionId);
+			if (current.status === "running" && (current.collaboration ?? "autonomous") !== input.mode)
+				throw new ArtifactError(
+					"session_running",
+					"对话正在进行，换模式要从下一轮起生效：等它停下或先停止，再发这句话",
+				);
 		}
 		const queued = this.#project.queueInbox(sessionId, input.text, `${input.commandId}:send`, {
 			model: input.model ?? null,
@@ -146,6 +157,7 @@ export class LocalSessionController {
 			this.#requireFree(sessionId);
 			this.#drive(harness, sessionId, {
 				...(input.binding === undefined ? {} : { model: input.binding }),
+				...(input.mode === undefined ? {} : { collaboration: input.mode }),
 				...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
 			});
 		}
@@ -186,6 +198,7 @@ export class LocalSessionController {
 		sessionId: string,
 		options: {
 			model?: ModelBindingSnapshot;
+			collaboration?: CollaborationMode;
 			onEvent?: SessionEventListener;
 		},
 	): void {

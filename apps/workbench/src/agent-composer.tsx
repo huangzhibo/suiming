@@ -23,6 +23,7 @@ import {
 	MAX_INPUT_BYTES,
 	textFileAttachment,
 } from "./composer-state.js";
+import { ConversationModePicker } from "./conversation-mode-picker.js";
 import { ConversationModelPicker } from "./conversation-model-picker.js";
 import type { Book } from "./model.js";
 import { isSessionActive } from "./run-presentation.js";
@@ -50,7 +51,14 @@ export function AgentComposer({
 	...binding
 }: ComposerBinding & {
 	book: Book;
-	session: { id: string; status: string; model?: import("@suiming/sdk").ModelChoice } | undefined;
+	session:
+		| {
+				id: string;
+				status: string;
+				model?: import("@suiming/sdk").ModelChoice;
+				collaboration?: import("@suiming/sdk").CollaborationMode;
+		  }
+		| undefined;
 	expanded: boolean;
 	refresh(): void;
 	openSettings(): void;
@@ -402,6 +410,13 @@ export function AgentComposer({
 							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
+					<ConversationModePicker
+						choice={composer.mode}
+						current={session?.collaboration}
+						active={active}
+						disabled={busy || !!composer.pending}
+						onChange={(mode) => update((draft) => ({ ...draft, mode }), true)}
+					/>
 					<ConversationModelPicker
 						choice={composer.model}
 						current={session?.model}

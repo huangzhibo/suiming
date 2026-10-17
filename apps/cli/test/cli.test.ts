@@ -466,6 +466,30 @@ test("session send --events 在最终响应之前逐行输出 SessionEvent 信�
 	}
 });
 
+test("session send --mode 设协作模式并随对话保留；取值写错报用法错误", async () => {
+	const checkoutPath = await fixture();
+	try {
+		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
+		const sent = await jsonCommand(checkoutPath, ["session", "send", "--mode", "discuss", "先聊聊"], replyGateway());
+		assert.equal(sent.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(sent.value));
+		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, sent.value.data));
+		const session = (sent.value.data as { session: { id: string; collaboration?: string } }).session;
+		assert.equal(session.collaboration, "discuss");
+		const listed = await jsonCommand(checkoutPath, ["session", "list"]);
+		assert.equal(
+			(listed.value.data as { sessions: { id: string; collaboration?: string }[] }).sessions.find(
+				(item) => item.id === session.id,
+			)?.collaboration,
+			"discuss",
+		);
+		const wrong = await jsonCommand(checkoutPath, ["session", "send", "--mode", "plan", "先聊聊"], replyGateway());
+		assert.equal(wrong.exitCode, SUIM_CLI_EXIT.usage);
+		assert.equal((wrong.value.error as { code: string }).code, "invalid_cli_usage");
+	} finally {
+		await rm(checkoutPath, { recursive: true, force: true });
+	}
+});
+
 test("suim 退出时统一由 shutdown 导出并关闭观测实例，成功与失败路径都执行", async () => {
 	const checkoutPath = await fixture();
 	try {

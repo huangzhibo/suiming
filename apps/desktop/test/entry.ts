@@ -320,6 +320,39 @@ if (process.argv.includes("--workbench-test") || process.argv.includes("--workbe
 		},
 	]);
 }
+if (process.argv.includes("--collaboration-mode-test")) {
+	// ADR-0038：讨论模式只读，协作模式改候选但不提交；faux 模型故意越界，看工具面挡不挡得住。
+	const last = (context: { messages: unknown[] }) => JSON.stringify(context.messages.at(-1));
+	provider.setResponses([
+		async (context) => {
+			assert.match(last(context), /对话模式：讨论/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "world/core.md" }));
+		},
+		async (context) => {
+			assert.match(last(context), /赤壁之战的天下/, "讨论模式读文件不替作者存草稿");
+			return fauxAssistantMessage(fauxToolCall("write", { path: "world/core.md", content: "讨论里偷偷改" }));
+		},
+		async (context) => {
+			assert.match(last(context), /unknown_tool/);
+			return fauxAssistantMessage("方案：核心设定的开头压短一句，切到协作再动手。");
+		},
+		async (context) => {
+			assert.match(last(context), /对话模式：协作/);
+			return fauxAssistantMessage(fauxToolCall("read", { path: "world/core.md" }));
+		},
+		async (context) => {
+			assert.match(last(context), /作者的草稿/);
+			return fauxAssistantMessage(
+				fauxToolCall("write", { path: "world/core.md", content: "赤壁之战的天下，作者的草稿，按方案压短\n" }),
+			);
+		},
+		fauxAssistantMessage(fauxToolCall("commit", { summary: "想自己提交" })),
+		async (context) => {
+			assert.match(last(context), /unknown_tool/);
+			return fauxAssistantMessage("改好了，候选里改了核心设定，等你提交。");
+		},
+	]);
+}
 if (process.argv.includes("--editor-sync-test")) {
 	provider.setResponses([
 		async () => {

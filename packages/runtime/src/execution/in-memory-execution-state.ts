@@ -1,3 +1,4 @@
+import type { CollaborationMode } from "@suiming/sdk";
 import { canonicalJson, sha256Hex } from "@suiming/story";
 import type { ModelBindingSnapshot } from "../model/model-gateway.js";
 import { ExecutionStateError } from "./errors.js";
@@ -39,6 +40,7 @@ export interface CreateSessionInput {
 	projectId: string;
 	kind?: SessionKind;
 	model?: ModelBindingSnapshot;
+	collaboration?: CollaborationMode;
 	baseRevisionId?: string;
 }
 
@@ -50,6 +52,8 @@ export interface StartTurnInput {
 	turnId?: string;
 	/** 从这个 turn 起换用的模型。 */
 	model?: ModelBindingSnapshot;
+	/** 从这个 turn 起换用的协作模式。 */
+	collaboration?: CollaborationMode;
 }
 
 export interface EndTurnInput {
@@ -223,6 +227,7 @@ export class InMemoryExecutionState {
 				kind: input.kind ?? "agent",
 				status: "idle",
 				...(input.model === undefined ? {} : { model: clone(input.model) }),
+				...(input.collaboration === undefined ? {} : { collaboration: input.collaboration }),
 				turn: 0,
 				...(input.baseRevisionId === undefined
 					? {}
@@ -237,7 +242,7 @@ export class InMemoryExecutionState {
 		});
 	}
 
-	/** idle → running：拿 lease、开新 turn；换模型只在这里发生。 */
+	/** idle → running：拿 lease、开新 turn；换模型与换协作模式只在这里发生。 */
 	startTurn(input: StartTurnInput): SessionRecord {
 		return this.#execute(input.commandId, input, () => {
 			const session = this.#requireSession(input.sessionId);
@@ -249,6 +254,7 @@ export class InMemoryExecutionState {
 			session.lease = { ...input.lease };
 			session.turnId = nonempty(input.turnId ?? input.lease.ownerId ?? "", "turn.id");
 			if (input.model !== undefined) session.model = clone(input.model);
+			if (input.collaboration !== undefined) session.collaboration = input.collaboration;
 			delete session.lastFailure;
 			touch(session, timestamp);
 			return clone(session);

@@ -157,6 +157,8 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 | 调研 | `web_search` `fetch` `save_material` | 否 | **未实现（切片 E）**，设计见第 8 节 |
 | 计算 | `run_command` | 否 | **未实现（切片 F）**，设计见第 8.5 节：本机 shell 在 Seatbelt 里跑，只能读写 checkout、无网络，结果直接落文件，改动清单随结果回来 |
 
+**协作模式按 turn 收窄工具面**（[ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md)）。Session 记录上的 `collaboration` 与模型绑定一样在 turn 开始时生效，整个 turn 用同一个；作者在 `session.send` 带 `mode` 换，对正在跑的对话换会被拒（`session_running`），不排进 inbox 悄悄失效。讨论模式下根 Agent 只有读的工具（没有写入、`delegate`、`review`、`resume_task`、`commit`），文件环境同时设为只读，读文件也不同步作者草稿；协作模式只去掉 `commit`。作者消息的系统附注写明当前模式。它不是第 16 节删掉的 scope 预设：那是按入口绑定、由系统设的写路径范围；模式是作者自己选的、只决定能不能写和能不能提交，不限定写哪里。
+
 修改候选的几个工具各有来由：
 
 - 桌面 Agent 实际访问文件前，通过可选编辑器端口同步该路径的作者草稿；不会因搜索、提交或打开多个 Tab 而保存其他文件。同步失败交回模型，`read(editor: true)` 查看草稿、原基线与磁盘，`write(draftSHA)` 经双边版本核对完成合并或明确恢复；复用现有保存 CAS，不要求作者先点按钮。临时 IPC、窗口重接及 CLI 边界见 [ADR-0036](adr/0036-agent-editor-sync.md)。
@@ -476,6 +478,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 - `source/<id>/**` 能不能改由 Checker 规则决定（原文导入后是否允许改是作品规则），不在工具层拦。
 - Reviewer 审什么由消息定，没有 scope 校验。
 - 作者任何时候都能说话；工具面与宪法升级了下一次请求就生效，不等下一个 session（第 3 节）。
+- 协作模式（讨论 / 协作 / 自主）是作者选的，不是系统设的闸：Codex 的 read-only 沙箱、Claude Code 的 plan 模式是同类。它只收窄能不能写、能不能提交，不按路径限定范围（第 6 节）。
 - 计算的边界是 Seatbelt，不是解释器：bash 在沙箱里，python 只是能跑的东西之一（第 8.5 节，未实现）。
 
 **留**（每条一句为什么）

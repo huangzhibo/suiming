@@ -1,7 +1,10 @@
 import { type Static, type TSchema, type TUnsafe, Type } from "typebox";
 import {
+	COLLABORATION_MODES,
+	type CollaborationMode,
 	type checkDiagnosticSchema,
 	checkSummarySchema,
+	collaborationModeSchema,
 	commitResultSchema,
 	type ModelChoice,
 	modelChoiceSchema,
@@ -21,7 +24,15 @@ import type { WorkbenchCall, WorkbenchReply } from "./workbench.js";
 
 const id = Type.String({ minLength: 1 });
 
-export { type ModelChoice, modelChoiceSchema, modelThinkingSchema, thinkingLevelSchema };
+export {
+	COLLABORATION_MODES,
+	type CollaborationMode,
+	collaborationModeSchema,
+	type ModelChoice,
+	modelChoiceSchema,
+	modelThinkingSchema,
+	thinkingLevelSchema,
+};
 
 const empty = Type.Object({}, { additionalProperties: false });
 const file = Type.Object(
@@ -406,11 +417,17 @@ export const LOCAL_COMMANDS = {
 	),
 	/**
 	 * 作者说一句话。没有 sessionId 就新建 session；idle 则开一个 turn，running 则排进 inbox 在下一边界注入。
-	 * `model` 只在 turn 边界生效。
+	 * `model` 与 `mode`（协作模式，ADR-0038）只在 turn 边界生效：对正在跑的对话换模式会被拒绝，不悄悄失效。
 	 */
 	"session.send": command(
 		Type.Object(
-			{ commandId: id, text: id, sessionId: Type.Optional(id), model: Type.Optional(modelChoiceSchema) },
+			{
+				commandId: id,
+				text: id,
+				sessionId: Type.Optional(id),
+				model: Type.Optional(modelChoiceSchema),
+				mode: Type.Optional(collaborationModeSchema),
+			},
 			{ additionalProperties: false },
 		),
 		Type.Object({ sessionId: id, sequence: Type.Integer({ minimum: 1 }) }, { additionalProperties: false }),

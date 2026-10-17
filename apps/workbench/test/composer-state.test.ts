@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	acknowledgeSubmission,
+	type ComposerState,
 	composerText,
 	emptyComposer,
+	restoreComposerDrafts,
 	settleComposerAttachment,
 	stageSubmission,
 	textFileAttachment,
@@ -90,6 +92,31 @@ test("同一 session 的消息带 sessionId；模型选择只在 turn 边界带�
 		};
 		assert.equal(stageSubmission(draft), draft);
 	}
+});
+
+test("协作模式与模型一样只在 turn 边界带上；与对话当前模式相同时不带", () => {
+	for (const status of ["running", "idle"]) {
+		const staged = stageSubmission({ goal: "先聊聊", attachments: [], mode: "discuss" }, { id: "session-1", status });
+		assert.equal(staged.pending?.mode, status === "idle" ? "discuss" : undefined, "跑着的时候这次不换模式");
+		assert.equal(staged.mode, "discuss", "输入框里的选择留到下一轮");
+	}
+	const same = stageSubmission(
+		{ goal: "接着聊", attachments: [], mode: "discuss" },
+		{ id: "session-1", status: "idle", collaboration: "discuss" },
+	);
+	assert.equal(same.pending?.mode, undefined);
+	const fresh = stageSubmission({ goal: "新对话就自主", attachments: [], mode: "autonomous" });
+	assert.equal(fresh.pending?.mode, undefined, "新对话默认就是自主");
+	assert.equal(stageSubmission({ goal: "新对话先讨论", attachments: [], mode: "discuss" }).pending?.mode, "discuss");
+	// 只选了模式、还没输入也要留着（与只选了模型相同）；重载恢复不丢
+	const empty: ComposerState = { sessionId: "", sessionChosen: false, composerDrafts: {} };
+	const state = updateComposerDraft(empty, "new", (draft) => ({
+		...draft,
+		mode: "discuss",
+	}));
+	assert.equal(state.composerDrafts.new?.mode, "discuss");
+	assert.equal(restoreComposerDrafts(JSON.parse(JSON.stringify(state.composerDrafts))).new?.mode, "discuss");
+	assert.throws(() => restoreComposerDrafts({ new: { goal: "", attachments: [], mode: "plan" } }), /不完整/);
 });
 
 test("外部文本真正解码，保留中文；拒绝二进制、未知编码和伪装的非文本文件", async () => {

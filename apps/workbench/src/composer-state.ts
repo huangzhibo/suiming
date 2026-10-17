@@ -1,7 +1,14 @@
-import type { ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
+import {
+	COLLABORATION_MODES,
+	type CollaborationMode,
+	type ModelChoice,
+	type WorkbenchActiveContext,
+} from "@suiming/sdk";
 
 export interface ComposerDraft {
 	model?: ModelChoice;
+	/** 协作模式的选择（ADR-0038）；与模型一样留在输入框里，对话正在回复时等下一条消息才带上。 */
+	mode?: CollaborationMode;
 	goal: string;
 	attachments: ComposerAttachment[];
 	pending?: ComposerSubmission;
@@ -26,6 +33,7 @@ export interface ComposerAttachment {
 /** 只保存一次尚未确认的用户提交，不承担运行队列或执行状态。 */
 export interface ComposerSubmission {
 	model?: ModelChoice;
+	mode?: CollaborationMode;
 	id: string;
 	text: string;
 	/** 缺省表示新建 session。 */
@@ -46,7 +54,8 @@ export function updateComposerDraft<T extends ComposerState>(
 ): T {
 	const draft = update(state.composerDrafts[key] ?? emptyComposer());
 	const composerDrafts = { ...state.composerDrafts };
-	if (draft.goal || draft.attachments.length || draft.pending || draft.model) composerDrafts[key] = draft;
+	if (draft.goal || draft.attachments.length || draft.pending || draft.model || draft.mode)
+		composerDrafts[key] = draft;
 	else delete composerDrafts[key];
 	// 开始输入即选定当前对话，重载不能因后台新出现 session 而切走这份草稿。
 	return { ...state, composerDrafts, sessionChosen: true };
@@ -72,7 +81,7 @@ export function formatWorkbenchContext(context: WorkbenchActiveContext): string 
 }
 export function stageSubmission(
 	draft: ComposerDraft,
-	session?: { id: string; status: string; model?: ModelChoice },
+	session?: { id: string; status: string; model?: ModelChoice; collaboration?: CollaborationMode },
 	context?: WorkbenchActiveContext,
 ): ComposerDraft {
 	if (
@@ -89,13 +98,20 @@ export function stageSubmission(
 			: body;
 	// 换模型只在 turn 边界生效：正在跑的 session 这次不带模型，输入框里的选择留到下一轮。
 	const model = draft.model && session?.status !== "running" ? draft.model : undefined;
+	// 模式同理；与对话当前模式相同就不带，免得每条消息都像在「换模式」。
+	const mode =
+		draft.mode && session?.status !== "running" && draft.mode !== (session?.collaboration ?? "autonomous")
+			? draft.mode
+			: undefined;
 	return {
 		...emptyComposer(),
 		...(draft.model ? { model: draft.model } : {}),
+		...(draft.mode ? { mode: draft.mode } : {}),
 		pending: {
 			id: crypto.randomUUID(),
 			text,
 			...(model ? { model } : {}),
+			...(mode ? { mode } : {}),
 			...(session ? { sessionId: session.id } : {}),
 		},
 	};
@@ -185,6 +201,10 @@ export async function contentFingerprint(content: string): Promise<string> {
 }
 
 /** 本机草稿恢复：内容字段校验失败就停止恢复，未知辅助字段丢掉；输入只有 attachments 一种表示。 */
+function validMode(value: unknown): value is CollaborationMode {
+	return typeof value === "string" && (COLLABORATION_MODES as readonly string[]).includes(value);
+}
+
 export function restoreComposerDrafts(value: unknown): Record<string, ComposerDraft> {
 	if (value === undefined) return {};
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("本机对话草稿格式无效");
@@ -209,12 +229,14 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 				!Array.isArray(saved.attachments) ||
 				attachments.length !== saved.attachments.length ||
 				(saved.model !== undefined && !validModelChoice(saved.model)) ||
+				(saved.mode !== undefined && !validMode(saved.mode)) ||
 				(pending !== undefined &&
 					(!pending ||
 						typeof pending.id !== "string" ||
 						typeof pending.text !== "string" ||
 						(pending.sessionId !== undefined && typeof pending.sessionId !== "string") ||
-						(pending.model !== undefined && !validModelChoice(pending.model))))
+						(pending.model !== undefined && !validModelChoice(pending.model)) ||
+						(pending.mode !== undefined && !validMode(pending.mode))))
 			)
 				throw new Error("本机对话草稿不完整");
 			return [
@@ -224,6 +246,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 						goal: typeof saved.goal === "string" ? saved.goal : "",
 						attachments,
 						...(validModelChoice(saved.model) ? { model: saved.model } : {}),
+						...(validMode(saved.mode) ? { mode: saved.mode } : {}),
 						...(pending && typeof pending.id === "string" && typeof pending.text === "string"
 							? {
 									pending: {
@@ -231,6 +254,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 										text: pending.text,
 										...(typeof pending.sessionId === "string" ? { sessionId: pending.sessionId } : {}),
 										...(validModelChoice(pending.model) ? { model: pending.model } : {}),
+										...(validMode(pending.mode) ? { mode: pending.mode } : {}),
 									},
 								}
 							: {}),

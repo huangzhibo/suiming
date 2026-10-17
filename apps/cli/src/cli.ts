@@ -48,6 +48,8 @@ import {
 	telemetryFromEnvironment,
 } from "@suiming/runtime";
 import {
+	COLLABORATION_MODES,
+	type CollaborationMode,
 	errorCategory,
 	retryableErrorCode,
 	SUIM_CLI_COMMAND_DATA,
@@ -1036,13 +1038,22 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 		.description("发一条作者消息并等这个 turn 结束；不带 --session 就新开一个 session")
 		.argument("<text...>")
 		.option("--session <id>", "继续一个已有的 session")
+		.option(
+			"--mode <mode>",
+			"协作模式，从这一轮起生效并沿用：discuss 只读讨论，collaborate 能改候选但由作者提交，autonomous 能改也能提交（新对话的默认）",
+		)
 		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
 		.option("--auth <path>", "覆盖 ~/.suiming/auth.json")
 		.option("--events", "在最终响应之前逐行流式输出 SessionEvent NDJSON")
 		.action(
-			async (words: string[], options: { session?: string; config?: string; auth?: string; events?: boolean }) => {
+			async (
+				words: string[],
+				options: { session?: string; mode?: string; config?: string; auth?: string; events?: boolean },
+			) => {
 				await execute("session.send", () =>
 					withProject(projectPath(program), async (service) => {
+						if (options.mode !== undefined && !COLLABORATION_MODES.includes(options.mode as CollaborationMode))
+							throw new ArtifactError("invalid_cli_usage", `--mode 只能是 ${COLLABORATION_MODES.join("、")}`);
 						const models = await modelGateway(io, options);
 						const controller = new LocalSessionController({
 							project: service,
@@ -1055,6 +1066,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 							commandId: randomUUID(),
 							text: words.join(" "),
 							...(options.session === undefined ? {} : { sessionId: options.session }),
+							...(options.mode === undefined ? {} : { mode: options.mode as CollaborationMode }),
 							...(onEvent === undefined ? {} : { onEvent }),
 						});
 						await withInterrupt(io, async (signal) => {

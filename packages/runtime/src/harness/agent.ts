@@ -495,15 +495,17 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 		refreshOpening: () => workSnapshot(session, "压缩上下文"),
 		decorateInbox: async (text) => {
 			const current = await readProjectStatus(project, await session.scan(), { stale: false });
-			return `${text}\n\n[系统附注：收到这条消息时，版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个。此后修改不更新本附注，最新状态用 project_status 查询]`;
+			return `${text}\n\n[系统附注：收到这条消息时，版本 ${shortId(session.currentRevisionId)}${session.headMoved ? "，上一轮之后作品有新提交" : ""}；候选里未提交的文件 ${current.candidate.uncommittedChanges} 个；${COLLABORATION_NOTE[session.collaboration]}。此后修改不更新本附注，最新状态用 project_status 查询]`;
 		},
 		tools: (handle) => {
+			// 协作模式由工具面保证（ADR-0038）：讨论只给读的，协作不给 commit；整个 turn 用同一个模式。
+			const mode = session.collaboration;
 			const delegate = delegation(session, handle);
 			const reviewTool = review(session, handle);
-			return [
+			const tools: HarnessTool[] = [
 				projectStatusTool(session, handle),
 				...workbenchTools(session.workbench, handle.env),
-				...fileTools(handle.env, "write", handle.scan),
+				...fileTools(handle.env, mode === "discuss" ? "read" : "write", handle.scan),
 				searchTool(handle.scan),
 				impactTool(handle.scan),
 				compactContextTool(() => workSnapshot(session, "压缩上下文")),
@@ -513,9 +515,7 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 					segmentCodePoints: () => segmentCodePoints(session),
 					extractionPlan: SOURCE_EXTRACTION_PLAN,
 				}),
-				delegate,
-				reviewTool,
-				resumeTask(session, [delegate, reviewTool]),
+				...(mode === "discuss" ? [] : [delegate, reviewTool, resumeTask(session, [delegate, reviewTool])]),
 				{
 					name: "write_context",
 					description:
@@ -556,9 +556,18 @@ export async function agentTurn(session: HarnessSession): Promise<RootLoopOutcom
 					},
 				},
 			];
+			return mode === "autonomous" ? tools : tools.filter((tool) => tool.name !== "commit");
 		},
 	});
 }
+
+/** 收到作者消息时附注里的协作模式说明（ADR-0038）：工具面已经保证了边界，这句让模型知道为什么、该怎么交代。 */
+const COLLABORATION_NOTE = {
+	autonomous: "对话模式：自主",
+	collaborate: "对话模式：协作，由作者提交——可以改候选、派子任务、审稿，但没有 commit；改完在回复里说明候选里改了什么",
+	discuss:
+		"对话模式：讨论，只读——不能改文件、派子任务、审稿落盘或提交；需要改就在回复里给出方案，等作者切到协作或自主再动手",
+} as const;
 
 /** 一次提交结果里最多列这么多路径；超了给总数，避免整部作品的文件名灌进 Context。 */
 const MAX_COMMITTED_PATHS = 30;

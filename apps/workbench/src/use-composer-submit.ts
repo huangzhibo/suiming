@@ -1,4 +1,4 @@
-import type { ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
+import type { CollaborationMode, ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "./bridge.js";
@@ -9,7 +9,7 @@ export interface ComposerSubmitBinding {
 	uiContext?: WorkbenchActiveContext;
 	composer: ComposerDraft;
 	draftKey: string;
-	session: { id: string; status: string; model?: ModelChoice } | undefined;
+	session: { id: string; status: string; model?: ModelChoice; collaboration?: CollaborationMode } | undefined;
 	updateComposer(key: string, update: (draft: ComposerDraft) => ComposerDraft, persist?: boolean): void;
 	onSubmitted(key: string, id: string, sessionId: string): void;
 	refresh(): void;
@@ -66,6 +66,7 @@ export function useComposerSubmit({
 				text: pending.text,
 				...(pending.sessionId ? { sessionId: pending.sessionId } : {}),
 				...(pending.model ? { model: pending.model } : {}),
+				...(pending.mode ? { mode: pending.mode } : {}),
 			});
 			onSubmitted(draftKey, pending.id, receipt.sessionId);
 			refresh();

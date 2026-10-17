@@ -41,6 +41,6 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0035](0035-shared-checkout-write-protection.md) | Accepted | 共享 checkout 的整篇覆盖与删除核对本轮读取版本；保留局部编辑、手动合并和原有草稿机制 |
 | [0036](0036-agent-editor-sync.md) | Accepted | 普通消息直接发送；Agent 访问哪个文件就按原保存 CAS 同步哪个文件的草稿，冲突与恢复由 Agent 用 read / write 处理 |
 | [0037](0037-agent-workbench-context.md) | Accepted | 发送时界面快照、根 Agent 展示能力；复用导航与比较，保护作者现场与取消边界 |
-| [0038](0038-collaboration-modes-goal-and-slash-commands.md) | Accepted，未实现 | 讨论 / 协作 / 自主三种协作模式按工具面保证；作者设定的目标自动续跑，用量检查点按作者开的那一轮计；`/` 命令只是现有能力的入口 |
+| [0038](0038-collaboration-modes-goal-and-slash-commands.md) | Accepted，协作模式已实现 | 讨论 / 协作 / 自主三种协作模式按工具面保证；作者设定的目标自动续跑，用量检查点按作者开的那一轮计；`/` 命令只是现有能力的入口 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。

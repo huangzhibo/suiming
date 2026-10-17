@@ -494,6 +494,7 @@ export class LocalWorkspace implements LocalCommandClient {
 						...(args.sessionId === undefined ? {} : { sessionId: args.sessionId }),
 						...(args.model === undefined ? {} : { model: args.model }),
 						...(binding === undefined ? {} : { binding }),
+						...(args.mode === undefined ? {} : { mode: args.mode }),
 						onEvent: () => this.#changed("stream"),
 					});
 					this.#changed();

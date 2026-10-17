@@ -115,6 +115,8 @@ Story Artifact 与 Story Language 是作品语义真源；机器 schema 必须�
 
 一个 Session 只有一个根 Agent，负责理解这一轮要解决什么、选择动作、在 checkout 上修改并阶段提交。它可以直接执行，也可以把独立任务委派给 Worker；没有固定创作顺序，计划写在消息里而不是实体，作者不需要操作 DAG。Worker 只处理 task-local 输入，不能直接提交 Canon，所有候选由 Agent 收敛。子任务结果交付成功不代表判断正确或适用于新稿，采用前仍要核对输入与正文 / 审稿时效。Session、Task 与 Worker 的准确语义见 [Harness 设计](harness-design.md)。
 
+作者可以为每段对话选协作模式：讨论只读，Agent 只出方案；协作由 Agent 改候选、作者提交；自主由 Agent 改完自己提交。模式由 Agent 能用的工具保证，不靠它自觉，与换模型一样从下一轮起生效（[ADR-0038](adr/0038-collaboration-modes-goal-and-slash-commands.md)）。
+
 turn 结束不表示作者的目标达成，达成与否由作者看作品定。未提交的候选留在 checkout，Agent 在回复里说明哪些改了还没提交，这一轮采用的长期结论写回作品或在回复里点名。
 
 异常结束应说明原因，允许作者沿原对话继续；需要先恢复凭据、数据或环境时，明确给出处理路径。请求结果未知或两轮之间更换模型、工具面，不再要求作者进入额外的暂停确认流程；未确认调用的风险与用量须如实可见，不承诺外部请求 exactly-once。重新打开、重连和重载只恢复展示，不重新执行；正在运行的 Agent 不因 renderer 重载而停止，已停止的执行由作者后续消息继续。准确的停止与恢复规则只在 [Harness 设计](harness-design.md)第 3、5 节维护。

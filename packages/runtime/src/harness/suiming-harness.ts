@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
-import type { EditorFileHandler, WorkbenchHandler } from "@suiming/sdk";
+import type { CollaborationMode, EditorFileHandler, WorkbenchHandler } from "@suiming/sdk";
 import {
 	EventType,
 	type ModelChoice,
@@ -183,6 +183,8 @@ export interface TurnOptions {
 	onEvent?: SessionEventListener;
 	/** 从这个 turn 起换用的模型。 */
 	model?: ModelBindingSnapshot;
+	/** 从这个 turn 起换用的协作模式（ADR-0038）。 */
+	collaboration?: CollaborationMode;
 	onStarted?(value: { sessionId: string; turnId: string }): Promise<void> | void;
 }
 
@@ -277,6 +279,11 @@ export class HarnessSession {
 		return this.#execution.session(this.sessionId);
 	}
 
+	/** 这一轮的协作模式（ADR-0038）；旧记录没有这个字段就是自主。 */
+	get collaboration(): CollaborationMode {
+		return this.record.collaboration ?? "autonomous";
+	}
+
 	/** 已提交基线，即 turn 开始时的 head、或最近一次阶段提交之后的版本。 */
 	get currentRevisionId(): string {
 		return this.#base.baseRevisionId;
@@ -336,9 +343,19 @@ export class HarnessSession {
 		return handler ? (request, signal) => handler(request, signal ?? this.#signal) : undefined;
 	}
 
-	#editorOptions(): { editorFiles?: EditorFileHandler } {
+	/**
+	 * 读写文件前同步作者草稿的端口（ADR-0036）。`save: false` 时不替作者存盘，只保留查看草稿（`read(editor: true)`）：
+	 * 讨论模式承诺这一轮 checkout 什么都不变，存盘也是改。
+	 */
+	#editorOptions(options: { save: boolean } = { save: true }): { editorFiles?: EditorFileHandler } {
 		const handler = this.#engine.editorFiles;
-		return handler ? { editorFiles: (request, signal) => handler(request, signal ?? this.#signal) } : {};
+		if (!handler) return {};
+		return {
+			editorFiles: (request, signal) =>
+				!options.save && request.operation === "save"
+					? Promise.resolve(null)
+					: handler(request, signal ?? this.#signal),
+		};
 	}
 
 	/** 根 Agent 的一个 turn：从 session 的 checkpoint 续，模型停下即返回。 */
@@ -349,7 +366,13 @@ export class HarnessSession {
 		const model = await this.#engine.bindModel("main", record.model);
 		// 根 Agent 的写范围是整个 checkout（.git / .suiming 与 host 接入目录除外，由 ConfinedExecutionEnv 拦），
 		// 合法性在 commit 时由 Checker 判；只有子任务按角色缩小写范围（Harness 设计第 6 节）。
-		const env = new ConfinedExecutionEnv({ rootPath: this.checkoutPath, policy: "write", ...this.#editorOptions() });
+		// 讨论模式（ADR-0038）整轮只读：工具面不给写入，环境也拒绝写入、不替作者存草稿，双重保证。
+		const discuss = this.collaboration === "discuss";
+		const env = new ConfinedExecutionEnv({
+			rootPath: this.checkoutPath,
+			policy: discuss ? "read" : "write",
+			...this.#editorOptions({ save: !discuss }),
+		});
 		const restored = await this.#restore(record.checkpointRef);
 		// 模型已经停下、inbox 也没有新消息：不该开新的模型调用。
 		if (restored !== undefined && restored.loop.phase === "settled" && this.pendingInbox().length === 0)
@@ -891,7 +914,13 @@ export class SuimingHarness {
 	 * rank 之类脚本驱动的 session 不绑根模型。
 	 */
 	async createSession(
-		input: { commandId?: string; kind?: SessionKind; model?: ModelChoice; binding?: ModelBindingSnapshot } = {},
+		input: {
+			commandId?: string;
+			kind?: SessionKind;
+			model?: ModelChoice;
+			binding?: ModelBindingSnapshot;
+			collaboration?: CollaborationMode;
+		} = {},
 	): Promise<SessionRecord> {
 		const execution = this.project.createExecutionState({ now: this.now });
 		const id = input.commandId === undefined ? `session_${randomUUID()}` : this.sessionIdForCommand(input.commandId);
@@ -905,6 +934,7 @@ export class SuimingHarness {
 			projectId: this.project.projectId,
 			kind,
 			...(binding === undefined ? {} : { model: binding }),
+			...(input.collaboration === undefined ? {} : { collaboration: input.collaboration }),
 			baseRevisionId: await this.project.refreshHead(),
 		});
 	}
@@ -988,6 +1018,7 @@ export class SuimingHarness {
 			lease,
 			turnId: ownerId,
 			...(options.model === undefined ? {} : { model: options.model }),
+			...(options.collaboration === undefined ? {} : { collaboration: options.collaboration }),
 		});
 		execution.bindOwner(sessionId, ownerId);
 		// 上一个 turn 结束到这里之间可能回收过执行对象（只在没有 turn 跑时删），存过哪些节点要重新核对。

@@ -1,3 +1,4 @@
+import type { CollaborationMode } from "@suiming/sdk";
 import type { ModelBindingSnapshot } from "../model/model-gateway.js";
 
 /**
@@ -60,6 +61,8 @@ export interface SessionRecord {
 	status: SessionStatus;
 	/** 根 Agent 当前的模型绑定；换模型在 turn 边界改它。 */
 	model?: ModelBindingSnapshot;
+	/** 协作模式（ADR-0038），与模型一样在 turn 边界改；没有就是自主（autonomous）。 */
+	collaboration?: CollaborationMode;
 	/** 已开始的 turn 数；`turnId` 是当前（或最近一个）turn 的 AG-UI runId。 */
 	turn: number;
 	turnId?: string;
