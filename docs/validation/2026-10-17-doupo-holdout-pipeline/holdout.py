@@ -47,6 +47,16 @@ STYLE_EDITS = [
 ]
 
 
+# 评委是评测协议的一部分，不跟本机 .env 的 judge 设置走（2026-10-17 评委位置偏差实验，docs/validation/2026-10-17-judge-position）：
+# 不开思考时先出场的候选赢 79%，结论多半由顺序决定；deepseek-flash 开思考后正反顺序各跑两轮，四轮全一致的结论可复现。
+JUDGE_ENV = {
+    "SUIMING_JUDGE_MODEL_PROVIDER": "deepseek",
+    "SUIMING_JUDGE_MODEL_ID": "deepseek-flash",
+    "SUIMING_JUDGE_MODEL_OPTIONS": '{"maxTokens":32768,"reasoningEffort":"high"}',
+}
+RANK_ROUNDS = 4
+
+
 def load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
@@ -95,12 +105,13 @@ class Pipeline:
         if dist_fingerprint() != self.fingerprint:
             raise SystemExit("dist 在运行中变了，之后的结果与前面不可比，停止。")
 
-    def suim(self, cwd: Path, args: list[str], log: str) -> dict:
-        """跑一次 suim --json，原样存下 stdout / stderr；返回解析后的信封。"""
+    def suim(self, cwd: Path, args: list[str], log: str, env: dict[str, str] | None = None) -> dict:
+        """跑一次 suim --json，原样存下 stdout / stderr；返回解析后的信封。env 覆盖本机 .env 的同名变量。"""
         self.guard()
         started = time.time()
         done = subprocess.run(
-            ["node", str(CLI), "--json", *args], cwd=cwd, env=self.env, capture_output=True, text=True, check=False
+            ["node", str(CLI), "--json", *args], cwd=cwd, env=self.env | (env or {}), capture_output=True, text=True,
+            check=False,
         )
         (self.logs / f"{log}.json").write_text(done.stdout, encoding="utf8")
         if done.stderr:
@@ -197,8 +208,9 @@ class Pipeline:
                 self.suim(
                     self.ref,
                     ["rank", beat, "--candidate", str(folder / "agent.md"), str(folder / "original.md"),
-                     "--rubric", "reader", "--rounds", "2"],
+                     "--rubric", "reader", "--rounds", str(RANK_ROUNDS)],
                     f"rank-{beat}",
+                    JUDGE_ENV,
                 )
             ranks[beat] = json.loads(log.read_text(encoding="utf8") or "{}")
         return metrics, ranks
@@ -240,7 +252,8 @@ class Pipeline:
             "metrics": metrics,
             "ranks": {
                 beat: (
-                    {item["label"]: item["averageRank"] for item in rank["data"]["ranking"]} | {"judge": rank["data"]["judge"]["model"]}
+                    {item["label"]: item["averageRank"] for item in rank["data"]["ranking"]}
+                    | {"rounds": rank["data"]["rounds"], "judge": rank["data"]["judge"]["model"]}
                     if rank.get("ok")
                     else {"error": rank.get("error")}
                 )
@@ -248,10 +261,17 @@ class Pipeline:
             },
         }
         (self.out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf8")
-        wins = sum(1 for value in results["ranks"].values() if value.get("agent", 9) < value.get("original", 9))
-        losses = sum(1 for value in results["ranks"].values() if value.get("agent", 0) > value.get("original", 0))
-        # 评委没交出结果的节单列，不算持平
+        # 每节按 Agent 赢了几轮分档：两个候选时平均名次 1 是轮轮都赢，2 是一轮没赢。
+        # 只有各轮全一致才算明确，其余是倾向或持平；评委没交出结果的节单列，不算持平
         failed = [beat for beat, value in results["ranks"].items() if "error" in value]
+        tally: dict[str, int] = {}
+        for value in results["ranks"].values():
+            if "error" in value:
+                continue
+            rounds = value["rounds"]
+            won = round((2 - value["agent"]) * rounds)
+            key = "Agent 全胜" if won == rounds else "原作全胜" if won == 0 else "持平" if 2 * won == rounds else "Agent 占多" if 2 * won > rounds else "原作占多"
+            tally[key] = tally.get(key, 0) + 1
         lines = [
             f"# 留出全流程结果（构建 {results['repo']} · dist {results['dist']}）",
             "",
@@ -279,7 +299,8 @@ class Pipeline:
             "- 正文与审稿之外的改动：" + ("、".join(other) if (other := [
                 path for path in changed if not path.startswith(("text/", "review/"))
             ]) else "无"),
-            f"- 读者口径评委（2 轮）：Agent 平均名次更好 {wins} 节，原作更好 {losses} 节，持平 {len(ranks) - wins - losses - len(failed)} 节"
+            f"- 读者口径评委（{JUDGE_ENV['SUIMING_JUDGE_MODEL_ID']}，{RANK_ROUNDS} 轮）："
+            + "，".join(f"{key} {tally.get(key, 0)} 节" for key in ("Agent 全胜", "Agent 占多", "持平", "原作占多", "原作全胜"))
             + (f"，评委没交出结果 {len(failed)} 节（{'、'.join(failed)}）" if failed else ""),
         ]
         (self.out / "results.md").write_text("\n".join(lines) + "\n", encoding="utf8")
