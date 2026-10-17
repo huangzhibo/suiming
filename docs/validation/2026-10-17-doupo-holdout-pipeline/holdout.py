@@ -85,6 +85,7 @@ class Pipeline:
         self.logs = out / "logs"
         self.env = environment()
         self.fingerprint = dist_fingerprint()
+        self.commit = self.git(REPO, "rev-parse", "--short", "HEAD").stdout.strip()
 
     def guard(self) -> None:
         if dist_fingerprint() != self.fingerprint:
@@ -141,7 +142,16 @@ class Pipeline:
         return [beat for beat in beats if self.git(self.work, "cat-file", "-e", f"refs/suiming/canon:text/{beat}.md").returncode == 0]
 
     # ② 续写、审稿、提交：一句作者消息，没写完就说「继续」
+    def build_identity(self) -> dict:
+        """写正文那次的构建：第一轮开始前记下，之后续跑出汇总也报它，而不是续跑时的 dist。"""
+        path = self.logs / "build.json"
+        if not path.exists():
+            path.write_text(json.dumps({"commit": self.commit, "dist": self.fingerprint}), encoding="utf8")
+        return json.loads(path.read_text(encoding="utf8"))
+
     def write(self, beats: list[str]) -> list[dict]:
+        if len(self.committed(beats)) < len(beats) and self.build_identity()["dist"] != self.fingerprint:
+            raise SystemExit("前面的 turn 用的是另一份 dist，接着写会把两次构建混进一份结果；换一个输出目录重跑")
         turns: list[dict] = []
         for path in sorted(self.logs.glob("turn-*.json")):
             turns.append(json.loads(path.read_text(encoding="utf8") or "{}"))
@@ -193,16 +203,19 @@ class Pipeline:
         revisions = self.git(self.work, "rev-list", "--count", "refs/suiming/canon").stdout.strip()
         changed = self.git(self.work, "diff", "--name-only", "refs/suiming/canon~" + str(max(int(revisions or 1) - 1, 0)),
                            "refs/suiming/canon").stdout.split()
-        dirty = self.git(self.work, "status", "--porcelain", "--untracked-files=all").stdout.split("\n")
+        # 作品仓的 main 分支没有提交，git status 会把整个目录算成未跟踪；候选与过时审稿以 suim status 为准
+        status = self.suim(self.work, ["status"], "status").get("data", {})
         committed = self.committed(beats)
         results = {
-            "repo": self.git(REPO, "rev-parse", "--short", "HEAD").stdout.strip(),
-            "dist": self.fingerprint,
+            # 写正文那次的提交与 dist 指纹；dist 才是构建的身份（中间只有文档提交时两者不一一对应）
+            "repo": self.build_identity()["commit"],
+            "dist": self.build_identity()["dist"],
             "heldOut": beats,
             "committed": committed,
             "canonRevisions": int(revisions or 0),
             "changedSinceGenesis": changed,
-            "uncommitted": [line for line in dirty if line.strip()],
+            "uncommittedChanges": status.get("candidate", {}).get("uncommittedChanges"),
+            "staleReviews": status.get("stale", {}).get("reviews", {}).get("ids", []),
             "turns": [
                 {
                     "ok": turn.get("ok"),
@@ -232,12 +245,18 @@ class Pipeline:
         lines = [
             f"# 留出全流程结果（构建 {results['repo']} · dist {results['dist']}）",
             "",
-            f"- 留出 {len(beats)} 节，提交了 {len(committed)} 节；Canon 共 {results['canonRevisions']} 个版本；未提交 {len(results['uncommitted'])} 个文件",
+            f"- 留出 {len(beats)} 节，提交了 {len(committed)} 节；Canon 共 {results['canonRevisions']} 个版本；"
+            f"未提交改动 {results['uncommittedChanges']}；审稿 {sum(1 for path in changed if path.startswith('review/'))} 份，"
+            f"其中过时 {len(results['staleReviews'])} 份",
             f"- turn {len(turns)} 次（其中「继续」{max(len(turns) - 1, 0)} 次）：" + "；".join(
                 f"{'ok' if turn['ok'] else 'fail'} {turn['seconds']}s {turn['status']} 调用 {(turn['usage'] or {}).get('calls')} 估算 ${(turn['usage'] or {}).get('costUsd', 0):.2f}"
                 for turn in results["turns"]
             ),
             f"- check：{'passed' if (results['check'] or {}).get('passed') else results['check']}",
+            # 留出评测的前提是两边按同一份 Design 写；Agent 改了 Design 或别的作品文件，在这里点名，评分时心里有数
+            "- 正文与审稿之外的改动：" + ("、".join(other) if (other := [
+                path for path in changed if not path.startswith(("text/", "review/"))
+            ]) else "无"),
             f"- 读者口径评委（2 轮）：Agent 平均名次更好 {wins} 节，原作更好 {losses} 节，持平 {len(ranks) - wins - losses} 节",
         ]
         (self.out / "results.md").write_text("\n".join(lines) + "\n", encoding="utf8")
