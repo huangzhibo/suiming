@@ -13,8 +13,7 @@
 
 ```sh
 python3 -I docs/validation/2026-10-17-doupo-holdout-pipeline/holdout.py \
-  ~/stories/doupo-agent-gpt-2026-10-03c ~/stories/doupo-agent-gpt-2026-10-03c.reply.md \
-  ~/stories/doupo-holdout120-2026-10-17 --holdout-from 107
+  <120 章抽取作品> <那次 Agent 的回复.md> <输出目录> --holdout-from 107
 ```
 
 作品与原文在作者本机，不进仓库。跑之前先构建；跑的过程中不要重建 dist，脚本每一步核对指纹。
