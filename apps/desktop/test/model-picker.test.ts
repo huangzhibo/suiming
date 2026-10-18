@@ -26,13 +26,13 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 		assert.match(await picker.innerText(), /测试模型 A/);
 		await picker.click();
 		await page.getByRole("option", { name: "测试模型 B", exact: true }).click();
+		const thinking = page.getByRole("radiogroup", { name: "思考强度", exact: true });
 		assert.equal(
-			await page.getByRole("combobox", { name: "思考强度", exact: true }).innerText(),
-			"低",
+			await thinking.getByRole("radio", { name: "低", exact: true }).getAttribute("aria-checked"),
+			"true",
 			"换模型保留兼容的思考强度",
 		);
-		await page.getByRole("combobox", { name: "思考强度", exact: true }).click();
-		await page.getByRole("option", { name: "高", exact: true }).click();
+		await thinking.getByRole("radio", { name: "高", exact: true }).click();
 		await page.reload();
 		await picker.waitFor();
 		// 本地选择先恢复为模型 ID，显示名称要等异步模型目录；按钮可见不代表目录已返回。
@@ -51,6 +51,21 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 			true,
 			"窄侧栏不应横向溢出",
 		);
+		// 输入框窄到内容不足 300px 时只留图标（照 Codex），模型名在提示里；仍不横向溢出
+		const composerForm = page.locator("form.agent-composer");
+		await composerForm.evaluate((element) => {
+			(element as unknown as { style: { width: string } }).style.width = "300px";
+		});
+		await eventually(async () => (await picker.innerText()).trim() === "", "窄输入框里模型只留图标");
+		assert.equal(
+			await composer.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+			true,
+			"窄输入框不应横向溢出",
+		);
+		await composerForm.evaluate((element) => {
+			(element as unknown as { style: { width: string } }).style.width = "";
+		});
+		await eventually(async () => /测试模型 B/u.test(await picker.innerText()), "放宽后模型名回来");
 		if (process.env.SUIMING_CAPTURE_DIR) {
 			await mkdir(process.env.SUIMING_CAPTURE_DIR, { recursive: true });
 			await page.screenshot({
@@ -215,12 +230,18 @@ test("模型选择与设置：单对话选择、思考深度、窄栏布局与�
 		await form.getByRole("combobox", { name: "模型", exact: true }).click();
 		await page.getByRole("option", { name: "示例故事模型 · 长名称排版验证", exact: true }).click();
 		assert.equal(
-			await page.getByRole("combobox", { name: "思考强度", exact: true }).count(),
+			await page.getByRole("radiogroup", { name: "思考强度", exact: true }).count(),
 			0,
 			"不支持思考强度的模型隐藏控件",
 		);
 		await page.getByRole("option", { name: "测试模型 B", exact: true }).click();
-		assert.equal(await page.getByRole("combobox", { name: "思考强度", exact: true }).innerText(), "模型默认");
+		assert.equal(
+			await page
+				.getByRole("radiogroup", { name: "思考强度", exact: true })
+				.getByRole("radio", { name: "默认", exact: true })
+				.getAttribute("aria-checked"),
+			"true",
+		);
 		await page.keyboard.press("Escape");
 		assert.match(await form.getByRole("combobox", { name: "模型", exact: true }).innerText(), /测试模型 B/);
 		await form.locator("summary").filter({ hasText: "高级模型参数" }).click();

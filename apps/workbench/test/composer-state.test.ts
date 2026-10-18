@@ -119,6 +119,15 @@ test("讨论开关与模型一样只在 turn 边界带上；与对话当前设�
 	assert.equal(state.composerDrafts.new?.discuss, true);
 	assert.equal(restoreComposerDrafts(JSON.parse(JSON.stringify(state.composerDrafts))).new?.discuss, true);
 	assert.throws(() => restoreComposerDrafts({ new: { goal: "", attachments: [], discuss: "yes" } }), /不完整/);
+	// 选了 /目标 还没写的草稿也留着，重载后仍在目标输入里；发出后回到普通输入
+	const goal = updateComposerDraft(empty, "new", (draft) => ({ ...draft, goalMode: true }));
+	assert.equal(restoreComposerDrafts(JSON.parse(JSON.stringify(goal.composerDrafts))).new?.goalMode, true);
+	assert.equal(
+		stageSubmission({ goal: "写完第二卷", attachments: [], goalMode: true }, undefined, undefined, { goal: true })
+			.goalMode,
+		undefined,
+	);
+	assert.throws(() => restoreComposerDrafts({ new: { goal: "", attachments: [], goalMode: "yes" } }), /不完整/);
 	// 2026-10-19 之前的草稿存的是三档的 mode：当作未知辅助字段丢掉，草稿照常恢复
 	const legacy = restoreComposerDrafts({ new: { goal: "旧草稿", attachments: [], mode: "collaborate" } });
 	assert.deepEqual(legacy.new, { goal: "旧草稿", attachments: [] });

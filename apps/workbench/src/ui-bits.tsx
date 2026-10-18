@@ -203,15 +203,19 @@ export function Segmented<T extends string>({
 	options,
 	onChange,
 	className,
+	label,
 }: {
 	value: T;
 	options: { id: T; label: string; icon?: ReactNode; title?: string; disabled?: boolean }[];
 	onChange(value: T): void;
 	className?: string;
+	/** 这组单选的名字，给读屏与测试；没有可见标题时必须给。 */
+	label?: string;
 }) {
 	return (
 		<RadioGroup
 			value={value}
+			aria-label={label}
 			onValueChange={(next) => {
 				if (typeof next === "string" && !options.find((option) => option.id === next)?.disabled)
 					onChange(next as T);

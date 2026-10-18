@@ -1,5 +1,5 @@
 import type { GoalAction, WorkbenchActiveContext } from "@suiming/sdk";
-import { ArrowUp, FileText, Loader2, Plus, RotateCcw, Square, X } from "lucide-react";
+import { ArrowUp, FileText, Loader2, Plus, RotateCcw, Square, Target, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { invoke } from "./bridge.js";
+import { ComposerModeChip } from "./composer-mode-chip.js";
 import {
 	type ComposerAttachment,
 	type ComposerDraft,
@@ -200,13 +201,13 @@ export function AgentComposer({
 		}
 	}
 	/**
-	 * 选中菜单里的一项：`/目标` 要参数，补成 `/目标 `；`/讨论` 立刻开关，与输入框里的讨论开关是同一个状态；
-	 * `/模型` 打开输入框里同一个模型面板。
+	 * 选中菜单里的一项：`/目标` 进入目标输入，底部出现「目标」标记，下一条发出的话设为目标；`/讨论` 立刻开关，
+	 * 与底部的讨论标记是同一个状态；`/模型` 打开输入框里同一个模型面板。
 	 */
 	function pick(command: SlashCommand) {
 		setError("");
 		if (command.kind === "goal") {
-			update((draft) => ({ ...draft, goal: `/${command.name} ` }), true);
+			update((draft) => ({ ...draft, goal: "", goalMode: true }), true);
 			textarea.current?.focus();
 			return;
 		}
@@ -241,11 +242,11 @@ export function AgentComposer({
 	}
 	return (
 		<form
-			className={`agent-composer mx-auto w-full shrink-0 ${expanded ? "max-w-[720px]" : ""}`}
+			className={`agent-composer @container/composer mx-auto w-full shrink-0 ${expanded ? "max-w-[720px]" : ""}`}
 			onSubmit={(event) => {
 				event.preventDefault();
 				void (async () => {
-					if (!(await runSlash())) await submit();
+					if (!(await runSlash())) await (composer.goalMode ? submitGoal(composer) : submit());
 				})();
 			}}
 			onDragOver={(event) => {
@@ -448,7 +449,13 @@ export function AgentComposer({
 						value={composer.goal}
 						aria-label="输入消息"
 						rows={2}
-						placeholder="输入消息…"
+						placeholder={
+							composer.goalMode
+								? "描述目标，写清做到什么程度算完成…"
+								: discussing
+									? "说说想商量的事，Agent 只出方案…"
+									: "输入消息…"
+						}
 						onChange={(event) => {
 							const goal = event.target.value;
 							setHighlight(0);
@@ -545,6 +552,17 @@ export function AgentComposer({
 							disabled={busy || !!composer.pending}
 							onChange={(discuss) => update((draft) => ({ ...draft, discuss }), true)}
 						/>
+						{composer.goalMode && (
+							<ComposerModeChip
+								icon={<Target />}
+								label="目标"
+								hint="这条消息会设为目标：Agent 接着做，直到完成或需要你拍板。点一下取消（/目标）"
+								pressed
+								disabled={busy || !!composer.pending}
+								onRemove={() => update(({ goalMode: _, ...draft }) => draft, true)}
+							/>
+						)}
+						<span className="flex-1" />
 						<ConversationModelPicker
 							open={modelOpen}
 							onOpenChange={setModelOpen}
@@ -555,7 +573,6 @@ export function AgentComposer({
 							onChange={(model) => update((draft) => ({ ...draft, model }), true)}
 							openSettings={openSettings}
 						/>
-						<span className="flex-1" />
 						{active && !stopping && (
 							<Hint side="top" content="停止当前回复">
 								<Button

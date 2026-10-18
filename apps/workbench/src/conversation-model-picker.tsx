@@ -1,5 +1,5 @@
 import type { ModelChoice } from "@suiming/sdk";
-import { ChevronDown, Settings2 } from "lucide-react";
+import { Brain, ChevronDown, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -52,8 +52,8 @@ export function ConversationModelPicker({
 					side="top"
 					content={
 						pending
-							? `当前使用 ${current?.model ?? "原模型"}；新选择在停止后继续或下次回复时生效`
-							: "切换当前对话的模型，不修改默认设置"
+							? `${label}\n当前使用 ${current?.model ?? "原模型"}；新选择在停止后继续或下次回复时生效`
+							: `${label}\n切换这段对话的模型与思考强度，不改默认设置（/模型）`
 					}
 				>
 					<PopoverTrigger
@@ -66,15 +66,16 @@ export function ConversationModelPicker({
 								disabled={disabled}
 								aria-label="对话模型"
 							>
-								<span className="truncate">{label}</span>
+								{/* 输入框窄时只留图标，模型名在提示里（照 Codex） */}
+								<Brain className="hidden shrink-0 @max-[300px]/composer:block" />
+								<span className="truncate @max-[300px]/composer:hidden">{label}</span>
 								{pending && <span className="shrink-0 text-[10px]">待生效</span>}
-								<ChevronDown className="shrink-0" />
+								<ChevronDown className="shrink-0 @max-[300px]/composer:hidden" />
 							</Button>
 						}
 					/>
 				</Hint>
-				<PopoverContent side="top" align="start" className="w-[340px] max-w-[calc(100vw-32px)] overflow-hidden p-1">
-					<p className="px-3 pt-2 text-xs text-muted-foreground">当前对话 · 不修改默认配置</p>
+				<PopoverContent side="top" align="end" className="w-[340px] max-w-[calc(100vw-32px)] overflow-hidden p-1">
 					{settings.isPending ? (
 						<p role="status" className="p-3 text-xs">
 							正在读取模型…
@@ -96,12 +97,12 @@ export function ConversationModelPicker({
 					)}
 
 					<ModelThinking providers={settings.data?.providers ?? []} selected={selected} onSelect={onChange} />
-					<div className="mt-1 border-t pt-1">
+					<div className="mt-1 flex items-center justify-between border-t pt-1">
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							className="w-full justify-start text-xs"
+							className="justify-start text-xs"
 							onClick={() => {
 								setOpen(false);
 								openSettings();
@@ -110,6 +111,7 @@ export function ConversationModelPicker({
 							<Settings2 />
 							模型设置…
 						</Button>
+						<span className="pr-2 text-[11px] text-muted-foreground">只改这段对话</span>
 					</div>
 				</PopoverContent>
 			</Popover>

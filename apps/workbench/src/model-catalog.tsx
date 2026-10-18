@@ -1,13 +1,12 @@
 import type { LocalCommandOutput, ModelChoice } from "@suiming/sdk";
 import { Check, ChevronDown } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { THINKING_LABELS } from "./model-labels.js";
+import { Segmented } from "./ui-bits.js";
 
 export type ModelSettingsData = LocalCommandOutput<"models.show">;
 export type ModelProvider = ModelSettingsData["providers"][number];
@@ -33,9 +32,13 @@ export function ModelCatalog({
 	onSelect(choice: ModelChoice): void;
 	fallback?: ModelChoice | undefined;
 }) {
-	const visible = providers.filter((provider) => provider.enabled && provider.usable);
+	// 当前模型所在的提供商排在最前，打开时停在当前模型上（cmdk 挂载时把选中项滚进视口）：
+	// 不然高亮落在列表第一项，像是选中了它，当前模型却要往下翻才看得到。
+	const visible = providers
+		.filter((provider) => provider.enabled && provider.usable)
+		.sort((a, b) => Number(b.id === selected?.provider) - Number(a.id === selected?.provider));
 	return (
-		<Command>
+		<Command {...(selected ? { defaultValue: `${selected.provider} ${selected.model}` } : {})}>
 			<CommandInput aria-label="搜索模型" placeholder="搜索模型或提供商…" />
 			<CommandList className="max-h-64">
 				<CommandEmpty>
@@ -124,7 +127,7 @@ export function modelChoiceLabel(providers: ModelProvider[], selected?: ModelCho
 	return `${modelName(providers, selected)}${model?.thinkingLevels.length ? ` · ${THINKING_LABELS[selected?.thinking ?? "default"]}` : ""}`;
 }
 
-/** 对话与设置共用；选模型后留在同一面板调整强度。 */
+/** 对话与设置共用；选模型后留在同一面板调整强度。一排分段按钮，一下就选，不再在弹层里套下拉框。 */
 export function ModelThinking({
 	providers,
 	selected,
@@ -134,42 +137,31 @@ export function ModelThinking({
 	selected: ModelChoice | undefined;
 	onSelect(choice: ModelChoice): void;
 }) {
-	const id = useId();
 	const provider = providers.find((provider) => provider.id === selected?.provider);
 	const model = provider?.models.find((model) => model.id === selected?.model);
 	if (!selected || !model?.thinkingLevels.length) return null;
+	const disabled = !provider?.enabled || !provider.usable;
 	return (
 		<>
 			<Separator />
-			<Field orientation="horizontal" className="justify-between p-3">
-				<FieldLabel htmlFor={id}>思考强度</FieldLabel>
-				<Select
+			<div className="flex items-center justify-between gap-3 px-3 py-2">
+				<span className="shrink-0 text-xs text-muted-foreground">思考强度</span>
+				<Segmented
+					label="思考强度"
 					value={selected.thinking ?? "default"}
-					items={[
-						{ value: "default", label: "模型默认" },
-						...model.thinkingLevels.map((level) => ({ value: level, label: THINKING_LABELS[level] })),
+					options={[
+						{ id: "default", label: "默认", title: "模型默认", disabled },
+						...model.thinkingLevels.map((level) => ({
+							id: level,
+							label: THINKING_LABELS[level] ?? level,
+							disabled,
+						})),
 					]}
-					disabled={!provider?.enabled || !provider.usable}
-					onValueChange={(thinking) =>
-						thinking !== null &&
+					onChange={(thinking) =>
 						onSelect({ ...selected, thinking: thinking as NonNullable<ModelChoice["thinking"]> })
 					}
-				>
-					<SelectTrigger id={id} aria-label="思考强度" size="sm">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectGroup>
-							<SelectItem value="default">模型默认</SelectItem>
-							{model.thinkingLevels.map((level) => (
-								<SelectItem key={level} value={level}>
-									{THINKING_LABELS[level]}
-								</SelectItem>
-							))}
-						</SelectGroup>
-					</SelectContent>
-				</Select>
-			</Field>
+				/>
+			</div>
 		</>
 	);
 }

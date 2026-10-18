@@ -4,6 +4,8 @@ export interface ComposerDraft {
 	model?: ModelChoice;
 	/** 讨论开关的选择（ADR-0039）；与模型一样留在输入框里，对话正在回复时等下一条消息才带上。 */
 	discuss?: boolean;
+	/** 选了 `/目标`：下一条发出的话设为对话的目标（ADR-0039），发出后回到普通输入。 */
+	goalMode?: boolean;
 	goal: string;
 	attachments: ComposerAttachment[];
 	pending?: ComposerSubmission;
@@ -51,7 +53,14 @@ export function updateComposerDraft<T extends ComposerState>(
 ): T {
 	const draft = update(state.composerDrafts[key] ?? emptyComposer());
 	const composerDrafts = { ...state.composerDrafts };
-	if (draft.goal || draft.attachments.length || draft.pending || draft.model || draft.discuss !== undefined)
+	if (
+		draft.goal ||
+		draft.attachments.length ||
+		draft.pending ||
+		draft.model ||
+		draft.discuss !== undefined ||
+		draft.goalMode
+	)
 		composerDrafts[key] = draft;
 	else delete composerDrafts[key];
 	// 开始输入即选定当前对话，重载不能因后台新出现 session 而切走这份草稿。
@@ -226,6 +235,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 				attachments.length !== saved.attachments.length ||
 				(saved.model !== undefined && !validModelChoice(saved.model)) ||
 				(saved.discuss !== undefined && typeof saved.discuss !== "boolean") ||
+				(saved.goalMode !== undefined && typeof saved.goalMode !== "boolean") ||
 				(pending !== undefined &&
 					(!pending ||
 						typeof pending.id !== "string" ||
@@ -244,6 +254,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 						attachments,
 						...(validModelChoice(saved.model) ? { model: saved.model } : {}),
 						...(typeof saved.discuss === "boolean" ? { discuss: saved.discuss } : {}),
+						...(saved.goalMode === true ? { goalMode: true } : {}),
 						...(pending && typeof pending.id === "string" && typeof pending.text === "string"
 							? {
 									pending: {

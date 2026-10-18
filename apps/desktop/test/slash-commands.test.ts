@@ -32,6 +32,15 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 		const discussOn = () => page.locator('button[aria-label="讨论"][aria-pressed="true"]').waitFor();
 		const discussOff = () => page.locator('button[aria-label="讨论"]').waitFor({ state: "detached" });
 		const send = () => page.keyboard.press("Meta+Enter");
+		// 设了 SUIMING_CAPTURE_DIR 才截图，给人看样子
+		const capture = async (name: string) => {
+			if (!process.env.SUIMING_CAPTURE_DIR) return;
+			await mkdir(process.env.SUIMING_CAPTURE_DIR, { recursive: true });
+			await page.screenshot({
+				animations: "disabled",
+				path: join(process.env.SUIMING_CAPTURE_DIR, `slash-${name}.png`),
+			});
+		};
 
 		// 菜单：行首输入 / 出现，只有三条；按前缀筛，Esc 收起，再输入又出现
 		await input.click();
@@ -76,6 +85,8 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 		await page.keyboard.press("Enter");
 		await discussOn(); // /讨论 打开的就是输入框底部的讨论标记
 		assert.equal(await input.inputValue(), "", "立刻执行的命令清掉输入");
+		assert.match((await input.getAttribute("placeholder")) ?? "", /只出方案/, "提示语跟着模式换");
+		await capture("composer-discuss");
 		await input.fill("/讨");
 		assert.match(await menu.getByRole("option").first().innerText(), /关上讨论/);
 		// 英文别名不开输入法也能打
@@ -86,20 +97,32 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 		// /模型 打开输入框里同一个模型面板
 		await input.fill("/模型");
 		await page.keyboard.press("Enter");
-		await page.getByText("当前对话 · 不修改默认配置", { exact: true }).waitFor();
+		await page.getByText("只改这段对话", { exact: true }).waitFor();
+		await capture("model-panel");
 		await page.keyboard.press("Escape");
 
-		// 方向键 + Tab 补全要参数的命令
+		// 方向键 + Tab 选 /目标：进入目标输入，底部出现「目标」标记，与讨论同一种样子（照 Codex 的计划 / 目标）
 		await input.fill("/g");
 		await menu.waitFor();
 		await page.keyboard.press("ArrowDown");
 		await page.keyboard.press("ArrowUp");
 		await page.keyboard.press("Tab");
-		assert.equal(await input.inputValue(), "/目标 ", "补成带空格的命令等你写目标");
+		const goalChip = page.locator('button[aria-label="目标"][aria-pressed="true"]');
+		await goalChip.waitFor();
+		assert.equal(await input.inputValue(), "", "选了 /目标 就清空输入，等你写目标");
+		assert.match((await input.getAttribute("placeholder")) ?? "", /描述目标/);
+		await capture("composer-goal");
+		// 点标记取消，回到普通输入；再选一次
+		await goalChip.click();
+		await goalChip.waitFor({ state: "detached" });
+		await input.fill("/目标");
+		await page.keyboard.press("Enter");
+		await goalChip.waitFor();
 
 		// 设目标：续跑到模型标「等你拍板」，状态条写明原因；inbox 里只有作者那一句
-		await input.fill("/目标 把第一节的杖数改成六十");
+		await input.fill("把第一节的杖数改成六十");
 		await send();
+		await goalChip.waitFor({ state: "detached" }); // 发出后回到普通输入
 		const bar = page.getByRole("status", { name: "对话目标", exact: true });
 		await bar
 			.locator('[data-goal-status="blocked"]')
@@ -119,7 +142,7 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 			inbox.map((item) => item.text),
 			["把第一节的杖数改成六十"],
 		);
-		// `/目标 清除` 与状态条上的「清除」同一个动作，不会被当成新目标去跑
+		// 直接打 `/目标 <动作>` 也行：`/目标 清除` 与状态条上的「清除」同一个动作，不会被当成新目标去跑
 		await input.fill("/目标 清除");
 		await send();
 		await bar.waitFor({ state: "hidden" });

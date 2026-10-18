@@ -47,7 +47,7 @@ test("讨论：/讨论 打开后只读不碰草稿，点标记关上后照方案
 		await input.fill("/讨论");
 		await page.keyboard.press("Enter");
 		await pressed(true);
-		assert.match(await toggle.innerText(), /讨论中/);
+		assert.match(await toggle.innerText(), /讨论/);
 		await input.fill("把核心设定改紧凑些");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		await page.getByText("方案：核心设定的开头压短一句，关掉讨论再动手。", { exact: true }).waitFor();
