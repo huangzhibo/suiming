@@ -1,4 +1,4 @@
-import type { CollaborationMode, ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
+import type { ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "./bridge.js";
@@ -9,7 +9,7 @@ export interface ComposerSubmitBinding {
 	uiContext?: WorkbenchActiveContext;
 	composer: ComposerDraft;
 	draftKey: string;
-	session: { id: string; status: string; model?: ModelChoice; collaboration?: CollaborationMode } | undefined;
+	session: { id: string; status: string; model?: ModelChoice; discuss?: boolean } | undefined;
 	updateComposer(key: string, update: (draft: ComposerDraft) => ComposerDraft, persist?: boolean): void;
 	onSubmitted(key: string, id: string, sessionId: string): void;
 	refresh(): void;
@@ -66,7 +66,7 @@ export function useComposerSubmit({
 				text: pending.text,
 				...(pending.sessionId ? { sessionId: pending.sessionId } : {}),
 				...(pending.model ? { model: pending.model } : {}),
-				...(pending.mode ? { mode: pending.mode } : {}),
+				...(pending.discuss === undefined ? {} : { discuss: pending.discuss }),
 				...(pending.goal ? { goal: true } : {}),
 			});
 			onSubmitted(draftKey, pending.id, receipt.sessionId);
@@ -110,7 +110,7 @@ export function useComposerSubmit({
 		setError,
 		submit: (retry?: ComposerSubmission) => send(retry),
 		submitDraft: (draft: ComposerDraft) => send(undefined, draft),
-		/** `/goal <目标>`：把草稿里的目标原文作为目标发出（ADR-0038）。 */
+		/** `/目标 <目标>`：把草稿里的目标原文作为目标发出（ADR-0038、ADR-0039）。 */
 		submitGoal: (draft: ComposerDraft) => send(undefined, draft, { goal: true }),
 	};
 }

@@ -94,29 +94,34 @@ test("同一 session 的消息带 sessionId；模型选择只在 turn 边界带�
 	}
 });
 
-test("协作模式与模型一样只在 turn 边界带上；与对话当前模式相同时不带", () => {
+test("讨论开关与模型一样只在 turn 边界带上；与对话当前设置相同时不带", () => {
 	for (const status of ["running", "idle"]) {
-		const staged = stageSubmission({ goal: "先聊聊", attachments: [], mode: "discuss" }, { id: "session-1", status });
-		assert.equal(staged.pending?.mode, status === "idle" ? "discuss" : undefined, "跑着的时候这次不换模式");
-		assert.equal(staged.mode, "discuss", "输入框里的选择留到下一轮");
+		const staged = stageSubmission({ goal: "先聊聊", attachments: [], discuss: true }, { id: "session-1", status });
+		assert.equal(staged.pending?.discuss, status === "idle" ? true : undefined, "跑着的时候这次不开关讨论");
+		assert.equal(staged.discuss, true, "输入框里的选择留到下一轮");
 	}
 	const same = stageSubmission(
-		{ goal: "接着聊", attachments: [], mode: "discuss" },
-		{ id: "session-1", status: "idle", collaboration: "discuss" },
+		{ goal: "接着聊", attachments: [], discuss: true },
+		{ id: "session-1", status: "idle", discuss: true },
 	);
-	assert.equal(same.pending?.mode, undefined);
-	const fresh = stageSubmission({ goal: "新对话就自主", attachments: [], mode: "autonomous" });
-	assert.equal(fresh.pending?.mode, undefined, "新对话默认就是自主");
-	assert.equal(stageSubmission({ goal: "新对话先讨论", attachments: [], mode: "discuss" }).pending?.mode, "discuss");
-	// 只选了模式、还没输入也要留着（与只选了模型相同）；重载恢复不丢
+	assert.equal(same.pending?.discuss, undefined);
+	const closing = stageSubmission(
+		{ goal: "照这个做", attachments: [], discuss: false },
+		{ id: "session-1", status: "idle", discuss: true },
+	);
+	assert.equal(closing.pending?.discuss, false, "关上讨论要明确带 false");
+	const fresh = stageSubmission({ goal: "新对话", attachments: [], discuss: false });
+	assert.equal(fresh.pending?.discuss, undefined, "新对话默认就关着");
+	assert.equal(stageSubmission({ goal: "新对话先讨论", attachments: [], discuss: true }).pending?.discuss, true);
+	// 只开了讨论、还没输入也要留着（与只选了模型相同）；重载恢复不丢
 	const empty: ComposerState = { sessionId: "", sessionChosen: false, composerDrafts: {} };
-	const state = updateComposerDraft(empty, "new", (draft) => ({
-		...draft,
-		mode: "discuss",
-	}));
-	assert.equal(state.composerDrafts.new?.mode, "discuss");
-	assert.equal(restoreComposerDrafts(JSON.parse(JSON.stringify(state.composerDrafts))).new?.mode, "discuss");
-	assert.throws(() => restoreComposerDrafts({ new: { goal: "", attachments: [], mode: "plan" } }), /不完整/);
+	const state = updateComposerDraft(empty, "new", (draft) => ({ ...draft, discuss: true }));
+	assert.equal(state.composerDrafts.new?.discuss, true);
+	assert.equal(restoreComposerDrafts(JSON.parse(JSON.stringify(state.composerDrafts))).new?.discuss, true);
+	assert.throws(() => restoreComposerDrafts({ new: { goal: "", attachments: [], discuss: "yes" } }), /不完整/);
+	// 2026-10-19 之前的草稿存的是三档的 mode：当作未知辅助字段丢掉，草稿照常恢复
+	const legacy = restoreComposerDrafts({ new: { goal: "旧草稿", attachments: [], mode: "collaborate" } });
+	assert.deepEqual(legacy.new, { goal: "旧草稿", attachments: [] });
 });
 
 test("外部文本真正解码，保留中文；拒绝二进制、未知编码和伪装的非文本文件", async () => {

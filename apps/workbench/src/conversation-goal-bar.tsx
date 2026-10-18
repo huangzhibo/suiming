@@ -11,7 +11,7 @@ const STATUS: Record<SessionGoal["status"], string> = {
 };
 
 /**
- * 对话的目标（ADR-0038）：输入框上方一行，写明目标、状态与原因；继续、暂停、清除与 `/goal resume|pause|clear`
+ * 对话的目标（ADR-0038）：输入框上方一行，写明目标、状态与原因；继续、暂停、清除与 `/目标 继续|暂停|清除`
  * 是同一个命令。对话正在回复时都不能点：跑着时目标只归持有 turn 的进程改，要停先按停止（停止即暂停）。
  */
 export function ConversationGoalBar({

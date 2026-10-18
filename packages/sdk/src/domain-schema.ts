@@ -12,16 +12,6 @@ const id = Type.String({ minLength: 1 });
 export const sessionStatusSchema = Type.Union([Type.Literal("idle"), Type.Literal("running")]);
 export const sessionKindSchema = Type.Union([Type.Literal("agent"), Type.Literal("rank")]);
 /**
- * 协作模式（ADR-0038）：讨论只读，协作能改候选但不提交，自主能改也能提交。由根 Agent 的工具面保证，
- * 与换模型一样从下一个 turn 起生效。缺省（旧记录没有这个字段）就是自主。
- */
-export const collaborationModeSchema = Type.Union([
-	Type.Literal("discuss"),
-	Type.Literal("collaborate"),
-	Type.Literal("autonomous"),
-]);
-export type CollaborationMode = Static<typeof collaborationModeSchema>;
-/**
  * 作者设定的目标（ADR-0038）：active 时 turn 结束自动续下一轮；complete / blocked 由模型用 update_goal 标，
  * 或由系统在续跑空转时标 blocked；paused 是作者停止或 `pause` 的结果。它是执行数据，不是作品事实。
  */
@@ -47,9 +37,6 @@ export const sessionGoalSchema = Type.Object(
 export type SessionGoal = Static<typeof sessionGoalSchema>;
 export const GOAL_ACTIONS = ["clear", "pause", "resume"] as const;
 export type GoalAction = (typeof GOAL_ACTIONS)[number];
-
-/** 与 collaborationModeSchema 同一组取值，给 CLI 校验参数与列出可选值。 */
-export const COLLABORATION_MODES: readonly CollaborationMode[] = ["discuss", "collaborate", "autonomous"];
 
 export const executionFailureSchema = Type.Object(
 	{ code: id, message: id, retryable: Type.Boolean() },
@@ -187,7 +174,8 @@ export const sessionSummarySchema = Type.Object(
 		turnId: Type.Optional(id),
 		usage: Type.Optional(modelUsageSchema),
 		model: Type.Optional(modelChoiceSchema),
-		collaboration: Type.Optional(collaborationModeSchema),
+		/** 讨论开着（ADR-0039）：根 Agent 只读，只出方案。由工具面保证，与换模型一样从下一个 turn 起生效。 */
+		discuss: Type.Optional(Type.Boolean()),
 		goal: Type.Optional(sessionGoalSchema),
 		lastFailure: Type.Optional(executionFailureSchema),
 		result: Type.Optional(resultReferenceSchema),

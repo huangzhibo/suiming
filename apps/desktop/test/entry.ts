@@ -321,12 +321,12 @@ if (process.argv.includes("--workbench-test") || process.argv.includes("--workbe
 	]);
 }
 if (process.argv.includes("--slash-command-test")) {
-	// ADR-0038：`/goal` 设目标后续跑到模型标「需要作者拍板」；自定义命令按参数展开后就是作者的消息。
+	// ADR-0039：`/目标` 设目标后续跑到模型标「需要作者拍板」；`/讨论 <话>` 打开讨论并把这句话发出去。
 	const last = (context: { messages: unknown[] }) => JSON.stringify(context.messages.at(-1));
 	provider.setResponses([
 		async (context) => {
 			assert.match(last(context), /当前目标/);
-			assert.doesNotMatch(last(context), /\/goal/, "发出去的是目标原文，不带命令名");
+			assert.doesNotMatch(last(context), /\/目标/, "发出去的是目标原文，不带命令名");
 			return fauxAssistantMessage(
 				fauxToolCall("edit", {
 					path: "outline/story/vol-0001/beat-0001.md",
@@ -344,29 +344,30 @@ if (process.argv.includes("--slash-command-test")) {
 		},
 		fauxAssistantMessage("要不要连人物档一起改？"),
 		async (context) => {
-			assert.match(last(context), /独立审一下 第一节/);
-			return fauxAssistantMessage("收到常用话。");
+			assert.match(last(context), /第一节怎么改/);
+			assert.match(last(context), /讨论：开/);
+			return fauxAssistantMessage("先说方案。");
 		},
 	]);
 }
-if (process.argv.includes("--collaboration-mode-test")) {
-	// ADR-0038：讨论模式只读，协作模式改候选但不提交；faux 模型故意越界，看工具面挡不挡得住。
+if (process.argv.includes("--discuss-test")) {
+	// ADR-0039：讨论开着只读；faux 模型故意越界，看工具面挡不挡得住。关上讨论后能改也能提交。
 	const last = (context: { messages: unknown[] }) => JSON.stringify(context.messages.at(-1));
 	provider.setResponses([
 		async (context) => {
-			assert.match(last(context), /对话模式：讨论/);
+			assert.match(last(context), /讨论：开/);
 			return fauxAssistantMessage(fauxToolCall("read", { path: "world/core.md" }));
 		},
 		async (context) => {
-			assert.match(last(context), /赤壁之战的天下/, "讨论模式读文件不替作者存草稿");
+			assert.doesNotMatch(last(context), /作者的草稿/, "讨论开着读文件不替作者存草稿");
 			return fauxAssistantMessage(fauxToolCall("write", { path: "world/core.md", content: "讨论里偷偷改" }));
 		},
 		async (context) => {
 			assert.match(last(context), /unknown_tool/);
-			return fauxAssistantMessage("方案：核心设定的开头压短一句，切到协作再动手。");
+			return fauxAssistantMessage("方案：核心设定的开头压短一句，关掉讨论再动手。");
 		},
 		async (context) => {
-			assert.match(last(context), /对话模式：协作/);
+			assert.match(last(context), /讨论：关/);
 			return fauxAssistantMessage(fauxToolCall("read", { path: "world/core.md" }));
 		},
 		async (context) => {
@@ -375,10 +376,10 @@ if (process.argv.includes("--collaboration-mode-test")) {
 				fauxToolCall("write", { path: "world/core.md", content: "赤壁之战的天下，作者的草稿，按方案压短\n" }),
 			);
 		},
-		fauxAssistantMessage(fauxToolCall("commit", { summary: "想自己提交" })),
+		fauxAssistantMessage(fauxToolCall("commit", { summary: "照方案压短核心设定" })),
 		async (context) => {
-			assert.match(last(context), /unknown_tool/);
-			return fauxAssistantMessage("改好了，候选里改了核心设定，等你提交。");
+			assert.doesNotMatch(last(context), /unknown_tool/, "关上讨论就有 commit");
+			return fauxAssistantMessage("改好了，已经提交。");
 		},
 	]);
 }

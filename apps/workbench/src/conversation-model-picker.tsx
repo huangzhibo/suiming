@@ -23,7 +23,7 @@ export function ConversationModelPicker({
 	disabled: boolean;
 	onChange(model: ModelChoice): void;
 	openSettings(): void;
-	/** 给 `/模型` 用：由输入框打开同一个面板，不另做一个入口。 */
+	/** 给 `/模型` 用（ADR-0039）：由输入框打开同一个面板，不另做一个入口。 */
 	open?: boolean;
 	onOpenChange?(open: boolean): void;
 }) {

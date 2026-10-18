@@ -35,7 +35,6 @@ import { parseHostContextTask } from "../harness/host-context.js";
 import { compileWriteContext } from "../harness/write-context.js";
 import { LocalModelSettings } from "../model/local-model-settings.js";
 import type { ModelGateway } from "../model/model-gateway.js";
-import { readAuthorCommands } from "./author-commands.js";
 import { checkSummary } from "./check-summary.js";
 import type { LocalProjectService } from "./local-project-service.js";
 import { LocalSessionController } from "./local-session-controller.js";
@@ -294,8 +293,6 @@ export class LocalWorkspace implements LocalCommandClient {
 			}
 			case "models.show":
 				return this.#settings.show();
-			case "commands.list":
-				return readAuthorCommands(this.#settings.configPath);
 			case "models.provider.setEnabled": {
 				await this.#settings.setProviderEnabled(input as LocalCommandInput<"models.provider.setEnabled">);
 				this.#modelsChanged = true;
@@ -497,7 +494,7 @@ export class LocalWorkspace implements LocalCommandClient {
 						...(args.sessionId === undefined ? {} : { sessionId: args.sessionId }),
 						...(args.model === undefined ? {} : { model: args.model }),
 						...(binding === undefined ? {} : { binding }),
-						...(args.mode === undefined ? {} : { mode: args.mode }),
+						...(args.discuss === undefined ? {} : { discuss: args.discuss }),
 						...(args.goal === true ? { goal: true } : {}),
 						onEvent: () => this.#changed("stream"),
 					});

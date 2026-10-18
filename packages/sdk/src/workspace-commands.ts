@@ -1,10 +1,7 @@
 import { type Static, type TSchema, type TUnsafe, Type } from "typebox";
 import {
-	COLLABORATION_MODES,
-	type CollaborationMode,
 	type checkDiagnosticSchema,
 	checkSummarySchema,
-	collaborationModeSchema,
 	commitResultSchema,
 	GOAL_ACTIONS,
 	type GoalAction,
@@ -29,9 +26,6 @@ import type { WorkbenchCall, WorkbenchReply } from "./workbench.js";
 const id = Type.String({ minLength: 1 });
 
 export {
-	COLLABORATION_MODES,
-	type CollaborationMode,
-	collaborationModeSchema,
 	GOAL_ACTIONS,
 	type GoalAction,
 	type ModelChoice,
@@ -44,12 +38,6 @@ export {
 
 const empty = Type.Object({}, { additionalProperties: false });
 
-/**
- * 作者存的常用话（ADR-0038 决定三）：应用配置目录 `commands/<名字>.md`，与 config.toml 同处。工作流习惯不是作品事实，
- * 不放进作品目录；输入框里用 `/名字` 调出，发出去的就是展开后的原文。
- */
-export const authorCommandSchema = Type.Object({ name: id, text: id }, { additionalProperties: false });
-export type AuthorCommand = Static<typeof authorCommandSchema>;
 const file = Type.Object(
 	{ path: id, content: Type.String(), sha256: Type.Union([Type.String(), Type.Null()]) },
 	{ additionalProperties: false },
@@ -432,7 +420,7 @@ export const LOCAL_COMMANDS = {
 	),
 	/**
 	 * 作者说一句话。没有 sessionId 就新建 session；idle 则开一个 turn，running 则排进 inbox 在下一边界注入。
-	 * `model` 与 `mode`（协作模式，ADR-0038）只在 turn 边界生效：对正在跑的对话换模式会被拒绝，不悄悄失效。
+	 * `model` 与 `discuss`（讨论开关，ADR-0039）只在 turn 边界生效：对正在跑的对话切换会被拒绝，不悄悄失效。
 	 */
 	"session.send": command(
 		Type.Object(
@@ -441,7 +429,7 @@ export const LOCAL_COMMANDS = {
 				text: id,
 				sessionId: Type.Optional(id),
 				model: Type.Optional(modelChoiceSchema),
-				mode: Type.Optional(collaborationModeSchema),
+				discuss: Type.Optional(Type.Boolean()),
 				/** 把这句话设为对话的目标（ADR-0038）：turn 结束后自动续跑，直到模型标完成或需要作者拍板。 */
 				goal: Type.Optional(Type.Literal(true)),
 			},
@@ -449,8 +437,6 @@ export const LOCAL_COMMANDS = {
 		),
 		Type.Object({ sessionId: id, sequence: Type.Integer({ minimum: 1 }) }, { additionalProperties: false }),
 	),
-	/** 作者存的常用话；目录不存在就是空表。 */
-	"commands.list": command(empty, Type.Array(authorCommandSchema)),
 	/** 清除、暂停或继续对话的目标；对正在跑的对话会被拒绝（先停止）。resume 立刻开一轮续跑。 */
 	"session.goal": command(
 		Type.Object(

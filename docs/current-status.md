@@ -15,6 +15,8 @@
 
 ## 最近有效验收
 
+2026-10-19：按 [ADR-0039](adr/0039-slash-commands-by-need.md) 重设 `/` 命令，协作模式收成讨论开关。输入框底部的三档下拉换成一个「讨论」开关（开着只读，Agent 只出方案；关着就是原来的自主），Session 记录从 `collaboration` 改成 `discuss`，CLI 改用 `--discuss` / `--no-discuss`。`/` 菜单只留管这段对话怎么跑的三条：`/目标`（别名 `goal`，`/目标 暂停|继续|清除`）、`/讨论`（别名 `plan`，菜单行按状态写「打开」或「关上」，`/讨论 <话>` 打开并发出）、`/模型`。`/协作` `/自主` `/新对话` `/提交` 与配置目录的自定义命令（`commands.list`）删除。验收：机制用例 3 项（只读与草稿不落盘、沿用与关上、跑着时开关被拒）、CLI 1 项、工作台单测 4 项、桌面 E2E 2 项（讨论开关越界写入被挡后关上照方案改并由 Agent 提交；菜单、别名、`/模型`、`/目标` 到拍板再清除、`/讨论 <话>`）；真实模型回归 `mode-discuss` 1 / 1。全仓 515 / 515；完整桌面 87 / 88，唯一失败的「导航与文件」改动前的代码上连跑 4 次也只过 1 次，见已知缺陷。
+
 2026-10-19：[AI 代作者使用](validation/2026-10-18-doupo-proxy-author/README.md)：Claude 扮作者在斗破上多轮续写第 121–140 章并还原每一轮的上下文。写作方法改为篇幅意图是软尺度、写完不逐处补字，写手每节的小改从平均 10 次降到 0；Story Language 规定资源与日常过程只在改变选择或后果时写进 StoryBeat，只管一段的 Intent 写成那一段的范围。这些结果不说明文学质量。
 
 2026-10-18：[斗破留出的篇幅](validation/2026-10-18-doupo-length/README.md)：Write Context 标出本节 Design、前文各节正文与 Design 的字数，写作方法改为没有篇幅意图时按前文的比例定；同一组 24 节留出从原作的 1.91 倍降到 1.35 倍，每个 Design 字对应的正文从 8.3 字降到 5.8 字（原作 4.1），花费少三分之一；writer 回归 3 / 3。评委互比偏向更长的改前版；作者定不做盲读（内容质量靠观测实际使用来优化），评委只当参考。[接着写第 121–140 章](validation/2026-10-18-doupo-continuation/README.md)：Agent 自己设计并写 20 章，一个 turn 跑完、检查通过，设定接得上，推进约为原作的一半。这些结果不说明文学质量。
@@ -64,9 +66,9 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 515 / 515、0 skip（2026-10-18），工作台 82 / 82 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 515 / 515、0 skip（2026-10-19），工作台 86 / 86 包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
-| 桌面与窗口 | 完整桌面 88 / 88 通过、0 skip（2026-10-18，作品入口提示补上目录之后；含此前因宿主锁屏未验的原生全屏），含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
+| 桌面与窗口 | 完整桌面 88 / 88 通过、0 skip（2026-10-18，作品入口提示补上目录之后；含此前因宿主锁屏未验的原生全屏）；2026-10-19 复跑 87 / 88，「导航与文件」时好时坏，见已知缺陷，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
 较早的布局迭代、失败与修复过程保留在[变更记录](changelog.md)及各次验收记录中；下面的能力与缺陷以当前实现为准。
 
@@ -82,9 +84,9 @@
 | 正文 / 审稿时效、Source 覆盖率 | `artifact/derived.ts` | 真实调用：审稿时效在桌面手动修订后再次验证；Source 覆盖率有抽取记录 |
 | AG-UI 事件、只读 attach、桌面 typed IPC | `sdk/run-event.ts`、`apps/desktop` | 机制、Electron E2E 与真实模型中断 / 重连 |
 | 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/workbench` | Electron E2E、真实模型创作闭环与 231 情节隔离副本走查 |
-| 目标（goal）：作者设定后自动续跑 | `local-session-controller.ts`、`harness/agent.ts` 的 `update_goal`、`conversation-goal-bar.tsx` | 真实调用：回归 `goal-text`、`goal-continue`（真实续跑一轮后收口）各 1 / 1；斗破 24 节留出带目标跑两次，Agent 自己标完成，检查点 100 万时撞线即停、目标不跑出窗口（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）；空转即停、检查点跨轮次、停止即暂停由机制用例覆盖；桌面 `/goal` 与状态条经 E2E |
-| 输入框 `/` 命令 | `slash-commands.ts`、`agent-composer.tsx`、`local/author-commands.ts` | Electron E2E；只是现有能力的入口 |
-| 协作模式（讨论 / 协作 / 自主） | `harness/agent.ts`、`conversation-mode-picker.tsx` | 真实调用：回归 `mode` 组 2 / 2；faux 越界写入由工具面挡住，桌面 E2E 覆盖选择、草稿不落盘与作者提交 |
+| 目标（goal）：作者设定后自动续跑 | `local-session-controller.ts`、`harness/agent.ts` 的 `update_goal`、`conversation-goal-bar.tsx` | 真实调用：回归 `goal-text`、`goal-continue`（真实续跑一轮后收口）各 1 / 1；斗破 24 节留出带目标跑两次，Agent 自己标完成，检查点 100 万时撞线即停、目标不跑出窗口（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）；空转即停、检查点跨轮次、停止即暂停由机制用例覆盖；桌面 `/目标` 与状态条经 E2E |
+| 输入框 `/` 命令（`/目标` `/讨论` `/模型`） | `slash-commands.ts`、`agent-composer.tsx` | Electron E2E；管这段对话怎么跑，新对话与提交走按钮（[ADR-0039](adr/0039-slash-commands-by-need.md)） |
+| 讨论开关 | `harness/agent.ts`、`conversation-discuss-toggle.tsx` | 真实调用：回归 `mode-discuss` 1 / 1（2026-10-19）；faux 越界写入由工具面挡住，桌面 E2E 覆盖开关、草稿不落盘、关上后 Agent 提交 |
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |
@@ -100,6 +102,8 @@
 | 真实长篇 | 在不少于 3 卷 30 个 StoryBeat 的真实作品上跑通并有作者反馈 |
 
 ## 已知缺陷
+
+- **桌面 E2E「导航与文件」时好时坏**：2026-10-19 完整桌面 87 / 88，失败在关闭标签后切回第一个标签、等编辑器里的「第二次共享修改」超时；改动前的代码（41bceb0）连跑 4 次也只过 1 次，2026-10-18 那次 88 / 88 是碰巧过了。在等待前多停 1.5 秒就过，像是标签切换与草稿恢复之间的竞争，还没定位。
 
 - **历史观测缺失未能唯一归因，短超时问题已修复**：按需编辑同步验收的本地执行记录为 3 次模型 / 6 次工具，Langfuse 再查仍为 2 / 2。对应服务端时间窗有请求体读取失败，但未带 trace ID；已独立复现客户端 1500ms 短超时会放弃正常慢响应，现恢复上游默认超时和重试，并为每个失败批次补脱敏诊断。退出仍有界，不重建观测队列。旧批次未补造，不能因新运行成功就断言历史根因已经确证，见[排查记录](validation/2026-10-17-continuous-workbench/telemetry.md)。
 

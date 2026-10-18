@@ -466,25 +466,31 @@ test("session send --events 在最终响应之前逐行输出 SessionEvent 信�
 	}
 });
 
-test("session send --mode 设协作模式并随对话保留；取值写错报用法错误", async () => {
+test("session send --discuss 打开讨论并随对话保留，--no-discuss 关上；旧的 --mode 报用法错误", async () => {
 	const checkoutPath = await fixture();
 	try {
 		assert.equal((await jsonCommand(checkoutPath, ["init"])).exitCode, SUIM_CLI_EXIT.success);
-		const sent = await jsonCommand(checkoutPath, ["session", "send", "--mode", "discuss", "先聊聊"], replyGateway());
+		const sent = await jsonCommand(checkoutPath, ["session", "send", "--discuss", "先聊聊"], replyGateway());
 		assert.equal(sent.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(sent.value));
 		assert.ok(Value.Check(SuimCliSessionTurnDataSchema, sent.value.data));
-		const session = (sent.value.data as { session: { id: string; collaboration?: string } }).session;
-		assert.equal(session.collaboration, "discuss");
-		const listed = await jsonCommand(checkoutPath, ["session", "list"]);
-		assert.equal(
-			(listed.value.data as { sessions: { id: string; collaboration?: string }[] }).sessions.find(
-				(item) => item.id === session.id,
-			)?.collaboration,
-			"discuss",
+		const session = (sent.value.data as { session: { id: string; discuss?: boolean } }).session;
+		assert.equal(session.discuss, true);
+		const discussOf = async () =>
+			(
+				(await jsonCommand(checkoutPath, ["session", "list"])).value.data as {
+					sessions: { id: string; discuss?: boolean }[];
+				}
+			).sessions.find((item) => item.id === session.id)?.discuss;
+		assert.equal(await discussOf(), true);
+		const closed = await jsonCommand(
+			checkoutPath,
+			["session", "send", "--session", session.id, "--no-discuss", "照这个做"],
+			replyGateway(),
 		);
-		const wrong = await jsonCommand(checkoutPath, ["session", "send", "--mode", "plan", "先聊聊"], replyGateway());
-		assert.equal(wrong.exitCode, SUIM_CLI_EXIT.usage);
-		assert.equal((wrong.value.error as { code: string }).code, "invalid_cli_usage");
+		assert.equal(closed.exitCode, SUIM_CLI_EXIT.success, JSON.stringify(closed.value));
+		assert.equal(await discussOf(), false);
+		const old = await jsonCommand(checkoutPath, ["session", "send", "--mode", "discuss", "先聊聊"], replyGateway());
+		assert.equal(old.exitCode, SUIM_CLI_EXIT.usage);
 	} finally {
 		await rm(checkoutPath, { recursive: true, force: true });
 	}

@@ -1,12 +1,5 @@
 import type { TelemetryContext } from "@earendil-works/pi-telemetry";
-import type {
-	CollaborationMode,
-	EditorFileHandler,
-	GoalAction,
-	ModelChoice,
-	SessionGoal,
-	WorkbenchHandler,
-} from "@suiming/sdk";
+import type { EditorFileHandler, GoalAction, ModelChoice, SessionGoal, WorkbenchHandler } from "@suiming/sdk";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ExecutionStateEvent, SessionRecord } from "../execution/types.js";
 import { agentTurn } from "../harness/agent.js";
@@ -56,8 +49,8 @@ export interface SendInput {
 	/** 新 session 的模型，或在 turn 边界换绑。 */
 	model?: ModelChoice;
 	binding?: ModelBindingSnapshot;
-	/** 协作模式（ADR-0038）：新 session 的初始模式，或从这一轮起换用；对正在跑的对话换模式会被拒绝。 */
-	mode?: CollaborationMode;
+	/** 讨论开关（ADR-0039）：新 session 的初始设置，或从这一轮起打开、关上；对正在跑的对话切换会被拒绝。 */
+	discuss?: boolean;
 	/** 把这句话设为对话的目标（ADR-0038）；对正在跑的对话会被拒绝。 */
 	goal?: boolean;
 	onEvent?: SessionEventListener;
@@ -145,20 +138,20 @@ export class LocalSessionController {
 				commandId: input.commandId,
 				...(input.model === undefined ? {} : { model: input.model }),
 				...(input.binding === undefined ? {} : { binding: input.binding }),
-				...(input.mode === undefined ? {} : { collaboration: input.mode }),
+				...(input.discuss === undefined ? {} : { discuss: input.discuss }),
 			});
 			sessionId = created.id;
 		} else {
 			const current = harness.session(sessionId);
-			// 模式与模型一样只在 turn 边界换：排进正在跑的对话就会悄悄失效，所以明确拒绝（本进程和别的进程在跑都算）。
+			// 讨论与模型一样只在 turn 边界切换：排进正在跑的对话就会悄悄失效，所以明确拒绝（本进程和别的进程在跑都算）。
 			if (
-				input.mode !== undefined &&
+				input.discuss !== undefined &&
 				current.status === "running" &&
-				(current.collaboration ?? "autonomous") !== input.mode
+				(current.discuss === true) !== input.discuss
 			)
 				throw new ArtifactError(
 					"session_running",
-					"对话正在进行，换模式要从下一轮起生效：等它停下或先停止，再发这句话",
+					"对话正在进行，开关讨论要从下一轮起生效：等它停下或先停止，再发这句话",
 				);
 			if (input.goal === true && current.status === "running")
 				throw new ArtifactError("session_running", "对话正在进行：先停止当前回复，再设目标");
@@ -189,7 +182,7 @@ export class LocalSessionController {
 			this.#requireFree(sessionId);
 			this.#drive(harness, sessionId, {
 				...(input.binding === undefined ? {} : { model: input.binding }),
-				...(input.mode === undefined ? {} : { collaboration: input.mode }),
+				...(input.discuss === undefined ? {} : { discuss: input.discuss }),
 				...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
 			});
 		}
@@ -278,7 +271,7 @@ export class LocalSessionController {
 		sessionId: string,
 		options: {
 			model?: ModelBindingSnapshot;
-			collaboration?: CollaborationMode;
+			discuss?: boolean;
 			onEvent?: SessionEventListener;
 			/** 第一轮就是目标的续跑（作者 resume）。 */
 			continueGoal?: boolean;
@@ -297,7 +290,7 @@ export class LocalSessionController {
 						{
 							signal: controller.signal,
 							...(first && options.model !== undefined ? { model: options.model } : {}),
-							...(first && options.collaboration !== undefined ? { collaboration: options.collaboration } : {}),
+							...(first && options.discuss !== undefined ? { discuss: options.discuss } : {}),
 							...(options.onEvent === undefined ? {} : { onEvent: options.onEvent }),
 							...(continuing ? { continueGoal: true } : {}),
 							...(carried === undefined ? {} : { usageCarried: carried }),

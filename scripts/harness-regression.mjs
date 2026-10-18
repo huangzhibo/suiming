@@ -265,29 +265,14 @@ const TASKS = [
 		],
 	},
 	{
-		// 协作模式（ADR-0038）：作者提了改稿要求，但选的是讨论。工具面里没有写入，看模型会不会改用给方案。
+		// 讨论（ADR-0039）：作者提了改稿要求，但讨论开着。工具面里没有写入，看模型会不会改用给方案。
 		id: "mode-discuss",
-		mode: "discuss",
+		discuss: true,
 		prompt: "把 beat-0002 改得紧凑些，火船冲营那段交代得太满。",
 		grade: (r) => [
 			expect("没有改动作品", total(r.summary.changed) === 0),
 			expect("没有提交", r.summary.revisions === 0),
 			expect("回复里给了第二节的方案", r.reply.length > 0 && /第二节|beat-0002|火船/u.test(r.reply)),
-		],
-	},
-	{
-		// 协作模式：能改候选、没有 commit。改完应留在候选里，并在回复里说明改了什么、等作者提交。
-		id: "mode-collaborate",
-		mode: "collaborate",
-		prompt: "在 beat-0002 里加一句：火船出发前，黄盖把降书的底稿交给阚泽收好。改完检查一下。",
-		grade: (r) => [
-			expect(
-				"改的是 beat-0002",
-				r.summary.changed.design.paths.some((path) => path.endsWith("beat-0002.md")),
-			),
-			expect("没有提交", r.summary.revisions === 0),
-			expect("改动留在候选里", r.summary.uncommitted > 0),
-			expect("回复说明了候选里改了什么", /第二节|beat-0002/u.test(r.reply)),
 		],
 	},
 	{
@@ -357,7 +342,7 @@ async function runTask(task, root, trial) {
 	const sent = await suim(dir, [
 		"session",
 		...(task.goal ? ["goal", "set"] : ["send"]),
-		...(task.mode ? ["--mode", task.mode] : []),
+		...(task.discuss ? ["--discuss"] : []),
 		task.prompt,
 	]);
 	const durationMs = Date.now() - started;
@@ -443,7 +428,7 @@ async function runTask(task, root, trial) {
 /**
  * `--only` 可以写任务名，也可以写分组：改了哪类 prompt 就跑哪组，不必每次凭判断挑任务。
  * writer：写正文、委派 writer、审稿（Writer / Reviewer 契约、Write Context、写作方法）；design：改设计与写回；
- * check：只读检查与带着 ISSUES 写正文（check 输出、阶段提交的说明）；smoke：一次调用的冒烟；mode：协作模式的讨论与协作；
+ * check：只读检查与带着 ISSUES 写正文（check 输出、阶段提交的说明）；smoke：一次调用的冒烟；mode：讨论开关；
  * goal：目标的自动续跑与收口。
  */
 const GROUPS = {
@@ -451,7 +436,7 @@ const GROUPS = {
 	design: ["design-edit"],
 	check: ["check-issues", "delegate-writer-issues"],
 	smoke: ["discuss"],
-	mode: ["mode-discuss", "mode-collaborate"],
+	mode: ["mode-discuss"],
 	goal: ["goal-text", "goal-continue"],
 };
 

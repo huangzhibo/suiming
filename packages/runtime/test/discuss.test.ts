@@ -21,7 +21,7 @@ import {
 } from "../src/index.js";
 import { sampleWorkFiles } from "./sample-work.js";
 
-// ADR-0038 决定一：协作模式由工具面结构性保证，不靠模型自觉。走产品路径 LocalSessionController.send。
+// ADR-0039：讨论开关由工具面结构性保证，不靠模型自觉。走产品路径 LocalSessionController.send。
 
 type Step = (
 	context: Context,
@@ -40,11 +40,11 @@ async function withController(
 		saved: string[];
 	}) => Promise<void>,
 ): Promise<void> {
-	const root = await mkdtemp(join(tmpdir(), "suiming-collaboration-"));
+	const root = await mkdtemp(join(tmpdir(), "suiming-discuss-"));
 	await materializeOpenStoryDirectorySnapshot(root, sampleWorkFiles());
 	const declared: string[][] = [];
 	const saved: string[] = [];
-	// 作者在编辑器里有未保存的修改：Agent 读文件时会先把它存盘（ADR-0036），讨论模式不该这样做。
+	// 作者在编辑器里有未保存的修改：Agent 读文件时会先把它存盘（ADR-0036），讨论开着时不该这样做。
 	const editorFiles: EditorFileHandler = async (request) => {
 		if (request.operation === "save") {
 			saved.push(request.path);
@@ -52,7 +52,7 @@ async function withController(
 		}
 		return null;
 	};
-	const provider = fauxProvider({ provider: "collaboration-faux", models: [{ id: "agent-model" }] });
+	const provider = fauxProvider({ provider: "discuss-faux", models: [{ id: "agent-model" }] });
 	provider.setResponses(
 		steps.map((step) => async (context: Context) => {
 			declared.push(declaredTools(context));
@@ -69,7 +69,7 @@ async function withController(
 	});
 	let project: LocalProjectService | undefined;
 	try {
-		project = await LocalProjectService.init({ checkoutPath: root, projectId: "project-collaboration" });
+		project = await LocalProjectService.init({ checkoutPath: root, projectId: "project-discuss" });
 		const controller = new LocalSessionController({ project, models: gateway, editorFiles });
 		await body({ controller, project, root, declared, saved });
 	} finally {
@@ -99,7 +99,7 @@ function lastAuthorText(context: Context): string {
 
 const call = (name: string, args: JsonObject) => fauxAssistantMessage(fauxToolCall(name, args));
 
-test("讨论模式只读：没有写入、委派、审稿与提交；Agent 硬要写被拒，读文件也不替作者存草稿", async () => {
+test("讨论开着只读：没有写入、委派、审稿与提交；Agent 硬要写被拒，读文件也不替作者存草稿", async () => {
 	let note = "";
 	await withController(
 		[
@@ -108,66 +108,69 @@ test("讨论模式只读：没有写入、委派、审稿与提交；Agent 硬�
 				return call("read", { path: TEXT });
 			},
 			() => call("write", { path: BEAT, content: "改掉" }),
-			() => fauxAssistantMessage("方案：把第一节的开场压短，等你切到协作再动手。"),
+			() => fauxAssistantMessage("方案：把第一节的开场压短，等你关掉讨论再动手。"),
 		],
 		async ({ controller, project, root, declared, saved }) => {
 			const before = await readFile(join(root, TEXT), "utf8");
 			const beat = await readFile(join(root, BEAT), "utf8");
-			const sent = await controller.send({ commandId: "discuss-1", text: "第一节改紧凑些", mode: "discuss" });
+			const sent = await controller.send({ commandId: "discuss-1", text: "第一节改紧凑些", discuss: true });
 			await controller.completion(sent.sessionId);
 
 			const tools = declared[0] ?? [];
 			for (const name of ["write", "edit", "copy", "move", "delete", "delegate", "review", "resume_task", "commit"])
-				assert.ok(!tools.includes(name), `讨论模式不应声明 ${name}`);
+				assert.ok(!tools.includes(name), `讨论开着不应声明 ${name}`);
 			for (const name of ["read", "list", "search", "check", "project_status"])
-				assert.ok(tools.includes(name), `讨论模式应保留 ${name}`);
-			assert.match(note, /讨论/, "收到消息时的系统附注写明当前模式");
-			assert.deepEqual(saved, [], "讨论模式读文件不同步作者草稿");
+				assert.ok(tools.includes(name), `讨论开着应保留 ${name}`);
+			assert.match(note, /讨论：开/, "收到消息时的系统附注写明讨论开着");
+			assert.deepEqual(saved, [], "讨论开着读文件不同步作者草稿");
 			assert.equal(await readFile(join(root, TEXT), "utf8"), before);
 			assert.equal(await readFile(join(root, BEAT), "utf8"), beat, "硬要写也写不进去");
 			const session = project.loadExecutionEntities().sessions.find((item) => item.id === sent.sessionId);
-			assert.equal(session?.collaboration, "discuss");
+			assert.equal(session?.discuss, true);
 			assert.equal(session?.status, "idle");
 		},
 	);
 });
 
-test("协作模式能改候选不能提交；模式随对话保留，切回自主才有 commit", async () => {
+test("讨论随对话保留，关掉才有写入与 commit；新对话默认关着", async () => {
 	await withController(
 		[
+			() => fauxAssistantMessage("先说方案。"),
+			() => fauxAssistantMessage("还在讨论。"),
 			() => call("edit", { path: BEAT, oldText: "杖责五十", newText: "杖责六十" }),
-			() => fauxAssistantMessage("改好了，候选里改了第一节的情节设计，等你提交。"),
-			() => fauxAssistantMessage("还是协作模式。"),
-			() => fauxAssistantMessage("现在可以提交了。"),
+			() => fauxAssistantMessage("改好了。"),
+			() => fauxAssistantMessage("新对话。"),
 		],
 		async ({ controller, project, declared }) => {
-			const genesis = project.project().headRevisionId;
-			const sent = await controller.send({ commandId: "co-1", text: "把第一节改一下", mode: "collaborate" });
+			const sent = await controller.send({ commandId: "d-1", text: "第一节怎么改", discuss: true });
 			await controller.completion(sent.sessionId);
-			assert.ok(declared[0]?.includes("edit") && declared[0].includes("delegate"));
-			assert.ok(!declared[0]?.includes("commit"), "协作模式没有 commit");
-			assert.equal(project.project().headRevisionId, genesis, "Canon 没有推进");
+			assert.ok(!declared[0]?.includes("edit") && !declared[0]?.includes("commit"));
 
-			// 不带模式的下一句沿用上一次的选择
-			await controller.send({ commandId: "co-2", text: "继续", sessionId: sent.sessionId });
+			// 不带开关的下一句沿用上一次的设置
+			await controller.send({ commandId: "d-2", text: "再想想", sessionId: sent.sessionId });
 			await controller.completion(sent.sessionId);
-			assert.ok(!declared[2]?.includes("commit"));
+			assert.ok(!declared[1]?.includes("edit"), "讨论沿用到下一轮");
 
-			await controller.send({ commandId: "co-3", text: "可以了", sessionId: sent.sessionId, mode: "autonomous" });
+			await controller.send({ commandId: "d-3", text: "照这个改", sessionId: sent.sessionId, discuss: false });
 			await controller.completion(sent.sessionId);
-			assert.ok(declared[3]?.includes("commit"), "切回自主才有 commit");
+			for (const name of ["edit", "delegate", "review", "commit"])
+				assert.ok(declared[2]?.includes(name), `关掉讨论后应声明 ${name}`);
 			const session = project.loadExecutionEntities().sessions.find((item) => item.id === sent.sessionId);
-			assert.equal(session?.collaboration, "autonomous");
+			assert.equal(session?.discuss, false);
+
+			const fresh = await controller.send({ commandId: "d-4", text: "另起一段" });
+			await controller.completion(fresh.sessionId);
+			assert.ok(declared[4]?.includes("commit"), "新对话默认关着讨论");
 		},
 	);
 });
 
-test("对话正在跑时换模式明确拒绝，不排进去悄悄失效", async () => {
+test("对话正在跑时开关讨论明确拒绝，不排进去悄悄失效", async () => {
 	let release: () => void = () => undefined;
 	const gate = new Promise<void>((resolve) => {
 		release = resolve;
 	});
-	// 第一次回复挂到测完「跑着时换模式」才回来，保证那时对话确实在跑
+	// 第一次回复挂到测完「跑着时开讨论」才回来，保证那时对话确实在跑
 	let entered: () => void = () => undefined;
 	const running = new Promise<void>((resolve) => {
 		entered = resolve;
@@ -185,15 +188,15 @@ test("对话正在跑时换模式明确拒绝，不排进去悄悄失效", async
 			const sent = await controller.send({ commandId: "run-1", text: "写第一节" });
 			await running;
 			await assert.rejects(
-				controller.send({ commandId: "run-2", text: "先讨论", sessionId: sent.sessionId, mode: "discuss" }),
+				controller.send({ commandId: "run-2", text: "先讨论", sessionId: sent.sessionId, discuss: true }),
 				(error: unknown) => error instanceof ArtifactError && error.code === "session_running",
 			);
-			// 不改模式的插话照常排进去
+			// 不碰讨论开关的插话照常排进去
 			await controller.send({ commandId: "run-3", text: "顺便看看大纲", sessionId: sent.sessionId });
 			release();
 			await controller.completion(sent.sessionId);
 			const session = project.loadExecutionEntities().sessions.find((item) => item.id === sent.sessionId);
-			assert.notEqual(session?.collaboration, "discuss");
+			assert.notEqual(session?.discuss, true);
 			assert.deepEqual(
 				project.readInbox(sent.sessionId).map((item) => item.text),
 				["写第一节", "顺便看看大纲"],

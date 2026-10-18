@@ -75,8 +75,6 @@ export interface AgentPanelProps extends ComposerBinding {
 	openSettings(): void;
 	expanded: boolean;
 	toggleExpand(): void;
-	/** 与「提交版本」按钮同一个动作，给 `/提交` 用（ADR-0038）。 */
-	commit: { run(): void; blocked?: string | undefined };
 }
 /**
  * 待确认的调用数由存储形状派生：`confirmedCalls` 缺省表示历史记录全部已确认。
@@ -101,7 +99,6 @@ export function AgentPanel({
 	openSettings,
 	expanded,
 	toggleExpand,
-	commit,
 	...binding
 }: AgentPanelProps) {
 	const titles = useMemo(() => new Map([...book.byPath].map(([path, file]) => [path, book.title(file)])), [book]);
@@ -383,8 +380,6 @@ export function AgentPanel({
 				expanded={expanded}
 				refresh={refresh}
 				openSettings={openSettings}
-				newConversation={() => onSelect("")}
-				commit={commit}
 			/>
 			{exportNotice && (
 				<p role="status" className="text-xs text-muted-foreground">

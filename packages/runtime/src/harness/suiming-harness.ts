@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { NOOP_TELEMETRY_CONTEXT, type TelemetryContext, type TelemetrySpan } from "@earendil-works/pi-telemetry";
-import type { CollaborationMode, EditorFileHandler, SessionGoal, WorkbenchHandler } from "@suiming/sdk";
+import type { EditorFileHandler, SessionGoal, WorkbenchHandler } from "@suiming/sdk";
 import {
 	EventType,
 	type ModelChoice,
@@ -185,8 +185,8 @@ export interface TurnOptions {
 	onEvent?: SessionEventListener;
 	/** 从这个 turn 起换用的模型。 */
 	model?: ModelBindingSnapshot;
-	/** 从这个 turn 起换用的协作模式（ADR-0038）。 */
-	collaboration?: CollaborationMode;
+	/** 从这个 turn 起打开或关上讨论（ADR-0039）。 */
+	discuss?: boolean;
 	/** 这一轮是目标的自动续跑（ADR-0038）：没有作者新消息也接着请求。 */
 	continueGoal?: boolean;
 	/**
@@ -305,9 +305,9 @@ export class HarnessSession {
 		return this.#execution.session(this.sessionId);
 	}
 
-	/** 这一轮的协作模式（ADR-0038）；旧记录没有这个字段就是自主。 */
-	get collaboration(): CollaborationMode {
-		return this.record.collaboration ?? "autonomous";
+	/** 这一轮讨论开没开（ADR-0039）；没有这个字段就是关着。 */
+	get discuss(): boolean {
+		return this.record.discuss === true;
 	}
 
 	/** 作者设定的目标（ADR-0038）。 */
@@ -412,8 +412,8 @@ export class HarnessSession {
 		const model = await this.#engine.bindModel("main", record.model);
 		// 根 Agent 的写范围是整个 checkout（.git / .suiming 与 host 接入目录除外，由 ConfinedExecutionEnv 拦），
 		// 合法性在 commit 时由 Checker 判；只有子任务按角色缩小写范围（Harness 设计第 6 节）。
-		// 讨论模式（ADR-0038）整轮只读：工具面不给写入，环境也拒绝写入、不替作者存草稿，双重保证。
-		const discuss = this.collaboration === "discuss";
+		// 讨论（ADR-0039）整轮只读：工具面不给写入，环境也拒绝写入、不替作者存草稿，双重保证。
+		const discuss = this.discuss;
 		const env = new ConfinedExecutionEnv({
 			rootPath: this.checkoutPath,
 			policy: discuss ? "read" : "write",
@@ -987,7 +987,7 @@ export class SuimingHarness {
 			kind?: SessionKind;
 			model?: ModelChoice;
 			binding?: ModelBindingSnapshot;
-			collaboration?: CollaborationMode;
+			discuss?: boolean;
 		} = {},
 	): Promise<SessionRecord> {
 		const execution = this.project.createExecutionState({ now: this.now });
@@ -1002,7 +1002,7 @@ export class SuimingHarness {
 			projectId: this.project.projectId,
 			kind,
 			...(binding === undefined ? {} : { model: binding }),
-			...(input.collaboration === undefined ? {} : { collaboration: input.collaboration }),
+			...(input.discuss === undefined ? {} : { discuss: input.discuss }),
 			baseRevisionId: await this.project.refreshHead(),
 		});
 	}
@@ -1087,7 +1087,7 @@ export class SuimingHarness {
 			lease,
 			turnId: ownerId,
 			...(options.model === undefined ? {} : { model: options.model }),
-			...(options.collaboration === undefined ? {} : { collaboration: options.collaboration }),
+			...(options.discuss === undefined ? {} : { discuss: options.discuss }),
 			...(options.continueGoal === true ? { goalTurn: true } : {}),
 		});
 		execution.bindOwner(sessionId, ownerId);

@@ -1,5 +1,4 @@
 import type { GoalAction, WorkbenchActiveContext } from "@suiming/sdk";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowUp, FileText, Loader2, Plus, RotateCcw, Square, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,17 +23,17 @@ import {
 	MAX_INPUT_BYTES,
 	textFileAttachment,
 } from "./composer-state.js";
-import { ConversationModePicker } from "./conversation-mode-picker.js";
+import { ConversationDiscussToggle } from "./conversation-discuss-toggle.js";
 import { ConversationModelPicker } from "./conversation-model-picker.js";
 import type { Book } from "./model.js";
 import { isSessionActive } from "./run-presentation.js";
 import {
+	commandDetail,
 	commandMenu,
-	expandCustom,
+	findCommand,
 	goalIntent,
 	parseSlash,
 	type SlashCommand,
-	slashCommands,
 } from "./slash-commands.js";
 import { Hint } from "./ui-bits.js";
 import { useComposerSubmit } from "./use-composer-submit.js";
@@ -57,8 +56,6 @@ export function AgentComposer({
 	expanded,
 	refresh,
 	openSettings,
-	newConversation,
-	commit,
 	...binding
 }: ComposerBinding & {
 	book: Book;
@@ -67,16 +64,12 @@ export function AgentComposer({
 				id: string;
 				status: string;
 				model?: import("@suiming/sdk").ModelChoice;
-				collaboration?: import("@suiming/sdk").CollaborationMode;
+				discuss?: boolean;
 		  }
 		| undefined;
 	expanded: boolean;
 	refresh(): void;
 	openSettings(): void;
-	/** `/新对话`：与对话栏的「新对话」按钮同一个动作。 */
-	newConversation(): void;
-	/** `/提交`：与「提交版本」按钮同一个动作；`blocked` 是按钮不可用时的原因。 */
-	commit: { run(): void; blocked?: string | undefined };
 }) {
 	const {
 		composer,
@@ -102,17 +95,12 @@ export function AgentComposer({
 	});
 	const [picker, setPicker] = useState(false);
 	const [query, setQuery] = useState("");
-	// `/` 命令（ADR-0038）：只是现有能力的入口。dismissed 是按 Esc 收起菜单的记号，输入一变就清掉。
-	const authorCommands = useQuery({
-		queryKey: ["author-commands"],
-		queryFn: () => invoke("commands.list", {}),
-		staleTime: 15000,
-	});
-	const commands = slashCommands(authorCommands.data ?? []);
+	// `/` 命令（ADR-0039）：只放没有别的入口的事。dismissed 是按 Esc 收起菜单的记号，输入一变就清掉。
 	const [dismissed, setDismissed] = useState<string | undefined>();
 	const [highlight, setHighlight] = useState(0);
 	const [modelOpen, setModelOpen] = useState(false);
-	const menu = dismissed === composer.goal ? [] : commandMenu(commands, composer.goal);
+	const discussing = composer.discuss ?? session?.discuss === true;
+	const menu = dismissed === composer.goal ? [] : commandMenu(composer.goal);
 	const highlighted = Math.min(highlight, Math.max(menu.length - 1, 0));
 	const input = useRef<HTMLInputElement>(null);
 	const textarea = useRef<HTMLTextAreaElement>(null);
@@ -196,7 +184,7 @@ export function AgentComposer({
 	const clearInput = () => update((draft) => ({ ...draft, goal: "" }), true);
 	async function goalAction(action: GoalAction) {
 		if (!session) {
-			setError("还没有对话：先用 /goal 写上目标");
+			setError("还没有对话：先用 /目标 写上目标");
 			return;
 		}
 		setBusy(true);
@@ -211,43 +199,44 @@ export function AgentComposer({
 			setBusy(false);
 		}
 	}
-	/** 选中菜单里的一项：要参数的补成 `/名字 `，其余立刻执行，与对应按钮做同一件事。 */
+	/**
+	 * 选中菜单里的一项：`/目标` 要参数，补成 `/目标 `；`/讨论` 立刻开关，与输入框里的讨论开关是同一个状态；
+	 * `/模型` 打开输入框里同一个模型面板。
+	 */
 	function pick(command: SlashCommand) {
 		setError("");
-		if (command.kind === "goal" || command.kind === "custom") {
+		if (command.kind === "goal") {
 			update((draft) => ({ ...draft, goal: `/${command.name} ` }), true);
 			textarea.current?.focus();
 			return;
 		}
-		update((draft) => ({ ...draft, goal: "", ...(command.kind === "mode" ? { mode: command.mode } : {}) }), true);
-		if (command.kind === "model") setModelOpen(true);
-		else if (command.kind === "new") newConversation();
-		else if (command.kind === "commit") {
-			if (commit.blocked) setError(commit.blocked);
-			else commit.run();
+		if (command.kind === "discuss") {
+			update((draft) => ({ ...draft, goal: "", discuss: !(draft.discuss ?? session?.discuss === true) }), true);
+			return;
 		}
+		update((draft) => ({ ...draft, goal: "" }), true);
+		setModelOpen(true);
 	}
 	/** 发送前先看是不是命令；是命令就由这里处理，返回 true。 */
 	async function runSlash(): Promise<boolean> {
 		const parsed = parseSlash(composer.goal);
 		if (!parsed) return false;
-		const command = commands.find((item) => item.name === parsed.name);
+		const command = findCommand(parsed.name);
 		if (!command) {
 			setError(`没有这个命令：/${parsed.name}`);
 			return true;
 		}
 		if (command.kind === "goal") {
 			const intent = goalIntent(parsed.argument);
-			if (!intent) setError("在 /goal 后面写上目标，或者 clear、pause、resume");
+			if (!intent) setError("在 /目标 后面写上目标，或者 暂停、继续、清除");
 			else if ("action" in intent) await goalAction(intent.action);
 			else await submitGoal({ ...composer, goal: intent.objective });
 			return true;
 		}
-		if (command.kind === "custom") {
-			await submitDraft({ ...composer, goal: expandCustom(command.text, parsed.argument) });
-			return true;
-		}
-		pick(command);
+		// `/讨论 <话>`：打开讨论并把这句话发出去，与 Claude Code 的 `/plan <描述>` 相同
+		if (command.kind === "discuss" && parsed.argument)
+			await submitDraft({ ...composer, discuss: true, goal: parsed.argument });
+		else pick(command);
 		return true;
 	}
 	return (
@@ -444,7 +433,9 @@ export function AgentComposer({
 							}}
 						>
 							<span className="shrink-0 font-medium">/{command.name}</span>
-							<span className="min-w-0 truncate text-xs text-muted-foreground">{command.detail}</span>
+							<span className="min-w-0 truncate text-xs text-muted-foreground">
+								{commandDetail(command, discussing)}
+							</span>
 						</div>
 					))}
 				</div>
@@ -542,12 +533,12 @@ export function AgentComposer({
 							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<ConversationModePicker
-						choice={composer.mode}
-						current={session?.collaboration}
+					<ConversationDiscussToggle
+						choice={composer.discuss}
+						current={session?.discuss}
 						active={active}
 						disabled={busy || !!composer.pending}
-						onChange={(mode) => update((draft) => ({ ...draft, mode }), true)}
+						onChange={(discuss) => update((draft) => ({ ...draft, discuss }), true)}
 					/>
 					<ConversationModelPicker
 						open={modelOpen}

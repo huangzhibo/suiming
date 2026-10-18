@@ -1,14 +1,9 @@
-import {
-	COLLABORATION_MODES,
-	type CollaborationMode,
-	type ModelChoice,
-	type WorkbenchActiveContext,
-} from "@suiming/sdk";
+import type { ModelChoice, WorkbenchActiveContext } from "@suiming/sdk";
 
 export interface ComposerDraft {
 	model?: ModelChoice;
-	/** 协作模式的选择（ADR-0038）；与模型一样留在输入框里，对话正在回复时等下一条消息才带上。 */
-	mode?: CollaborationMode;
+	/** 讨论开关的选择（ADR-0039）；与模型一样留在输入框里，对话正在回复时等下一条消息才带上。 */
+	discuss?: boolean;
 	goal: string;
 	attachments: ComposerAttachment[];
 	pending?: ComposerSubmission;
@@ -33,8 +28,8 @@ export interface ComposerAttachment {
 /** 只保存一次尚未确认的用户提交，不承担运行队列或执行状态。 */
 export interface ComposerSubmission {
 	model?: ModelChoice;
-	mode?: CollaborationMode;
-	/** 这句话设为对话的目标（`/goal`，ADR-0038）。 */
+	discuss?: boolean;
+	/** 这句话设为对话的目标（`/目标`，ADR-0038）。 */
 	goal?: true;
 	id: string;
 	text: string;
@@ -56,7 +51,7 @@ export function updateComposerDraft<T extends ComposerState>(
 ): T {
 	const draft = update(state.composerDrafts[key] ?? emptyComposer());
 	const composerDrafts = { ...state.composerDrafts };
-	if (draft.goal || draft.attachments.length || draft.pending || draft.model || draft.mode)
+	if (draft.goal || draft.attachments.length || draft.pending || draft.model || draft.discuss !== undefined)
 		composerDrafts[key] = draft;
 	else delete composerDrafts[key];
 	// 开始输入即选定当前对话，重载不能因后台新出现 session 而切走这份草稿。
@@ -83,7 +78,7 @@ export function formatWorkbenchContext(context: WorkbenchActiveContext): string 
 }
 export function stageSubmission(
 	draft: ComposerDraft,
-	session?: { id: string; status: string; model?: ModelChoice; collaboration?: CollaborationMode },
+	session?: { id: string; status: string; model?: ModelChoice; discuss?: boolean },
 	context?: WorkbenchActiveContext,
 	options: { goal?: boolean } = {},
 ): ComposerDraft {
@@ -102,20 +97,20 @@ export function stageSubmission(
 			: body;
 	// 换模型只在 turn 边界生效：正在跑的 session 这次不带模型，输入框里的选择留到下一轮。
 	const model = draft.model && session?.status !== "running" ? draft.model : undefined;
-	// 模式同理；与对话当前模式相同就不带，免得每条消息都像在「换模式」。
-	const mode =
-		draft.mode && session?.status !== "running" && draft.mode !== (session?.collaboration ?? "autonomous")
-			? draft.mode
+	// 讨论同理；与对话当前设置相同就不带，免得每条消息都像在「开关讨论」。
+	const discuss =
+		draft.discuss !== undefined && session?.status !== "running" && draft.discuss !== (session?.discuss === true)
+			? draft.discuss
 			: undefined;
 	return {
 		...emptyComposer(),
 		...(draft.model ? { model: draft.model } : {}),
-		...(draft.mode ? { mode: draft.mode } : {}),
+		...(draft.discuss === undefined ? {} : { discuss: draft.discuss }),
 		pending: {
 			id: crypto.randomUUID(),
 			text,
 			...(model ? { model } : {}),
-			...(mode ? { mode } : {}),
+			...(discuss === undefined ? {} : { discuss }),
 			...(options.goal ? { goal: true as const } : {}),
 			...(session ? { sessionId: session.id } : {}),
 		},
@@ -205,11 +200,7 @@ export async function contentFingerprint(content: string): Promise<string> {
 	return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-/** 本机草稿恢复：内容字段校验失败就停止恢复，未知辅助字段丢掉；输入只有 attachments 一种表示。 */
-function validMode(value: unknown): value is CollaborationMode {
-	return typeof value === "string" && (COLLABORATION_MODES as readonly string[]).includes(value);
-}
-
+/** 本机草稿恢复：内容字段校验失败就停止恢复，未知辅助字段丢掉（2026-10-19 之前的 `mode` 也在其列）；输入只有 attachments 一种表示。 */
 export function restoreComposerDrafts(value: unknown): Record<string, ComposerDraft> {
 	if (value === undefined) return {};
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("本机对话草稿格式无效");
@@ -234,14 +225,14 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 				!Array.isArray(saved.attachments) ||
 				attachments.length !== saved.attachments.length ||
 				(saved.model !== undefined && !validModelChoice(saved.model)) ||
-				(saved.mode !== undefined && !validMode(saved.mode)) ||
+				(saved.discuss !== undefined && typeof saved.discuss !== "boolean") ||
 				(pending !== undefined &&
 					(!pending ||
 						typeof pending.id !== "string" ||
 						typeof pending.text !== "string" ||
 						(pending.sessionId !== undefined && typeof pending.sessionId !== "string") ||
 						(pending.model !== undefined && !validModelChoice(pending.model)) ||
-						(pending.mode !== undefined && !validMode(pending.mode)) ||
+						(pending.discuss !== undefined && typeof pending.discuss !== "boolean") ||
 						(pending.goal !== undefined && pending.goal !== true)))
 			)
 				throw new Error("本机对话草稿不完整");
@@ -252,7 +243,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 						goal: typeof saved.goal === "string" ? saved.goal : "",
 						attachments,
 						...(validModelChoice(saved.model) ? { model: saved.model } : {}),
-						...(validMode(saved.mode) ? { mode: saved.mode } : {}),
+						...(typeof saved.discuss === "boolean" ? { discuss: saved.discuss } : {}),
 						...(pending && typeof pending.id === "string" && typeof pending.text === "string"
 							? {
 									pending: {
@@ -260,7 +251,7 @@ export function restoreComposerDrafts(value: unknown): Record<string, ComposerDr
 										text: pending.text,
 										...(typeof pending.sessionId === "string" ? { sessionId: pending.sessionId } : {}),
 										...(validModelChoice(pending.model) ? { model: pending.model } : {}),
-										...(validMode(pending.mode) ? { mode: pending.mode } : {}),
+										...(typeof pending.discuss === "boolean" ? { discuss: pending.discuss } : {}),
 										...(pending.goal === true ? { goal: true as const } : {}),
 									},
 								}

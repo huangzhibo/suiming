@@ -1,4 +1,4 @@
-import type { CollaborationMode, SessionGoal } from "@suiming/sdk";
+import type { SessionGoal } from "@suiming/sdk";
 import type { ModelBindingSnapshot } from "../model/model-gateway.js";
 
 /**
@@ -61,8 +61,8 @@ export interface SessionRecord {
 	status: SessionStatus;
 	/** 根 Agent 当前的模型绑定；换模型在 turn 边界改它。 */
 	model?: ModelBindingSnapshot;
-	/** 协作模式（ADR-0038），与模型一样在 turn 边界改；没有就是自主（autonomous）。 */
-	collaboration?: CollaborationMode;
+	/** 讨论开着（ADR-0039）：根 Agent 只读。与模型一样在 turn 边界改；没有就是关着。 */
+	discuss?: boolean;
 	/** 作者设定的目标（ADR-0038）：执行数据，不是作品事实。作者只在 idle 时改，跑着时只由持有 turn 的进程改。 */
 	goal?: SessionGoal;
 	/** 已开始的 turn 数；`turnId` 是当前（或最近一个）turn 的 AG-UI runId。 */

@@ -48,8 +48,6 @@ import {
 	telemetryFromEnvironment,
 } from "@suiming/runtime";
 import {
-	COLLABORATION_MODES,
-	type CollaborationMode,
 	errorCategory,
 	GOAL_ACTIONS,
 	type GoalAction,
@@ -1040,22 +1038,18 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 		.description("发一条作者消息并等这个 turn 结束；不带 --session 就新开一个 session")
 		.argument("<text...>")
 		.option("--session <id>", "继续一个已有的 session")
-		.option(
-			"--mode <mode>",
-			"协作模式，从这一轮起生效并沿用：discuss 只读讨论，collaborate 能改候选但由作者提交，autonomous 能改也能提交（新对话的默认）",
-		)
+		.option("--discuss", "打开讨论（只读，Agent 只出方案、不改文件不提交），从这一轮起生效并沿用")
+		.option("--no-discuss", "关上讨论，从这一轮起生效并沿用；新对话默认关着")
 		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
 		.option("--auth <path>", "覆盖 ~/.suiming/auth.json")
 		.option("--events", "在最终响应之前逐行流式输出 SessionEvent NDJSON")
 		.action(
 			async (
 				words: string[],
-				options: { session?: string; mode?: string; config?: string; auth?: string; events?: boolean },
+				options: { session?: string; discuss?: boolean; config?: string; auth?: string; events?: boolean },
 			) => {
 				await execute("session.send", () =>
 					withProject(projectPath(program), async (service) => {
-						if (options.mode !== undefined && !COLLABORATION_MODES.includes(options.mode as CollaborationMode))
-							throw new ArtifactError("invalid_cli_usage", `--mode 只能是 ${COLLABORATION_MODES.join("、")}`);
 						const models = await modelGateway(io, options);
 						const controller = new LocalSessionController({
 							project: service,
@@ -1068,7 +1062,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 							commandId: randomUUID(),
 							text: words.join(" "),
 							...(options.session === undefined ? {} : { sessionId: options.session }),
-							...(options.mode === undefined ? {} : { mode: options.mode as CollaborationMode }),
+							...(options.discuss === undefined ? {} : { discuss: options.discuss }),
 							...(onEvent === undefined ? {} : { onEvent }),
 						});
 						await withInterrupt(io, async (signal) => {
@@ -1102,10 +1096,8 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 		.argument("<action>", "set、clear、pause 或 resume")
 		.argument("[objective...]", "set 时的目标原文")
 		.option("--session <id>", "已有的对话；set 不带就新开一个")
-		.option(
-			"--mode <mode>",
-			"set 时同时设协作模式：discuss 只读讨论，collaborate 能改候选但由作者提交，autonomous 能改也能提交",
-		)
+		.option("--discuss", "set 时同时打开讨论：Agent 只能讨论")
+		.option("--no-discuss", "set 时同时关上讨论")
 		.option("--config <path>", "覆盖 ~/.suiming/config.toml")
 		.option("--auth <path>", "覆盖 ~/.suiming/auth.json")
 		.option("--events", "在最终响应之前逐行流式输出 SessionEvent NDJSON")
@@ -1113,7 +1105,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 			async (
 				action: string,
 				words: string[],
-				options: { session?: string; mode?: string; config?: string; auth?: string; events?: boolean },
+				options: { session?: string; discuss?: boolean; config?: string; auth?: string; events?: boolean },
 			) => {
 				await execute("session.goal", () =>
 					withProject(projectPath(program), async (service) => {
@@ -1123,8 +1115,6 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 							throw new ArtifactError("invalid_cli_usage", "set 要写上目标原文");
 						if (action !== "set" && options.session === undefined)
 							throw new ArtifactError("invalid_cli_usage", `${action} 要用 --session 指明对话`);
-						if (options.mode !== undefined && !COLLABORATION_MODES.includes(options.mode as CollaborationMode))
-							throw new ArtifactError("invalid_cli_usage", `--mode 只能是 ${COLLABORATION_MODES.join("、")}`);
 						const models = await modelGateway(io, options);
 						const controller = new LocalSessionController({
 							project: service,
@@ -1141,7 +1131,7 @@ export async function runSuimCli(argv: readonly string[], io: SuimCliIo): Promis
 											text: words.join(" "),
 											goal: true,
 											...(options.session === undefined ? {} : { sessionId: options.session }),
-											...(options.mode === undefined ? {} : { mode: options.mode as CollaborationMode }),
+											...(options.discuss === undefined ? {} : { discuss: options.discuss }),
 											...(onEvent === undefined ? {} : { onEvent }),
 										})
 									).sessionId

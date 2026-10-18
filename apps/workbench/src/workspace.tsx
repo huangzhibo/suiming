@@ -645,7 +645,6 @@ function WorkspaceShell() {
 								openSettings={() => setSettingsOpen(true)}
 								expanded={view.expanded}
 								toggleExpand={() => patch({ expanded: !view.expanded })}
-								commit={{ run: () => void commitVersion(), blocked: commitBlocked }}
 							/>
 						)}
 					</aside>
