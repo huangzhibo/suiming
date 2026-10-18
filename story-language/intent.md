@@ -14,7 +14,7 @@ subjects:
 诸葛亮与周瑜的较量不能把周瑜写成心胸狭窄、只供衬托诸葛亮的人，也不能为了翻案抹去他几次设计除掉诸葛亮的事实。二人的可敬与可议应来自各自替主公谋划的同一套立场，并在军令状兑现时让受众重新理解这场较量，而不只是确认谁更聪明。
 ```
 
-缺省值为 `applies_to: design`、`target: book`，`subjects / style_refs` 缺省为空。frontmatter 只负责路由；当前有效的要求、禁止项和取舍直接写在 Markdown 主体中，不另造来源、强度或状态字段。`subjects` 像 StoryBeat `refs` 一样按 kind 分组并只写本地 id；它只路由，不表达关系或状态。`style_refs` 选择 `reference/style/<id>.md` 作为表达证据。`design` Intent 是 Design 的一部分，并继续约束 StoryText；`text` Intent 只约束表达，不属于 Design。
+缺省值为 `applies_to: design`、`target: book`，`subjects / style_refs` 缺省为空。frontmatter 只负责路由；当前有效的要求、禁止项和取舍直接写在 Markdown 主体中，不另造来源、强度或状态字段。`subjects` 像 StoryBeat `refs` 一样按 kind 分组并只写本地 id；它只路由，不表达关系或状态。`style_refs` 选择 `reference/style/<id>.md` 作为表达证据。`design` Intent 是 Design 的一部分，并继续约束 StoryText；`text` Intent 只约束表达，不属于 Design。只管一段的要求（例如「第一百二十一章起」），`target` 写成那一段的 Beat 范围：Intent 是它覆盖的每个 Beat 的写作依据，写成全书范围，改动它会让全书已有正文都显示为依据已变。
 
 Intent 主动约束故事，StoryBeat 写出重写正文时也要保持的因果设计，Review 回头检查是否兑现。Context 按 `target / subjects` 选出适用的 Intent，所以 StoryBeat 不保存 `intent_refs` 或来源引用。采用后的事件、选择、经历、关系变化和因果直接进入 StoryOutline；只有仍要约束后面多个 Beat、下次重写正文或改编时，才保留 Intent。已经完全写成故事事实的重复 Intent 应合并或删除，形成过程由 ProjectRevision 保存。
 
