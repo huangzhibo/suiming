@@ -7,6 +7,7 @@ import {
 	verifyStoryText,
 } from "@suiming/story";
 import { beatDesign } from "../artifact/beat-design.js";
+import { codePointCount } from "../artifact/code-points.js";
 import { isTargetArtifactIdentity, targetArtifactIdentity } from "../artifact/identity.js";
 import { inspectStoryDesignCandidate } from "../artifact/story-design-validator.js";
 import type { ArtifactCandidate, ArtifactIdentity, CandidateArtifact } from "../artifact/types.js";
@@ -105,6 +106,24 @@ export function selectedStyleEvidence(
 function refIds(beat: StoryBeat, kind: string): string[] {
 	const prefix = `${kind}:`;
 	return beat.refs.filter((ref) => ref.startsWith(prefix)).map((ref) => ref.slice(prefix.length));
+}
+
+/**
+ * 篇幅的确定性事实：去掉标题行与空白后的字数，与对照原作时 compare.py 的口径一样。前文各节标出正文与它那一节 Design 的字数，
+ * 写手才能按这部作品自己的比例定篇幅——2026-10-18 斗破留出，写手只看得到上一节多长，后面的节照着 Agent 自己写长了的上一节
+ * 往下写，开新章的节也到原作的 1.7–1.8 倍。
+ */
+function bodyChars(text: string): number {
+	const body = text
+		.split("\n")
+		.filter((line) => !line.trimStart().startsWith("#"))
+		.join("")
+		.replace(/\s/gu, "");
+	return codePointCount(body);
+}
+
+function lengthNote(text: string, beat: StoryBeat): string {
+	return `正文 ${bodyChars(text)} 字，这一节的 Design ${bodyChars(beat.text)} 字`;
 }
 
 function head(text: string, codePoints: number): string {
@@ -241,7 +260,7 @@ export function compileWriteContext(
 	sections.push(
 		[
 			"## target_story_design",
-			`${target.path}（顺序 ${target.ordinal + 1} / ${beats.length}，${target.volumeId}${volume?.title ? `「${volume.title}」` : ""}）`,
+			`${target.path}（顺序 ${target.ordinal + 1} / ${beats.length}，${target.volumeId}${volume?.title ? `「${volume.title}」` : ""}；Design ${bodyChars(target.text)} 字）`,
 			`refs: ${target.refs.join(", ") || "无"}`,
 			`contracts: open=[${target.contracts.open.join(", ")}] advance=[${target.contracts.advance.join(", ")}] resolve=[${target.contracts.resolve.join(", ")}]`,
 			"",
@@ -335,9 +354,11 @@ export function compileWriteContext(
 	const prior: string[] = ["## prior_story_text"];
 	for (const selection of priorTexts) {
 		artifacts.push(targetArtifactIdentity("story-text", selection.storyBeatId));
+		const text = texts.get(selection.storyBeatId) ?? "";
+		const beat = beats.find((item) => item.id === selection.storyBeatId) as StoryBeat;
 		prior.push(
-			`### text/${selection.storyBeatId}.md（${selection.continuity === "continuous" ? "与 previous 连续" : "非连续，只提供历史表达证据，不代表当前状态"}；来源 ${selection.reason}）`,
-			(texts.get(selection.storyBeatId) ?? "").trim(),
+			`### text/${selection.storyBeatId}.md（${selection.continuity === "continuous" ? "与 previous 连续" : "非连续，只提供历史表达证据，不代表当前状态"}；来源 ${selection.reason}；${lengthNote(text, beat)}）`,
+			text.trim(),
 			"",
 		);
 	}
@@ -363,7 +384,11 @@ export function compileWriteContext(
 	const previousText = previous === undefined ? undefined : texts.get(previous.id);
 	if (previous !== undefined && previousText !== undefined) {
 		artifacts.push(targetArtifactIdentity("story-text", previous.id));
-		immediate.push(`### previous text/${previous.id}.md（直接续写表面）`, previousText.trim(), "");
+		immediate.push(
+			`### previous text/${previous.id}.md（直接续写表面；${lengthNote(previousText, previous)}）`,
+			previousText.trim(),
+			"",
+		);
 	} else {
 		immediate.push(
 			previous === undefined
