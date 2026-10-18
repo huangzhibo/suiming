@@ -819,7 +819,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 							</PopoverTrigger>
 							<PopoverContent side="top" align="start" className="max-w-[calc(100vw-24px)]">
 								<PopoverTitle>{error || projection.error ? "操作未完成" : "操作结果"}</PopoverTitle>
-								<PopoverDescription className="break-words">{feedback}</PopoverDescription>
+								<PopoverDescription className="break-words whitespace-pre-line">{feedback}</PopoverDescription>
 							</PopoverContent>
 						</Popover>
 						{!error && typeof notice === "object" && notice.action && (

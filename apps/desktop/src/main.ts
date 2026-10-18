@@ -133,7 +133,7 @@ export function startDesktop(
 		});
 		// 「新建」只接受空目录；Finder 的目录元数据不算内容，其他隐藏文件仍须保留。
 		if (create && entries.some((entry) => entry !== ".DS_Store"))
-			throw new Error("新建作品请选择空文件夹。这个文件夹已有内容；若要继续已有作品，请使用「打开作品」。");
+			throw new Error(`新建作品请选择空文件夹。这个文件夹已有内容：${path}\n若要继续已有作品，请使用「打开作品」。`);
 		// 目录还没有 .suiming 时就地初始化执行登记；作品版本在 .git 的 Canon ref，.suiming 保存对话。
 		// scaffold 是幂等的，只补缺失的 index.yaml 等最小 Design；已有作品文件直接成为第一个版本。
 		// 「打开」一个既非空、又没有任何作品文件的目录（例如误选 ~/Documents）时拒绝，不往里写东西。
@@ -145,7 +145,7 @@ export function startDesktop(
 			const visibleEntries = entries.filter((entry) => !entry.startsWith("."));
 			if (!create && !hasStoryFiles && visibleEntries.length > 0)
 				throw new Error(
-					"这个文件夹里没有作品文件，也不是空目录。请选择 Open Story Directory，或用「新建作品」选一个空目录。",
+					`这个文件夹里没有作品文件，也不是空目录：${path}\n请选择 Open Story Directory，或用「新建作品」选一个空目录。`,
 				);
 			try {
 				(await LocalProjectService.initWithStarter({ checkoutPath: path })).service.close();

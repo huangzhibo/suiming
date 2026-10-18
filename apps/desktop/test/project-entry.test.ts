@@ -65,7 +65,17 @@ test("新建与取消：误选非空目录不初始化、不切作品，编辑�
 		await selectDirectory(app, foreign);
 		await page.getByRole("button", { name: "切换作品", exact: true }).click();
 		await page.getByRole("button", { name: "新建作品", exact: true }).click();
-		await page.getByText(/新建作品请选择空文件夹/).waitFor();
+		const refused = page.getByText(/新建作品请选择空文件夹/);
+		await refused.waitFor();
+		assert.ok((await refused.innerText()).includes(await realpath(foreign)), "提示写出是哪个目录");
+		// 状态栏只有一行，长路径会被截断；点开看全文，路径与建议分两行
+		await refused.click();
+		const full = page.getByRole("dialog").filter({ hasText: "操作未完成" });
+		assert.ok(
+			(await full.innerText()).includes(`${await realpath(foreign)}\n若要继续已有作品`),
+			"弹出框里看得到完整路径",
+		);
+		await page.keyboard.press("Escape");
 		await mkdir("/tmp/suiming-project-entry-qa", { recursive: true });
 		await page.screenshot({ path: "/tmp/suiming-project-entry-qa/nonempty.png" });
 		await page.keyboard.press("Escape");
@@ -83,9 +93,10 @@ test("新建与取消：误选非空目录不初始化、不切作品，编辑�
 				await writeFile(join(path, ".keep"), "保留");
 			}
 			await selectDirectory(app, path);
+			const shown = await realpath(path);
 			await assert.rejects(
 				page.evaluate(() => window.suiming.chooseProject(true)),
-				/新建作品请选择空文件夹/,
+				(error: Error) => error.message.includes("新建作品请选择空文件夹") && error.message.includes(shown),
 			);
 		}
 		const unreadable = join(directory, "无权限目录");

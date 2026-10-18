@@ -8,7 +8,7 @@ declare const window: {
 declare const document: { documentElement: { scrollWidth: number } };
 
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -695,7 +695,12 @@ test("打开没有 .suiming 的 Open Story Directory：主进程就地初始化�
 			page.evaluate((path) => window.suiming?.openProject(path), foreign),
 			/最近列表/,
 		);
-		await assert.rejects(chooseDirectory(app, page, foreign), /没有作品文件/);
+		// 提示要写出是哪个目录：2026-10-18 作者误选了一个盲读包目录，提示没说是哪个，不知道选错了哪一个。
+		const foreignPath = await realpath(foreign);
+		await assert.rejects(
+			chooseDirectory(app, page, foreign),
+			(error: Error) => error.message.includes("没有作品文件") && error.message.includes(foreignPath),
+		);
 		await assert.rejects(readFile(join(foreign, "outline/story/index.yaml")), { code: "ENOENT" });
 		// 旧仓格式的作品：不做迁移，错误说清是哪份文件、哪一项；scaffold 补的 index.yaml 与 .suiming 都收回。
 		const legacy = join(directory, "legacy");
