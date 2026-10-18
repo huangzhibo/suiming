@@ -899,6 +899,12 @@ test("导航与文件：侧栏独立、共享草稿、固定与新开、关闭�
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();
 		assert.equal(await page.getByRole("dialog").count(), 0, "仍由作品页持有的草稿不丢弃");
 		await page.locator(".tab-btn").first().locator("button").first().click();
+		// CodeMirror 只把视口附近的行放进 DOM。切回的标签恢复了自己的滚动位置（停在「第一份共享草稿」），
+		// 在另一个标签追加的最后一行刚好在视口下面，有时在 DOM 里有时不在。这里查的是草稿内容，先滚到底再看
+		// （2026-10-19 查明：失败时编辑器内容是对的，只是那一行没渲染）。
+		await page.locator(".cm-scroller").evaluate((element) => {
+			element.scrollTop = element.scrollHeight;
+		});
 		await page.locator(".cm-content").filter({ hasText: "第二次共享修改" }).waitFor();
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();
 		await page.getByRole("dialog").getByRole("button", { name: "取消", exact: true }).click();
