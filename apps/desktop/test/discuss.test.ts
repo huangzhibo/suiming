@@ -10,9 +10,10 @@ import { collectPageErrors, eventually, launchDesktop } from "./launch.js";
 
 declare const window: { suiming: DesktopBridge };
 
-// ADR-0039：输入框里的讨论开关。开着时 Agent 硬要写也写不进去、不替作者存草稿；关上后能改也能提交。
+// ADR-0039：讨论用 `/讨论` 打开，开着时输入框底部有「讨论中」标记，点一下关上；关着时标记不占位置。
+// 开着时 Agent 硬要写也写不进去、不替作者存草稿；关上后能改也能提交。
 // faux 模型的越界动作在 entry.ts 的 --discuss-test。
-test("讨论开关：开着只读不碰草稿，关上后照方案改并提交", { timeout: 90000 }, async () => {
+test("讨论：/讨论 打开后只读不碰草稿，点标记关上后照方案改并提交", { timeout: 90000 }, async () => {
 	const directory = await mkdtemp(join(tmpdir(), "suiming-discuss-"));
 	const root = join(directory, "work");
 	await mkdir(root);
@@ -42,9 +43,11 @@ test("讨论开关：开着只读不碰草稿，关上后照方案改并提交",
 		await editor.fill(draft);
 		const genesis = await head();
 
-		await pressed(false); // 新对话默认关着讨论
-		await toggle.click();
+		assert.equal(await toggle.count(), 0, "新对话默认关着讨论，标记不占位置");
+		await input.fill("/讨论");
+		await page.keyboard.press("Enter");
 		await pressed(true);
+		assert.match(await toggle.innerText(), /讨论中/);
 		await input.fill("把核心设定改紧凑些");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		await page.getByText("方案：核心设定的开头压短一句，关掉讨论再动手。", { exact: true }).waitFor();
@@ -54,7 +57,7 @@ test("讨论开关：开着只读不碰草稿，关上后照方案改并提交",
 		assert.equal(await head(), genesis);
 
 		await toggle.click();
-		await pressed(false);
+		await toggle.waitFor({ state: "detached" });
 		await input.fill("照方案改");
 		await page.getByRole("button", { name: "发送", exact: true }).click();
 		await page.getByText("改好了，已经提交。", { exact: true }).waitFor();

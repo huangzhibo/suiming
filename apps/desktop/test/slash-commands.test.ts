@@ -28,15 +28,31 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 		await page.getByRole("heading", { name: "beat-0001", exact: true }).waitFor();
 		const input = page.getByRole("textbox", { name: "输入消息", exact: true });
 		const menu = page.getByRole("listbox", { name: "命令", exact: true });
-		// 讨论开关的状态：等它变到 value，不读一次就下结论
-		const discussPressed = (value: boolean) =>
-			page.locator(`button[aria-label="讨论"][aria-pressed="${value}"]`).waitFor();
+		// 讨论标记：开着时出现，关着时不占位置
+		const discussOn = () => page.locator('button[aria-label="讨论"][aria-pressed="true"]').waitFor();
+		const discussOff = () => page.locator('button[aria-label="讨论"]').waitFor({ state: "detached" });
 		const send = () => page.keyboard.press("Meta+Enter");
 
 		// 菜单：行首输入 / 出现，只有三条；按前缀筛，Esc 收起，再输入又出现
 		await input.click();
+		const composer = page.locator('[data-variant="composer"]');
+		const before = await composer.boundingBox();
 		await input.fill("/");
 		await menu.waitFor();
+		// 菜单浮在输入框上方，不把输入框和上面的对话往上推；也没被别的东西盖住（2026-10-19 作者截图发现）
+		const after = await composer.boundingBox();
+		const box = await menu.boundingBox();
+		assert.ok(before && after && box);
+		assert.equal(after.y, before.y, "弹出菜单时输入框没有移动");
+		assert.ok(box.y + box.height <= after.y, "菜单在输入框上方");
+		assert.ok(
+			await menu.evaluate((element) => {
+				const rect = element.getBoundingClientRect();
+				const top = element.ownerDocument.elementFromPoint(rect.left + rect.width / 2, rect.top + 6);
+				return top !== null && element.contains(top);
+			}),
+			"菜单顶端露在最上层，没被裁掉或盖住",
+		);
 		const options = await menu.getByRole("option").allInnerTexts();
 		assert.deepEqual(
 			options.map((text) => text.split(/\s/u)[0]),
@@ -58,14 +74,14 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 		);
 		assert.equal(await input.inputValue(), "/讨");
 		await page.keyboard.press("Enter");
-		await discussPressed(true); // /讨论 打开的就是输入框里的开关
+		await discussOn(); // /讨论 打开的就是输入框底部的讨论标记
 		assert.equal(await input.inputValue(), "", "立刻执行的命令清掉输入");
 		await input.fill("/讨");
 		assert.match(await menu.getByRole("option").first().innerText(), /关上讨论/);
 		// 英文别名不开输入法也能打
 		await input.fill("/plan");
 		await page.keyboard.press("Enter");
-		await discussPressed(false); // 再来一次就关上
+		await discussOff(); // 再来一次就关上
 
 		// /模型 打开输入框里同一个模型面板
 		await input.fill("/模型");
@@ -112,7 +128,7 @@ test("/ 命令：菜单与键盘、/讨论 与开关同一个状态、/模型、
 		await input.fill("/讨论 第一节怎么改");
 		await send();
 		await page.getByText("先说方案。", { exact: true }).waitFor();
-		await discussPressed(true);
+		await discussOn();
 		await eventually(
 			async () =>
 				(await page.evaluate(() => window.suiming.invoke("session.list", {}))).sessions[0]?.discuss === true,

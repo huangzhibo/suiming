@@ -413,173 +413,179 @@ export function AgentComposer({
 					引用总量超过 256 KB，请移除部分内容或改为引用选段。
 				</p>
 			)}
-			{menu.length > 0 && (
-				<div
-					role="listbox"
-					aria-label="命令"
-					className="mb-1 max-h-56 overflow-auto rounded-lg border bg-popover p-1 text-sm shadow-sm"
-				>
-					{menu.map((command, index) => (
-						<div
-							key={command.name}
-							role="option"
-							tabIndex={-1}
-							aria-selected={index === highlighted}
-							data-highlighted={index === highlighted ? "" : undefined}
-							className="flex cursor-default items-baseline gap-2 rounded-md px-2 py-1 data-[highlighted]:bg-accent"
-							onMouseDown={(event) => {
-								event.preventDefault();
-								pick(command);
-							}}
-						>
-							<span className="shrink-0 font-medium">/{command.name}</span>
-							<span className="min-w-0 truncate text-xs text-muted-foreground">
-								{commandDetail(command, discussing)}
-							</span>
-						</div>
-					))}
-				</div>
-			)}
-			<InputGroup data-variant="composer">
-				<InputGroupTextarea
-					ref={textarea}
-					value={composer.goal}
-					aria-label="输入消息"
-					rows={2}
-					placeholder="输入消息…"
-					onChange={(event) => {
-						const goal = event.target.value;
-						setHighlight(0);
-						setDismissed(undefined);
-						update((draft) => ({ ...draft, goal }));
-					}}
-					onPaste={(event) => {
-						if (event.clipboardData.files.length) {
-							event.preventDefault();
-							addFiles([...event.clipboardData.files]);
-						}
-					}}
-					onKeyDown={(event) => {
-						if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-						if (menu.length > 0 && !event.metaKey && !event.ctrlKey) {
-							if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-								event.preventDefault();
-								const step = event.key === "ArrowDown" ? 1 : -1;
-								setHighlight((highlighted + step + menu.length) % menu.length);
-								return;
-							}
-							if (event.key === "Enter" || event.key === "Tab") {
-								event.preventDefault();
-								const command = menu[highlighted];
-								if (command) pick(command);
-								return;
-							}
-							if (event.key === "Escape") {
-								event.preventDefault();
-								setDismissed(composer.goal);
-								return;
-							}
-						}
-						const cursor = event.currentTarget.selectionStart;
-						if (event.key === "@" && (cursor === 0 || /\s/u.test(event.currentTarget.value[cursor - 1] ?? ""))) {
-							event.preventDefault();
-							openPicker();
-							return;
-						}
-						if (
-							(event.metaKey || event.ctrlKey) &&
-							event.key === "Enter" &&
-							!event.nativeEvent.isComposing &&
-							event.keyCode !== 229
-						) {
-							event.preventDefault();
-							if (!busy && !composer.pending && ready) event.currentTarget.form?.requestSubmit();
-						}
-					}}
-				/>
-				<InputGroupAddon align="block-end">
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							render={
-								<Button type="button" variant="ghost" size="icon-sm" aria-label="添加内容">
-									<Plus />
-								</Button>
-							}
-						/>
-						<DropdownMenuContent side="top" align="start">
-							<DropdownMenuGroup>
-								<DropdownMenuItem
-									disabled={!currentPath}
-									onClick={() => addDocument(currentPath, !!currentSelection)}
-								>
-									{currentSelection
-										? "引用当前选段"
-										: currentPath
-											? "引用当前文档"
-											: "引用当前文档（当前页面不是作品文件）"}
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={openPicker}>
-									选择作品文件…
-									<span className="ml-auto text-muted-foreground">@</span>
-								</DropdownMenuItem>
-								<DropdownMenuItem
-									onClick={() => {
-										replacement.current = null;
-										input.current?.click();
-									}}
-								>
-									添加文本文件…
-								</DropdownMenuItem>
-							</DropdownMenuGroup>
-						</DropdownMenuContent>
-					</DropdownMenu>
-					<ConversationDiscussToggle
-						choice={composer.discuss}
-						current={session?.discuss}
-						active={active}
-						disabled={busy || !!composer.pending}
-						onChange={(discuss) => update((draft) => ({ ...draft, discuss }), true)}
-					/>
-					<ConversationModelPicker
-						open={modelOpen}
-						onOpenChange={setModelOpen}
-						choice={composer.model}
-						current={session?.model}
-						active={active}
-						disabled={busy || !!composer.pending}
-						onChange={(model) => update((draft) => ({ ...draft, model }), true)}
-						openSettings={openSettings}
-					/>
-					<span className="flex-1" />
-					{active && !stopping && (
-						<Hint side="top" content="停止当前回复">
-							<Button
-								type="button"
-								size="icon-sm"
-								variant="ghost"
-								aria-label="停止"
-								disabled={busy}
-								onClick={() => void stop()}
+			{/* 命令菜单浮在输入框上方，盖住上面的内容而不是把它们往上推（2026-10-19 作者截图发现） */}
+			<div className="relative">
+				{menu.length > 0 && (
+					<div
+						role="listbox"
+						aria-label="命令"
+						className="absolute inset-x-0 bottom-full z-20 mb-1 max-h-56 overflow-auto rounded-lg border bg-popover p-1 text-sm shadow-sm"
+					>
+						{menu.map((command, index) => (
+							<div
+								key={command.name}
+								role="option"
+								tabIndex={-1}
+								aria-selected={index === highlighted}
+								data-highlighted={index === highlighted ? "" : undefined}
+								className="flex cursor-default items-baseline gap-2 rounded-md px-2 py-1 data-[highlighted]:bg-accent"
+								onMouseDown={(event) => {
+									event.preventDefault();
+									pick(command);
+								}}
 							>
-								<Square />
+								<span className="shrink-0 font-medium">/{command.name}</span>
+								<span className="min-w-0 truncate text-xs text-muted-foreground">
+									{commandDetail(command, discussing)}
+								</span>
+							</div>
+						))}
+					</div>
+				)}
+				<InputGroup data-variant="composer">
+					<InputGroupTextarea
+						ref={textarea}
+						value={composer.goal}
+						aria-label="输入消息"
+						rows={2}
+						placeholder="输入消息…"
+						onChange={(event) => {
+							const goal = event.target.value;
+							setHighlight(0);
+							setDismissed(undefined);
+							update((draft) => ({ ...draft, goal }));
+						}}
+						onPaste={(event) => {
+							if (event.clipboardData.files.length) {
+								event.preventDefault();
+								addFiles([...event.clipboardData.files]);
+							}
+						}}
+						onKeyDown={(event) => {
+							if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+							if (menu.length > 0 && !event.metaKey && !event.ctrlKey) {
+								if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+									event.preventDefault();
+									const step = event.key === "ArrowDown" ? 1 : -1;
+									setHighlight((highlighted + step + menu.length) % menu.length);
+									return;
+								}
+								if (event.key === "Enter" || event.key === "Tab") {
+									event.preventDefault();
+									const command = menu[highlighted];
+									if (command) pick(command);
+									return;
+								}
+								if (event.key === "Escape") {
+									event.preventDefault();
+									setDismissed(composer.goal);
+									return;
+								}
+							}
+							const cursor = event.currentTarget.selectionStart;
+							if (
+								event.key === "@" &&
+								(cursor === 0 || /\s/u.test(event.currentTarget.value[cursor - 1] ?? ""))
+							) {
+								event.preventDefault();
+								openPicker();
+								return;
+							}
+							if (
+								(event.metaKey || event.ctrlKey) &&
+								event.key === "Enter" &&
+								!event.nativeEvent.isComposing &&
+								event.keyCode !== 229
+							) {
+								event.preventDefault();
+								if (!busy && !composer.pending && ready) event.currentTarget.form?.requestSubmit();
+							}
+						}}
+					/>
+					<InputGroupAddon align="block-end">
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button type="button" variant="ghost" size="icon-sm" aria-label="添加内容">
+										<Plus />
+									</Button>
+								}
+							/>
+							<DropdownMenuContent side="top" align="start">
+								<DropdownMenuGroup>
+									<DropdownMenuItem
+										disabled={!currentPath}
+										onClick={() => addDocument(currentPath, !!currentSelection)}
+									>
+										{currentSelection
+											? "引用当前选段"
+											: currentPath
+												? "引用当前文档"
+												: "引用当前文档（当前页面不是作品文件）"}
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={openPicker}>
+										选择作品文件…
+										<span className="ml-auto text-muted-foreground">@</span>
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() => {
+											replacement.current = null;
+											input.current?.click();
+										}}
+									>
+										添加文本文件…
+									</DropdownMenuItem>
+								</DropdownMenuGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
+						<ConversationDiscussToggle
+							choice={composer.discuss}
+							current={session?.discuss}
+							active={active}
+							disabled={busy || !!composer.pending}
+							onChange={(discuss) => update((draft) => ({ ...draft, discuss }), true)}
+						/>
+						<ConversationModelPicker
+							open={modelOpen}
+							onOpenChange={setModelOpen}
+							choice={composer.model}
+							current={session?.model}
+							active={active}
+							disabled={busy || !!composer.pending}
+							onChange={(model) => update((draft) => ({ ...draft, model }), true)}
+							openSettings={openSettings}
+						/>
+						<span className="flex-1" />
+						{active && !stopping && (
+							<Hint side="top" content="停止当前回复">
+								<Button
+									type="button"
+									size="icon-sm"
+									variant="ghost"
+									aria-label="停止"
+									disabled={busy}
+									onClick={() => void stop()}
+								>
+									<Square />
+								</Button>
+							</Hint>
+						)}
+						<Hint side="top" content={stopping ? "停止当前回复" : "发送消息\n⌘ / Ctrl + Enter 发送，Enter 换行"}>
+							<Button
+								type={stopping ? "button" : "submit"}
+								onClick={stopping ? () => void stop() : undefined}
+								size="icon-sm"
+								data-composer-submit
+								aria-label={sendLabel}
+								aria-keyshortcuts="Meta+Enter Control+Enter"
+								disabled={busy || (stopping ? false : !!composer.pending || !ready || !composerText(composer))}
+							>
+								{busy ? <Loader2 className="animate-spin" /> : stopping ? <Square /> : <ArrowUp />}
 							</Button>
 						</Hint>
-					)}
-					<Hint side="top" content={stopping ? "停止当前回复" : "发送消息\n⌘ / Ctrl + Enter 发送，Enter 换行"}>
-						<Button
-							type={stopping ? "button" : "submit"}
-							onClick={stopping ? () => void stop() : undefined}
-							size="icon-sm"
-							data-composer-submit
-							aria-label={sendLabel}
-							aria-keyshortcuts="Meta+Enter Control+Enter"
-							disabled={busy || (stopping ? false : !!composer.pending || !ready || !composerText(composer))}
-						>
-							{busy ? <Loader2 className="animate-spin" /> : stopping ? <Square /> : <ArrowUp />}
-						</Button>
-					</Hint>
-				</InputGroupAddon>
-			</InputGroup>
+					</InputGroupAddon>
+				</InputGroup>
+			</div>
 			{error && (
 				<p role="alert" className="mt-2 text-xs text-destructive">
 					{error}

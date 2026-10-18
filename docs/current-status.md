@@ -15,7 +15,7 @@
 
 ## 最近有效验收
 
-2026-10-19：按 [ADR-0039](adr/0039-slash-commands-by-need.md) 重设 `/` 命令，协作模式收成讨论开关。输入框底部的三档下拉换成一个「讨论」开关（开着只读，Agent 只出方案；关着就是原来的自主），Session 记录从 `collaboration` 改成 `discuss`，CLI 改用 `--discuss` / `--no-discuss`。`/` 菜单只留管这段对话怎么跑的三条：`/目标`（别名 `goal`，`/目标 暂停|继续|清除`）、`/讨论`（别名 `plan`，菜单行按状态写「打开」或「关上」，`/讨论 <话>` 打开并发出）、`/模型`。`/协作` `/自主` `/新对话` `/提交` 与配置目录的自定义命令（`commands.list`）删除。验收：机制用例 3 项（只读与草稿不落盘、沿用与关上、跑着时开关被拒）、CLI 1 项、工作台单测 4 项、桌面 E2E 2 项（讨论开关越界写入被挡后关上照方案改并由 Agent 提交；菜单、别名、`/模型`、`/目标` 到拍板再清除、`/讨论 <话>`）；真实模型回归 `mode-discuss` 1 / 1。全仓 515 / 515；完整桌面 87 / 88，唯一失败的「导航与文件」改动前的代码上连跑 4 次也只过 1 次，见已知缺陷。
+2026-10-19：按 [ADR-0039](adr/0039-slash-commands-by-need.md) 重设 `/` 命令，协作模式收成讨论开关。输入框底部的三档下拉删掉，讨论用 `/讨论` 打开，开着时底部显示「讨论中 ×」、点一下关上，关着时不占位置（开着只读，Agent 只出方案；关着就是原来的自主）；命令菜单改为浮在输入框上方，不再把对话往上推（作者截图发现，E2E 加了位置断言），Session 记录从 `collaboration` 改成 `discuss`，CLI 改用 `--discuss` / `--no-discuss`。`/` 菜单只留管这段对话怎么跑的三条：`/目标`（别名 `goal`，`/目标 暂停|继续|清除`）、`/讨论`（别名 `plan`，菜单行按状态写「打开」或「关上」，`/讨论 <话>` 打开并发出）、`/模型`。`/协作` `/自主` `/新对话` `/提交` 与配置目录的自定义命令（`commands.list`）删除。验收：机制用例 3 项（只读与草稿不落盘、沿用与关上、跑着时开关被拒）、CLI 1 项、工作台单测 4 项、桌面 E2E 2 项（讨论开关越界写入被挡后关上照方案改并由 Agent 提交；菜单、别名、`/模型`、`/目标` 到拍板再清除、`/讨论 <话>`）；真实模型回归 `mode-discuss` 1 / 1。全仓 515 / 515；完整桌面 87 / 88，唯一失败的「导航与文件」改动前的代码上连跑 4 次也只过 1 次，见已知缺陷。
 
 2026-10-19：[AI 代作者使用](validation/2026-10-18-doupo-proxy-author/README.md)：Claude 扮作者在斗破上多轮续写第 121–140 章并还原每一轮的上下文。写作方法改为篇幅意图是软尺度、写完不逐处补字，写手每节的小改从平均 10 次降到 0；Story Language 规定资源与日常过程只在改变选择或后果时写进 StoryBeat，只管一段的 Intent 写成那一段的范围。这些结果不说明文学质量。
 
@@ -86,7 +86,7 @@
 | 桌面工作台：阅读编辑、比较、Review、故事轴、邻域图、状态查询、检查结果、模型设置 | `apps/workbench` | Electron E2E、真实模型创作闭环与 231 情节隔离副本走查 |
 | 目标（goal）：作者设定后自动续跑 | `local-session-controller.ts`、`harness/agent.ts` 的 `update_goal`、`conversation-goal-bar.tsx` | 真实调用：回归 `goal-text`、`goal-continue`（真实续跑一轮后收口）各 1 / 1；斗破 24 节留出带目标跑两次，Agent 自己标完成，检查点 100 万时撞线即停、目标不跑出窗口（[记录](validation/2026-10-17-doupo-holdout-pipeline/README.md)）；空转即停、检查点跨轮次、停止即暂停由机制用例覆盖；桌面 `/目标` 与状态条经 E2E |
 | 输入框 `/` 命令（`/目标` `/讨论` `/模型`） | `slash-commands.ts`、`agent-composer.tsx` | Electron E2E；管这段对话怎么跑，新对话与提交走按钮（[ADR-0039](adr/0039-slash-commands-by-need.md)） |
-| 讨论开关 | `harness/agent.ts`、`conversation-discuss-toggle.tsx` | 真实调用：回归 `mode-discuss` 1 / 1（2026-10-19）；faux 越界写入由工具面挡住，桌面 E2E 覆盖开关、草稿不落盘、关上后 Agent 提交 |
+| 讨论开关 | `harness/agent.ts`、`conversation-discuss-toggle.tsx` | 真实调用：回归 `mode-discuss` 1 / 1（2026-10-19）；faux 越界写入由工具面挡住，桌面 E2E 覆盖 `/讨论` 打开、标记关上、草稿不落盘、关上后 Agent 提交 |
 | CLI 与三个 host 接入（`init` / `update`） | `apps/cli`、`integrations/` | 编译产物实际调用；Codex host-native 真实创作（2026-09-05）；Claude Code host 真实运行：斗破前 120 章忠实抽取、提升与续写（2026-10-02，[host 对照记录](validation/2026-10-02-doupo-host/README.md)） |
 | 模型凭据：API key 与 OAuth 登录向导 | `model/`、设置页 | API key 经桌面 E2E；`openai`（Sign in with ChatGPT）的登录、调用与 token 刷新到真实调用；其余 OAuth 只到机制 |
 | 观测 | OpenTelemetry，Langfuse 可选 | 真实 Langfuse；整轮结果、调用编号、来源与内容开关已读回核对；Electron 观测 2/2，见[验收](validation/2026-10-14-langfuse/README.md) |

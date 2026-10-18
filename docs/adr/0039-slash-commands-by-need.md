@@ -77,7 +77,7 @@ Session 记录里的 `collaboration` 改成布尔的 `discuss`。CLI 的 `--mode
 
 ## 后果
 
-- 输入框底部的「协作模式」下拉换成一个「讨论」开关。对话正在回复时切换，与换模型一样显示「待生效」，随下一条消息生效。
+- 输入框底部的「协作模式」下拉删掉。讨论开着时那里显示「讨论中 ×」，点一下关上；关着时不占位置，用 `/讨论` 打开。Claude Code 也只在不是默认模式时才显示模式；作者看到常驻的「讨论」按钮问过为什么还有它（同日改）。对话正在回复时切换，与换模型一样显示「待生效」或「待关上」，随下一条消息生效。
 - 删掉 `commands.list` 命令、`readAuthorCommands`，以及工作台里读取自定义命令的查询。
 - 回归里的 `mode-collaborate` 删掉，`mode-discuss` 保留。
 - 现行规范同步：[作者工作台设计](../workbench-design.md)的对话区与命令菜单，[Harness 设计](../harness-design.md)里提到协作模式的地方，[需求与目标](../vision-and-requirements.md) 5.1 节，以及 Skill 里 `session send` 的参数。
