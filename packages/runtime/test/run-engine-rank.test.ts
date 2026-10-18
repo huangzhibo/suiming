@@ -97,6 +97,11 @@ test("盲读评委：默认按宪法口径；候选匿名打乱、每轮一个�
 			assert.equal(item.averageRank, 1.5, "两轮里各排过一次第一和第二");
 		}
 		assert.equal(result.ranking[0]?.ranks[0], 1, "平均名次相同时第一轮第一的在前");
+		// 评委偏爱更长的一版是已知的长度偏差，正反换位压不住（docs/validation/2026-10-18-doupo-length）；每版标出字数，
+		// 名次和长短放在一起看。口径与篇幅指标一样：去掉标题与空白。
+		const chars = (text: string) => [...text.replace(/\s/gu, "")].length;
+		for (const item of result.ranking)
+			assert.equal(item.chars, chars(candidates.find((candidate) => candidate.label === item.label)?.text ?? ""));
 		assert.ok(result.ranking.some((item) => item.flaws.includes("旁白替人物作证")));
 		assert.equal(result.roundResultObjectIds.length, 2);
 

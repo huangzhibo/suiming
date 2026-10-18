@@ -1384,6 +1384,7 @@ test("suim run rank：多版候选文件匿名交给评委，输出合并名次�
 		const skill = await readFile(new URL("../../../integrations/shared/suiming/SKILL.md", import.meta.url), "utf8");
 		assert.match(skill, /`judge\.sameModelAsWriter` 为 true 时评委就是写正文的模型/u);
 		assert.match(skill, /`judge\.thinking` 是 `off` 时评委没开思考/u);
+		assert.match(skill, /每版带 `chars`/u);
 		assert.deepEqual(data.ranking.map((item) => item.label).sort(), ["flash", "pro"]);
 		const shown = await jsonCommand(checkoutPath, ["session", "show", data.sessionId]);
 		const rank = shown.value.data as { session: { kind: string }; tasks: { kind: string; status: string }[] };

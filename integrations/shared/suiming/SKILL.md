@@ -182,7 +182,7 @@ session 没有暂停状态：模型调用失败、原地打转、到了每轮用
 
 观察 session：`suim --json session list`、`suim --json session show <session-id>`（子任务、用量、模型）、`suim --json session events <session-id> [--after <sequence>]`。`session send --events` 输出持久事件 NDJSON，最后一行是命令响应。事件 envelope 内是 AG-UI 标准事件与类型化 Suiming 扩展；事件订阅只读，不触发模型运行。
 
-`rank` 单独保留确定性的 Eval 协议，结果是执行对象，不提交作品。评委用 `judge` profile，没配时落回默认对话模型；结果里 `judge.sameModelAsWriter` 为 true 时评委就是写正文的模型，名次会偏向它自己的稿子，只能当参考——告诉作者这一点，并建议在 config.toml 给 `judge` 配一个不同的模型。`judge.thinking` 是 `off` 时评委没开思考，名次多半由候选顺序决定（实测先出场的赢八成），同样只能当参考，建议给 `judge` 开思考。默认跑 4 轮、轮换候选顺序，只有各轮一致的名次才算明确，`ranks` 里各轮不一致的当作持平。默认口径按本作宪法与写作准则评，用来在本作的几份候选里挑一份。拿原作或别处的参照稿来比时用 `--rubric reader`：评委不带本作准则、不看 Design，只拿紧挨着的前文，判断哪一版更像这部书接着往下写——用本作的准则给原作打分，等于用 Writer 的考纲给原作阅卷。
+`rank` 单独保留确定性的 Eval 协议，结果是执行对象，不提交作品。评委用 `judge` profile，没配时落回默认对话模型；结果里 `judge.sameModelAsWriter` 为 true 时评委就是写正文的模型，名次会偏向它自己的稿子，只能当参考——告诉作者这一点，并建议在 config.toml 给 `judge` 配一个不同的模型。`judge.thinking` 是 `off` 时评委没开思考，名次多半由候选顺序决定（实测先出场的赢八成），同样只能当参考，建议给 `judge` 开思考。默认跑 4 轮、轮换候选顺序，只有各轮一致的名次才算明确，`ranks` 里各轮不一致的当作持平。评委还偏爱更长的一版，换顺序压不住：`ranking` 里每版带 `chars`（去标题与空白的字数），长的那版胜出、两版长短又差得多时，名次只当参考；要比两种写法，先把两版截到同样字数再比。默认口径按本作宪法与写作准则评，用来在本作的几份候选里挑一份。拿原作或别处的参照稿来比时用 `--rubric reader`：评委不带本作准则、不看 Design，只拿紧挨着的前文，判断哪一版更像这部书接着往下写——用本作的准则给原作打分，等于用 Writer 的考纲给原作阅卷。
 
 ## 错误处理
 

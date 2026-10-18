@@ -1,5 +1,6 @@
 import { Type } from "@earendil-works/pi-ai";
 import { sha256Hex } from "@suiming/story";
+import { bodyCharCount } from "../artifact/code-points.js";
 import { designFrame } from "../artifact/design-frame.js";
 import { ArtifactError } from "../artifact/errors.js";
 import type { ArtifactCandidate } from "../artifact/types.js";
@@ -51,6 +52,8 @@ const READER_PRIOR_TEXT_CODE_POINTS = 12_000;
 
 export interface RankedCandidate {
 	label: string;
+	/** 去标题与空白后的字数。LLM 评委偏爱更长的一版，正反换位压不住（docs/validation/2026-10-18-doupo-length），名次要和长短一起看。 */
+	chars: number;
 	averageRank: number;
 	ranks: number[];
 	reasons: string[];
@@ -323,6 +326,7 @@ export async function runRankExperiment(engine: SuimingHarness, input: StartRank
 				const ranks = entries.map((entry) => entry.rank);
 				return {
 					label: candidate.label,
+					chars: bodyCharCount(candidate.text),
 					averageRank: ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length,
 					ranks,
 					reasons: entries.map((entry) => entry.reason),

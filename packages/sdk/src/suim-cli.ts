@@ -615,6 +615,8 @@ export const SuimCliRankDataSchema = Type.Object(
 			Type.Object(
 				{
 					label: Type.String({ minLength: 1 }),
+					/** 去标题与空白后的字数：LLM 评委偏爱更长的一版，正反换位压不住，名次要和长短一起看。 */
+					chars: Type.Integer({ minimum: 0 }),
 					averageRank: Type.Number(),
 					ranks: Type.Array(Type.Integer({ minimum: 1 })),
 					reasons: Type.Array(Type.String()),

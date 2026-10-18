@@ -7,7 +7,7 @@ import {
 	verifyStoryText,
 } from "@suiming/story";
 import { beatDesign } from "../artifact/beat-design.js";
-import { codePointCount } from "../artifact/code-points.js";
+import { bodyCharCount } from "../artifact/code-points.js";
 import { isTargetArtifactIdentity, targetArtifactIdentity } from "../artifact/identity.js";
 import { inspectStoryDesignCandidate } from "../artifact/story-design-validator.js";
 import type { ArtifactCandidate, ArtifactIdentity, CandidateArtifact } from "../artifact/types.js";
@@ -109,21 +109,11 @@ function refIds(beat: StoryBeat, kind: string): string[] {
 }
 
 /**
- * 篇幅的确定性事实：去掉标题行与空白后的字数，与对照原作时 compare.py 的口径一样。前文各节标出正文与它那一节 Design 的字数，
- * 写手才能按这部作品自己的比例定篇幅——2026-10-18 斗破留出，写手只看得到上一节多长，后面的节照着 Agent 自己写长了的上一节
- * 往下写，开新章的节也到原作的 1.7–1.8 倍。
+ * 前文各节标出正文与它那一节 Design 的字数，写手才能按这部作品自己的比例定篇幅：2026-10-18 斗破留出，写手只看得到前文多长、
+ * 看不到那一节本来要写多少事，每个 Design 字写出约 8.3 字正文（原作 4.1）；标出之后降到 5.8 字（docs/validation/2026-10-18-doupo-length）。
  */
-function bodyChars(text: string): number {
-	const body = text
-		.split("\n")
-		.filter((line) => !line.trimStart().startsWith("#"))
-		.join("")
-		.replace(/\s/gu, "");
-	return codePointCount(body);
-}
-
 function lengthNote(text: string, beat: StoryBeat): string {
-	return `正文 ${bodyChars(text)} 字，这一节的 Design ${bodyChars(beat.text)} 字`;
+	return `正文 ${bodyCharCount(text)} 字，这一节的 Design ${bodyCharCount(beat.text)} 字`;
 }
 
 function head(text: string, codePoints: number): string {
@@ -260,7 +250,7 @@ export function compileWriteContext(
 	sections.push(
 		[
 			"## target_story_design",
-			`${target.path}（顺序 ${target.ordinal + 1} / ${beats.length}，${target.volumeId}${volume?.title ? `「${volume.title}」` : ""}；Design ${bodyChars(target.text)} 字）`,
+			`${target.path}（顺序 ${target.ordinal + 1} / ${beats.length}，${target.volumeId}${volume?.title ? `「${volume.title}」` : ""}；Design ${bodyCharCount(target.text)} 字）`,
 			`refs: ${target.refs.join(", ") || "无"}`,
 			`contracts: open=[${target.contracts.open.join(", ")}] advance=[${target.contracts.advance.join(", ")}] resolve=[${target.contracts.resolve.join(", ")}]`,
 			"",

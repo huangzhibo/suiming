@@ -27,3 +27,17 @@ export function sliceCodePoints(text: string, start: number, end: number): strin
 	const from = unitOffset(text, start);
 	return text.slice(from, unitOffset(text, Math.max(0, end - start), from));
 }
+
+/**
+ * 篇幅的确定性口径：去掉 Markdown 标题行与全部空白后的码点数，与对照原作的 compare.py 一样（标题会泄露章号，也不算正文）。
+ * Write Context 标篇幅、评委结果标各版长短都用它。
+ */
+export function bodyCharCount(text: string): number {
+	return codePointCount(
+		text
+			.split("\n")
+			.filter((line) => !line.trimStart().startsWith("#"))
+			.join("")
+			.replace(/\s/gu, ""),
+	);
+}
