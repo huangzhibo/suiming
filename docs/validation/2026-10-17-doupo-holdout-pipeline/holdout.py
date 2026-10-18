@@ -40,10 +40,14 @@ MAX_CONTINUES = 2
 
 # 评测搭法对意图的两处改动（2026-10-03 留出时手改过同样两处）：留出点之后的正文不是原作；
 # 续写篇幅那句去掉——篇幅交给 Agent 按前文判断，留着它会让 24 节各写一万字。
+# 分章那句原来是「章题沿用前文的格式，章号接着前文往下编」，四次留出 Agent 都每节开一章（原作 24 节只有 14 节开章），
+# 章内续接的节膨胀到 2.4 倍；这部书一章常跨几节，2026-10-18 改成照前文分章（路线图第 6 节第 4a 项）。
 STYLE_INTENT = "intent/story-text-style.md"
 STYLE_EDITS = [
     (r"前[一二三四五六七八九十百零]+章的正文就是原作章节，续写正文延续原作的笔法：", "第 {n} 章之前的正文就是原作章节，之后的正文延续原作的笔法："),
-    (r"续写每个 StoryBeat 写一万字左右[^\n]*", "章题沿用前文的格式「## 第N章 标题」，章号接着前文往下编。"),
+    (r"续写每个 StoryBeat 写一万字左右[^\n]*",
+     "分章照前文：一章常常跨两三节，开新章的那一节才写章题，格式沿用前文的「## 第N章 标题」，章号接着前文往下编；"
+     "接着上一节同一章往下写的节不加章题。"),
 ]
 
 
@@ -215,6 +219,27 @@ class Pipeline:
             ranks[beat] = json.loads(log.read_text(encoding="utf8") or "{}")
         return metrics, ranks
 
+    def length_line(self, metrics: dict) -> str:
+        """篇幅按原作开不开新章、第一节与其后分开算（路线图第 6 节第 4 项）：第一节接的是原作前文，其后接 Agent 自己的上一节。"""
+        heading = re.compile(r"^#+\s*第.+章", re.M)
+        rows = []
+        for beat, value in sorted(metrics.items()):
+            agent, original = map(int, re.match(r"(\d+) / (\d+)", value["字数（候选 / 原作）"]).groups())
+            opens = bool(heading.search((self.reference / f"{beat}.md").read_text(encoding="utf8")))
+            titled = bool(heading.search(self.git(self.work, "show", f"refs/suiming/canon:text/{beat}.md").stdout))
+            rows.append((beat, agent, original, opens, titled))
+
+        def ratio(selected: list[tuple]) -> str:
+            total = sum(row[2] for row in selected)
+            return f"{sum(row[1] for row in selected) / total:.2f}" if total else "—"
+
+        first, rest = rows[:1], rows[1:]
+        return (
+            f"- 篇幅：合计 {ratio(rows)} 倍；原作开新章的 {sum(r[3] for r in rows)} 节 {ratio([r for r in rows if r[3]])} 倍，"
+            f"章内续接的 {sum(not r[3] for r in rows)} 节 {ratio([r for r in rows if not r[3]])} 倍；"
+            f"第一节 {ratio(first)} 倍，其后 {ratio(rest)} 倍；Agent 稿带章题 {sum(r[4] for r in rows)} / {len(rows)} 节"
+        )
+
     def summarize(self, beats: list[str], turns: list[dict], metrics: dict, ranks: dict) -> None:
         check = self.suim(self.work, ["check"], "check")
         revisions = self.git(self.work, "rev-list", "--count", "refs/suiming/canon").stdout.strip()
@@ -299,6 +324,7 @@ class Pipeline:
             "- 正文与审稿之外的改动：" + ("、".join(other) if (other := [
                 path for path in changed if not path.startswith(("text/", "review/"))
             ]) else "无"),
+            self.length_line(metrics),
             f"- 读者口径评委（{JUDGE_ENV['SUIMING_JUDGE_MODEL_ID']}，{RANK_ROUNDS} 轮）："
             + "，".join(f"{key} {tally.get(key, 0)} 节" for key in ("Agent 全胜", "Agent 占多", "持平", "原作占多", "原作全胜"))
             + (f"，评委没交出结果 {len(failed)} 节（{'、'.join(failed)}）" if failed else ""),
