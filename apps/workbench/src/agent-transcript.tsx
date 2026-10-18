@@ -496,7 +496,9 @@ const MessageRow = memo(function MessageRow({
 			) : (
 				<Markdown className="msg-text" content={text} streaming={streaming} links={links} />
 			)}
-			<MessageActions text={text} onReference={() => onReference(id, text)} />
+			{/* 回复流完再给复制、引用：流入时新到的字逐词淡入，还没轮到的已经占了位置却是透明的，按钮会悬在一片空白下面
+			    （2026-10-19 作者在流式测试里看到）；对一段还在变的回复也没什么可复制、可引用的。 */}
+			{!streaming && <MessageActions text={text} onReference={() => onReference(id, text)} />}
 		</article>
 	);
 });

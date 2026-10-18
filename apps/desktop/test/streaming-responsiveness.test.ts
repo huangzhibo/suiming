@@ -110,6 +110,7 @@ for (const layout of ["sidebar", "expanded", "narrow"] as const)
 			const flowing = page.locator(".message.assistant").filter({ hasText: "流式片段 0：" });
 			await flowing.waitFor();
 			const streamStarted = performance.now();
+			assert.equal(await flowing.locator(".message-actions").count(), 0, "回复还在流入时不显示复制、引用");
 			// 主工作面多跑到 1.2 万字再操作，覆盖当前回复也逐渐变长的情况，而不只测历史很长。
 			if (layout === "expanded")
 				await eventually(async () => (await flowing.innerText()).length >= 12000, "持续输出达到 1.2 万字", 60000);
@@ -236,6 +237,14 @@ for (const layout of ["sidebar", "expanded", "narrow"] as const)
 				"停止后的流式内容与持久快照逐字一致",
 			);
 			metrics.streamedCharacters = expected.content.length;
+			// 停下之后按钮紧跟在最后一段正文下面，中间没有还没淡入的透明段落（2026-10-19 作者截图发现）
+			await flowing.locator(".message-actions").waitFor();
+			const gap = await flowing.evaluate((message) => {
+				const last = [...message.querySelectorAll(".msg-text p")].at(-1);
+				const buttons = message.querySelector(".message-actions");
+				return last && buttons ? buttons.getBoundingClientRect().top - last.getBoundingClientRect().bottom : null;
+			});
+			assert.ok(gap !== null && gap >= 0 && gap < 40, `按钮紧跟正文，实际间距 ${gap}px`);
 			assert.equal(
 				await input.inputValue(),
 				"keep this draft while the story is streaming after disconnect",
