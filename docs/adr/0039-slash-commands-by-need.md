@@ -73,6 +73,7 @@ Session 记录里的 `collaboration` 改成布尔的 `discuss`。CLI 的 `--mode
   - **没用过。**没有任何真实使用里出现过。等真实使用里出现作者反复敲同一段长话，再连同创建入口一起设计。
 - 命令名用中文，与界面一致。按前缀筛选时也认英文别名 `goal`、`plan`，不开输入法也能打，原来的 `/goal` 照样能用。
 - 不做内置的创作命令（如 `/写下一节`、`/审稿`）。固定创作配方已经删除，这些都是对 Agent 说一句话的事。Codex 的「代码审查」是一个独立的审查模式，我们的审稿是 Agent 自己能调的能力，不对应。
+- 不把 host 的 Skill 做成命令（作者问过：Codex / Claude Code 里的 `suiming` Skill 也用 `/` 调起）。那是给通用 host agent 按需加载的一份说明，教它跑 `suim`、派自己的子 agent；桌面 Agent 的系统提示、Story Language（`story_guide`）与写作方法一直都在，Harness 也刻意不加载 host 接入文件（[Harness 设计](../harness-design.md)「host 接入文件不进 Harness」），`/suiming` 什么也不会多给。host 的研究、候选、写手、审稿子 agent，在桌面是 Agent 自己派的子任务，作者说一句「审一下这节」就行。
 - 不做「使用情况和计费」。Codex 的这一项打开 ChatGPT 套餐的用量与账单；我们没有账单，作者直接付给模型提供方。这段对话的累计用量与估算花费显示在执行记录上方，防空转的每轮用量检查点在设置里。
 
 ## 后果
