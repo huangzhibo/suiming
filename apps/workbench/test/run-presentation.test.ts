@@ -110,6 +110,16 @@ test("turn 对账：没改作品也没提交就不显示；有改动时一行说
 		}),
 		"本轮：意图改了 1 个文件 · 没有提交 · 还有 1 个文件未提交",
 	);
+	// 审完又改、没再审的审稿（2026-10-19）：回复说「已复审」时作者看得见实情
+	assert.equal(
+		turnSummaryText({
+			...quiet,
+			changed: { ...quiet.changed, design: { count: 1, paths: ["outline/story/vol-0001/beat-0001.md"] } },
+			staleReviews: { count: 1, paths: ["review/design-1.md"] },
+			uncommitted: 1,
+		}),
+		"本轮：作者 1 条 · 意图未改动 · 设计改了 1 个文件 · 1 份审稿在之后的修改里过时，没有再审 · 没有提交 · 还有 1 个文件未提交",
+	);
 	// 2026-10-02 斗破留出评测：根 Agent 三节正文都没取写作依据就自己写了，没人发现
 	assert.equal(
 		turnSummaryText({

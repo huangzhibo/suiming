@@ -59,6 +59,9 @@ export function turnSummaryText(summary: SuimingTurnSummary): string | undefined
 			parts.push(
 				`${label}改了 ${item.count} 个文件${label === "正文" && uninformed > 0 ? `，其中 ${uninformed} 个没先读取写作依据` : ""}`,
 			);
+	// 审完又改、没再审的审稿：回复说「已复审」时作者看得见实情
+	if (summary.staleReviews && summary.staleReviews.count > 0)
+		parts.push(`${summary.staleReviews.count} 份审稿在之后的修改里过时，没有再审`);
 	parts.push(summary.revisions === 0 ? "没有提交" : `提交了 ${summary.revisions} 个版本`);
 	if (summary.uncommitted > 0) parts.push(`还有 ${summary.uncommitted} 个文件未提交`);
 	return `${summary.stopped ? "已停止 · " : ""}本轮：${parts.join(" · ")}`;

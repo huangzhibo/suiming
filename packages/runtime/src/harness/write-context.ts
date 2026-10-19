@@ -53,7 +53,7 @@ export interface StoryTextCheck {
 	failures: string[];
 }
 
-function textArtifacts(candidate: ArtifactCandidate): Map<string, string> {
+export function textArtifacts(candidate: ArtifactCandidate): Map<string, string> {
 	const texts = new Map<string, string>();
 	for (const artifact of candidate.artifacts) {
 		if (!isTargetArtifactIdentity(artifact.identity) || artifact.identity.kind !== "story-text") continue;
@@ -111,6 +111,9 @@ function refIds(beat: StoryBeat, kind: string): string[] {
 /**
  * 前文各节标出正文与它那一节 Design 的字数，写手才能按这部作品自己的比例定篇幅：2026-10-18 斗破留出，写手只看得到前文多长、
  * 看不到那一节本来要写多少事，每个 Design 字写出约 8.3 字正文（原作 4.1）；标出之后降到 5.8 字（docs/validation/2026-10-18-doupo-length）。
+ *
+ * 2026-10-19 试过在这里加前文的平均段长（动笔前给数，照篇幅的经验），留出 13 节平均段长 31 → 37 字，原作 53，仍在旧配置
+ * 32–47 的波动里，按判定撤掉：段落偏短不是缺数字（写入结果早就给段长），是模型自己的写法倾向（docs/validation/2026-10-19-old-skills-audit）。
  */
 function lengthNote(text: string, beat: StoryBeat): string {
 	return `正文 ${bodyCharCount(text)} 字，这一节的 Design ${bodyCharCount(beat.text)} 字`;

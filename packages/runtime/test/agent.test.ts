@@ -255,6 +255,41 @@ test("turn 结束事件带对账：作者几条、意图 / Design / 正文各改
 	}
 });
 
+test("对账点名这一轮让哪些审稿过时：审完又改了 Design、没再审", async () => {
+	// 2026-10-19 补：斗破留出第二次，Agent 回复「修订并复审」，最后一轮修改其实没再审，对账里看不出来。
+	const f = await fixture();
+	try {
+		const id = (await f.harness.createSession()).id;
+		f.provider.setResponses([
+			call("review", { layer: "design" }),
+			call("submit_review", { verdict: "pass", summary: "没问题", findings: [], uncovered: [], uncertainties: [] }),
+			call("edit", { path: "outline/story/vol-0001/beat-0001.md", oldText: "杖责五十", newText: "杖责六十" }),
+			reply("审过了，又改了一处。"),
+		]);
+		await f.say("审一下设计，再把杖数改成六十", id);
+		const summary = f.project
+			.readSessionEvents(id)
+			.map((record) => record.event)
+			.find((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn");
+		assert.ok(summary?.type === "ACTIVITY_SNAPSHOT");
+		const stale = (summary.content as { staleReviews?: { count: number; paths: string[] } }).staleReviews;
+		assert.equal(stale?.count, 1);
+		assert.match(stale?.paths[0] ?? "", /^review\/design-/u);
+
+		// 下一轮没再动作品：开始时就过时的审稿不重复算
+		f.provider.setResponses([reply("好的。")]);
+		await f.say("知道了", id);
+		const second = f.project
+			.readSessionEvents(id)
+			.map((record) => record.event)
+			.filter((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn")[1];
+		assert.ok(second?.type === "ACTIVITY_SNAPSHOT");
+		assert.equal((second.content as { staleReviews?: unknown }).staleReviews, undefined);
+	} finally {
+		await f.close();
+	}
+});
+
 test("对账点名根 Agent 没取写作依据就整篇写入的正文；取过 write_context、委派 writer 的不算，小改不算", async () => {
 	// 2026-10-02 斗破留出评测：根 Agent 没委派 Writer、也没调 write_context，三节正文都是自己凭 Frame 写的，
 	// 再用 118 次 edit 凑篇幅；写作方法与硬边界只跟着 Write Context 到，没人发现它跳过了。
@@ -921,13 +956,24 @@ test("Agent 按模型决定调用独立 Review，结论随工具结果直接回�
 			call("read", { path: "intent/计谋的代价.md" }),
 			call("write", { path: "intent/计谋的代价.md", content: "真相必须来自主动选择，并有不可逆代价。" }),
 			call("review", { layer: "design", goal: "核对因果与代价" }),
-			call("submit_review", {
-				verdict: "pass",
-				summary: "因果与代价一致",
-				findings: [],
-				uncovered: [],
-				uncertainties: [],
-			}),
+			(context) => {
+				// 设计审稿查得到 Story Language（2026-10-19 补回）：此前只有 Source 层有 story_guide
+				assert.ok(
+					context.messages.some(
+						(message) =>
+							message.role === "system" &&
+							(message.toolsAdded ?? []).some((tool) => tool.name === "story_guide"),
+					),
+					"设计 Reviewer 有 story_guide",
+				);
+				return call("submit_review", {
+					verdict: "pass",
+					summary: "因果与代价一致",
+					findings: [],
+					uncovered: [],
+					uncertainties: [],
+				});
+			},
 			async (context) => {
 				const message = context.messages.at(-1);
 				assert.equal(message?.role, "toolResult");

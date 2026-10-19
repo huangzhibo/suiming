@@ -321,22 +321,51 @@ export async function reviewCurrency(
 	const shared = await cacheFor(reader, head, cache);
 	const revision = file.revision === CANDIDATE_REVISION ? shared.written.get(review.path) : file.revision;
 	const label = revision === undefined ? {} : { revision };
+	const { changed, reason } = reviewChanges(candidate, file);
+	return {
+		state: changed.length === 0 && reason === undefined ? "current" : "stale",
+		changed,
+		...label,
+		...(reason === undefined ? {} : { reason }),
+	};
+}
+
+/** 审稿主体里内容变了的路径；主体本身算不出来（范围里的 Beat 没了）时给 reason。判定只比内容，不需要版本历史。 */
+function reviewChanges(candidate: ArtifactCandidate, file: ReviewFile): { changed: string[]; reason?: string } {
 	let paths: string[];
 	try {
 		paths = reviewSubjectPaths(candidate, file.layer, file.scope);
 	} catch (error) {
-		return { state: "stale", changed: [], ...label, reason: (error as Error).message };
+		return { changed: [], reason: (error as Error).message };
 	}
 	const now = subjectDigests(candidate, paths);
 	const changed = new Set<string>();
 	for (const [path, digest] of file.subjects) if (now.get(path) !== digest) changed.add(path);
 	// 审稿时不存在、现在成了主体的文件（新写的正文、新加的 Design）也让它过时。
 	for (const path of now.keys()) if (!file.subjects.has(path)) changed.add(path);
-	return {
-		state: changed.size === 0 ? "current" : "stale",
-		changed: [...changed].sort(),
-		...label,
-	};
+	return { changed: [...changed].sort() };
+}
+
+/**
+ * 候选里已经过时的审稿路径，判定与 `reviewCurrency` 同一份。turn 结束的对账用它数「这一轮让几份审稿过时」：
+ * 斗破留出第二次，Agent 回复「修订并复审」，最后一轮修改其实没再审（2026-10-19 补）。解析不了的审稿文件不算，
+ * 那由 check 报。
+ */
+export function staleReviewPaths(candidate: ArtifactCandidate): Set<string> {
+	const stale = new Set<string>();
+	for (const artifact of candidate.artifacts) {
+		if (!isTargetArtifactIdentity(artifact.identity) || artifact.identity.kind !== "review") continue;
+		try {
+			const { changed, reason } = reviewChanges(
+				candidate,
+				parseReviewFile(decoder.decode(artifact.bytes), artifact.path),
+			);
+			if (changed.length > 0 || reason !== undefined) stale.add(artifact.path);
+		} catch {
+			// 解析不了的审稿文件由 check 报，不在对账里数
+		}
+	}
+	return stale;
 }
 
 export interface SourceCoverage {

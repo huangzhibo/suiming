@@ -1,5 +1,6 @@
 import type { SessionEvent, SuimingTurnSummary } from "@suiming/sdk";
 import { TARGET_DESIGN_KINDS } from "@suiming/story";
+import { staleReviewPaths } from "../artifact/derived.js";
 import { artifactIdentityKey } from "../artifact/identity.js";
 import type { ArtifactCandidate, ArtifactIdentity } from "../artifact/types.js";
 
@@ -48,6 +49,9 @@ export function turnSummary(
 		const sorted = [...paths].sort();
 		return { count: sorted.length, paths: sorted.slice(0, MAX_PATHS) };
 	};
+	// 这一轮让几份审稿过时：结束时过时、开始时还不过时（或这一轮才写）的。回复说「已复审」而最后一轮修改没再审时看得见。
+	const staleBefore = staleReviewPaths(start);
+	const becameStale = [...staleReviewPaths(end)].filter((path) => !staleBefore.has(path));
 	return {
 		authorMessages: counts.authorMessages,
 		changed: {
@@ -60,6 +64,7 @@ export function turnSummary(
 		revisions: counts.revisions,
 		uncommitted: counts.uncommitted,
 		textWithoutContext: summarize(counts.textWithoutContext),
+		...(becameStale.length === 0 ? {} : { staleReviews: summarize(becameStale) }),
 	};
 }
 

@@ -5,12 +5,13 @@ import { ArtifactError } from "../artifact/errors.js";
 import { type ComposedReview, composeReviewFile } from "../artifact/review-authoring.js";
 import { storyPackageCodec } from "../artifact/story-package-codec.js";
 import type { ArtifactCandidate, ArtifactIdentity } from "../artifact/types.js";
+import { designCapacity } from "./design-context.js";
 import { compileDesignViewContext, type DesignViewTask } from "./design-view-context.js";
 import { type MaterialSpan, materialSpan, renderSourceNotes, sourceMaterialText } from "./material.js";
 import { withConstitution } from "./prompts.js";
 import { compileReviewContext, type ReviewLayer, type ReviewScope } from "./review-context.js";
 import { compileWriteContext } from "./write-context.js";
-import { DESIGN_READER_PROMPT, SOURCE_READER_METHOD } from "./writing-methods.js";
+import { DESIGN_METHOD, DESIGN_READER_PROMPT, SOURCE_READER_METHOD } from "./writing-methods.js";
 
 /**
  * host 能拿到的 Context 任务（ADR-0008 决定 14 的 host-native 一侧）：
@@ -209,8 +210,10 @@ export async function compileHostContext(
 			hasCurrentText: compiled.hasCurrentText,
 		};
 	} else if (task.kind === "design") {
-		systemPrompt = withConstitution(DESIGN_READER_PROMPT);
-		text = `当前完整 Target Design：\n\n${renderDesign(candidate)}`;
+		// 主会话设计时读的就是这一份：带上与 Suiming Agent 的 design_context 同一份设计方法与设计容量（2026-10-19）。
+		// 带时点的人物视图（design-view）交给模拟人物的子 agent，只要阅读契约。
+		systemPrompt = withConstitution(`${DESIGN_READER_PROMPT}\n\n${DESIGN_METHOD}`);
+		text = `${designCapacity(candidate)}\n\n当前完整 Target Design：\n\n${renderDesign(candidate)}`;
 		selections = designContextSelections(candidate);
 	} else if (task.kind === "design-view") {
 		const compiled = compileDesignViewContext(candidate, task.view);

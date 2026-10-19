@@ -119,7 +119,7 @@ test("讨论开着只读：没有写入、委派、审稿与提交；Agent 硬�
 			const tools = declared[0] ?? [];
 			for (const name of ["write", "edit", "copy", "move", "delete", "delegate", "review", "resume_task", "commit"])
 				assert.ok(!tools.includes(name), `讨论开着不应声明 ${name}`);
-			for (const name of ["read", "list", "search", "check", "project_status"])
+			for (const name of ["read", "list", "search", "check", "project_status", "design_context"])
 				assert.ok(tools.includes(name), `讨论开着应保留 ${name}`);
 			assert.match(note, /讨论：开/, "收到消息时的系统附注写明讨论开着");
 			assert.deepEqual(saved, [], "讨论开着读文件不同步作者草稿");

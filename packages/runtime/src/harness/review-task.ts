@@ -71,7 +71,14 @@ function layerTools(handle: TaskHandle, compiled: CompiledReviewContext): Harnes
 			storyGuideTool(),
 		];
 	}
-	return [...fileTools(handle.env, "read"), searchTool(handle.scan), checkTool(handle.scan), frameTool(handle.scan)];
+	// 设计与正文的 Reviewer 也查得到 Story Language（2026-10-19）：此前只有 Source 层有，「每类文件该写什么」的规范 Reviewer 读不到
+	return [
+		...fileTools(handle.env, "read"),
+		searchTool(handle.scan),
+		checkTool(handle.scan),
+		frameTool(handle.scan),
+		storyGuideTool(),
+	];
 }
 
 const REVIEW_TITLES: Readonly<Record<ReviewLayer, string>> = { design: "审设计", text: "审正文", source: "审原作抽取" };

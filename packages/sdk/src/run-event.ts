@@ -72,6 +72,8 @@ export const SuimingTurnSummarySchema = Type.Object(
 		textWithoutContext: Type.Optional(TurnChangeSchema),
 		/** 作者按了停止，这一轮停在半途；2026-10-05 加，之前停下的 turn 与说完的看起来一样。 */
 		stopped: Type.Optional(Type.Literal(true)),
+		/** 这一轮的修改让哪些审稿过时（审完又改了、没再审）；2026-10-19 加，没有时不带。 */
+		staleReviews: Type.Optional(TurnChangeSchema),
 	},
 	{ additionalProperties: false },
 );
