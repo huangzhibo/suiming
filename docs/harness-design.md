@@ -66,6 +66,7 @@ Agent 直接在作品 checkout 里读写，没有自己的目录；作者在两�
 - turn 开始与结束时 checkout 之差，按意图 / Design / 正文 / 审稿 / 其它分类；
 - Agent 提交了几个版本，结束时还剩几个文件未提交；
 - 没取写作依据就整篇 `write` 的正文：这一轮既没调 `write_context`、也没委派 writer。从这一轮的动作事件算，writer 子任务的写入与 `edit` 小改不算。加这一项是因为斗破留出评测里根 Agent 三节正文都凭 Frame 自己写，没人发现。
+- 这一轮的修改让哪些审稿过时（审完又改了、没再审），`staleReviews`，没有时不带（2026-10-19 加：回复说「已复审」而最后一轮修改没再审时看得见）；
 - 作者按了停止时带 `stopped`。失败或被打断的 turn 也发对账；什么都没改的 turn 界面不显示对账，唯独停下的要说一声「已停止」，否则对话里只剩一串操作、后面没有回复，作者看不出是自己停的还是出了事（2026-10-05 走查）。
 
 调研来源与落盘数（第 8 节）随切片 E 加进来。「作者目标是否达成」由作者看作品定，系统不判。
@@ -150,7 +151,7 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 
 | 能力 | 工具 | 可重读 | 说明 |
 | --- | --- | --- | --- |
-| 读取作品 | `read` `list` `search` `impact` `frame` `write_context` `project_status` | 是 | `read` 对文本按行分页（默认 2000 行），非 UTF-8 文件只确认当前版本与大小；超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
+| 读取作品 | `read` `list` `search` `impact` `frame` `design_context` `write_context` `project_status` | 是 | `read` 对文本按行分页（默认 2000 行），非 UTF-8 文件只确认当前版本与大小；超过 10 KB 的读取结果过了边界在请求里折成头尾（第 7 节）。`list` 列一层目录，`.git` / `.suiming`、host 接入目录、symlink 与读范围之外的文件不列；没有 shell 时，找审稿、资料、正文的准确路径只能靠它。`design_context` 与 `write_context` 一样把方法与依据成对交付：设计方法、按这部作品已有正文算的设计容量（正文与 Design 的字数比）与给定 Beat 前后的 Design，host 的 `context compile design` 带同一份（2026-10-19 补回旧 suim-design 的方法，见[旧 Skill 对照](validation/2026-10-19-old-skills-audit/README.md)）。`impact` 按 `refs` 与 `refs.beat` 召回改一个对象之前可能受影响的 Beat 与文件，只召回、不判断语义，与 `suim design impact` 是同一个 `storyImpact`。下游沿 `refs.beat` 层层传递，但对紧挨着的上一节的依赖只算一跳、不往后传；改的是 Beat 时，紧接着的下一节不论有没有声明都在其中。相邻由顺序表达，而 Agent 抽出的作品常常每节都连上一节：2026-10-04 量过，示例三国改前半本任何一节，原来的闭包召回后文的 87%，斗破前 120 章是 94%，等于没召回 |
 | 修改候选 | `write` `edit` `copy` `move` `delete` | 否 | 可写范围是整个 checkout（`.git` / `.suiming` 与 host 接入目录除外，见下）；Story 根之外的文件是 repository-auxiliary，永远不进版本，`commit` 结果点名跳过的文件。各工具的来由见表后 |
 | 检查与提交 | `check` `commit` | 是 / 否 | Checker 在 `commit` 处把关不变，StoryText 完整性与 exact 片段也在这道 Checker 里；`check` 与 `write` / `edit` 的 `check: true` 跑的都是对整个候选的同一判定（PASSED / ISSUES / FAILED）。单 Beat 的 `checkStoryText` 只在 CLI `suim text check` 后面，引擎不调用 |
 | Context | `compact_context` | 否 | 模型主动压缩；系统触发的压缩见第 7 节 |
@@ -176,6 +177,8 @@ ModelCall 的状态是 `prepared → effect_pending → received | failed`，从
 - 两种执行者在同一个 checkout 上共用的是：作品文件、Checker、`commitCheckout`、写手与审稿的角色契约（`writerSystemPrompt` / `reviewerSystemPrompt` 同一份源出两个变体，host 经 `suim context compile` 取）和审稿落盘（`composeReviewFile`），读的也是同一份作品：host 的 `context compile`、`search`、`source list` 与 `review list` / `record` 缺省读 checkout，与 Agent 的工具一样含未提交的修改（2026-10-05 之前它们只读已提交版本，Skill 只好让 host「先提交再取写作依据、先提交再审」）。主 Agent 怎么干活各写一份：SKILL 写给 host，`AGENT_PROMPT` 与工具描述写给 Harness。
 - `.agents/` `.claude/` `.codex/` `.grok/` 对模型的文件工具与 `.git` / `.suiming` 一样不可见（`ConfinedExecutionEnv` 的 `HOST_ADAPTER_ROOTS`，按小写比），作者的文件视图照常可见（`hostAdapters: "visible"`）。理由：读了只拿到用不上的指令，改了不进版本，turn 对账只比作品文件也看不见。`list` 加回之后它们第一次出现在模型眼前，装上接入文件的回归里 Agent 读到 Skill 的两次都照它改用委派 Writer，花费约为平时的 2.5 倍（[记录](validation/2026-10-01-harness-regression/README.md)）。新加一种 host 时根表要跟上，`cli.test.ts` 按 `installHost` 实际写出的路径核对。
 - 入口文件不藏：作者可能在标记段外写了自己的东西，Agent 看得见但不自动加载，作品要长期遵守的约束在 `intent/**`。标记段只点名给 host，并告诉应用内的 Agent 不是写给它的（`host-install.ts` 的 `ENTRY_BLOCK`）；它原本叫所有读者「先读 Skill」，Agent 读到就去试，18 次里有 1 次读了两份被拒。
+
+**正文审稿带邻节，只查衔接。**选几节审正文时，上下文附上范围前一节的全文与后一节的开头，两节可读但不计入审稿主体：计入会让已有的 selection 审稿全部显示过时，邻节改了衔接判断可能旧一拍，可以接受。此前 Reviewer 读不到范围外的邻节，斗破留出两次共 7 次 `permission_denied`；整卷审稿超窗拆块后，块与块之间的接缝没人审（2026-10-19 补回旧 suim-review 的连续性审稿）。设计与正文的 Reviewer 也有 `story_guide`，设计审稿带推进、容量等清单（`review-context.ts`）。
 
 **`submit_review` 校验引文。**Reviewer 的每条 finding 带 evidence 引文，审稿页把 finding 锚回段落靠的就是它；引文找不到时页面只能静默只锚文件——典型的失败静默。`review-authoring.ts` 的 `quoteMissing` 在落盘前拒绝引文不在锚定文件里的 finding（去空白与引号后逐字匹配，规则与渲染端 `anchors.ts` 相同），拒绝作为工具错误回到 Reviewer，host 的 `suim review record` 走同一处。这是 AGENTS.md 说的「malformed output 由 tool contract 拒绝」，规则来自 SoL-Pi 的 Evidence-Preserving Reducer。余下的差别：校验按整个文件匹配，页面按段落锚，跨段的引文过得了校验、锚不到段落。
 
@@ -285,7 +288,7 @@ Codex / Claude Code / Grok 自带网络能力，调研方法论在共享 SKILL �
 
 **读取范围同样随角色走。**文件读取与领域查询的候选扫描共用 `ConfinedExecutionEnv.canRead`：Writer 不读 Source，Source 角色只读所选 Source，搜索、状态与检查不得绕过它。Source 委派只编译 Source 输入，不预先构造 Target Frame；Writer 只构造 Write Context。Source 检查范围由角色显式传入，不能从「候选没有 Target」反推：根候选删空 Target 时仍须报 Target 缺失。根 Agent 仍读取完整候选。
 
-子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`，以及桌面入口的 `workbench`（查询界面与应作者要求展示文档，见 [ADR-0037](adr/0037-agent-workbench-context.md)）。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。**子任务的角色就是它的 profile**，TaskRecord 的 `kind` 与 SUBAGENT_STARTED 的 `name` 都记它（`writer`、`source-reader`、`source-extractor`、`main` 来自 `delegate`，`reviewer` 来自 `review`，`judge` 来自 `suim rank`），界面按它显示设置页里同一个档位名。2026-10-05 之前另有一维 kind（`subagent` / `review` / `rank.round`），按建它的入口起名，其中 `subagent` 说的是类别本身；角色推得出入口、入口推不出角色，所以只留角色，读旧记录时界面仍认那三个值。
+子智能体的工具（`agent.ts` 的 `subagentTools`）是 `project_status`、`read` / `list` 与按写范围给的文件工具（`write` / `edit` / `copy` / `move` / `delete`）、`search`、`impact`、`check`、`frame`、`compact_context`，除 writer 外还有 `read_source` / `search_source` / `source_coverage` / `story_guide`，做设计的 `main` 子任务还有 `design_context`，加交付用的 `submit_task`；根 Agent 有而它们没有的是 `commit`、`delegate`、`review`、`write_context`，以及桌面入口的 `workbench`（查询界面与应作者要求展示文档，见 [ADR-0037](adr/0037-agent-workbench-context.md)）。Worker 是权限形状——task-local、无 `commit`、不递归委派、不 pull inbox——不是角色；两者正交。**子任务的角色就是它的 profile**，TaskRecord 的 `kind` 与 SUBAGENT_STARTED 的 `name` 都记它（`writer`、`source-reader`、`source-extractor`、`main` 来自 `delegate`，`reviewer` 来自 `review`，`judge` 来自 `suim rank`），界面按它显示设置页里同一个档位名。2026-10-05 之前另有一维 kind（`subagent` / `review` / `rank.round`），按建它的入口起名，其中 `subagent` 说的是类别本身；角色推得出入口、入口推不出角色，所以只留角色，读旧记录时界面仍认那三个值。
 
 没有预规划：`plan` / `execute_task` 已删（第 2 节）。根 Agent 要分几步做，写在自己的回复里；`delegate` 是同步调用，结果回来再决定下一个。例外是写入不重叠的委派，见下一段。
 
@@ -492,7 +495,7 @@ checkpoint 复用 execution object 保存不可变 JSON 片段，长数组按固
 | 写入前后的 hash、提交回执、lease、checkpoint 归档 | 前两样不为崩溃核对：hash 发现作者与 Agent 同时改一个文件，回执让被打断的 commit 说清提交成了没有；lease 判谁在跑；归档前 checkpoint 曾到 2.8 GB |
 | 折叠、摘要、`submit_review` 引文校验、turn 结束对账 | 第 7、6、3 节各自的数字 |
 | 一个 Project 一个 `running` session | 没有 worktree 后并行会互相覆盖；要并行再给 session 配工作目录 |
-| `story_guide` / `frame` / `write_context` / `project_status` / `search` / `impact` / `compact_context` | 原生匹配 Open Story Package 就是这几个 |
+| `story_guide` / `frame` / `design_context` / `write_context` / `project_status` / `search` / `impact` / `compact_context` | 原生匹配 Open Story Package 就是这几个 |
 | 未确认调用计数 | 作废的请求可能已计费，作者看得见，几行 |
 | `run_no_progress`（同一动作同一结果连续 3 次、连续 5 次回复的动作全被拒）与每轮用量检查点 | 根 Agent 的死循环兜底，回 idle；为什么是这几道见第 4、10 节 |
 | 模型输出平面 `Type.Object` | 真实 provider 把 union 下的数组序列化成字符串 |
