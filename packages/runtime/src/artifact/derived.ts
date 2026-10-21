@@ -347,23 +347,35 @@ function reviewChanges(candidate: ArtifactCandidate, file: ReviewFile): { change
 }
 
 /**
- * 候选里已经过时的审稿路径，判定与 `reviewCurrency` 同一份。turn 结束的对账用它数「这一轮让几份审稿过时」：
- * 斗破留出第二次，Agent 回复「修订并复审」，最后一轮修改其实没再审（2026-10-19 补）。解析不了的审稿文件不算，
- * 那由 check 报。
+ * 候选里已经过时、也没被复审取代的审稿路径，过时的判定与 `reviewCurrency` 同一份。turn 结束的对账用它数「这一轮让几份
+ * 审稿过时」：斗破留出第二次，Agent 回复「修订并复审」，最后一轮修改其实没再审（2026-10-19 补）。同一层有一份当前的
+ * 审稿看过它还在的全部主体，就算被取代，不数：2026-10-21 原创长篇第一次写设计，审 → 改 → 复审通过，对账仍报第一份
+ * 过时，与「复审通过」对不上。审稿面板里它照样是过时，这里只管对账。解析不了的审稿文件不算，那由 check 报。
  */
 export function staleReviewPaths(candidate: ArtifactCandidate): Set<string> {
-	const stale = new Set<string>();
+	const reviews: { path: string; file: ReviewFile; current: boolean }[] = [];
 	for (const artifact of candidate.artifacts) {
 		if (!isTargetArtifactIdentity(artifact.identity) || artifact.identity.kind !== "review") continue;
 		try {
-			const { changed, reason } = reviewChanges(
-				candidate,
-				parseReviewFile(decoder.decode(artifact.bytes), artifact.path),
-			);
-			if (changed.length > 0 || reason !== undefined) stale.add(artifact.path);
+			const file = parseReviewFile(decoder.decode(artifact.bytes), artifact.path);
+			const { changed, reason } = reviewChanges(candidate, file);
+			reviews.push({ path: artifact.path, file, current: changed.length === 0 && reason === undefined });
 		} catch {
 			// 解析不了的审稿文件由 check 报，不在对账里数
 		}
+	}
+	const present = new Set(candidate.artifacts.map((artifact) => artifact.path));
+	const stale = new Set<string>();
+	for (const review of reviews) {
+		if (review.current) continue;
+		const remaining = [...review.file.subjects.keys()].filter((path) => present.has(path));
+		const superseded = reviews.some(
+			(other) =>
+				other.current &&
+				other.file.layer === review.file.layer &&
+				remaining.every((path) => other.file.subjects.has(path)),
+		);
+		if (!superseded) stale.add(review.path);
 	}
 	return stale;
 }

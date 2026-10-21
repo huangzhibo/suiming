@@ -290,6 +290,40 @@ test("对账点名这一轮让哪些审稿过时：审完又改了 Design、没�
 	}
 });
 
+test("审 → 改 → 复审通过：被复审取代的第一份审稿不算过时", async () => {
+	// 2026-10-21 原创长篇第一次写设计：复审通过了，对账仍报第一份审稿过时，与回复对不上。
+	const f = await fixture();
+	try {
+		const id = (await f.harness.createSession()).id;
+		const verdict = (value: string) => ({
+			verdict: value,
+			summary: "审过",
+			findings: [],
+			uncovered: [],
+			uncertainties: [],
+		});
+		f.provider.setResponses([
+			call("review", { layer: "design" }),
+			call("submit_review", verdict("pass")),
+			call("edit", { path: "outline/story/vol-0001/beat-0001.md", oldText: "杖责五十", newText: "杖责六十" }),
+			call("review", { layer: "design" }),
+			call("submit_review", verdict("pass")),
+			reply("改完复审过了。"),
+		]);
+		await f.say("审一下设计，把杖数改成六十，再复审", id);
+		const summary = f.project
+			.readSessionEvents(id)
+			.map((record) => record.event)
+			.find((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn");
+		assert.ok(summary?.type === "ACTIVITY_SNAPSHOT");
+		const content = summary.content as { changed: { review: { count: number } }; staleReviews?: unknown };
+		assert.equal(content.changed.review.count, 2, "两份审稿都在");
+		assert.equal(content.staleReviews, undefined);
+	} finally {
+		await f.close();
+	}
+});
+
 test("对账点名根 Agent 没取写作依据就整篇写入的正文；取过 write_context、委派 writer 的不算，小改不算", async () => {
 	// 2026-10-02 斗破留出评测：根 Agent 没委派 Writer、也没调 write_context，三节正文都是自己凭 Frame 写的，
 	// 再用 118 次 edit 凑篇幅；写作方法与硬边界只跟着 Write Context 到，没人发现它跳过了。
