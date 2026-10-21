@@ -319,6 +319,20 @@ test("审 → 改 → 复审通过：被复审取代的第一份审稿不算过�
 		const content = summary.content as { changed: { review: { count: number } }; staleReviews?: unknown };
 		assert.equal(content.changed.review.count, 2, "两份审稿都在");
 		assert.equal(content.staleReviews, undefined);
+
+		// 下一轮又改了设计、没再审：这条链只数最新那份，不把更早的那份也算进来
+		f.provider.setResponses([
+			call("edit", { path: "outline/story/vol-0001/beat-0001.md", oldText: "杖责六十", newText: "杖责七十" }),
+			reply("改成七十了。"),
+		]);
+		await f.say("杖数再改成七十", id);
+		const second = f.project
+			.readSessionEvents(id)
+			.map((record) => record.event)
+			.filter((event) => event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "suiming.turn")[1];
+		assert.ok(second?.type === "ACTIVITY_SNAPSHOT");
+		const stale = (second.content as { staleReviews?: { count: number } }).staleReviews;
+		assert.equal(stale?.count, 1);
 	} finally {
 		await f.close();
 	}

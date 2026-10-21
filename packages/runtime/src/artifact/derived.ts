@@ -348,9 +348,12 @@ function reviewChanges(candidate: ArtifactCandidate, file: ReviewFile): { change
 
 /**
  * 候选里已经过时、也没被复审取代的审稿路径，过时的判定与 `reviewCurrency` 同一份。turn 结束的对账用它数「这一轮让几份
- * 审稿过时」：斗破留出第二次，Agent 回复「修订并复审」，最后一轮修改其实没再审（2026-10-19 补）。同一层有一份当前的
- * 审稿看过它还在的全部主体，就算被取代，不数：2026-10-21 原创长篇第一次写设计，审 → 改 → 复审通过，对账仍报第一份
- * 过时，与「复审通过」对不上。审稿面板里它照样是过时，这里只管对账。解析不了的审稿文件不算，那由 check 报。
+ * 审稿过时」：斗破留出第二次，Agent 回复「修订并复审」，最后一轮修改其实没再审（2026-10-19 补）。
+ *
+ * 同一层另有一份审稿看过它还在的全部主体、而且是当前的或者比它晚，它就算被取代，不数——一条「审 → 改 → 复审」的链只数
+ * 最新那份。2026-10-21 原创长篇：审 → 改 → 复审通过，对账仍报第一份过时；后来设计又改了，同一条链上的三份设计审稿各数一次。
+ * 先后看审稿 id：`composeReviewFile` 起的 id 是「层-时间-随机」，同一层里 id 大的晚。审稿面板里旧的照样是过时，这里只管
+ * 对账。解析不了的审稿文件不算，那由 check 报。
  */
 export function staleReviewPaths(candidate: ArtifactCandidate): Set<string> {
 	const reviews: { path: string; file: ReviewFile; current: boolean }[] = [];
@@ -371,7 +374,8 @@ export function staleReviewPaths(candidate: ArtifactCandidate): Set<string> {
 		const remaining = [...review.file.subjects.keys()].filter((path) => present.has(path));
 		const superseded = reviews.some(
 			(other) =>
-				other.current &&
+				other !== review &&
+				(other.current || other.path > review.path) &&
 				other.file.layer === review.file.layer &&
 				remaining.every((path) => other.file.subjects.has(path)),
 		);
