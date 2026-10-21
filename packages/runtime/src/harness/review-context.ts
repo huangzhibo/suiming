@@ -92,38 +92,44 @@ const NEXT_OPENING_CODE_POINTS = 600;
 /**
  * 审正文时范围前一节的全文与后一节的开头，只读、只查衔接（2026-10-19 补回旧 suim-review「非首节要有真实前文才做连续性审稿」）。
  * 整卷审稿超窗后拆块审，块与块之间的接缝原来没人审。邻节不计入审稿主体：计入会让已有的 selection 审稿全部显示过时，
- * 邻节改了衔接判断可能旧了一拍，可以接受。
+ * 邻节改了衔接判断可能旧了一拍，可以接受。邻节还没有正文也说一句：2026-10-21 原创长篇审第 1–6 章时，Reviewer 去读还没写的
+ * 第 7 章，撞上 permission_denied。
  */
-function textNeighbors(
-	candidate: ArtifactCandidate,
-	storyBeatIds: readonly string[],
-): { id: string; role: "previous" | "next"; text: string }[] {
+type Neighbor = { id: string; role: "previous" | "next"; text?: string };
+
+function textNeighbors(candidate: ArtifactCandidate, storyBeatIds: readonly string[]): Neighbor[] {
 	const ordered = inspectStoryDesignCandidate(candidate).design.story.beats.map((beat) => beat.id);
 	const texts = textArtifacts(candidate);
 	const inScope = new Set(storyBeatIds);
 	const first = ordered.indexOf(storyBeatIds[0] ?? "");
 	const last = ordered.indexOf(storyBeatIds.at(-1) ?? "");
-	const result: { id: string; role: "previous" | "next"; text: string }[] = [];
+	const result: Neighbor[] = [];
 	const previous = first > 0 ? ordered[first - 1] : undefined;
-	if (previous !== undefined && !inScope.has(previous) && texts.has(previous))
-		result.push({ id: previous, role: "previous", text: (texts.get(previous) ?? "").trim() });
+	if (previous !== undefined && !inScope.has(previous)) {
+		const text = texts.get(previous);
+		result.push({ id: previous, role: "previous", ...(text === undefined ? {} : { text: text.trim() }) });
+	}
 	const next = last >= 0 ? ordered[last + 1] : undefined;
-	if (next !== undefined && !inScope.has(next) && texts.has(next))
+	if (next !== undefined && !inScope.has(next)) {
+		const text = texts.get(next);
 		result.push({
 			id: next,
 			role: "next",
-			text: [...(texts.get(next) ?? "").trim()].slice(0, NEXT_OPENING_CODE_POINTS).join(""),
+			...(text === undefined ? {} : { text: [...text.trim()].slice(0, NEXT_OPENING_CODE_POINTS).join("") }),
 		});
+	}
 	return result;
 }
 
-function renderNeighbors(neighbors: readonly { id: string; role: "previous" | "next"; text: string }[]): string {
+function renderNeighbors(neighbors: readonly Neighbor[]): string {
 	return neighbors
-		.map((item) =>
-			item.role === "previous"
+		.map((item) => {
+			const where = item.role === "previous" ? "前" : "后";
+			if (item.text === undefined) return `\n\n# 范围${where}一节 text/${item.id}.md 还没有正文，不必去读`;
+			return item.role === "previous"
 				? `\n\n# 范围前一节的正文（只查衔接，不在审查范围内）\n\n## text/${item.id}.md\n\n${item.text}`
-				: `\n\n# 范围后一节的开头（只查衔接，不在审查范围内）\n\n## text/${item.id}.md\n\n${item.text}`,
-		)
+				: `\n\n# 范围后一节的开头（只查衔接，不在审查范围内）\n\n## text/${item.id}.md\n\n${item.text}`;
+		})
 		.join("");
 }
 
@@ -225,7 +231,11 @@ export function compileReviewContext(input: ReviewContextInput): CompiledReviewC
 	const storyBeatIds = resolveTextScope(candidate, scope);
 	const neighbors = textNeighbors(candidate, storyBeatIds);
 	// 邻节可读：审衔接要看（斗破留出两次共 7 次 permission_denied，都是 Reviewer 想看范围外的邻节）
-	const textPaths = new Set([...storyBeatIds, ...neighbors.map((item) => item.id)].map((id) => `text/${id}.md`));
+	const textPaths = new Set(
+		[...storyBeatIds, ...neighbors.filter((item) => item.text !== undefined).map((item) => item.id)].map(
+			(id) => `text/${id}.md`,
+		),
+	);
 	const styles = (scanned: ArtifactCandidate) =>
 		selectedStyleEvidence(scanned, inspectStoryDesignCandidate(scanned).design, storyBeatIds);
 	const styleEvidence = styles(candidate);

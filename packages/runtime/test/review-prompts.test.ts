@@ -51,6 +51,14 @@ test("正文审稿带上范围前一节与后一节的开头，可读但不计�
 	});
 	assert.match(first.prompt, /# 范围后一节的开头（只查衔接，不在审查范围内）\n\n## text\/beat-0002\.md/u);
 	assert.doesNotMatch(first.prompt, /范围前一节/u);
+	// 后一节还没写：说清楚，免得 Reviewer 去读不存在的文件（2026-10-21 原创长篇审第 1–6 章时撞上 permission_denied）
+	const unwritten = compileReviewContext({
+		candidate: candidateFromOpenStoryFiles(files.slice(0, -1), "review-neighbors-unwritten"),
+		layer: "text",
+		scope: { kind: "selection", storyBeatIds: ["beat-0001"] },
+	});
+	assert.match(unwritten.prompt, /# 范围后一节 text\/beat-0002\.md 还没有正文，不必去读/u);
+	assert.ok(!unwritten.readable?.("text/beat-0002.md"));
 	const book = compileReviewContext({ candidate, layer: "text" });
 	assert.doesNotMatch(book.prompt, /范围前一节|范围后一节/u, "全书审稿没有邻节");
 	assert.match(reviewerSystemPrompt("text"), /邻节只给你查衔接/u);
