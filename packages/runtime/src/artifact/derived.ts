@@ -94,10 +94,12 @@ function boundDesignOf(candidate: ArtifactCandidate): BoundDesign | undefined {
 
 export interface TextCurrency {
 	storyBeatId: string;
-	/** current：写成之后 Design 闭包没变；design-changed：变了，`changed` 列出哪些；unknown：历史或当前 Design 无法解析，时效不能确认；uncommitted：候选里还没提交。 */
+	/** current：写成之后 Design 闭包没变，或变了但已复核（见 `reviewedIn`）；design-changed：变了，`changed` 列出哪些；unknown：历史或当前 Design 无法解析，时效不能确认；uncommitted：候选里还没提交。 */
 	state: "current" | "design-changed" | "unknown" | "uncommitted" | "missing";
 	writtenAt?: string;
 	changed: string[];
+	/** 写成之后闭包变过，这份正文审稿看过这一节正文与它现在的整个闭包、没指出这一节的问题：复核过。审稿 id。 */
+	reviewedIn?: string;
 }
 
 interface DerivedCache {
@@ -203,7 +205,65 @@ export async function textCurrency(
 		if (before !== undefined && before === indexEntry(candidate, storyBeatId))
 			changed = changed.filter((path) => path !== indexPath);
 	}
+	if (changed.length > 0) {
+		const reviewedIn = await confirmingReview(reader, shared, candidate, storyBeatId, indexPath);
+		if (reviewedIn !== undefined) return { storyBeatId, state: "current", writtenAt, changed: [], reviewedIn };
+	}
 	return { storyBeatId, state: changed.length === 0 ? "current" : "design-changed", writtenAt, changed };
+}
+
+/**
+ * Design 变了而正文不必改时的复核：一份正文审稿看过这一节正文与它**现在的**整个 Design 闭包（摘要都对得上），也没有
+ * 意见落在这一节的正文或 Design 上，就算对照当前 Design 看过了。2026-10-21 原创长篇：补人物基底让第一卷五章变成
+ * design-changed，Agent 逐章核过、明说不改字，又把五章放进一次正文审稿；正文不改，状态就一直挂着，Release 也会拦。
+ * 复核的记录本来就是审稿文件自己（「等待影响分析、修订或复核」），不另设确认动作。story index 与 `textCurrency` 一样
+ * 只比这一节的那一段：摘要对不上时，拿审稿首次进版本时的 index 比；审稿还没提交就不认。
+ */
+async function confirmingReview(
+	reader: RevisionHistoryReader,
+	cache: DerivedCache,
+	candidate: ArtifactCandidate,
+	storyBeatId: string,
+	indexPath: string | undefined,
+): Promise<string | undefined> {
+	const textPath = `text/${storyBeatId}.md`;
+	const closure = designClosurePaths(candidate, storyBeatId);
+	const now = subjectDigests(candidate, [textPath, ...closure]);
+	const beatPath = candidate.artifacts.find(
+		(artifact) =>
+			isTargetArtifactIdentity(artifact.identity) &&
+			artifact.identity.kind === "story-beat" &&
+			artifact.identity.localId === storyBeatId,
+	)?.path;
+	const reviews = candidate.artifacts
+		.filter((artifact) => isTargetArtifactIdentity(artifact.identity) && artifact.identity.kind === "review")
+		.sort((left, right) => right.path.localeCompare(left.path));
+	for (const artifact of reviews) {
+		let file: ReviewFile;
+		try {
+			file = parseReviewFile(decoder.decode(artifact.bytes), artifact.path);
+		} catch {
+			continue; // 解析不了的审稿由 check 报，不拿来复核
+		}
+		const review = { id: artifact.identity.localId, path: artifact.path };
+		if (file.layer !== "text" || file.subjects.get(textPath) !== now.get(textPath)) continue;
+		if (
+			file.draft.findings.some(
+				(finding) =>
+					finding.anchor.kind === "artifact" &&
+					(finding.anchor.path === textPath || finding.anchor.path === beatPath),
+			)
+		)
+			continue;
+		const mismatched = closure.filter((path) => file.subjects.get(path) !== now.get(path));
+		if (mismatched.length === 0) return review.id;
+		if (mismatched.length > 1 || mismatched[0] !== indexPath) continue;
+		const committedAt = cache.written.get(review.path);
+		if (committedAt === undefined) continue;
+		const entry = indexEntry(await snapshotOf(reader, cache, committedAt), storyBeatId);
+		if (entry !== undefined && entry === indexEntry(candidate, storyBeatId)) return review.id;
+	}
+	return undefined;
 }
 
 /** head 下全部正文的时效，按故事顺序。 */

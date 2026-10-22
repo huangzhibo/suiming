@@ -70,6 +70,8 @@ const textCurrency = Type.Object(
 		writtenAt: Type.Optional(id),
 		/** 写成之后变过的 Design 闭包路径。 */
 		changed: Type.Array(id),
+		/** 闭包变过、由这份正文审稿复核过（state 为 current）。 */
+		reviewedIn: Type.Optional(id),
 	},
 	{ additionalProperties: false },
 );

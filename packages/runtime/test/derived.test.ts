@@ -133,6 +133,91 @@ test("正文时效从历史派生：写成时的 Design 闭包没变就是 curre
 	await assert.rejects(textCurrencies(history, "r9", history.candidate(r4)), { code: "revision_not_found" });
 });
 
+test("Design 变了、正文不必改时，一份看过当前闭包且没指出这一节问题的正文审稿算复核", async () => {
+	// 2026-10-21 原创长篇：补人物基底让第一卷五章 design-changed，Agent 逐章核过、明说不改字，还审了一次；状态一直挂着。
+	const history = new FakeHistory();
+	const withText = [...sampleWorkFiles(), ...texts()];
+	const r1 = history.commit(withText);
+	const backstory = "---\nname: 黄盖\n---\n宁可自己受刑，也不让计谋露出破绽。\n";
+	const changedDesign = replace(withText, "world/characters/黄盖.md", backstory);
+	const r2 = history.commit(changedDesign);
+	assert.deepEqual(
+		(await textCurrencies(history, r2, history.candidate(r2))).map((item) => item.state),
+		["design-changed", "design-changed"],
+	);
+	const review = (draft: Parameters<typeof composeReviewFile>[1]["draft"]) =>
+		renderReviewFile(
+			composeReviewFile(history.candidate(r2), {
+				layer: "text",
+				scope: { kind: "beats", storyBeatIds: ["beat-0001", "beat-0002"] },
+				revision: r2,
+				draft,
+			}).file,
+		);
+	// 审了两节：beat-0001 没意见，beat-0002 有一条落在它正文上的意见
+	const r3 = history.commit([
+		...changedDesign,
+		markdown(
+			"review/text-20261022-090000-aaaa.md",
+			review({
+				verdict: "revise",
+				summary: "第二节火船数目要对一下",
+				findings: [
+					{
+						severity: "minor",
+						anchor: { kind: "artifact", path: "text/beat-0002.md" },
+						issue: "火船数目与 Design 不一致",
+						evidence: "二十艘火船",
+						repairLayer: "text",
+					},
+				],
+				uncovered: [],
+				uncertainties: [],
+			}),
+		),
+	]);
+	assert.deepEqual(await textCurrencies(history, r3, history.candidate(r3)), [
+		{
+			storyBeatId: "beat-0001",
+			state: "current",
+			writtenAt: r1,
+			changed: [],
+			reviewedIn: "text-20261022-090000-aaaa",
+		},
+		{ storyBeatId: "beat-0002", state: "design-changed", writtenAt: r1, changed: ["world/characters/黄盖.md"] },
+	]);
+	// 复核之后全书末尾加了一卷：index.yaml 整份变了，但 beat-0001 那一段没变，复核照样算
+	const appended = [
+		...history.candidateFiles(r3).filter((file) => file.path !== "outline/story/index.yaml"),
+		markdown(
+			"outline/story/index.yaml",
+			"schema_version: 2\nvolumes:\n  - id: vol-0001\n    title: 赤壁之战\n    beat_ids: [beat-0001, beat-0002]\n  - id: vol-0002\n    title: 续篇\n    beat_ids: [beat-0003]\n",
+		),
+		markdown("outline/story/vol-0002/beat-0003.md", "---\nrefs:\n  character: [黄盖]\n---\n黄盖离开都城。\n"),
+	];
+	const r3b = history.commit(appended);
+	assert.equal(
+		(await textCurrency(history, r3b, history.candidate(r3b), "beat-0001")).reviewedIn,
+		"text-20261022-090000-aaaa",
+	);
+	// 复核之后闭包又变了：那份审稿看的不是现在的闭包，不再算
+	const r4 = history.commit(
+		replace(history.candidateFiles(r3), "world/characters/黄盖.md", `${backstory}老将，跟过孙坚。\n`),
+	);
+	assert.equal((await textCurrency(history, r4, history.candidate(r4), "beat-0001")).state, "design-changed");
+	// 更早的、Design 变之前的审稿不算复核（它看的是旧闭包）
+	const early = renderReviewFile(
+		composeReviewFile(history.candidate(r1), {
+			layer: "text",
+			scope: { kind: "beats", storyBeatIds: ["beat-0001"] },
+			revision: r1,
+			draft: { verdict: "pass", summary: "成立", findings: [], uncovered: [], uncertainties: [] },
+		}).file,
+	);
+	const r5 = history.commit([...changedDesign, markdown("review/text-20261021-090000-bbbb.md", early)]);
+	assert.equal((await textCurrency(history, r5, history.candidate(r5), "beat-0001")).state, "design-changed");
+});
+
 test("story index 只按这个 Beat 的那一段算进闭包：末尾加卷不让前面的正文变黄，改卷名、动了前后邻居才算", async () => {
 	const history = new FakeHistory();
 	const withText = [...sampleWorkFiles(), ...texts()];

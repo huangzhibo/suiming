@@ -37,7 +37,7 @@ StoryText 可以创造措辞、动作颗粒、对白、感官、氛围、表演�
 
 Workspace 或 ProjectRevision 可以只包含部分 StoryText，也可以保留尚待校准的完整候选。路径存在和确定性检查通过只说明文件覆盖与机器边界，不是语义接受或审稿结论；文件覆盖与审稿时效都从明确版本派生，不回填正文 frontmatter。
 
-正文的 Design 时效由它最后一次提交时的 Design 闭包（这个 Beat、它引用的人物 / 地点 / 资源 / World 文档、Contract、适用的 Intent，以及 story index 里它所在的卷与前后相邻的 Beat）与当前 Design 的差异派生：闭包没变是 `current`，变了是 `design-changed` 并列出变过的文件，等待影响分析、修订或复核，不自动删除；候选里未提交的正文是 `uncommitted`。这个状态不证明正文已经符合当前 text Intent 或通过 Review；它是版本派生值，不进入 StoryText 内容。
+正文的 Design 时效由它最后一次提交时的 Design 闭包（这个 Beat、它引用的人物 / 地点 / 资源 / World 文档、Contract、适用的 Intent，以及 story index 里它所在的卷与前后相邻的 Beat）与当前 Design 的差异派生：闭包没变是 `current`，变了是 `design-changed` 并列出变过的文件，等待影响分析、修订或复核，不自动删除；候选里未提交的正文是 `uncommitted`。正文不必改时，复核的记录就是一份正文审稿：它看过这一节正文与现在的整个闭包（`subjects` 的摘要都对得上），也没有意见落在这一节的正文或 StoryBeat 上，这一节就回到 `current`，并记下是哪份审稿复核的；不为消掉提示去改字。这个状态不证明正文已经符合当前 text Intent 或通过 Review；它是版本派生值，不进入 StoryText 内容。
 
 ## 审稿与历史派生状态
 

@@ -165,7 +165,11 @@ export class Book {
 		if (!entry) return undefined;
 		const written = entry.writtenAt === undefined ? "" : `写于 ${this.revisionLabel(entry.writtenAt)} · `;
 		if (entry.state === "unknown") return { text: `${written}时效无法确认：历史或当前设计无法解析`, tone: "gray" };
-		if (entry.state === "current") return { text: `${written}设计未变`, tone: "green" };
+		if (entry.state === "current")
+			return {
+				text: entry.reviewedIn === undefined ? `${written}设计未变` : `${written}设计变过，已由审稿复核`,
+				tone: "green",
+			};
 		// 正文还没提交：页面上已经有「未提交」，这里不再说一遍。
 		if (entry.state === "uncommitted") return undefined;
 		return { text: `${written}设计已变：${entry.changed.length} 个文件`, tone: "amber" };

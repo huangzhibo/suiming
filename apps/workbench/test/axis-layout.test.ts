@@ -493,3 +493,12 @@ test("无法解析历史时不把正文画成已更新或设计未变，列表�
 	assert.match(book.currencyLabel("beat-0001")?.text ?? "", /时效无法确认/u);
 	assert.equal(axisModel(book, []).beats[0]?.text, "unknown");
 });
+
+test("设计变过、由审稿复核过的正文说清是复核过，不说成设计未变", () => {
+	const book = new Book({
+		...data,
+		storyText: [{ storyBeatId: "beat-0001", state: "current", writtenAt: "r1", changed: [], reviewedIn: "text-1" }],
+	});
+	assert.match(book.currencyLabel("beat-0001")?.text ?? "", /设计变过，已由审稿复核/u);
+	assert.equal(book.currencyLabel("beat-0001")?.tone, "green");
+});
