@@ -101,24 +101,25 @@ function textNeighbors(candidate: ArtifactCandidate, storyBeatIds: readonly stri
 	const ordered = inspectStoryDesignCandidate(candidate).design.story.beats.map((beat) => beat.id);
 	const texts = textArtifacts(candidate);
 	const inScope = new Set(storyBeatIds);
-	const first = ordered.indexOf(storyBeatIds[0] ?? "");
-	const last = ordered.indexOf(storyBeatIds.at(-1) ?? "");
-	const result: Neighbor[] = [];
-	const previous = first > 0 ? ordered[first - 1] : undefined;
-	if (previous !== undefined && !inScope.has(previous)) {
-		const text = texts.get(previous);
-		result.push({ id: previous, role: "previous", ...(text === undefined ? {} : { text: text.trim() }) });
-	}
-	const next = last >= 0 ? ordered[last + 1] : undefined;
-	if (next !== undefined && !inScope.has(next)) {
-		const text = texts.get(next);
-		result.push({
-			id: next,
-			role: "next",
-			...(text === undefined ? {} : { text: [...text.trim()].slice(0, NEXT_OPENING_CODE_POINTS).join("") }),
+	// 范围可以不连续（2026-10-21 原创长篇把第一卷五章与第二卷六章放在一起审）：每一段连续的都给它的前一节与后一节，
+	// 只给整个范围的两头时，Reviewer 去读中间缺的几章，撞了五次 permission_denied。夹在两段之间的一节既是后一段的前一节
+	// 也是前一段的后一节，给全文。
+	const roles = new Map<string, "previous" | "next">();
+	ordered.forEach((id, index) => {
+		if (!inScope.has(id)) return;
+		const previous = ordered[index - 1];
+		if (previous !== undefined && !inScope.has(previous)) roles.set(previous, "previous");
+		const next = ordered[index + 1];
+		if (next !== undefined && !inScope.has(next) && !roles.has(next)) roles.set(next, "next");
+	});
+	return ordered
+		.filter((id) => roles.has(id))
+		.map((id): Neighbor => {
+			const role = roles.get(id) ?? "next";
+			const text = texts.get(id)?.trim();
+			if (text === undefined) return { id, role };
+			return { id, role, text: role === "previous" ? text : [...text].slice(0, NEXT_OPENING_CODE_POINTS).join("") };
 		});
-	}
-	return result;
 }
 
 function renderNeighbors(neighbors: readonly Neighbor[]): string {

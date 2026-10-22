@@ -64,6 +64,32 @@ test("正文审稿带上范围前一节与后一节的开头，可读但不计�
 	assert.match(reviewerSystemPrompt("text"), /邻节只给你查衔接/u);
 });
 
+test("审的几节不连续时，每一段都带上前一节与后一节，夹在两段之间的那节给全文", async () => {
+	// 2026-10-21 原创长篇把第一卷五章与第二卷六章放在一起审，只给两头的邻节，Reviewer 去读中间缺的几章被拒五次。
+	const { compileReviewContext } = await import("../src/harness/review-context.js");
+	const { candidateFromOpenStoryFiles } = await import("../src/index.js");
+	const { syntheticWorkFiles } = await import("./synthetic-work.js");
+	const encoder = new TextEncoder();
+	const ids = ["beat-0001", "beat-0002", "beat-0003", "beat-0004", "beat-0005"];
+	const files = [
+		...syntheticWorkFiles({ volumes: 1, beatsPerVolume: 5 }),
+		...ids.map((id) => ({
+			path: `text/${id}.md`,
+			mediaType: "text/markdown; charset=utf-8",
+			bytes: encoder.encode(`${id} 的正文。\n`),
+		})),
+	];
+	const context = compileReviewContext({
+		candidate: candidateFromOpenStoryFiles(files, "review-neighbors-gaps"),
+		layer: "text",
+		scope: { kind: "selection", storyBeatIds: ["beat-0002", "beat-0004"] },
+	});
+	assert.match(context.prompt, /# 范围前一节的正文（只查衔接，不在审查范围内）\n\n## text\/beat-0001\.md/u);
+	assert.match(context.prompt, /# 范围前一节的正文（只查衔接，不在审查范围内）\n\n## text\/beat-0003\.md/u);
+	assert.match(context.prompt, /# 范围后一节的开头（只查衔接，不在审查范围内）\n\n## text\/beat-0005\.md/u);
+	for (const id of ["beat-0001", "beat-0003", "beat-0005"]) assert.ok(context.readable?.(`text/${id}.md`), id);
+});
+
 // 抽取方法从旧仓 suim-source 补回三条（2026-10-19）：人物基底的时间边界、相邻节的状态接续、笔记 span 只写实际读完的范围。
 test("抽取方法写明人物基底只放进入故事前的事实、相邻节状态接得上、笔记 span 只写读完的范围", async () => {
 	const { SOURCE_EXTRACTION_METHOD, SOURCE_SEGMENT_METHOD, SOURCE_COMPLETION_METHOD } = await import(
