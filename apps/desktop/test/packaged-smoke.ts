@@ -71,6 +71,12 @@ test("macOS 安装包：首次启动、新建、替换安装、启动拒绝与�
 			electron: process.versions.electron,
 		}));
 		assert.equal((report.runtime as { packaged: boolean }).packaged, true);
+		const desktop = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+		assert.equal(
+			(report.runtime as { electron: string }).electron,
+			desktop.devDependencies.electron,
+			"验收包必须使用当前锁定的 Electron，不能用旧安装包代替",
+		);
 		const packageFiles = await app.evaluate(({ app }) => {
 			return process.getBuiltinModule("fs").readdirSync(app.getAppPath()).sort();
 		});
