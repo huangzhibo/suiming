@@ -97,7 +97,7 @@ Cloud Web 复用桌面已完成的 React 工作台与同一事件契约，不再
 
 ### 依赖安全维护（2026-11-03）
 
-Electron 45 与独立的 Undici、fast-uri 安全更新按 [ADR-0040](adr/0040-electron-security-upgrade-validation.md) 验收；实际完成证据见[当前状态](current-status.md)。后续单独协调 SDK 与 AG-UI 的 Zod 依赖，修复 [PR #9](https://github.com/huangzhibo/suiming/pull/9) 的类型不兼容与旧版残留；验收覆盖 AG-UI schema 转换、消息协议回归、完整检查与构建，并重新核对安全审计。其余传递依赖告警按实际使用路径分别评估，不通过批量强制升级或跳过检查清空数字。签名、公证与独立机器首装仍按下方发行队列处理。
+Electron 45 与独立的 Undici、fast-uri 安全更新按 [ADR-0040](adr/0040-electron-security-upgrade-validation.md) 验收；实际完成证据见[当前状态](current-status.md)。Zod 与 AG-UI、shadcn 的依赖对齐见 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md)。后续每次升级 AG-UI 时核对 client、proto 的 Zod 依赖声明；上游允许安全的 Zod 4 后，删除对应定向 override，并重跑干净安装、schema 转换、消息回放与桌面验收。其余传递依赖告警按实际使用路径分别评估，不通过批量强制升级或跳过检查清空数字。签名、公证与独立机器首装仍按下方发行队列处理。
 
 本节是下一步任务的唯一队列。当前能力与缺陷见[当前状态](current-status.md)，已完成过程见[变更记录](changelog.md)。
 
