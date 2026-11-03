@@ -15,6 +15,8 @@
 
 ## 最近有效验收
 
+2026-11-03：按 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md) 将 Zod 统一为 4.6.7，AG-UI 统一为 1.0.3，shadcn 升到 4.23.0。干净安装、完整检查、工作台生产构建通过；新增 schema 转换正反例和超限集合提前拒绝回归，全仓测试 524 / 524、无跳过。真实持久事件与恢复快照通过 AG-UI 官方客户端校验；桌面 E2E 与实际安装包的验收证据集中记录在 [PR #13](https://github.com/huangzhibo/suiming/pull/13)。锁文件只有一份 Zod 4.6.7；本次 `npm audit --omit=dev` 为 0，全量审计仍有 17 个中低危受影响依赖条目，无高危或严重项。
+
 2026-11-03：按 [ADR-0040](adr/0040-electron-security-upgrade-validation.md) 将桌面升级到 Electron 45.2.1，同时采用 Undici 7.30.1、fast-uri 3.1.9 的完整安全更新。组合后的干净 `npm ci`、`npm run check`、工作台生产构建通过；全仓测试 522 / 522，真实 Electron 45.2.1 桌面 E2E 88 / 88，均无跳过。安装包验收增加实际 Electron 版本断言，已用 44.9.1 旧包复现拒绝；从原版本 44.6.0 直接升级到 45.2.1、再回退的 ASAR 安装包验收记录见 [PR #10](https://github.com/huangzhibo/suiming/pull/10)。本次使用本地未签名包，不代表签名、公证、独立机器下载首装或真实服务商联网通过。
 
 2026-10-19：把旧仓四个 Skill 丢的方法补回桌面 Agent（[记录](validation/2026-10-19-old-skills-audit/README.md)）。新增 `design_context`（设计方法、覆盖这一节的意图、按已有正文算的设计容量、前后 Design；host 的 `context compile design` 带同一份），只设计第 121–140 章重跑一次，意图篇幅与 Design 之比 6.6 → 5.3、推进更快。设计审稿有了推进、容量等清单，设计与正文 Reviewer 有 `story_guide`，10-18 那份审稿 pass 的 Design 重审成 revise。审几节正文时附上前一节与后一节开头，邻节审稿 `permission_denied` 0 次。turn 结束对账加「这一轮让几份审稿过时」。抽取方法补了人物基底的时间边界、相邻节状态接续、笔记 span 只写读完的范围。试过又撤掉的：根 Agent「先对照意图」一句（三次复现都没拦住）、Write Context 的前文段长（31 → 37 字仍在波动里）。全仓单测通过；真实模型约 $7.2。
@@ -109,7 +111,7 @@
 
 ## 已知缺陷
 
-- **安全依赖尚未清零（2026-11-03）。**Zod 的 [PR #9](https://github.com/huangzhibo/suiming/pull/9) 把 SDK 升到 4.6.6，但 AG-UI 仍解析到旧版 `zod/v4`，`run-event.ts` 的 `toJSONSchema(EventSchemas)` 因类型版本不兼容而编译失败；锁文件根依赖也仍保留 3.25.76。该 PR 保留待修，不能把其他安全更新通过理解为所有告警已消除。
+- **安全依赖仍有维护项（2026-11-03）。**Zod 的类型冲突与旧版残留已由 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md) 的组合更新解决；AG-UI client / proto 1.0.3 仍需临时定向 override，待上游修正依赖范围后删除并重验。全量审计剩余 17 个中低危受影响依赖条目，主要位于开发、检查和打包工具链；生产依赖审计为 0 只代表本次依赖扫描结果。
 
 - **历史观测缺失未能唯一归因，短超时问题已修复**：按需编辑同步验收的本地执行记录为 3 次模型 / 6 次工具，Langfuse 再查仍为 2 / 2。对应服务端时间窗有请求体读取失败，但未带 trace ID；已独立复现客户端 1500ms 短超时会放弃正常慢响应，现恢复上游默认超时和重试，并为每个失败批次补脱敏诊断。退出仍有界，不重建观测队列。旧批次未补造，不能因新运行成功就断言历史根因已经确证，见[排查记录](validation/2026-10-17-continuous-workbench/telemetry.md)。
 

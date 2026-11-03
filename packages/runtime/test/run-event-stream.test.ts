@@ -96,6 +96,9 @@ test("一个对话的持久事件与 attach 快照都符合 AG-UI 的运行生�
 		assert.equal(events.filter((record) => record.event.type === EventType.RUN_STARTED).length, 2);
 		assertRunLifecycle(productEventSnapshot(events));
 		assertRunLifecycle(productEventSnapshot(events.slice(0, 5)));
+		for (const replay of [events.map((record) => record.event), productEventSnapshot(events)]) {
+			await lastValueFrom(verifyEvents()(from(replay as BaseEvent[])).pipe(toArray()));
+		}
 	});
 });
 

@@ -1,5 +1,7 @@
 # 变更记录
 
+- **2026-11-03** 修复 Zod 安全依赖与 AG-UI 类型冲突：SDK 升到 Zod 4.6.7，AG-UI core / client / proto / encoder 统一为 1.0.3，shadcn 升到 4.23.0 并移除旧 Zod 工具链。仅对 client / proto 1.0.3 保留限定版本的 override，不给根目录重复加 Zod，不覆盖已支持新版的 core；删除条件见 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md)。补充 schema 转换正反例、超限集合提前拒绝，以及官方客户端对持久事件与恢复快照的回归。完整更新见 [PR #13](https://github.com/huangzhibo/suiming/pull/13)，替代只升 SDK 的 #9；验收和剩余审计项见[当前状态](current-status.md)。
+
 - **2026-11-03** 安全依赖维护：合入 Undici 7.30.1 与 fast-uri 3.1.9 的完整锁文件更新，Electron 直接采用当前稳定版 45.2.1 替代两份 44.9.1 Dependabot 更新。保留原有 sandbox 与 Runtime 边界，移除失效的 Electron 安装脚本许可，修正首次下载和代理配置说明；安装包 smoke 增加实际 Electron 版本断言，防止旧包冒充升级验收。依赖变更与文档决策分开提交，决定见 [ADR-0040](adr/0040-electron-security-upgrade-validation.md)，验证证据见[当前状态](current-status.md)。Zod 的独立更新仍有类型不兼容及旧版残留，保留待修。
 
 - **2026-10-19** 把旧仓四个 Skill 丢的方法补回桌面 Agent（作者问旧的 `/suim-source` 等合成一个 Agent 后还能不能准确完成任务，让负责人把有必要的都做了）。先逐条对照：host 侧几乎完整，丢的集中在桌面 Agent。补法按五条原则：方法跟着动作走、一份方法两条通道、能算的给数字、只补出过事的、不加闸。六项各跑一次真实验证按判定取舍：新增 `design_context` 与设计方法（容量比 6.6 → 5.3、推进更快），设计审稿清单（同一份 Design 从 pass 审成 revise），审正文带邻节（`permission_denied` 7 → 0），抽取方法补三条，turn 对账加过时审稿数，这些留下；根 Agent「改作者定下的 Design 前先对照意图」三次复现都没拦住、撤掉，Write Context 前文段长 31 → 37 字仍在波动里、撤掉。顺带：beat-0521 的复现前两次搭法有漏洞（正文是改错后的版本），第三次换回原作正文才算公平。
