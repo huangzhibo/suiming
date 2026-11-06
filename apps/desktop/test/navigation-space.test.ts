@@ -139,7 +139,8 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 		// 新标签页按对象类型辨识，长标题和路径仅在截断时补全。
 		await button("新标签页").click();
 		await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).fill(` ${longName} `);
-		const row = page.locator('[data-scroll-key="empty"] [data-page]').first();
+		// 搜索词切换后，按目标路径等新结果，避免 hover 仍落在上一轮的第一行。
+		const row = page.locator(`[data-scroll-key="empty"] [data-page="${added}"]`);
 		await row.waitFor();
 		assert.match(await row.innerText(), /创作意图/);
 		await page.keyboard.press("Tab");
@@ -154,7 +155,7 @@ test("导航空间：版本逐文件核对、跨版本定位、最近访问截�
 		assert.equal(await page.getByText(/· 第 1 段$/).count(), 0);
 		await button("新标签页").click();
 		await page.getByRole("textbox", { name: "搜索对象或文件", exact: true }).fill("world/core.md");
-		await row.hover();
+		await page.locator('[data-scroll-key="empty"] [data-page="world/core.md"]').hover();
 		await assertNoTooltip(page, "完整标题与路径不重复提示");
 		await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
 		await page.waitForFunction(() => innerWidth === 960);
