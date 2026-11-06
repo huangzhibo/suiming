@@ -1,4 +1,4 @@
-# 当前状态（2026-10-22）
+# 当前状态（2026-11-07）
 
 本文只回答三件事：什么已经成立、证据到哪一级、还有哪些已知缺陷。形状以[系统架构](architecture.md)与 [Harness 设计](harness-design.md)为准；接下来做什么只在[路线图](roadmap.md)第 6 节维护，发生过什么见[变更记录](changelog.md)。
 
@@ -14,6 +14,12 @@
 - **证据边界**：最高到「真实调用」。真实写作、真实流中断恢复与大型作品浏览均有证据；抽取原作、合成规模测试和少量正文不等于 Agent 完成真实长篇，也不能代替作者对文学效果的判断。
 
 ## 最近有效验收
+
+2026-11-07：合并审稿复核、审稿邻节与对账修复和 [ADR-0040](adr/0040-electron-security-upgrade-validation.md)、[ADR-0041](adr/0041-zod-agui-dependency-alignment.md) 的安全依赖更新，保留两边的代码、测试和验收记录。Node 24.19.0 / npm 11.17.0 下干净安装、完整检查和工作台生产构建通过，全仓 528 / 528、无跳过；实际 Electron 二进制为 45.2.1。完整桌面首轮 87 / 88，导航空间的窄窗提示框等待超时；原用例单独复跑通过，尚未将整套桌面验收记为通过。依赖树中 AG-UI 四包均为 1.0.3，Zod 仅有 4.6.7；生产依赖审计为 0，全量审计有 16 个中低危受影响依赖条目，无高危或严重项。AG-UI 1.0.4 已评估但未升级，实施与验收范围见[路线图](roadmap.md)第 6 节。
+
+2026-11-03：按 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md) 将 Zod 统一为 4.6.7，AG-UI 统一为 1.0.3，shadcn 升到 4.23.0。干净安装、完整检查、工作台生产构建通过；新增 schema 转换正反例和超限集合提前拒绝回归，全仓测试 524 / 524、无跳过。真实持久事件与恢复快照通过 AG-UI 官方客户端校验；桌面 E2E 与实际安装包的验收证据集中记录在 [PR #13](https://github.com/huangzhibo/suiming/pull/13)。锁文件只有一份 Zod 4.6.7；本次 `npm audit --omit=dev` 为 0，全量审计仍有 17 个中低危受影响依赖条目，无高危或严重项。
+
+2026-11-03：按 [ADR-0040](adr/0040-electron-security-upgrade-validation.md) 将桌面升级到 Electron 45.2.1，同时采用 Undici 7.30.1、fast-uri 3.1.9 的完整安全更新。组合后的干净 `npm ci`、`npm run check`、工作台生产构建通过；全仓测试 522 / 522，真实 Electron 45.2.1 桌面 E2E 88 / 88，均无跳过。安装包验收增加实际 Electron 版本断言，已用 44.9.1 旧包复现拒绝；从原版本 44.6.0 直接升级到 45.2.1、再回退的 ASAR 安装包验收记录见 [PR #10](https://github.com/huangzhibo/suiming/pull/10)。本次使用本地未签名包，不代表签名、公证、独立机器下载首装或真实服务商联网通过。
 
 2026-10-22：[交互式写一部原创长篇](validation/2026-10-21-original-novel/README.md)。Claude 扮作者从空作品起步，十四轮对话写成三卷 36 章、约 12.4 万字：先讨论定题材与走向，分卷设计、先写一两章看手感再往下；中途改一次设定、改一次方向，Agent 都按影响面改了已写的设计与正文；第三卷换新对话，Agent 只靠作品文件列全了作者说过的要求。检查通过、36 章全部 current，实际干活约 6.5 小时、588 次调用、估算 $26.8，用量检查点没触发。同时修了四处：turn 对账把被复审取代的审稿算作过时、一条审稿链重复计数；Design 变了而正文不必改时，正文审稿算复核，正文时效回到 current（以前只能改字清掉）；审稿邻节在下一节还没写、范围不连续时缺失。桌面检查没做（作者没有同意控制窗口），Checker 没拦到确定性失败。这不是作者反馈过的长篇，也不说明文学质量。全仓 526 / 526。
 
@@ -72,7 +78,7 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 526 / 526、0 skip（2026-10-22），工作台单测包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 最新复跑见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)。此前 Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 528 / 528、0 skip（2026-11-07），工作台单测包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 本次合并验收见上方「最近有效验收」；此前组合验收见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)，Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
 | 桌面与窗口 | 完整桌面 88 / 88 通过、0 skip（2026-10-18，作品入口提示补上目录之后；含此前因宿主锁屏未验的原生全屏）；2026-10-19 查明「导航与文件」的偶发失败是测试读了 CodeMirror 没渲染的行，修后单项连跑 10 / 10、完整桌面 88 / 88，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 
@@ -108,6 +114,8 @@
 | 真实长篇 | 在不少于 3 卷 30 个 StoryBeat 的真实作品上跑通并有作者反馈 |
 
 ## 已知缺陷
+
+- **安全依赖仍有维护项（2026-11-07）。**Zod 的类型冲突与旧版残留已由 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md) 的组合更新解决；当前 AG-UI client / proto 1.0.3 仍需临时定向 override。1.0.4 的发布包已允许安全的 Zod 4，待完成升级验收后删除覆盖，范围见[路线图](roadmap.md)第 6 节。全量审计剩余 16 个中低危受影响依赖条目，主要位于开发、检查和打包工具链；生产依赖审计为 0 只代表本次依赖扫描结果。
 
 - **历史观测缺失未能唯一归因，短超时问题已修复**：按需编辑同步验收的本地执行记录为 3 次模型 / 6 次工具，Langfuse 再查仍为 2 / 2。对应服务端时间窗有请求体读取失败，但未带 trace ID；已独立复现客户端 1500ms 短超时会放弃正常慢响应，现恢复上游默认超时和重试，并为每个失败批次补脱敏诊断。退出仍有界，不重建观测队列。旧批次未补造，不能因新运行成功就断言历史根因已经确证，见[排查记录](validation/2026-10-17-continuous-workbench/telemetry.md)。
 

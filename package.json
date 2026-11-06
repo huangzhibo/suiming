@@ -54,7 +54,14 @@
 		"@google/genai@2.21.0": false,
 		"esbuild@0.28.2": true,
 		"fsevents@2.3.3": true,
-		"protobufjs@7.6.6": false,
-		"electron@44.6.0": true
+		"protobufjs@7.6.6": false
+	},
+	"overrides": {
+		"@ag-ui/client@1.0.3": {
+			"zod": "4.6.7"
+		},
+		"@ag-ui/proto@1.0.3": {
+			"zod": "4.6.7"
+		}
 	}
 }

@@ -11,8 +11,8 @@
 
 ## 升级 Electron
 
-- 根目录 `package.json` 的 `allowScripts` 按「包名@版本」放行安装脚本：升级时要把 `electron@<旧版本>` 改成新版本，否则 npm 静默跳过下载二进制，`node_modules/electron/dist` 是空的，桌面与 E2E 都起不来；改完跑 `npm rebuild electron`（2026-10-07 升 44 时撞上）。
-- Electron 的下载器（`@electron/get`）不读 `HTTPS_PROXY`。机器要走代理时，带上 `ELECTRON_GET_USE_PROXY=1` 与 `GLOBAL_AGENT_HTTPS_PROXY` 跑 `node node_modules/electron/install.js`，否则它直连，可能慢到下不完。
+- Electron 44.6.0、44.9.1 与 45.2.1 的 npm 包已不带 `postinstall`：首次运行时下载二进制，也可提前运行 `node node_modules/electron/install.js`。不要靠 `allowScripts` 或 `npm rebuild electron` 判断二进制已经安装；升级后核对实际可执行文件的版本，再跑桌面与安装包验收。旧的版本化 Electron `allowScripts` 条目已移除（2026-11-03 核对官方 npm 包与安装说明）。
+- 当前锁定的下载器（`@electron/get`）在 `ELECTRON_GET_USE_PROXY=1` 时使用 undici 的 `EnvHttpProxyAgent`，读取 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`；需要代理下载时带这些变量运行 `node node_modules/electron/install.js`。不要继续使用旧下载器的 `GLOBAL_AGENT_HTTPS_PROXY` 配法（2026-11-03 核对已安装包的 `proxy.js`）。
 - Electron 只支持最近三个大版本，升级前看两份破坏性变更：发布说明的 Breaking Changes 与仓库里的 `docs/breaking-changes.md`。
 
 ## 桌面 E2E

@@ -43,5 +43,7 @@ ADR 记录重要架构选择在当时的背景、理由和后果。当前规范�
 | [0037](0037-agent-workbench-context.md) | Accepted | 发送时界面快照、根 Agent 展示能力；复用导航与比较，保护作者现场与取消边界 |
 | [0038](0038-collaboration-modes-goal-and-slash-commands.md) | Amended，已实现；模式与 `/` 命令由 0039 取代 | 作者设定的目标自动续跑、用量检查点按作者开的那一轮计仍有效；三种协作模式与七条内置命令、自定义命令已撤 |
 | [0039](0039-slash-commands-by-need.md) | Accepted | 协作模式收成讨论开关（工具面保证只读）；`/` 命令管这段对话怎么跑：`/目标`、`/讨论`、`/模型`，新对话与提交走按钮，删自定义命令 |
+| [0040](0040-electron-security-upgrade-validation.md) | Accepted | Electron 安全升级核对组合依赖、真实二进制与 ASAR 安装包；不以独立 PR 的 CI 代替桌面及替换安装验收 |
+| [0041](0041-zod-agui-dependency-alignment.md) | Accepted | Zod 与 AG-UI、shadcn 协同升级；只对已核对版本保留定向覆盖，按上游依赖修复和组合验收删除 |
 
 2026-09-13 起的几项大改没有单独立 ADR：Session 取代 Conversation / Run / Attempt、去掉 per-session worktree、去掉预算、evidence 改为从 Canon 历史派生、删除 Cloud 执行与 TUI。决定与理由见 [Harness 设计](../harness-design.md)第 2、10、15、16 节与 [派生状态设计](../derived-evidence-design.md)。
