@@ -6,7 +6,7 @@
 
 <!-- 这一段只在阶段变化时改。 -->
 
-> **当前状态：开发预览**。桌面工作台与自主 Agent 已经贯通，但证据最高只到「真实调用」：还没有一部完整的长篇在它上面写完，也没有安装包，目前只在 macOS 上验证过。完成度与已知缺陷见[当前状态](docs/current-status.md)，接下来做什么见[路线图](docs/roadmap.md)第 6 节。
+> **当前状态：开发预览**。桌面工作台与自主 Agent 已经贯通，桌面端已在 macOS 上验证。完成度、验证范围与已知缺陷见[当前状态](docs/current-status.md)，接下来做什么见[路线图](docs/roadmap.md)第 6 节。
 
 <p align="center"><img src="docs/media/tour.webp" alt="全书故事轴：读者期待、因果依赖与人物轨迹；选中华容道那一节查看状态，进入赤壁一卷，打开关羽的人物页，最后读这一节的正文和 Agent 的回答" width="100%"></p>
 <p align="center"><sub>示例作品是《三国演义》第一回到第五十回：设计由 Suiming 的 Agent 从原著忠实抽取，正文是原著原文。就是仓库里的 <a href="examples/README.md">examples/sanguo</a>，不配模型也能打开。</sub></p>
@@ -67,6 +67,8 @@ Agent 在你的作品目录上直接读、改、自检，可以把写正文、�
 
 <img src="docs/media/reading.webp" alt="左边是华容道这一节的原文，右边是 Agent 按故事顺序列出的伏笔" width="100%">
 
+**在原文旁写修改要求**。阅读时拖选文字，或悬停段落、标题并点「请 Agent 修改」，都能在原文旁打开输入框。打字时引用范围保持高亮，发送时要求和引用一起进入当前对话。已有草稿时，两者会追加到草稿，等你一起发送。[对话与作品联动](docs/workbench-design.md#42-对话与作品联动)
+
 ```text
 作者的目标 / 作品意图（intent/）
    ↓
@@ -84,7 +86,7 @@ Suiming Agent：在作品目录上读、改、自检，按需委派写作与独�
 - **原地打转会被拦下**。同一个动作得到同一个结果连续三次就停；一轮的用量到了上限先停下，说一句「继续」再接着做，上限在设置里可调。
 - **每轮结束对一次账**。你发了几条消息、意图改没改、设计和正文各改了几个文件、提交了几个版本，由系统从文件差异算出来，不靠 Agent 自报。
 
-写得好不好，还要你和独立审稿来看。
+在一次创作试验中，Claude 扮演作者，通过十四轮对话引导 Agent 从零写成《典忆》三卷 36 章，作品通过 Checker。文学质量仍待作者评阅。[创作试验记录](docs/validation/2026-10-21-original-novel/README.md)
 
 ## 作品就是一个文件夹
 
@@ -112,7 +114,7 @@ my-book/
 ### 桌面工作台
 
 ```sh
-npm install
+npm ci
 npm run dev:desktop
 ```
 
@@ -122,12 +124,14 @@ npm run dev:desktop
 cp -R examples/sanguo ~/Documents/sanguo
 ```
 
-阅读与编辑不需要模型；要和 Agent 对话，在导航轨底部的「设置」里配置：「提供商」里填 API key 或登录，「模型配置」里给各个角色选模型。目前是开发构建，安装包、签名与自动升级还没做。
+阅读与编辑不需要模型。要和 Agent 对话，在导航轨底部打开「设置」，在「提供商」里填 API key 或登录，再到「模型配置」里选模型。
+
+在 macOS 上也可以运行 `npm run package:mac`，在 `dist/macos/` 生成本机架构的 `Suiming.app` 和 zip。未签名预览包已在 arm64 本机验证首次启动、替换安装与回退。正式签名、公证与自动更新仍待完成。[macOS 预览安装说明](docs/macos-preview.md)
 
 ### 命令行 `suim`
 
 ```sh
-npm install
+npm ci
 npm run build
 npm link -w @suiming/cli
 suim --version
