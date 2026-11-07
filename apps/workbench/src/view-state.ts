@@ -205,6 +205,10 @@ export function patchView(state: WorkbenchState, partial: Partial<ViewState>): W
 								location: {
 									...tab.location,
 									...(partial.beatView ? { resolveContent: false } : {}),
+									// 设计和正文是两个文件，不能把一个文件的阅读选区恢复到另一个文件。
+									...(partial.beatView && partial.beatView !== tab.location.beatView
+										? { selectedText: "", proseSelection: null, selPara: -1 }
+										: {}),
 									...pagePatch,
 								},
 							}

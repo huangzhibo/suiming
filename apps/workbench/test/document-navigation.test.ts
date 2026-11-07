@@ -36,6 +36,18 @@ const book = new Book({
 } as unknown as WorkspaceData);
 const initial = () => ({ ...DEFAULT_VIEW, tabs: [createTab(pageState(design))] });
 
+test("正文选区只属于当前文件，换到设计时不带过去", () => {
+	const state = patchView(initial(), {
+		beatView: "text",
+		selectedText: "正文选区",
+		proseSelection: { scope: 0, anchor: 0, focus: 4 },
+		selPara: 0,
+	});
+	assert.equal(activeView(patchView(state, { beatView: "text" })).selectedText, "正文选区");
+	const { selectedText, proseSelection, selPara } = activeView(patchView(state, { beatView: "design" }));
+	assert.deepEqual({ selectedText, proseSelection, selPara }, { selectedText: "", proseSelection: null, selPara: -1 });
+});
+
 test("文件树与对象共用页面，设计 / 正文定位准确；普通文件、材料与差异不误归属", () => {
 	let state = patchView(initial(), { beatView: "text" });
 	state = openDocument(state, book, filePage(design));

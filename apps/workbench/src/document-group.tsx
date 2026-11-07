@@ -1,5 +1,5 @@
-import { CircleAlert, Save, X } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { CircleAlert, MessageSquarePlus, Save, X } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { StoryAxis } from "./axis/StoryAxis.js";
@@ -14,8 +14,8 @@ import { Markdown } from "./markdown.js";
 import { CANDIDATE_VERSION, pageTarget, stripFrontmatter } from "./model.js";
 import { NavigationSurface } from "./navigation-surface.js";
 import { ArtifactPage, IssuePage, VersionPage } from "./pages.js";
-import { captureReadingSelection, restoreReadingSelection } from "./reading-selection.js";
-import { SelectionBar } from "./selection-bar.js";
+import { captureReadingSelection, readingBlock, restoreReadingSelection } from "./reading-selection.js";
+import { type ReadingEditAnchor, SelectionBar } from "./selection-bar.js";
 import { TabStrip } from "./tab-strip.js";
 import { Hint, ToolButton } from "./ui-bits.js";
 import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
@@ -28,6 +28,7 @@ import {
 	type PageState,
 	pageState,
 	patchView,
+	type ReadingSelection,
 	resolveComparisonLayout,
 	resolveOpening,
 } from "./view-state.js";
@@ -168,6 +169,20 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 
 	const restoredFor = useRef("");
 	const restoreKey = `${tab?.id}:${page}:${view.beatView}:${view.edit}`;
+	const restoredReading = useRef<ReadingSelection | null>(null);
+	const draggingSelection = useRef(false);
+	const [readingTarget, setReadingTarget] = useState<
+		(ReadingEditAnchor & { key: string; content: string; text: string }) | null
+	>(null);
+	const [hoveredBlock, setHoveredBlock] = useState<HTMLElement | null>(null);
+	const readingEnabled = view.edit === "read" && editable && (kind === "artifact" || kind === "file");
+	const reading =
+		readingEnabled &&
+		readingTarget?.key.startsWith(`${restoreKey}\n`) &&
+		readingTarget.content === buffer &&
+		readingTarget.scope.isConnected
+			? readingTarget
+			: undefined;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: live / layoutLive 是 useWorkspaceGroup 给的 ref，读的是事件发生那一刻的值，不该让 effect 随它重跑
 	useEffect(() => {
 		if (!mainRef.current || restoredFor.current === restoreKey) return;
@@ -186,36 +201,87 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				}
 			}
 			const selection = live.current.tabs[live.current.active]?.location.proseSelection;
-			if (bodyRef.current && selection) restoreReadingSelection(bodyRef.current, selection);
+			if (bodyRef.current && selection) {
+				restoredReading.current = selection;
+				restoreReadingSelection(bodyRef.current, selection);
+			}
 			restoredFor.current = restoreKey;
 		});
 		return () => cancelAnimationFrame(frame);
 	}, [restoreKey, kind, primary.isLoading, isBeat, secondary.isLoading, directory.isLoading, view.scrolls]);
-	// 正文选择：原生选择落在段落内即形成带段号的引用。
+	const selectReadingText = useCallback(
+		(selection: Selection, focusInput = false) => {
+			const body = bodyRef.current;
+			if (!readingEnabled || !body || selection.isCollapsed || !selection.rangeCount) return;
+			const offsets = captureReadingSelection(body, selection);
+			const scope = offsets && body.querySelectorAll<HTMLElement>("[data-prose]")[offsets.scope];
+			if (!offsets || !scope) return;
+			const restored = restoredReading.current;
+			restoredReading.current = null;
+			if (
+				!focusInput &&
+				restored?.scope === offsets.scope &&
+				restored.anchor === offsets.anchor &&
+				restored.focus === offsets.focus
+			)
+				return;
+			const text = selection.toString();
+			const selectedText = text.slice(0, 12000);
+			if (!selectedText.trim()) return;
+			const range = selection.getRangeAt(0).cloneRange();
+			const parent = (node: Node) => (node instanceof Element ? node : node.parentElement);
+			const paragraph = parent(range.startContainer)?.closest("p[data-index]");
+			const selPara =
+				paragraph && paragraph === parent(range.endContainer)?.closest("p[data-index]")
+					? Number(paragraph.getAttribute("data-index"))
+					: -1;
+			patch({ selectedText, proseSelection: offsets, selPara, reveal: null });
+			const key = `${restoreKey}\n${offsets.scope}:${offsets.anchor}:${offsets.focus}`;
+			setReadingTarget((current) =>
+				!focusInput && current?.key === key && current.scope === scope && current.content === buffer
+					? current
+					: {
+							key,
+							content: buffer,
+							text: focusInput ? text : selectedText,
+							range,
+							scope,
+							boundary: body,
+							focusInput,
+						},
+			);
+		},
+		[readingEnabled, patch, restoreKey, buffer],
+	);
 	useEffect(() => {
 		const onSelect = () => {
-			if (view.edit === "edit") return;
+			if (!readingEnabled || draggingSelection.current) return;
 			const selection = window.getSelection();
-			const node = selection?.anchorNode;
-			const element = node instanceof Element ? node : node?.parentElement;
-			const prose = element?.closest("[data-prose]");
-			if (!selection || !prose || !bodyRef.current?.contains(prose) || selection.isCollapsed) {
-				if (selection?.isCollapsed && prose && bodyRef.current?.contains(prose)) {
-					setSelectedText("");
-					setSelPara(-1);
-				}
-				return;
+			if (!selection) return;
+			if (!selection.isCollapsed) selectReadingText(selection);
+			else if (
+				selection.anchorNode &&
+				bodyRef.current?.contains(selection.anchorNode) &&
+				!document.activeElement?.closest("[data-reading-edit]")
+			) {
+				setReadingTarget(null);
+				patch({ selectedText: "", proseSelection: null, selPara: -1 });
 			}
-			patch({
-				selectedText: selection.toString().slice(0, 12000),
-				proseSelection: captureReadingSelection(bodyRef.current, selection),
-				reveal: null,
-			});
-			setSelPara(Number(element?.closest("p[data-index]")?.getAttribute("data-index") ?? -1));
+		};
+		const endDrag = () => {
+			if (!draggingSelection.current) return;
+			draggingSelection.current = false;
+			onSelect();
 		};
 		document.addEventListener("selectionchange", onSelect);
-		return () => document.removeEventListener("selectionchange", onSelect);
-	}, [view.edit, setSelectedText, setSelPara, patch]);
+		document.addEventListener("pointerup", endDrag);
+		document.addEventListener("pointercancel", endDrag);
+		return () => {
+			document.removeEventListener("selectionchange", onSelect);
+			document.removeEventListener("pointerup", endDrag);
+			document.removeEventListener("pointercancel", endDrag);
+		};
+	}, [readingEnabled, selectReadingText, patch]);
 
 	const go = (direction: "back" | "forward") =>
 		setView((v) =>
@@ -296,6 +362,10 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 	// 外壳只在作品读到之后才画出各窗格，这里只是让类型收窄。
 	if (!shown || !book) return null;
 	const data = shown;
+	const viewport = bodyRef.current;
+	const block = readingEnabled && !reading && viewport?.contains(hoveredBlock) ? hoveredBlock : null;
+	const blockBox = block?.getBoundingClientRect();
+	const viewportBox = blockBox && viewport?.getBoundingClientRect();
 	const reviewFile = kind === "artifact" && file?.kind === "review" && !file.dirty && !changed;
 	const loadingReview = reviewFile && reviewsLoading;
 	const report = reviews.find((item) =>
@@ -571,7 +641,49 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 					ref={bodyRef}
 					data-scroll-key={`body:${view.beatView}`}
 					key={restoreKey}
+					onPointerDown={(event) => {
+						if (
+							readingEnabled &&
+							event.button === 0 &&
+							event.target instanceof Element &&
+							event.target.closest("[data-prose]")
+						) {
+							draggingSelection.current = true;
+							setHoveredBlock(null);
+						}
+					}}
+					onPointerMove={(event) => {
+						if (!readingEnabled || event.buttons || !(event.target instanceof Element)) return;
+						if (event.target.closest("[data-block-edit]")) return;
+						setHoveredBlock(readingBlock(event.currentTarget, event.target));
+					}}
+					onPointerLeave={() => setHoveredBlock(null)}
 				>
+					{block && blockBox && viewport && viewportBox && (
+						<Hint content="请 Agent 修改">
+							<Button
+								data-block-edit
+								aria-label="请 Agent 修改"
+								variant="tool"
+								size="icon-xs"
+								className="absolute z-[1] size-5"
+								style={{
+									top: Math.max(0, blockBox.top - viewportBox.top) + viewport.scrollTop,
+									left:
+										Math.min(blockBox.right - viewportBox.left, viewport.clientWidth - 20) +
+										viewport.scrollLeft,
+								}}
+								onClick={() => {
+									const selection = window.getSelection();
+									if (!selection) return;
+									selection.selectAllChildren(block);
+									selectReadingText(selection, true);
+								}}
+							>
+								<MessageSquarePlus aria-hidden="true" />
+							</Button>
+						</Hint>
+					)}
 					{kind === "empty" && (
 						<EmptyPage
 							autoFocus={groupId === layout.activeGroup}
@@ -605,6 +717,7 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 										<div className="document-page" data-measure="document">
 											<Markdown
 												className="design-body"
+												data-prose
 												content={stripFrontmatter(contentFor(rawPath, rawFile.content))}
 											/>
 										</div>
@@ -786,14 +899,24 @@ export function DocumentGroup({ groupId, first, last }: { groupId: string; first
 				</div>
 			)}
 			<SelectionBar
-				visible={kind === "artifact" && !view.reveal}
-				selectedText={selectedText}
+				key={`selection:${reading?.key ?? restoreKey}`}
+				visible={
+					groupId === layout.activeGroup &&
+					!view.reveal &&
+					(!!reading || (kind === "artifact" && view.edit === "edit"))
+				}
+				reading={reading}
+				dismissReading={() => setReadingTarget(null)}
+				selectedText={reading?.text ?? selectedText}
 				selPara={selPara}
 				source={`${book.title(file)} · ${book.headLabel}`}
 				path={editPath}
 				revisionId={data.revisionId}
 				contentSHA={saved.sha256}
-				setSelectedText={setSelectedText}
+				setSelectedText={(text) => {
+					if (!text) setReadingTarget(null);
+					setSelectedText(text);
+				}}
 				setSelPara={setSelPara}
 				composer={composer}
 				draftKey={draftKey}

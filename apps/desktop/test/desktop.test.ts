@@ -865,6 +865,7 @@ test("导航与文件：侧栏独立、共享草稿、固定与新开、关闭�
 			),
 			4,
 		);
+		assert.equal(await page.locator("[data-reading-edit]").count(), 0, "恢复选区只高亮，不打开就地输入框");
 		assert.equal(await body.evaluate((element) => element.scrollTop), 420);
 		await page.locator(".tab-btn").last().locator("button").first().click();
 		await page.getByRole("button", { name: "关闭标签", exact: true }).click();

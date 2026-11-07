@@ -15,6 +15,8 @@
 
 ## 最近有效验收
 
+2026-11-07 阅读态就地修改。拖选文字后在选区旁显示输入框，悬停 Markdown 段落或标题可把整块带入同一个输入框。两个入口使用当前对话和原发送路径，已有草稿时追加要求及引用。Electron 验收覆盖实际拖选、窄窗翻转、分屏内定位、整段与标题引用、中文输入法、草稿保护和 Agent 自动定位。完整桌面回归 88 / 88。随后补齐设计和正文切换时的选区文件边界，最终构建定向复跑 5 / 5，全仓检查及单测 530 / 530 通过，均无跳过。[作者工作台设计](workbench-design.md#42-对话与作品联动)
+
 2026-11-07 升级 AG-UI 四包到 1.0.4，移除 client、proto 的两条 Zod override。Node 24.19.0 / npm 11.17.0 下干净安装、完整检查和生产构建通过。SDK 与四个 AG-UI 包解析到同一份 Zod 4.6.7。core 的 schema ESM 产物及类型声明与 1.0.3 逐字节相同。客户端回归覆盖校验预算边界、超限报错、完整日志与快照加增量的文本和顺序一致性，以及半截回复和子任务续接。动作继续按持久序号展示。全仓单测 529 / 529，真实 Electron E2E 88 / 88，均无跳过。[ADR-0041](adr/0041-zod-agui-dependency-alignment.md)
 
 长对话单独对比使用同机、同一份 240 条消息与 1,320 个动作的 fixture，其中 12 条为长回复。重载耗时包含 IPC、attach 回放与回复可见，峰值内存取 Electron renderer 的峰值工作集。三种布局均通过停止、断线补读、重载和逐字对账。1.0.4 单独复跑的输入到下一帧最大 16.2ms，停止回 idle 最大 297ms，低于现有的 500ms 和 3s 验收上限。
@@ -92,7 +94,7 @@
 | 长对话流式响应 | 合成 240 条历史消息 / 1320 动作；侧栏、主工作面及窄窗的输入、动作展开、停止、断线补读、重载与导出通过；当前回复覆盖约 1.4 万字符 | [流式验收](validation/2026-10-16-streaming-responsiveness/README.md)；本机输入到下一帧 P95 9.8–11.5ms，受控提供商，不代表真实长篇或数小时运行 |
 | 长正文编辑与比较 | 10 万 / 100 万字符全文编辑、撤销、跨页返回、逐块还原、单栏 / 双栏、重载与保存；修复撤销丢失和长文差异粗化 | [长正文验收](validation/2026-10-14-long-editor/README.md)；合成负载，百万字符首开阅读约 2.2 秒，输入仍有超过 100ms 的样本 |
 | 可视化与交互 | 人物保留直接可读经历、全书分布和卷导航；情节 / 地点 / 资源保留关系图；期待按宽度与节点数量换向，预览渐进披露 | [人物分布](validation/2026-10-13-character-distribution/README.md)、[页面去重](validation/2026-10-13-page-polish/README.md)、[期待预览](validation/2026-10-13-contract-preview/README.md)、[提示定位](validation/2026-10-12-tooltip-placement/README.md)；各页按用途呈现，没有统一套成一种布局 |
-| 自动检查 | 最近全仓检查通过；全仓 529 / 529、0 skip（2026-11-07），工作台单测包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 本次升级验收见上方「最近有效验收」；此前组合验收见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)，Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
+| 自动检查 | 最近全仓检查通过；全仓 530 / 530、0 skip（2026-11-07），工作台单测包含在其中；缺失文件保存与恢复的 CAS 验收继续通过 | 本次文档交互验收见上方「最近有效验收」；此前组合验收见[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)，Cloud 测试删除及数据保全的计数边界见[删除记录](validation/2026-10-15-remove-cloud/README.md) |
 | macOS 预览安装 | 本机 arm64 生产包首次启动、新建、同格式构建替换与完整回退 smoke 通过 | [安装验收](validation/2026-10-15-macos-install/README.md)；真实长任务副本回读保全；已补 ad-hoc 签名演练与安装保全；正式 Developer ID / 公证及后续下载首装按作者要求暂缓；其他机器和跨格式升级仍未验，见[签名验收](validation/2026-10-15-macos-signing/README.md) |
 | 桌面与窗口 | 2026-11-07 AG-UI 1.0.4 完整复跑 88 / 88、0 skip，长对话对比见上方「最近有效验收」。此前完整桌面 88 / 88 通过、0 skip（2026-10-18，作品入口提示补上目录之后；含此前因宿主锁屏未验的原生全屏）；2026-10-19 查明「导航与文件」的偶发失败是测试读了 CodeMirror 没渲染的行，修后单项连跑 10 / 10、完整桌面 88 / 88，含长对话流式输入 / 停止 / 重连、多文件草稿重开与跨作品切换、文档外壳、外部文件恢复、键盘连续操作、macOS 原生全屏、隔离认证恢复与启动失败 | [界面能力验收](validation/2026-10-17-agent-workbench/README.md)为最近一次完整复跑；本轮[连续创作验收](validation/2026-10-17-continuous-workbench/README.md)定向复跑 18 项，新增自动定位与作者选段区分用例；覆盖上下文、定位、差异、停止与重载的迟到保护；[按需编辑同步验收](validation/2026-10-17-agent-editor-sync/README.md)的自动同步范围、Agent 冲突合并与删除恢复、重载和关窗重接继续通过；此前[并发编辑验收](validation/2026-10-17-concurrent-editing/README.md)的双向保护继续保留；[流式响应验收](validation/2026-10-16-streaming-responsiveness/README.md)保留压力测量边界；[键盘验收](validation/2026-10-15-keyboard-flow/README.md)及此前[作品入口](validation/2026-10-15-project-entry/README.md)、[安装](validation/2026-10-15-macos-install/README.md)与[执行恢复](validation/2026-10-15-harness-alignment/README.md)保留各自证据边界 |
 

@@ -103,7 +103,7 @@ function Body({ content, title }: { content: string; title: string }) {
 	const firstHeading = /^# +([^\n]+)(?:\n|$)/u.exec(body);
 	if (firstHeading?.[1]?.trim() === title) body = body.slice(firstHeading[0].length).trim();
 	if (!body) return <p className="design-body text-muted-foreground">这个文件还没有正文。</p>;
-	return <Markdown className="design-body" content={body} />;
+	return <Markdown className="design-body" data-prose content={body} />;
 }
 
 /** 正文：宋体连续阅读；段落带 data-index，选择由 selectionchange 判定所在段。 */

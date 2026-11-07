@@ -1,4 +1,12 @@
 import type { ReadingSelection } from "./view-state.js";
+
+/** 只选源文档渲染出的段落和标题。页面属性与图表不属于文档块。 */
+export function readingBlock(body: HTMLElement, target: EventTarget | null): HTMLElement | null {
+	const block = target instanceof Element ? target.closest<HTMLElement>("p,h1,h2,h3,h4,h5,h6") : null;
+	const prose = block?.closest("[data-prose]");
+	return prose && body.contains(prose) ? block : null;
+}
+
 /** 使用正文内文字偏移，跨 Markdown 的强调等节点保存选区。 */
 export function captureReadingSelection(body: HTMLElement, selection: Selection): ReadingSelection | null {
 	const anchor = selection.anchorNode;
