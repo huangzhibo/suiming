@@ -71,11 +71,32 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 		const narrowBody = await body.boundingBox();
 		assert.ok(narrowPopup && narrowBody && narrowPopup.x >= narrowBody.x);
 		assert.ok(narrowPopup.x + narrowPopup.width <= narrowBody.x + narrowBody.width);
+		assert.ok(narrowPopup.height <= 42, "窄窗仍只显示一行输入框");
+		await request.click();
 		await request.fill("门前先停一下再推门");
+		assert.deepEqual(
+			await request.evaluate((input) => {
+				const document = input.ownerDocument;
+				// 即便原生选区被输入框夺走，仍可看到即将发送的文档文字。
+				document.getSelection()?.removeAllRanges();
+				const highlight = document.defaultView?.CSS.highlights.get("reading-edit");
+				return {
+					focused: document.activeElement === input,
+					highlighted: [...(highlight ?? [])].map((range) => range.toString()),
+				};
+			}),
+			{ focused: true, highlighted: ["军杖落到第三十下。"] },
+		);
 		// 中文输入法确认候选字的回车不发送
 		await request.dispatchEvent("keydown", { key: "Enter", code: "Enter", isComposing: true, keyCode: 229 });
 		assert.equal((await page.evaluate(() => window.suiming?.invoke("session.list", {})))?.sessions.length, 0);
 		await request.press("Enter");
+		await popup.waitFor({ state: "hidden" });
+		assert.equal(
+			await body.evaluate((element) => element.ownerDocument.defaultView?.CSS.highlights.has("reading-edit")),
+			false,
+			"发送后清除高亮",
+		);
 		await page.locator(".run-status").getByText("等你继续", { exact: true }).waitFor();
 		const sessions = (await page.evaluate(() => window.suiming?.invoke("session.list", {})))?.sessions ?? [];
 		assert.equal(sessions.length, 1);
@@ -101,9 +122,17 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 		await paragraph.hover();
 		await body.getByRole("button", { name: "请 Agent 修改", exact: true }).click();
 		await request.waitFor();
-		assert.equal(await request.evaluate((input) => input.ownerDocument.activeElement === input), true);
+		assert.equal(
+			await request.evaluate((input) => {
+				const document = input.ownerDocument;
+				const highlight = document.defaultView?.CSS.highlights.get("reading-edit");
+				return document.activeElement === input ? [...(highlight ?? [])][0]?.toString() : null;
+			}),
+			paragraphText,
+			"整段入口自动聚焦后继续高亮整段",
+		);
 		await request.fill("这里改得更紧");
-		await request.press("Enter");
+		await popup.getByRole("button", { name: "发送修改要求", exact: true }).click();
 		assert.match(await composer.inputValue(), /^另外想问问后面的节奏\n请修改这一段：这里改得更紧$/);
 		const references = page.getByRole("button", { name: "查看引用内容", exact: true });
 		await references.first().click();
@@ -122,6 +151,12 @@ test("正文选段就地修改：选段栏写要求、回车直接发给 Agent�
 		const heading = page.getByRole("heading", { name: "军帐中的转折", exact: true });
 		await page.getByRole("radio", { name: "设计", exact: true }).click();
 		await heading.waitFor();
+		await popup.waitFor({ state: "hidden" });
+		assert.equal(
+			await heading.evaluate((element) => element.ownerDocument.defaultView?.CSS.highlights.has("reading-edit")),
+			false,
+			"切换文件后清除高亮",
+		);
 		assert.equal(
 			await heading.evaluate(
 				(element) =>

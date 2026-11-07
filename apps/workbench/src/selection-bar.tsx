@@ -1,7 +1,8 @@
-import { X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { ArrowUp, MessageSquarePlus, X } from "lucide-react";
+import { type ComponentProps, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTitle } from "@/components/ui/popover";
 import {
 	type ComposerAttachment,
@@ -91,6 +92,15 @@ export function SelectionBar({
 	});
 	const [editRequest, setEditRequest] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
+	const highlightedRange = visible ? reading?.range : undefined;
+	useLayoutEffect(() => {
+		if (!highlightedRange) return;
+		// 文档选区的原生高亮会随输入框聚焦消失，浮层打开期间按原范围绘制。
+		CSS.highlights.set("reading-edit", new Highlight(highlightedRange));
+		return () => {
+			CSS.highlights.delete("reading-edit");
+		};
+	}, [highlightedRange]);
 	const anchor = useMemo(
 		() =>
 			reading && {
@@ -131,40 +141,18 @@ export function SelectionBar({
 		clearSelection();
 	};
 	if (!visible || !selectedText) return null;
-	const controls = (
-		<>
-			<span className="truncate text-xs text-muted-foreground" title={source}>
-				已选择 {codePoints(selectedText)} 字{selPara >= 0 ? ` · 第 ${selPara + 1} 段` : ""} · {source}
-			</span>
-			<Input
-				ref={inputRef}
-				aria-label="说明要怎么改"
-				placeholder="说明要怎么改，回车发送"
-				value={editRequest}
-				onChange={(event) => setEditRequest(event.target.value)}
-				onKeyDown={(event) => {
-					// 中文输入法确认候选字的回车不算发送
-					if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return;
-					event.preventDefault();
-					requestEdit();
-				}}
-				className="h-8 min-w-0 flex-1"
-			/>
-			<div className="flex shrink-0 items-center gap-1">
-				<Button size="xs" disabled={!editRequest.trim() || inlineEdit.busy} onClick={requestEdit}>
-					修改
-				</Button>
-				<Button size="xs" variant="secondary" onClick={() => referenceSelection()}>
-					询问 Agent
-				</Button>
-				<Hint content={"取消选择"}>
-					<Button type="button" variant="ghost" size="icon-xs" aria-label="取消选择" onClick={clearSelection}>
-						<X className="size-[12px]" />
-					</Button>
-				</Hint>
-			</div>
-		</>
-	);
+	const sendDisabled = !editRequest.trim() || inlineEdit.busy;
+	const requestInput = {
+		"aria-label": "说明要怎么改",
+		value: editRequest,
+		onChange: (event) => setEditRequest(event.target.value),
+		onKeyDown: (event) => {
+			// 中文输入法确认候选字的回车不算发送
+			if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return;
+			event.preventDefault();
+			requestEdit();
+		},
+	} satisfies ComponentProps<"input">;
 	if (reading && anchor)
 		return (
 			<Popover
@@ -185,15 +173,53 @@ export function SelectionBar({
 					sideOffset={6}
 					initialFocus={reading.focusInput ? inputRef : false}
 					finalFocus={false}
-					className="w-[min(26rem,var(--available-width))] gap-1.5 p-2"
+					className="w-[min(21rem,var(--available-width))] rounded-xl p-0 shadow-lg ring-0"
 				>
 					<PopoverTitle className="sr-only">请 Agent 修改</PopoverTitle>
-					<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 [&>span]:col-span-2">
-						{controls}
-					</div>
+					<InputGroup className="h-10 rounded-xl has-[[data-slot=input-group-control]:focus-visible]:ring-1 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/30">
+						<InputGroupInput ref={inputRef} placeholder="说明要怎么改…" {...requestInput} />
+						<InputGroupAddon>
+							<Hint content="询问 Agent">
+								<InputGroupButton size="icon-xs" aria-label="询问 Agent" onClick={() => referenceSelection()}>
+									<MessageSquarePlus aria-hidden="true" />
+								</InputGroupButton>
+							</Hint>
+						</InputGroupAddon>
+						<InputGroupAddon align="inline-end">
+							<InputGroupButton
+								size="icon-xs"
+								aria-label="发送修改要求"
+								disabled={sendDisabled}
+								onClick={requestEdit}
+							>
+								<ArrowUp aria-hidden="true" />
+							</InputGroupButton>
+						</InputGroupAddon>
+					</InputGroup>
 				</PopoverContent>
 			</Popover>
 		);
+	const controls = (
+		<>
+			<span className="truncate text-xs text-muted-foreground" title={source}>
+				已选择 {codePoints(selectedText)} 字{selPara >= 0 ? ` · 第 ${selPara + 1} 段` : ""} · {source}
+			</span>
+			<Input placeholder="说明要怎么改，回车发送" className="h-8 min-w-0 flex-1" {...requestInput} />
+			<div className="flex shrink-0 items-center gap-1">
+				<Button size="xs" disabled={sendDisabled} onClick={requestEdit}>
+					修改
+				</Button>
+				<Button size="xs" variant="secondary" onClick={() => referenceSelection()}>
+					询问 Agent
+				</Button>
+				<Hint content={"取消选择"}>
+					<Button type="button" variant="ghost" size="icon-xs" aria-label="取消选择" onClick={clearSelection}>
+						<X className="size-[12px]" />
+					</Button>
+				</Hint>
+			</div>
+		</>
+	);
 	return (
 		<div className="pointer-events-none absolute inset-x-0 bottom-14 z-[5] flex justify-center px-3">
 			<div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border bg-popover p-2 text-popover-foreground shadow-md [&>input]:w-56 [&>input]:flex-none">

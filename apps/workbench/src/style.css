@@ -133,6 +133,9 @@
 	body {
 		@apply m-0 overflow-hidden bg-chrome font-sans text-[13px] text-foreground;
 	}
+	::highlight(reading-edit) {
+		background-color: var(--primary-selection);
+	}
 	::-webkit-scrollbar {
 		width: 8px;
 		height: 8px;
