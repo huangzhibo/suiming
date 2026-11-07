@@ -26,8 +26,7 @@ export class DesktopAgent extends AbstractAgent {
 			void (async () => {
 				try {
 					for await (const event of this.#events(controller.signal)) {
-						// 动作快照不交给官方客户端：它每应用一个事件就把整份消息列表深拷贝一遍，动作也算消息，
-						// 两千多个动作的对话 attach 时主线程卡住四秒（2026-10-06）。对话视图直接从事件流读动作。
+						// 对话视图按持久序号展示动作。官方客户端只拼消息，减少长对话重放时的工作量。
 						if (event.type === EventType.ACTIVITY_SNAPSHOT || event.type === EventType.ACTIVITY_DELTA) continue;
 						subscriber.next(event);
 					}

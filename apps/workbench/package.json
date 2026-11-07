@@ -10,7 +10,7 @@
   "lint": "eslint ."
  },
  "dependencies": {
-  "@ag-ui/client": "1.0.3",
+		"@ag-ui/client": "1.0.4",
   "@base-ui/react": "1.8.0",
   "@codemirror/commands": "6.11.1",
   "@codemirror/lang-markdown": "6.5.2",

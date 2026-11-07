@@ -99,7 +99,7 @@ Cloud Web 复用桌面已完成的 React 工作台与同一事件契约，不再
 
 Electron 45 与独立的 Undici、fast-uri 安全更新按 [ADR-0040](adr/0040-electron-security-upgrade-validation.md) 验收；实际完成证据见[当前状态](current-status.md)。Zod 与 AG-UI、shadcn 的依赖对齐见 [ADR-0041](adr/0041-zod-agui-dependency-alignment.md)。后续每次升级 AG-UI 时核对 client、proto 的 Zod 依赖声明；上游允许安全的 Zod 4 后，删除对应定向 override，并重跑干净安装、schema 转换、消息回放与桌面验收。其余传递依赖告警按实际使用路径分别评估，不通过批量强制升级或跳过检查清空数字。签名、公证与独立机器首装仍按下方发行队列处理。
 
-AG-UI 1.0.4 的发布包已允许 Zod 4.6.7，两条 override 的上游解除条件已满足，升级尚未实施。下一步统一升级至 1.0.4 并删除覆盖，保留 Zod 4.6.7；除上述验收外，重点验证客户端单事件校验预算、完整回放与快照加增量的一致性、消息和动作顺序，以及长对话性能。继续复用现有 schema、事件存储和展示边界，不预先禁用预算或恢复 activity 进入官方消息列表。
+AG-UI 1.0.4 升级与两条 Zod override 的删除已完成。客户端校验预算、完整回放与快照加增量、消息和动作顺序、长对话以及安装包替换回退均已验收。[当前状态](current-status.md)
 
 本节是下一步任务的唯一队列。当前能力与缺陷见[当前状态](current-status.md)，已完成过程见[变更记录](changelog.md)。
 

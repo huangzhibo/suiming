@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { type AGUIEvent, EventType } from "@suiming/sdk";
+import { productEventSnapshot } from "@suiming/runtime";
+import { type AGUIEvent, EventType, type SessionEvent } from "@suiming/sdk";
 import { conversationMessages, DesktopAgent } from "../src/desktop-agent.js";
 
 const run = (runId: string): AGUIEvent => ({ type: EventType.RUN_STARTED, threadId: "s", runId });
@@ -19,16 +20,10 @@ const text = (messageId: string, role: "user" | "assistant", delta: string, suba
 	];
 };
 
-/** 按 Runtime 的 attach 实际给出的形状：先是包在最近一次运行里的快照，再是之后的增量（productEventSnapshot）。 */
-const attached: AGUIEvent[] = [
+const history: AGUIEvent[] = [
 	run("t1"),
-	{
-		type: EventType.MESSAGES_SNAPSHOT,
-		messages: [
-			{ id: "m1", role: "user", content: "第一句", metadata: { suiming: { sequence: 2 } } },
-			{ id: "m2", role: "assistant", content: "第一轮回答", metadata: { suiming: { sequence: 4 } } },
-		],
-	},
+	...text("m1", "user", "第一句"),
+	...text("m2", "assistant", "第一轮回答"),
 	{
 		type: EventType.ACTIVITY_SNAPSHOT,
 		messageId: "a1",
@@ -41,7 +36,6 @@ const attached: AGUIEvent[] = [
 	...text("m3", "user", "第二句"),
 	{ type: EventType.SUBAGENT_STARTED, subagentRunId: "task-1", name: "writer" },
 	...text("w1", "assistant", "子任务的话", "task-1"),
-	{ type: EventType.SUBAGENT_FINISHED, subagentRunId: "task-1", outcome: { type: "success" } },
 	// 2026-10-05 之前落盘的子任务消息没有 subagentRunId，靠 metadata.suiming.taskKind 认
 	{
 		type: EventType.TEXT_MESSAGE_START,
@@ -58,44 +52,88 @@ const attached: AGUIEvent[] = [
 		metadata: { suiming: { sessionId: "s" } },
 	},
 	{ type: EventType.TEXT_MESSAGE_CONTENT, messageId: "m4", delta: "流到" },
-	{ type: EventType.TEXT_MESSAGE_CONTENT, messageId: "m4", delta: "一半" },
 ];
 
 async function* stream(events: readonly AGUIEvent[]) {
 	for (const event of events) yield event;
 }
 
-test("对话交给 AG-UI 官方客户端拼：attach 快照加之后的增量，消息按 id 拼好，正在生成跟着运行的开始与结束", async () => {
-	// 2026-10-05 之前用 TanStack AI 的 useChat：它内嵌另一份 @ag-ui/core（0.1.1-canary），bridge 靠一次类型强转把两边接起来，
-	// send 抛错、isLoading 恒为 false，只用到拼消息。
-	const agent = new DesktopAgent("s", () => stream(attached));
-	const generating: boolean[] = [];
-	agent.subscribe({
-		onRunStartedEvent: () => {
-			generating.push(true);
-		},
-		onRunFinishedEvent: () => {
-			generating.push(false);
-		},
-	});
-	await agent.connectAgent();
-	assert.deepEqual(generating, [true, false, true], "第二次运行还没结束");
+test("完整回放与 Runtime 快照加增量保留消息、顺序与序号，续接半截输出和子任务", async () => {
+	const durable = history.map(
+		(event, i): SessionEvent => ({ sessionId: "s", id: `e${i}`, sequence: i + 1, at: "2026-11-07", event }),
+	);
+	const original = structuredClone(durable);
+	const delta: AGUIEvent[] = [
+		{ type: EventType.SUBAGENT_FINISHED, subagentRunId: "task-1", outcome: { type: "success" } },
+		{ type: EventType.TEXT_MESSAGE_CONTENT, messageId: "m4", delta: "一半" },
+		{ type: EventType.TEXT_MESSAGE_END, messageId: "m4" },
+		finished("t2"),
+	];
+	const order = new Map(
+		durable.flatMap(({ event, sequence }) =>
+			event.type === EventType.TEXT_MESSAGE_START ? [[event.messageId, sequence] as const] : [],
+		),
+	);
+	async function replay(events: AGUIEvent[], lifecycle: boolean[]) {
+		const agent = new DesktopAgent("s", () => stream(events));
+		const generating: boolean[] = [];
+		agent.subscribe({
+			onRunStartedEvent: () => {
+				generating.push(true);
+			},
+			onRunFinishedEvent: () => {
+				generating.push(false);
+			},
+		});
+		await agent.connectAgent();
+		assert.equal(agent.threadId, "s");
+		assert.deepEqual(generating, lifecycle);
+		return conversationMessages(agent.messages);
+	}
+	const full = await replay([...durable.map(({ event }) => event), ...delta], [true, false, true, false]);
+	const restored = await replay([...productEventSnapshot(durable), ...delta], [true, false]);
 	assert.deepEqual(
-		conversationMessages(agent.messages).map((message) => [message.id, message.role, message.text]),
+		full.map(({ id, role, text }) => [id, role, text]),
 		[
 			["m1", "user", "第一句"],
 			["m2", "assistant", "第一轮回答"],
 			["m3", "user", "第二句"],
 			["m4", "assistant", "流到一半"],
 		],
-		"动作快照与子任务的话不进对话；流到一半的那条照样拼出来",
 	);
-	assert.equal(conversationMessages(agent.messages)[0]?.sequence, 2, "快照里的持久序号随消息带着");
+	// 完整日志的序号由 bridge 从 TEXT_MESSAGE_START 记录，快照则随消息携带。
+	assert.deepEqual(
+		restored,
+		full.map((message) => ({ ...message, sequence: order.get(message.id) })),
+	);
+	assert.deepEqual(durable, original);
 });
 
-test("动作快照不进官方客户端：它每应用一个事件就深拷贝整份消息列表，动作多了是平方级", async () => {
-	// 2026-10-06 斗破 120 章那次对话 attach 时有两千多个动作快照，客户端为每个事件 structuredClone 一遍全部消息，
-	// 主线程卡住四秒。动作由对话视图直接从事件流读（bridge 的 onEvent），官方客户端只拼对话里的话。
+test("单事件校验预算允许边界快照，超限时终止连接而不截断消息", async () => {
+	const agentFor = (length: number) => {
+		const agent = new DesktopAgent("s", () =>
+			stream([
+				run("t1"),
+				{
+					type: EventType.MESSAGES_SNAPSHOT,
+					messages: Array.from({ length }, (_, i) => ({ id: `m${i}`, role: "assistant", content: "正文" })),
+				},
+				finished("t1"),
+			]),
+		);
+		// 事件自身 2 个键，数组每个元素和消息的 3 个键各计一项。
+		agent.maxEnforcedEntries = 10;
+		return agent;
+	};
+	const accepted = agentFor(2);
+	await accepted.connectAgent();
+	assert.equal(accepted.messages.length, 2);
+	const rejected = agentFor(3);
+	await assert.rejects(rejected.connectAgent(), { name: "AGUIEnforcementLimitError" });
+	assert.deepEqual(rejected.messages, []);
+});
+
+test("动作快照由对话视图单独展示，官方客户端只拼消息", async () => {
 	const actions = Array.from(
 		{ length: 3 },
 		(_, index): AGUIEvent => ({

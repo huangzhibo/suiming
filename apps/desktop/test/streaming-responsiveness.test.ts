@@ -59,7 +59,7 @@ async function seedHistory(root: string): Promise<void> {
 					delta:
 						role === "user"
 							? `第 ${i} 次讨论：这个人物为何做出这样的选择？`
-							: `第 ${i} 次分析\n\n${"人物的选择必须付出代价，前面的铺垫也应在此时显出作用。".repeat(30)}\n\n- 保留人物动机。\n- 核对前后情节。`,
+							: `第 ${i} 次分析\n\n${"人物的选择必须付出代价，前面的铺垫也应在此时显出作用。".repeat(i % 10 === 0 ? 400 : 30)}\n\n- 保留人物动机。\n- 核对前后情节。`,
 				});
 				add({ type: EventType.TEXT_MESSAGE_END, messageId: id });
 			}
@@ -237,6 +237,10 @@ for (const layout of ["sidebar", "expanded", "narrow"] as const)
 				"停止后的流式内容与持久快照逐字一致",
 			);
 			metrics.streamedCharacters = expected.content.length;
+			metrics.rendererPeakKiB = await app.evaluate(({ app, BrowserWindow }) => {
+				const pid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId();
+				return app.getAppMetrics().find((metric) => metric.pid === pid)?.memory.peakWorkingSetSize;
+			});
 			// 停下之后按钮紧跟在最后一段正文下面，中间没有还没淡入的透明段落（2026-10-19 作者截图发现）
 			await flowing.locator(".message-actions").waitFor();
 			const gap = await flowing.evaluate((message) => {

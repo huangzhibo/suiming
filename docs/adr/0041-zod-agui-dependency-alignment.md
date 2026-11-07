@@ -22,6 +22,8 @@ AG-UI core 1.0.3 的 peer 范围已支持 Zod 4，并非整个 AG-UI 不支持�
 
 每次升级 AG-UI 时重新核对 client、proto 的发布包依赖声明和实际导入。当上游正式允许安全版本的 Zod 4 后，删除相应 override，重新生成锁文件，并通过干净安装、依赖树、schema 转换、消息回放和桌面验收。不能只改 override 的父版本来自动延续例外，也不能在上游已修复后永久保留覆盖。
 
+2026-11-07 解除覆盖。AG-UI 1.0.4 的 client、encoder、proto 声明 Zod peer 范围 `^3.25.18 || ^4.0.0`，core 发布包保留同范围的可选 peer。四包统一升到 1.0.4，根目录删除两条定向 override，SDK 的直接依赖继续提供唯一的 Zod 4.6.7。工作台沿用默认的单事件校验预算和原有动作展示路径。验收记录见[当前状态](../current-status.md)。
+
 ## 后果与边界
 
 不改变作品格式、执行数据库或消息协议；用新的完整更新替代 PR #9。Zod 告警消除与整个仓库审计清零是不同结论；剩余依赖问题仍按实际路径评估。验证证据见[当前状态](../current-status.md)，后续队列见[路线图](../roadmap.md)第 6 节。
@@ -30,6 +32,7 @@ AG-UI core 1.0.3 的 peer 范围已支持 Zod 4，并非整个 AG-UI 不支持�
 
 - [Zod 安全公告](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)
 - [AG-UI 1.0.3 发布](https://github.com/ag-ui-protocol/ag-ui/releases/tag/release%2F2026-10-16)
+- [AG-UI 1.0.4 发布](https://github.com/ag-ui-protocol/ag-ui/releases/tag/release/2026-11-05)
 - [npm overrides](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#overrides)
 - [Zod 库作者建议](https://zod.dev/library-authors)
 - [shadcn 变更记录](https://github.com/shadcn-ui/ui/blob/main/packages/shadcn/CHANGELOG.md)
