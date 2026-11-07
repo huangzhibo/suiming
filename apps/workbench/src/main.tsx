@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Workspace } from "./workspace.js";
 import "streamdown/styles.css";
 import "./style.css";
+import "./reading-highlight.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 const element = document.getElementById("root");

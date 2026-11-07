@@ -1,0 +1,6 @@
+/* 单独交给 Vite 的 CSS 优化器处理，Tailwind 内置的 Lightning CSS 1.32 不识别 ::highlight。 */
+@layer base {
+	::highlight(reading-edit) {
+		background-color: var(--primary-selection);
+	}
+}
